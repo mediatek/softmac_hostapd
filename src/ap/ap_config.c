@@ -188,6 +188,8 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 #ifdef CONFIG_IEEE80211BE
 	bss->mld_link_id = -1;
 #endif
+
+	bss->bss_termination_tsf = 0;
 }
 
 
