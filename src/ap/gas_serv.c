@@ -19,6 +19,7 @@
 #include "dpp_hostapd.h"
 #include "sta_info.h"
 #include "gas_serv.h"
+#include "neighbor_db.h"
 
 
 static void gas_serv_peer_timeout(void *eloop_ctx, void *timeout_ctx);
@@ -449,6 +450,24 @@ static void anqp_add_network_auth_type(struct hostapd_data *hapd,
 		wpabuf_put_data(*buf, hapd->conf->network_auth_type,
 				hapd->conf->network_auth_type_len);
 	}
+}
+
+static void anqp_add_neighbor_report(struct hostapd_data *hapd,
+				       struct wpabuf *buf)
+{
+	struct hostapd_neighbor_entry *nr;
+	u8 *len_pos = gas_anqp_add_element(buf, ANQP_NEIGHBOR_REPORT);
+	if (dl_list_empty(&hapd->nr_db)) {
+		wpabuf_put_le16(buf, 0);
+	}
+	else {
+		dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list ) {
+			wpabuf_put_u8(buf, WLAN_EID_NEIGHBOR_REPORT);
+			wpabuf_put_u8(buf, wpabuf_len(nr->nr));
+			wpabuf_put_buf(buf, nr->nr);
+		}
+	}
+	gas_anqp_set_element_len(buf, len_pos);
 }
 
 
@@ -950,6 +969,8 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 	len = 1400;
 	if (request & (ANQP_REQ_NAI_REALM | ANQP_REQ_NAI_HOME_REALM))
 		len += 1000;
+	if (request & ANQP_REQ_NEIGHBOR_REPORT)
+		len += (40 * hostapd_neighbor_count(hapd));
 #ifdef CONFIG_FILS
 	if (request & ANQP_FILS_REALM_INFO)
 		len += 2 * dl_list_len(&hapd->conf->fils_realms);
@@ -1094,6 +1115,16 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 	if (request & ANQP_REQ_EMERGENCY_NAI) {
 		prev_len = wpabuf_len(buf);
 		anqp_add_elem(hapd, &buf, ANQP_EMERGENCY_NAI);
+		if (wpabuf_len(buf) > max_len) {
+			wpa_printf(MSG_INFO,
+				   "ANQP: ANQP-element would go beyond maximum GAS response length - skip");
+			buf->used = prev_len;
+		}
+	}
+
+	if (request & ANQP_REQ_NEIGHBOR_REPORT) {
+		prev_len = wpabuf_len(buf);
+		anqp_add_neighbor_report(hapd, buf);
 		if (wpabuf_len(buf) > max_len) {
 			wpa_printf(MSG_INFO,
 				   "ANQP: ANQP-element would go beyond maximum GAS response length - skip");
@@ -1294,6 +1325,11 @@ static void rx_anqp_query_list_id(struct hostapd_data *hapd, u16 info_id,
 	case ANQP_EMERGENCY_NAI:
 		set_anqp_req(ANQP_REQ_EMERGENCY_NAI,
 			     "Emergency NAI",
+			     get_anqp_elem(hapd, info_id) != NULL, qi);
+		break;
+	case ANQP_NEIGHBOR_REPORT:
+		set_anqp_req(ANQP_REQ_NEIGHBOR_REPORT,
+			     "Neighbor Report",
 			     get_anqp_elem(hapd, info_id) != NULL, qi);
 		break;
 	default:

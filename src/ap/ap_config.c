@@ -191,6 +191,7 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 
 	bss->gas_max_peers = 10;
 	bss->rsnxe_capab_mask = ~0ULL;
+	bss->bss_termination_tsf = 0;
 }
 
 

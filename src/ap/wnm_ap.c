@@ -20,6 +20,7 @@
 #include "ap/wpa_auth.h"
 #include "mbo_ap.h"
 #include "wnm_ap.h"
+#include "ap/neighbor_db.h"
 
 #define MAX_TFS_IE_LEN  1024
 
@@ -390,13 +391,24 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	u8 *pos;
 	int res;
 
-	mgmt = os_zalloc(sizeof(*mgmt));
-	if (mgmt == NULL)
+	int nr_num = hostapd_neighbor_count(hapd);
+	int nr_size = ETH_ALEN + 4 + 1 + 1 + 1 + 5;
+	int total_nr_size = nr_num * nr_size;
+	u8 *nr_data = os_malloc(total_nr_size);
+	int nr_data_len = 0;
+	if(nr_data == NULL) {
+		wpa_printf (MSG_ERROR, "Failed to allocate memory");
+	} else {
+	    nr_data_len = hostapd_neighbor_insert_buffer(hapd, nr_data, total_nr_size);
+	}
+	mgmt = os_zalloc(sizeof(*mgmt) + nr_data_len);
+	if (mgmt == NULL) {
+		wpa_printf (MSG_ERROR, "Failed to allocate memory for mgmt frame");
 		return -1;
+	}
 
 	sta = ap_get_sta(hapd, addr);
 	own_addr = wnm_ap_get_own_addr(hapd, sta);
-
 	os_memcpy(mgmt->da, addr, ETH_ALEN);
 	os_memcpy(mgmt->sa, own_addr, ETH_ALEN);
 	os_memcpy(mgmt->bssid, own_addr, ETH_ALEN);
@@ -406,9 +418,17 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	mgmt->u.action.u.bss_tm_req.action = WNM_BSS_TRANS_MGMT_REQ;
 	mgmt->u.action.u.bss_tm_req.dialog_token = dialog_token;
 	mgmt->u.action.u.bss_tm_req.req_mode = 0;
+	if(nr_num) {
+		mgmt->u.action.u.bss_tm_req.req_mode |= WNM_BSS_TM_REQ_PREF_CAND_LIST_INCLUDED;
+	}
 	mgmt->u.action.u.bss_tm_req.disassoc_timer = host_to_le16(0);
 	mgmt->u.action.u.bss_tm_req.validity_interval = 1;
 	pos = mgmt->u.action.u.bss_tm_req.variable;
+
+	if(nr_num) {
+		os_memcpy(pos, nr_data, nr_data_len);
+		pos += nr_data_len;
+	}
 
 	hapd->openwrt_stats.wnm.bss_transition_request_tx++;
 	wpa_printf(MSG_DEBUG, "WNM: Send BSS Transition Management Request to "
@@ -915,6 +935,22 @@ static void set_disassoc_timer(struct hostapd_data *hapd, struct sta_info *sta,
 }
 
 
+void bss_termination_disable_iface(void *eloop_ctx, void *timeout_ctx)
+{
+	struct hostapd_data *hapd = eloop_ctx;
+	hostapd_disable_iface(hapd->iface);
+}
+
+
+static void set_disable_iface_timer(struct hostapd_data *hapd, struct sta_info *sta,
+			       int disable_iface_timer)
+{
+	wpa_printf(MSG_DEBUG, "Disable interface timer set to %d secs", disable_iface_timer);
+	eloop_register_timeout(disable_iface_timer, 0,
+			       bss_termination_disable_iface, hapd, NULL);
+}
+
+
 int wnm_send_ess_disassoc_imminent(struct hostapd_data *hapd,
 				   struct sta_info *sta, const char *url,
 				   int disassoc_timer)
@@ -1006,6 +1042,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 	    bss_term_dur) {
 		os_memcpy(pos, bss_term_dur, 12);
 		pos += 12;
+		set_disable_iface_timer(hapd, sta, hapd->conf->bss_termination_tsf);
 	}
 
 	if (url) {
