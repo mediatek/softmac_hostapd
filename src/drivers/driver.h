@@ -5632,6 +5632,11 @@ struct wpa_driver_ops {
 	 */
 	void (*nan_stop)(void *priv);
 #endif /* CONFIG_NAN */
+
+	int (*configure_edcca_enable)(void *priv, const u8 edcca_enable,
+				  const s8 edcca_compensation);
+	int (*configure_edcca_threshold)(void *priv, const int *threshold);
+	int (*get_edcca)(void *priv, const u8 mode, u8 *value);
 };
 
 /**
