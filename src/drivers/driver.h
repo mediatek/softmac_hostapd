@@ -6045,6 +6045,11 @@ struct wpa_driver_ops {
 	 */
 	void (*stop_peer_measurement)(void *priv);
 #endif /* CONFIG_PR */
+
+	int (*configure_edcca_enable)(void *priv, const u8 edcca_enable,
+				  const s8 edcca_compensation);
+	int (*configure_edcca_threshold)(void *priv, const int *threshold);
+	int (*get_edcca)(void *priv, const u8 mode, u8 *value);
 };
 
 /**
