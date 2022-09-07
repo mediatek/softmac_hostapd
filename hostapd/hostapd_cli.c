@@ -1824,6 +1824,13 @@ static int hostapd_cli_cmd_afc_send_request(struct wpa_ctrl *ctrl, int argc,
 #endif /* CONFIG_AFC */
 
 
+static int hostapd_cli_cmd_get_ibf(struct wpa_ctrl *ctrl, int argc,
+					   char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "GET_IBF", 0, NULL, NULL);
+}
+
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2084,6 +2091,8 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 #endif /* CONFIG_AFC */
 	{ "inband_discovery", hostapd_cli_cmd_inband_discovery, NULL,
           "<tx type(0/1/2)> <interval> = runtime set inband discovery" },
+	{ "get_ibf", hostapd_cli_cmd_get_ibf, NULL,
+	  " = show iBF state (enabled/disabled)"},
 	{ NULL, NULL, NULL, NULL }
 };
 
