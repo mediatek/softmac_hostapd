@@ -4232,6 +4232,30 @@ fail:
 	return os_snprintf(buf, buflen, "FAIL\n");
 }
 
+static int
+hostapd_ctrl_iface_get_ibf(struct hostapd_data *hapd, char *buf,
+					 size_t buflen)
+{
+	u8 ibf_enable;
+	int ret;
+	char *pos, *end;
+
+	pos = buf;
+	end = buf + buflen;
+
+	if (hostapd_drv_ibf_dump(hapd, &ibf_enable) == 0) {
+		hapd->iconf->ibf_enable = ibf_enable;
+		ret = os_snprintf(pos, end - pos, "ibf_enable: %u\n",
+			  ibf_enable);
+	}
+
+	if (os_snprintf_error(end - pos, ret))
+		return 0;
+
+	return ret;
+}
+
+
 static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      char *buf, char *reply,
 					      int reply_size,
@@ -4870,6 +4894,8 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 		reply_len = hostapd_ctrl_iface_get_mu(hapd, reply, reply_size);
 	} else if (os_strncmp(buf, "SET_THREE_WIRE ", 15) == 0) {
 		reply_len = hostapd_ctrl_iface_three_wire(hapd, buf + 15, reply, reply_size);
+	} else if (os_strncmp(buf, "GET_IBF", 7) == 0) {
+		reply_len = hostapd_ctrl_iface_get_ibf(hapd, reply, reply_size);
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;

@@ -1347,6 +1347,7 @@ struct hostapd_config {
 		u8 ext_sel;
 		u8 ceb_band_sel;
 	} three_wire;
+	u8 ibf_enable;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
@@ -1520,6 +1521,7 @@ hostapd_set_and_check_bw320_offset(struct hostapd_config *conf,
 #endif /* CONFIG_IEEE80211BE */
 }
 
+#define IBF_DEFAULT_ENABLE 0
 
 int hostapd_mac_comp(const void *a, const void *b);
 struct hostapd_config * hostapd_config_defaults(void);
