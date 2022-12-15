@@ -323,6 +323,7 @@ struct hostapd_config * hostapd_config_defaults(void)
 	conf->three_wire.ext_sel = THREE_WIRE_EXT_SEL_UNSET;
 	conf->three_wire.ceb_band_sel = THREE_WIRE_CEB_SEL_UNSET;
 	conf->ibf_enable = IBF_DEFAULT_ENABLE;
+	conf->amsdu = 1;
 
 	hostapd_set_and_check_bw320_offset(conf, 0);
 
