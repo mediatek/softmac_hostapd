@@ -1348,6 +1348,7 @@ struct hostapd_config {
 		u8 ceb_band_sel;
 	} three_wire;
 	u8 ibf_enable;
+	u8 dfs_detect_mode;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
@@ -1370,6 +1371,18 @@ enum three_wire_ceb_band_sel {
 	NUM_THREE_WIRE_CEB_BAND_SEL,
 	THREE_WIRE_CEB_BAND_SEL_MAX =
 		NUM_THREE_WIRE_CEB_BAND_SEL - 1
+};
+
+enum dfs_mode {
+	DFS_DETECT_MODE_DISABLE,
+	DFS_DETECT_MODE_AP_ENABLE,
+	DFS_DETECT_MODE_BACKGROUND_ENABLE,
+	DFS_DETECT_MODE_ALL_ENABLE,
+
+	/* keep last */
+	NUM_DFS_DETECT_MODE,
+	DFS_DETECT_MODE_MAX =
+		NUM_DFS_DETECT_MODE - 1
 };
 
 enum edcca_mode {
