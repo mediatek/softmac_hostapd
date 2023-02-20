@@ -6348,6 +6348,32 @@ enum wpa_event_type {
 	 * The event data includes the DW frequency.
 	 */
 	EVENT_NAN_NEXT_DW,
+
+	/*
+	 * EVENT_DFS_STA_CAC_SKIPPED - Notification that CAC has been skipped
+	 *
+	 * The channel in the notification is now marked as available.
+	 */
+	EVENT_DFS_STA_CAC_SKIPPED,
+
+	/**
+	 * EVENT_DFS_STA_CAC_EXPIRED - Notification that CAC has expired
+	 *
+	 * The channel in the notification is now marked as usable.
+	 */
+	EVENT_DFS_STA_CAC_EXPIRED,
+
+	/**
+	 * EVENT_DFS_BACKGROUND_CHAN_UPDATE - Notification that background
+	 * channel has been updated.
+	 */
+	EVENT_DFS_BACKGROUND_CHAN_UPDATE,
+
+	/**
+	 * EVENT_DFS_BACKGROUND_CHAN_EXPAND - Notification that background
+	 * channel has been updated and operating channel should expand its width.
+	 */
+	EVENT_DFS_BACKGROUND_CHAN_EXPAND,
 };
 
 
