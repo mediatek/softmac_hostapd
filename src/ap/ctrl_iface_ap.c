@@ -1163,6 +1163,7 @@ int hostapd_parse_freq_params(const char *pos,
 	params->eht_enabled = !!os_strstr(pos, " eht");
 	params->he_enabled = !!os_strstr(pos, " he") ||
 		params->eht_enabled;
+	params->radar_background = !!os_strstr(pos, " skip_cac");
 #undef SET_FREQ_PARAM
 
 	return 0;
