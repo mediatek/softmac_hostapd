@@ -1391,6 +1391,7 @@ struct hostapd_config {
 	u8 ibf_enable;
 	u8 dfs_detect_mode;
 	u8 amsdu;
+	void *muru_config;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
