@@ -1332,6 +1332,7 @@ struct hostapd_config {
 	u8 ibf_enable;
 	u8 dfs_detect_mode;
 	u8 amsdu;
+	void *muru_config;
 };
 
 enum three_wire_mode {
