@@ -1103,6 +1103,7 @@ struct hostapd_config {
 	bool hw_mode_set;
 	int acs_exclude_6ghz_non_psc;
 	int enable_background_radar;
+	int background_radar_mode;
 	enum {
 		LONG_PREAMBLE = 0,
 		SHORT_PREAMBLE = 1
@@ -1374,6 +1375,11 @@ enum three_wire_ceb_band_sel {
 	NUM_THREE_WIRE_CEB_BAND_SEL,
 	THREE_WIRE_CEB_BAND_SEL_MAX =
 		NUM_THREE_WIRE_CEB_BAND_SEL - 1
+};
+
+enum background_radar_mode {
+	BACKGROUND_RADAR_NORMAL_MODE,
+	BACKGROUND_RADAR_CERT_MODE,
 };
 
 enum dfs_mode {
