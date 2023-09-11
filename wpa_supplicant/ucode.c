@@ -8,6 +8,8 @@
 #include "ctrl_iface.h"
 #include "bss.h"
 #include "ucode.h"
+#include "driver_i.h"
+#include "common/ieee802_11_common.h"
 
 static struct wpa_global *wpa_global;
 static uc_resource_type_t *global_type, *iface_type;
@@ -97,6 +99,8 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 {
 	const char *state;
 	uc_value_t *val;
+	enum oper_chan_width ch_width;
+	int center_freq1, bw320_offset = 1;
 
 	if (event != EVENT_CH_SWITCH_STARTED)
 		return;
@@ -115,11 +119,42 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	uc_value_push(ucv_get(val));
 
 	if (event == EVENT_CH_SWITCH_STARTED) {
+		center_freq1 = data->ch_switch.cf1;
+
+		switch (data->ch_switch.ch_width) {
+		case CHAN_WIDTH_80:
+			ch_width = CONF_OPER_CHWIDTH_80MHZ;
+			break;
+		case CHAN_WIDTH_80P80:
+			ch_width = CONF_OPER_CHWIDTH_80P80MHZ;
+			break;
+		case CHAN_WIDTH_160:
+			ch_width = CONF_OPER_CHWIDTH_160MHZ;
+			break;
+		case CHAN_WIDTH_320:
+			ch_width = CONF_OPER_CHWIDTH_320MHZ;
+			break;
+		case CHAN_WIDTH_20_NOHT:
+		case CHAN_WIDTH_20:
+		case CHAN_WIDTH_40:
+		default:
+			ch_width = CONF_OPER_CHWIDTH_USE_HT;
+			break;
+		}
+
+		/* Check bandwidth 320 MHz-2 */
+		if (ch_width == CONF_OPER_CHWIDTH_320MHZ &&
+		    (center_freq1 == 6265) || center_freq1 == 6585 ||
+		     center_freq1 == 6905)
+			bw320_offset = 2;
+
 		ucv_object_add(val, "csa_count", ucv_int64_new(data->ch_switch.count));
 		ucv_object_add(val, "frequency", ucv_int64_new(data->ch_switch.freq));
 		ucv_object_add(val, "sec_chan_offset", ucv_int64_new(data->ch_switch.ch_offset));
-		ucv_object_add(val, "center_freq1", ucv_int64_new(data->ch_switch.cf1));
+		ucv_object_add(val, "center_freq1", ucv_int64_new(center_freq1));
 		ucv_object_add(val, "center_freq2", ucv_int64_new(data->ch_switch.cf2));
+		ucv_object_add(val, "ch_width", ucv_int64_new(ch_width));
+		ucv_object_add(val, "bw320_offset", ucv_int64_new(bw320_offset));
 	}
 
 	ucv_put(wpa_ucode_call(4));
@@ -213,6 +248,11 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	struct wpa_supplicant *wpa_s = uc_fn_thisval("wpas.iface");
 	struct wpa_bss *bss;
 	uc_value_t *ret, *val;
+	struct wpa_channel_info ci;
+	u8 op_class, channel;
+	enum oper_chan_width ch_width;
+	int center_freq1, bw320_offset = 1, is_24ghz;
+	enum hostapd_hw_mode hw_mode;
 
 	if (!wpa_s)
 		return NULL;
@@ -225,23 +265,37 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	bss = wpa_s->current_bss;
 	if (bss) {
 		int sec_chan = 0;
-		const u8 *ie;
 
-		ie = wpa_bss_get_ie(bss, WLAN_EID_HT_OPERATION);
-		if (ie && ie[1] >= 2) {
-			const struct ieee80211_ht_operation *ht_oper;
-			int sec;
+		hw_mode = ieee80211_freq_to_chan(bss->freq, &channel);
+		is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
+			hw_mode == HOSTAPD_MODE_IEEE80211B;
 
-			ht_oper = (const void *) (ie + 2);
-			sec = ht_oper->ht_param & HT_INFO_HT_PARAM_SECONDARY_CHNL_OFF_MASK;
-			if (sec == HT_INFO_HT_PARAM_SECONDARY_CHNL_ABOVE)
-				sec_chan = 1;
-			else if (sec == HT_INFO_HT_PARAM_SECONDARY_CHNL_BELOW)
-				sec_chan = -1;
+		wpa_drv_channel_info(wpa_s, &ci);
+		center_freq1 = ci.center_frq1;
+
+		if (bss->freq != center_freq1) {
+			if (is_24ghz)
+				sec_chan = (bss->freq < center_freq1) ? 1 : -1;
+			else
+				sec_chan = (bss->freq / 20) & 1 ? 1 : -1;
+		}
+
+		if (ieee80211_chaninfo_to_channel(ci.frequency, ci.chanwidth,
+						  sec_chan, &op_class, &channel))
+			return NULL;
+
+		ch_width = op_class_to_ch_width(op_class);
+		if (ch_width == CONF_OPER_CHWIDTH_320MHZ &&
+		    (center_freq1 == 6265) || center_freq1 == 6585 ||
+		     center_freq1 == 6905) {
+			/* Bandwidth 320 MHz-2 */
+			bw320_offset = 2;
 		}
 
 		ucv_object_add(ret, "sec_chan_offset", ucv_int64_new(sec_chan));
 		ucv_object_add(ret, "frequency", ucv_int64_new(bss->freq));
+		ucv_object_add(ret, "ch_width", ucv_int64_new(ch_width));
+		ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
 	}
 
 #ifdef CONFIG_MESH
