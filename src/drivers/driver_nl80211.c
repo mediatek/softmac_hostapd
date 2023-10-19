@@ -9121,7 +9121,7 @@ static int wpa_driver_nl80211_if_add(void *priv, enum wpa_driver_if_type type,
 				     void *bss_ctx, void **drv_priv,
 				     char *force_ifname, u8 *if_addr,
 				     const char *bridge, int use_existing,
-				     int setup_ap)
+				     int setup_ap, int freq)
 {
 	enum nl80211_iftype nlmode;
 	struct i802_bss *bss = priv;
