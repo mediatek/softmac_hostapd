@@ -1506,6 +1506,11 @@ static int hostapd_cli_cmd_set_three_wire_ctrl(struct wpa_ctrl *ctrl, int argc,
 	return hostapd_cli_cmd(ctrl, "SET_THREE_WIRE", 1, argc, argv);
 }
 
+static int hostapd_cli_cmd_disable_beacon(struct wpa_ctrl *ctrl, int argc,
+					   char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "NO_BEACON", 1, argc, argv);
+}
 
 #ifdef CONFIG_DPP
 
@@ -1933,6 +1938,8 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" = show mu onoff value in 0-15 bitmap"},
 	{ "set_three_wire", hostapd_cli_cmd_set_three_wire_ctrl, NULL,
 		" = Set three wire ctrl" },
+	{ "no_beacon", hostapd_cli_cmd_disable_beacon, NULL,
+		"<value> 0: Enable beacon, 1: Disable beacon"},
 #ifdef CONFIG_DPP
 	{ "dpp_qr_code", hostapd_cli_cmd_dpp_qr_code, NULL,
 	  "report a scanned DPP URI from a QR Code" },
