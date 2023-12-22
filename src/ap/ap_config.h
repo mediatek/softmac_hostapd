@@ -1400,6 +1400,9 @@ struct hostapd_config {
 	u8 amsdu;
 	void *muru_config;
 	u8 pp_mode;
+	u8 lpi_psd;
+	u8 sku_idx;
+	u8 lpi_bcn_enhance;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
