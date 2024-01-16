@@ -3685,6 +3685,7 @@ static void handle_auth(struct hostapd_data *hapd,
 
 			ap_sta_set_mld(sta, true);
 			sta->mld_assoc_link_id = link_id;
+			sta->mld_assoc_sta = sta;
 
 			/*
 			 * Set the MLD address as the station address and the
@@ -5241,6 +5242,7 @@ int ieee80211_ml_process_link(struct hostapd_data *hapd,
 #ifdef CONFIG_ENC_ASSOC
 	sta->epp_sta = origin_sta->epp_sta;
 #endif /* CONFIG_ENC_ASSOC */
+	sta->mld_assoc_sta = origin_sta;
 
 	status = __check_assoc_ies(hapd, sta, NULL, 0, &elems, type,
 				   origin_sta->wpa_sm);
@@ -7834,6 +7836,12 @@ void ieee802_11_rx_from_unknown(struct hostapd_data *hapd, const u8 *src,
 	struct sta_info *sta;
 
 	sta = ap_get_sta(hapd, src);
+
+#ifdef CONFIG_IEEE80211BE
+	if (sta && sta->mld_info.mld_sta)
+		sta = sta->mld_assoc_sta;
+#endif
+
 	if (sta &&
 	    ((sta->flags & WLAN_STA_ASSOC) ||
 	     ((sta->flags & WLAN_STA_ASSOC_REQ_OK) && wds))) {
