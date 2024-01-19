@@ -77,6 +77,7 @@ struct i802_link {
 	unsigned int beacon_set:1;
 
 	int freq;
+	int background_freq;
 	int bandwidth;
 	u8 addr[ETH_ALEN];
 	void *ctx;
