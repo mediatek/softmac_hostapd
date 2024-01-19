@@ -8476,6 +8476,9 @@ static u8 * hostapd_eid_rnr_colocation(struct hostapd_data *hapd, u8 *eid,
 		    !is_6ghz_op_class(iface->conf->op_class))
 			continue;
 
+		if (!iface->bss[0]->started)
+			continue;
+
 		eid = hostapd_eid_rnr_iface(iface->bss[0], hapd, eid,
 					    current_len, NULL, false);
 	}
