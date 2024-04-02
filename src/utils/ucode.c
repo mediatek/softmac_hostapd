@@ -110,7 +110,7 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	uc_value_t *freq = uc_fn_arg(0);
 	uc_value_t *sec = uc_fn_arg(1);
 	int width = ucv_uint64_get(uc_fn_arg(2));
-	int bw320_offset = 1;
+	int bw320_offset = 1, band_idx;
 	int freq_val, center_idx, center_ofs;
 	enum oper_chan_width chanwidth;
 	enum hostapd_hw_mode hw_mode;
@@ -123,6 +123,7 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 		return NULL;
 
 	freq_val = ucv_int64_get(freq);
+	band_idx = ucv_int64_get(uc_fn_arg(4));
 	if (ucv_type(sec) == UC_INTEGER)
 		sec_channel = ucv_int64_get(sec);
 	else if (sec)

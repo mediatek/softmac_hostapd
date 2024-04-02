@@ -10,6 +10,7 @@
 #include "dfs.h"
 #include "acs.h"
 #include "ieee802_11_auth.h"
+#include "ieee802_11.h"
 #include <libubox/uloop.h>
 
 static uc_resource_type_t *global_type, *bss_type, *iface_type;
@@ -494,13 +495,15 @@ static uc_value_t *
 uc_hostapd_iface_stop(uc_vm_t *vm, size_t nargs)
 {
 	struct hostapd_iface *iface = uc_fn_thisval("hostapd.iface");
-	int i;
-
-	wpa_printf(MSG_INFO, "ucode: mtk: stop iface for %s in state %s\n",
-			iface->phy, hostapd_state_text(iface->state));
+	struct hostapd_data *first_hapd;
+	struct hostapd_bss_config *conf;
+	int i, j;
 
 	if (!iface)
 		return NULL;
+
+	wpa_printf(MSG_INFO, "ucode: mtk: stop iface for %s in state %s\n",
+			iface->phy, hostapd_state_text(iface->state));
 
 	if (iface->state != HAPD_IFACE_ENABLED)
 		uc_hostapd_disable_iface(iface);
@@ -512,6 +515,34 @@ uc_hostapd_iface_stop(uc_vm_t *vm, size_t nargs)
 		hapd->beacon_set_done = 0;
 	}
 
+#ifdef CONFIG_IEEE80211BE
+	first_hapd = iface->bss[0];
+	conf = first_hapd->conf;
+	for (i = 0; conf->mld_ap && i < iface->interfaces->count; i++) {
+		struct hostapd_iface *h = iface->interfaces->iface[i];
+		struct hostapd_data *h_hapd = h->bss[0];
+		struct hostapd_bss_config *hconf = h_hapd->conf;
+
+		if (h == iface) {
+			wpa_printf(MSG_DEBUG, "MLD: Skip own interface");
+			continue;
+		}
+
+		if (!hconf->mld_ap) {
+			wpa_printf(MSG_DEBUG,
+				   "MLD: Skip non MLD");
+			continue;
+		}
+
+		if (hostapd_is_ml_partner(first_hapd, h_hapd)) {
+			for (j = 0; j < h->num_bss; j++) {
+				hostapd_drv_stop_ap(h->bss[j]);
+				h->bss[j]->beacon_set_done = 0;
+			}
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
+
 	return NULL;
 }
 
@@ -519,11 +550,12 @@ static uc_value_t *
 uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 {
 	struct hostapd_iface *iface = uc_fn_thisval("hostapd.iface");
+	struct hostapd_data *tmp_hapd;
 	uc_value_t *info = uc_fn_arg(0);
 	struct hostapd_config *conf;
 	bool changed = false;
 	uint64_t intval;
-	int i;
+	int i, band_idx;
 
 	wpa_printf(MSG_INFO, "ucode: mtk: start iface for %s in state %s\n",
 			iface->phy, hostapd_state_text(iface->state));
@@ -538,6 +570,24 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 
 	if (ucv_type(info) != UC_OBJECT)
 		return NULL;
+
+	intval = ucv_int64_get(ucv_object_get(info, "band_idx", NULL));
+	band_idx = errno ? iface->conf->band_idx : intval;
+
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(iface->bss[0])) {
+		for_each_mld_link(tmp_hapd, iface->bss[0]) {
+			if (band_idx == tmp_hapd->iconf->band_idx) {
+				wpa_printf(MSG_INFO, "ucode: mtk: MLD: switch to iface with band_idx %d \n", band_idx);
+				iface = tmp_hapd->iface;
+				break;
+			}
+		}
+	}
+
+	if (band_idx != iface->bss[0]->iconf->band_idx)
+		return NULL;
+#endif /* CONFIG_IEEE80211BE */
 
 #define UPDATE_VAL(field, name)							\
 	do {									\

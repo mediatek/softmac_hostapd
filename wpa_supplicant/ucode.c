@@ -247,12 +247,13 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 {
 	struct wpa_supplicant *wpa_s = uc_fn_thisval("wpas.iface");
 	struct wpa_bss *bss;
-	uc_value_t *ret, *val;
+	uc_value_t *ret, *val, *link_obj = uc_fn_arg(0);
 	struct wpa_channel_info ci;
 	u8 op_class, channel;
-	enum oper_chan_width ch_width;
-	int center_freq1, bw320_offset = 1, is_24ghz;
+	enum oper_chan_width ch_width = CONF_OPER_CHWIDTH_USE_HT;
+	int center_freq1, bw320_offset = 1, is_24ghz, band_idx;
 	enum hostapd_hw_mode hw_mode;
+	int link_id = ucv_int64_get(link_obj);
 
 	if (!wpa_s)
 		return NULL;
@@ -262,13 +263,25 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	val = ucv_string_new(wpa_supplicant_state_txt(wpa_s->wpa_state));
 	ucv_object_add(ret, "state", ucv_get(val));
 
-	bss = wpa_s->current_bss;
+	bss = link_id == -1 ? wpa_s->current_bss : wpa_s->links[link_id].bss;
 	if (bss) {
 		int sec_chan = 0;
 
 		hw_mode = ieee80211_freq_to_chan(bss->freq, &channel);
 		is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
 			hw_mode == HOSTAPD_MODE_IEEE80211B;
+		/*
+		 * Assume that the mapping between band and band_idx is
+		 * 2 GHz band: band_idx 0
+		 * 5 GHz band: band_idx 1
+		 * 6 GHz band: band_idx 2
+		 * */
+		if (is_24ghz)
+			band_idx = 0;
+		else if (IS_5GHZ(bss->freq))
+			band_idx = 1;
+		else if (is_6ghz_freq(bss->freq))
+			band_idx = 2;
 
 		wpa_drv_channel_info(wpa_s, &ci);
 		center_freq1 = ci.center_frq1;
@@ -280,11 +293,10 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 				sec_chan = (bss->freq / 20) & 1 ? 1 : -1;
 		}
 
-		if (ieee80211_chaninfo_to_channel(ci.frequency, ci.chanwidth,
-						  sec_chan, &op_class, &channel))
-			return NULL;
+		if (!ieee80211_chaninfo_to_channel(ci.frequency, ci.chanwidth,
+						   sec_chan, &op_class, &channel))
+			ch_width = op_class_to_ch_width(op_class);
 
-		ch_width = op_class_to_ch_width(op_class);
 		if (ch_width == CONF_OPER_CHWIDTH_320MHZ &&
 		    (center_freq1 == 6265) || center_freq1 == 6585 ||
 		     center_freq1 == 6905) {
@@ -296,6 +308,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 		ucv_object_add(ret, "frequency", ucv_int64_new(bss->freq));
 		ucv_object_add(ret, "ch_width", ucv_int64_new(ch_width));
 		ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
+		ucv_object_add(ret, "band_idx", ucv_int64_new(band_idx));
 	}
 
 #ifdef CONFIG_MESH
@@ -335,6 +348,21 @@ uc_wpas_iface_ctrl(uc_vm_t *vm, size_t nargs)
 	return ret;
 }
 
+static uc_value_t *
+uc_wpas_iface_get_valid_links(uc_vm_t *vm, size_t nargs)
+{
+	struct wpa_supplicant *wpa_s = uc_fn_thisval("wpas.iface");
+	uc_value_t *ret;
+
+	if (!wpa_s)
+		return NULL;
+
+	ret = ucv_object_new(vm);
+	ucv_object_add(ret, "valid_links", ucv_uint64_new(wpa_s->valid_links));
+
+	return ret;
+}
+
 int wpas_ucode_init(struct wpa_global *gl)
 {
 	static const uc_function_list_t global_fns[] = {
@@ -347,6 +375,7 @@ int wpas_ucode_init(struct wpa_global *gl)
 	static const uc_function_list_t iface_fns[] = {
 		{ "status", uc_wpas_iface_status },
 		{ "ctrl", uc_wpas_iface_ctrl },
+		{ "get_valid_links", uc_wpas_iface_get_valid_links },
 	};
 	uc_value_t *data, *proto;
 
