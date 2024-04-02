@@ -2819,6 +2819,8 @@ dfs_offload:
 	}
 #endif /* CONFIG_MESH */
 
+	if (hostapd_drv_pp_mode_set(hapd) < 0)
+		goto fail;
 	if (hostapd_drv_configure_edcca_enable(hapd) < 0)
 		goto fail;
 
@@ -2832,8 +2834,6 @@ dfs_offload:
 	if (hostapd_drv_ibf_ctrl(hapd) < 0)
 		goto fail;
 	if (hostapd_drv_amsdu_ctrl(hapd) < 0)
-		goto fail;
-	if (hostapd_drv_pp_mode_set(hapd) < 0)
 		goto fail;
 
 	wpa_printf(MSG_DEBUG, "%s: Setup of interface done.",

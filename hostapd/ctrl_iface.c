@@ -4939,27 +4939,57 @@ hostapd_ctrl_iface_set_background_radar_mode(struct hostapd_data *hapd, char *cm
 	return os_snprintf(buf, buflen, "OK\n");
 }
 
+struct hostapd_data *
+hostapd_get_hapd_by_band_idx(struct hostapd_data *hapd, u8 band_idx)
+{
+	struct hostapd_data *link;
+
+	if (!hostapd_is_mld_ap(hapd))
+		return hapd;
+
+	for_each_mld_link(link, hapd) {
+		if (link->iconf->band_idx == band_idx)
+			break;
+	}
+
+	if (!link || link->iconf->band_idx != band_idx) {
+		wpa_printf(MSG_ERROR, "Invalid band idx %d\n", band_idx);
+		return NULL;
+	}
+
+	return link;
+}
+
 static int
 hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 			  size_t buflen)
 {
-	char *pos, *config, *value;
+	char *band, *config, *value;
+	u8 band_idx;
 
 	config = cmd;
-	pos = os_strchr(config, ' ');
-	if (pos == NULL)
-		return -1;
-	*pos++ = '\0';
 
-	if (pos == NULL)
+	value = os_strchr(config, ' ');
+	if (value == NULL)
 		return -1;
-	value = pos;
+	*value++ = '\0';
+
+	band = os_strchr(value, ' ');
+	if (band == NULL)
+		return -1;
+	*band++ = '\0';
+	band_idx = strtol(band, NULL, 10);
+
+	hapd = hostapd_get_hapd_by_band_idx(hapd, band_idx);
+
+	if (!hapd)
+		return -1;
 
 	if (os_strcmp(config, "mode") == 0) {
-		int val = atoi(value);
+		int val = strtol(value, NULL, 10);
 
-		if (val < PP_DISABLE || val > PP_AUTO_MODE) {
-			wpa_printf(MSG_ERROR, "Invalid value for set_pp");
+		if (val < PP_DISABLE || val > PP_FW_MODE) {
+			wpa_printf(MSG_ERROR, "Invalid value for SET_PP");
 			return -1;
 		}
 		hapd->iconf->pp_mode = (u8) val;
@@ -4967,7 +4997,8 @@ hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 			return -1;
 	} else {
 		wpa_printf(MSG_ERROR,
-			   "Unsupported parameter %s for set_pp", config);
+			   "Unsupported parameter %s for SET_PP"
+			   "Usage: set_pp mode <value> <band_idx>", config);
 		return -1;
 	}
 	return os_snprintf(buf, buflen, "OK\n");
@@ -4977,19 +5008,17 @@ static int
 hostapd_ctrl_iface_get_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 			  size_t buflen)
 {
-	char *pos, *end;
+	u8 band_idx;
 
-	pos = buf;
-	end = buf + buflen;
+	band_idx = strtol(cmd, NULL, 10);
 
-	if (os_strcmp(cmd, "mode") == 0) {
-		return os_snprintf(pos, end - pos, "pp_mode: %d\n",
-				   hapd->iconf->pp_mode);
-	} else {
-		wpa_printf(MSG_ERROR,
-			   "Unsupported parameter %s for get_pp", cmd);
+	hapd = hostapd_get_hapd_by_band_idx(hapd, band_idx);
+
+	if (!hapd)
 		return -1;
-	}
+
+	return os_snprintf(buf, buflen, "pp_mode: %d, punct_bitmap: 0x%04x\n",
+			   hapd->iconf->pp_mode, hapd->iconf->punct_bitmap);
 }
 
 static int
