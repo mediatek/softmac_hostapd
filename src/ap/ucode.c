@@ -792,6 +792,38 @@ uc_hostapd_iface_csa_in_progress(uc_vm_t *vm, size_t nargs)
 }
 
 static uc_value_t *
+uc_hostapd_iface_get_radio_mask(uc_vm_t *vm, size_t nargs)
+{
+	struct hostapd_iface *iface = uc_fn_thisval("hostapd.iface");
+
+	if (!iface)
+		return ucv_int64_new(0);
+
+	return ucv_int64_new(iface->radio_mask);
+}
+
+static uc_value_t *
+uc_hostapd_iface_get_finished_radio_mask(uc_vm_t *vm, size_t nargs)
+{
+	struct hostapd_iface *iface = uc_fn_thisval("hostapd.iface");
+	struct hapd_interfaces *interfaces;
+	int i, radio_mask = 0;
+
+	if (!iface)
+		return ucv_int64_new(0);
+
+	interfaces = iface->interfaces;
+	for (i = 0; i < interfaces->count; i++) {
+		struct hostapd_iface *tmp_iface = interfaces->iface[i];
+
+		if (tmp_iface->current_hw_info)
+			radio_mask |= BIT(tmp_iface->current_hw_info->hw_idx);
+	}
+
+	return ucv_int64_new(radio_mask);
+}
+
+static uc_value_t *
 uc_hostapd_bss_rename(uc_vm_t *vm, size_t nargs)
 {
 	struct hostapd_data *hapd = uc_fn_thisval("hostapd.bss");
@@ -1250,6 +1282,8 @@ int hostapd_ucode_init(struct hapd_interfaces *ifaces)
 		{ "start", uc_hostapd_iface_start },
 		{ "switch_channel", uc_hostapd_iface_switch_channel },
 		{ "csa_in_progress", uc_hostapd_iface_csa_in_progress },
+		{ "get_radio_mask", uc_hostapd_iface_get_radio_mask },
+		{ "get_finished_radio_mask", uc_hostapd_iface_get_finished_radio_mask },
 	};
 	uc_value_t *data, *proto;
 
