@@ -741,8 +741,25 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	if ((intval = ucv_int64_get(ucv_object_get(info, "center_freq2", NULL))) && !errno)
 		csa.freq_params.center_freq2 = intval;
 
-	for (i = 0; i < iface->num_bss; i++)
+	wpa_printf(MSG_INFO, "ucode: mtk: switch channel information:\n");
+	wpa_printf(MSG_INFO, "    * freq is %d\n", csa.freq_params.freq);
+	wpa_printf(MSG_INFO, "    * bandwidth is %d\n",
+			csa.freq_params.bandwidth);
+	wpa_printf(MSG_INFO, "    * sec_chan_offset is %d\n",
+			csa.freq_params.sec_channel_offset);
+	wpa_printf(MSG_INFO, "    * center_freq1 is %d\n",
+			csa.freq_params.center_freq1);
+	wpa_printf(MSG_INFO, "    * center_freq2 is %d\n",
+			csa.freq_params.center_freq2);
+
+	for (i = 0; i < iface->num_bss; i++) {
 		ret = hostapd_switch_channel(iface->bss[i], &csa);
+
+#ifdef CONFIG_IEEE80211BE
+		if (!ret && iface->bss[i]->conf->mld_ap)
+			hostapd_update_aff_link_beacon(iface->bss[i], csa.cs_count);
+#endif
+	}
 
 	return ucv_boolean_new(!ret);
 }
