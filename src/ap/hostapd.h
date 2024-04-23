@@ -360,6 +360,9 @@ struct hostapd_data {
 	unsigned int cs_c_off_ecsa_beacon;
 	unsigned int cs_c_off_ecsa_proberesp;
 
+	unsigned int cs_c_off_sta_prof[MAX_NUM_MLD_LINKS];
+	unsigned int cs_c_off_ecsa_sta_prof[MAX_NUM_MLD_LINKS];
+
 #ifdef CONFIG_IEEE80211AX
 	bool cca_in_progress;
 	u8 cca_count;
@@ -518,6 +521,7 @@ struct hostapd_data {
 
 #ifdef CONFIG_IEEE80211BE
 	u8 eht_mld_bss_param_change;
+	u8 eht_mld_bss_critical_update;
 	struct hostapd_mld *mld;
 	struct dl_list link;
 	u8 mld_link_id;
@@ -867,6 +871,7 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 			   struct csa_settings *settings);
 int hostapd_force_channel_switch(struct hostapd_iface *iface,
 				 struct csa_settings *settings);
+int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count);
 void
 hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 				const struct hostapd_freq_params *freq_params);

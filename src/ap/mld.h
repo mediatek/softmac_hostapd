@@ -9,6 +9,7 @@
 #ifndef MLD_H
 #define MLD_H
 
+#define EHT_ML_MAX_STA_PROF_LEN 1024
 struct mld_link_info {
 	u8 valid:1;
 	u8 nstr_bitmap_len:2;
@@ -22,6 +23,10 @@ struct mld_link_info {
 	u16 status;
 	u16 resp_sta_profile_len;
 	u8 *resp_sta_profile;
+
+	u32 sta_prof_csa_offset;
+	u32 sta_prof_ecsa_offset;
+	u32 sta_prof_offset;
 };
 
 struct mld_info {

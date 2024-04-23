@@ -625,12 +625,16 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 		/* BSS Parameters Change Count */
 		if (include_bpcc)
 			wpabuf_put_u8(buf, link_bss->eht_mld_bss_param_change);
+
 		/* Enhanced Critical Updates Information */
 		if (include_bpcc && hostapd_is_uhr_enabled(hapd))
 			wpabuf_put_u8(buf, 0);
 
 		if (!link->resp_sta_profile)
 			continue;
+
+#define EXT_EID_TAG_LEN 3
+		link->sta_prof_offset = wpabuf_len(buf) + EXT_EID_TAG_LEN;
 
 		/* Fragment the sub element if needed */
 		if (total_len <= 255) {
