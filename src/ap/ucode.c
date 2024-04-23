@@ -744,8 +744,14 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	wpa_printf(MSG_INFO, "    * center_freq2 is %d\n",
 			csa.freq_params.center_freq2);
 
-	for (i = 0; i < iface->num_bss; i++)
+	for (i = 0; i < iface->num_bss; i++) {
 		ret = hostapd_switch_channel(iface->bss[i], &csa);
+
+#ifdef CONFIG_IEEE80211BE
+		if (!ret && iface->bss[i]->conf->mld_ap)
+			hostapd_update_aff_link_beacon(iface->bss[i], csa.cs_count);
+#endif
+	}
 
 	return ucv_boolean_new(!ret);
 }
