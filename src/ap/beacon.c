@@ -2829,6 +2829,10 @@ static int __ieee802_11_set_beacon(struct hostapd_data *hapd)
 	if (hapd->conf->mld_ap && !hapd->mld->started && hapd->beacon_set_done)
 		return 0;
 
+	/* skip setting beacon during ap link removal */
+	if (hapd->conf->mld_ap && hapd->mld->removed_links)
+		return 0;
+
 	if (!hapd->drv_priv) {
 		wpa_printf(MSG_ERROR, "Interface is disabled");
 		return -1;

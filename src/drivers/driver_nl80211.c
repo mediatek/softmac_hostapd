@@ -1287,6 +1287,11 @@ static void nl80211_put_wiphy_data_ap(struct i802_bss *bss)
 
 	if (w == NULL)
 		return;
+
+	/* do not clear wiphy data if there are still more than one links */
+	if (bss->valid_links && (bss->valid_links & (bss->valid_links - 1)))
+		return;
+
 	bss->wiphy_data = NULL;
 	dl_list_del(&bss->wiphy_list);
 

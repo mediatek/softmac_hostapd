@@ -332,6 +332,13 @@ int hostapd_set_sta_flags(struct hostapd_data *hapd, struct sta_info *sta)
 		return 0;
 	}
 
+	if (hapd->conf->mld_ap && hapd->mld->removed_links) {
+		wpa_printf(MSG_DEBUG,
+			   "%s: Do not update station flags (" MACSTR ")"
+			   " during ap link removal", __func__, MAC2STR(sta->addr));
+		return 0;
+	}
+
 	flags_or = total_flags & set_flags;
 	flags_and = total_flags | ~set_flags;
 	return hostapd_sta_set_flags(hapd, sta->addr, total_flags,

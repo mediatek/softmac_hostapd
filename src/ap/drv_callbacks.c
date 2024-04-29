@@ -3076,6 +3076,9 @@ void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 			   hapd->conf->iface);
 		hostapd_event_color_change(hapd, true);
 		break;
+	case EVENT_LINK_RECONFIG:
+		hostapd_link_remove_cb(hapd, data->reconfig_info.removed_links);
+		break;
 #endif /* CONFIG_IEEE80211AX */
 #ifdef CONFIG_IEEE80211BE
 	case EVENT_MLD_INTERFACE_FREED:

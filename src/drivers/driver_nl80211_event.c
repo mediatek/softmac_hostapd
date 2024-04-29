@@ -4234,6 +4234,49 @@ static void nl80211_obss_color_event(struct i802_bss *bss,
 
 #endif /* CONFIG_IEEE80211AX */
 
+static void nl80211_links_removed(struct wpa_driver_nl80211_data *drv,
+				  struct nlattr **tb)
+{
+	struct i802_bss *bss = NULL;
+	struct nlattr *link_attr, *link_data[NL80211_ATTR_MAX + 1];
+	static struct nla_policy link_policy[NL80211_ATTR_MAX + 1] = {
+		[NL80211_ATTR_MLO_LINK_ID] = { .type = NLA_U8 },
+	};
+	union wpa_event_data data = {};
+	int rem, ifidx = -1;
+
+	if (!tb[NL80211_ATTR_MLO_LINKS] || !tb[NL80211_ATTR_IFINDEX])
+		return;
+
+	ifidx = nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
+	bss = get_bss_ifindex(drv, ifidx);
+
+	if (!bss) {
+		wpa_printf(MSG_ERROR,
+			   "nl80211: Unknown ifindex (%d) for links removed event, ignoring",
+			   ifidx);
+		return;
+	}
+
+	nla_for_each_nested(link_attr, tb[NL80211_ATTR_MLO_LINKS], rem) {
+		u8 link_id;
+
+		if (nla_parse_nested(link_data, NL80211_ATTR_MAX,
+				     link_attr, link_policy) != 0)
+			continue;
+
+		if (!link_data[NL80211_ATTR_MLO_LINK_ID])
+			continue;
+
+		link_id = nla_get_u8(link_data[NL80211_ATTR_MLO_LINK_ID]);
+		if (link_id >= MAX_NUM_MLD_LINKS)
+			continue;
+		data.reconfig_info.removed_links |= BIT(link_id);
+	}
+
+	wpa_supplicant_event(bss->ctx, EVENT_LINK_RECONFIG, &data);
+}
+
 
 #ifdef CONFIG_NAN
 
@@ -4547,7 +4590,8 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		break;
 #endif /* CONFIG_IEEE80211AX */
 	case NL80211_CMD_LINKS_REMOVED:
-		mlme_event_link_removal(drv, tb[NL80211_ATTR_MLO_LINKS]);
+		// mlme_event_link_removal(drv, tb[NL80211_ATTR_MLO_LINKS]);
+		nl80211_links_removed(drv, tb);
 		break;
 	case NL80211_CMD_ASSOC_MLO_RECONF:
 		mlme_event_link_addition(bss, nla_data(frame), nla_len(frame));

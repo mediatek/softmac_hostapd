@@ -1803,6 +1803,12 @@ static int hostapd_cli_cmd_link_add(struct wpa_ctrl *ctrl, int argc,
 	return hostapd_cli_cmd(ctrl, "LINK_ADD", 1, argc, argv);
 }
 
+static int hostapd_cli_cmd_link_remove(struct wpa_ctrl *ctrl, int argc,
+				       char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "LINK_REMOVE", 1, argc, argv);
+}
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2071,6 +2077,8 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" = <ac> [cwmin=] [cwmax=] [aifs=] [txop_limit=]"},
 	{ "link_add", hostapd_cli_cmd_link_add, NULL,
 		" = Add a new link to a MLD AP"},
+	{ "link_remove", hostapd_cli_cmd_link_remove, NULL,
+		" [count=<count>] = Remove affiliated link of a MLD AP"},
 	{ NULL, NULL, NULL, NULL }
 };
 
