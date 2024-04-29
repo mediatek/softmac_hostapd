@@ -3966,11 +3966,31 @@ static int hostapd_ctrl_iface_disable_mld(struct hostapd_iface *iface)
 static int hostapd_ctrl_iface_link_remove(struct hostapd_data *hapd, char *cmd,
 					  char *buf, size_t buflen)
 {
+	char *token, *context = NULL;
+	u32 count = 0;
 	int ret;
-	u32 count = atoi(cmd);
 
-	if (!count)
-		count = 1;
+	while ((token = str_token(cmd, " ", &context))) {
+		if (os_strncmp(token, "count=", 6) == 0) {
+			count = atoi(token + 6);
+			continue;
+		}
+
+		wpa_printf(MSG_ERROR, "CTRL: Invalid LINK_REMOVE parameter: %s",
+			   token);
+		return -1;
+	}
+
+	if (!count) {
+		wpa_printf(MSG_ERROR, "Invalid ap removal count");
+		return -1;
+	}
+
+	/* limit total countdown time to be multiple of second */
+	if ((hapd->iconf->beacon_int * count) % 1000) {
+		wpa_printf(MSG_ERROR, "Total countdown time should be multiple of second");
+		return -1;
+	}
 
 	ret = hostapd_link_remove(hapd, count);
 	if (ret == 0) {

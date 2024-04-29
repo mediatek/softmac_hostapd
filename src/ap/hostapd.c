@@ -434,26 +434,21 @@ static void hostapd_link_remove_timeout_handler(void *eloop_data,
 						void *user_ctx)
 {
 	struct hostapd_data *hapd = (struct hostapd_data *) eloop_data;
+	struct hostapd_data *link;
+	struct hostapd_mld *mld = hapd->mld;
+	u8 link_id = hapd->mld_link_id;
 
-	if (hapd->eht_mld_link_removal_count == 0)
+	if (!mld || !mld->removed_links)
 		return;
-	hapd->eht_mld_link_removal_count--;
 
-	wpa_printf(MSG_DEBUG, "MLD: Remove link_id=%u in %u beacons",
-		   hapd->mld_link_id,
-		   hapd->eht_mld_link_removal_count);
+	wpa_printf(MSG_DEBUG, "MLD: Remove link_id=%u", hapd->mld_link_id);
 
-	ieee802_11_set_beacon(hapd);
+	hostapd_free_link_stas(hapd);
+	hostapd_disable_iface(hapd->iface);
+	mld->removed_links &= ~BIT(link_id);
 
-	if (!hapd->eht_mld_link_removal_count) {
-		hostapd_free_link_stas(hapd);
-		hostapd_disable_iface(hapd->iface);
-		return;
-	}
-
-	eloop_register_timeout(0, TU_TO_USEC(hapd->iconf->beacon_int),
-			       hostapd_link_remove_timeout_handler,
-			       hapd, NULL);
+	for_each_mld_link(link, mld->fbss)
+		ieee802_11_set_beacon(link);
 }
 
 
@@ -467,16 +462,32 @@ int hostapd_link_remove(struct hostapd_data *hapd, u32 count)
 		   hapd->mld_link_id, count);
 
 	hapd->eht_mld_link_removal_count = count;
-	hapd->eht_mld_bss_param_change++;
-	if (hapd->eht_mld_bss_param_change == 255)
-		hapd->eht_mld_bss_param_change = 0;
-
-	eloop_register_timeout(0, TU_TO_USEC(hapd->iconf->beacon_int),
-			       hostapd_link_remove_timeout_handler,
-			       hapd, NULL);
+	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_RECONFIG);
 
 	ieee802_11_set_beacon(hapd);
+
+	hapd->eht_mld_link_removal_count = 0;
+	hapd->mld->removed_links |= BIT(hapd->mld_link_id);
 	return 0;
+}
+
+
+void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links)
+{
+	struct hostapd_data *link;
+
+	if (!hapd->conf->mld_ap)
+		return;
+
+	for_each_mld_link(link, hapd) {
+		if (!(BIT(link->mld_link_id) & removed_links))
+			continue;
+
+		link->eht_mld_bss_critical_update = 0;
+		eloop_register_timeout(0, 0,
+				       hostapd_link_remove_timeout_handler,
+				       link, NULL);
+	}
 }
 
 #endif /* CONFIG_TESTING_OPTIONS */
@@ -869,7 +880,9 @@ static int hostapd_flush_old_stations(struct hostapd_data *hapd, u16 reason)
 void hostapd_bss_deinit_no_free(struct hostapd_data *hapd)
 {
 	hostapd_free_stas(hapd);
-	hostapd_flush_old_stations(hapd, WLAN_REASON_DEAUTH_LEAVING);
+	/* do not flush stations during ap link removal */
+	if (!hapd->conf->mld_ap || !hapd->mld->removed_links)
+		hostapd_flush_old_stations(hapd, WLAN_REASON_DEAUTH_LEAVING);
 #ifdef CONFIG_WEP
 	hostapd_clear_wep(hapd);
 #endif /* CONFIG_WEP */
@@ -1355,7 +1368,7 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 	}
 
 	if (flush_old_stations && !conf->start_disabled &&
-	    conf->broadcast_deauth) {
+	    conf->broadcast_deauth && (hapd->conf->mld_ap && !hapd->mld->started)) {
 		u8 addr[ETH_ALEN];
 
 		/* Should any previously associated STA not have noticed that
