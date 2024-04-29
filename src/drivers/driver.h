@@ -7978,7 +7978,7 @@ union wpa_event_data {
 	} t2l_map_info;
 
 	/**
-	 * struct reconfig_info - Data for EVENT_SETUP_LINK_RECONFIG
+	 * struct reconfig_info - Data for EVENT_SETUP_LINK_RECONFIG and EVENT_LINK_RECONFIG
 	 */
 	struct reconfig_info {
 		u16 added_links;
@@ -7986,6 +7986,7 @@ union wpa_event_data {
 		const u8 *status_list;
 		const u8 *resp_ie; /* Starting from Group Key Data */
 		size_t resp_ie_len;
+		u16 removed_links;
 	} reconfig_info;
 
 	struct nan_cluster_join_info {

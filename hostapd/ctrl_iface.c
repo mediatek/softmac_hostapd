@@ -3924,8 +3924,26 @@ static int hostapd_ctrl_iface_link_remove(struct hostapd_data *hapd, char *cmd)
 {
 	u32 count = atoi(cmd);
 
-	if (!count)
-		count = 1;
+	if (!hapd->conf->mld_ap) {
+		wpa_printf(MSG_ERROR, "Invalid ap removal on non-AP MLD");
+		return -1;
+	}
+
+	if (!hapd->mld || hapd->mld->num_links <= 1) {
+		wpa_printf(MSG_ERROR, "Invalid ap removal on AP MLD with 0 or 1 link");
+		return -1;
+	}
+
+	if (!count) {
+		wpa_printf(MSG_ERROR, "Invalid ap removal count");
+		return -1;
+	}
+
+	/* limit total countdown time to be multiple of second */
+	if ((hapd->iconf->beacon_int * count) % 1000) {
+		wpa_printf(MSG_ERROR, "Total countdown time should be multiple of second");
+		return -1;
+	}
 
 	return hostapd_link_remove(hapd, count);
 }
