@@ -1923,8 +1923,10 @@ static int wpa_supplicant_connect_ml_missing(struct wpa_supplicant *wpa_s,
 	removed_links = wpa_bss_parse_reconf_ml_element(wpa_s, selected);
 	missing_links &= ~removed_links;
 
+	/* FIXME Always do ML probe for the sake of stability.
 	if (!missing_links)
 		return 0;
+	*/
 
 	wpa_dbg(wpa_s, MSG_DEBUG,
 		"MLD: Doing an ML probe for missing links 0x%04x",
