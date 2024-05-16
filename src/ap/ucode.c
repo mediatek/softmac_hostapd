@@ -699,7 +699,7 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	struct hostapd_config *conf;
 	struct csa_settings csa = {};
 	uint64_t intval;
-	int i, ret = 0;
+	int i, ret = 0, band_idx;
 
 	wpa_printf(MSG_INFO, "ucode: mtk: channel switch for %s\n", iface->phy);
 	if (!iface || ucv_type(info) != UC_OBJECT)
@@ -733,6 +733,9 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	if ((intval = ucv_int64_get(ucv_object_get(info, "center_freq2", NULL))) && !errno)
 		csa.freq_params.center_freq2 = intval;
 
+	intval = ucv_int64_get(ucv_object_get(info, "band_idx", NULL));
+	band_idx = errno ? iface->conf->band_idx : intval;
+
 	wpa_printf(MSG_INFO, "ucode: mtk: switch channel information:\n");
 	wpa_printf(MSG_INFO, "    * freq is %d\n", csa.freq_params.freq);
 	wpa_printf(MSG_INFO, "    * bandwidth is %d\n",
@@ -743,6 +746,21 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 			csa.freq_params.center_freq1);
 	wpa_printf(MSG_INFO, "    * center_freq2 is %d\n",
 			csa.freq_params.center_freq2);
+	wpa_printf(MSG_INFO, "    * band_idx is %d\n",
+			band_idx);
+
+#ifdef CONFIG_IEEE80211BE
+	for (i = 0; i < iface->interfaces->count; i++) {
+		if (band_idx == iface->interfaces->iface[i]->conf->band_idx) {
+			iface = iface->interfaces->iface[i];
+			wpa_printf(MSG_INFO, "ucode: mtk: MLD: switch to iface with band_idx %d \n", band_idx);
+			break;
+		}
+	}
+
+	if (band_idx != iface->bss[0]->iconf->band_idx)
+		return NULL;
+#endif /* CONFIG_IEEE80211BE */
 
 	for (i = 0; i < iface->num_bss; i++) {
 		ret = hostapd_switch_channel(iface->bss[i], &csa);

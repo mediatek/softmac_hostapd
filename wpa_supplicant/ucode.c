@@ -100,9 +100,10 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	const char *state;
 	uc_value_t *val;
 	enum oper_chan_width ch_width;
-	int center_freq1, bw320_offset = 1;
+	int control_freq, center_freq1, bw320_offset = 1, band_idx;
 
-	if (event != EVENT_CH_SWITCH_STARTED)
+	if (event != EVENT_CH_SWITCH_STARTED &&
+	    event != EVENT_LINK_CH_SWITCH_STARTED)
 		return;
 
 	val = wpa_ucode_registry_get(iface_registry, wpa_s->ucode.idx);
@@ -118,7 +119,13 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	val = ucv_object_new(vm);
 	uc_value_push(ucv_get(val));
 
-	if (event == EVENT_CH_SWITCH_STARTED) {
+	if (event == EVENT_CH_SWITCH_STARTED ||
+	    event == EVENT_LINK_CH_SWITCH_STARTED) {
+		enum hostapd_hw_mode hw_mode;
+		int is_24ghz;
+		u8 channel;
+
+		control_freq = data->ch_switch.freq;
 		center_freq1 = data->ch_switch.cf1;
 
 		switch (data->ch_switch.ch_width) {
@@ -148,6 +155,23 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		     center_freq1 == 6905)
 			bw320_offset = 2;
 
+		hw_mode = ieee80211_freq_to_chan(control_freq, &channel);
+		is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
+			hw_mode == HOSTAPD_MODE_IEEE80211B;
+		/*
+		 * Assume that the mapping between band and band_idx is
+		 * 2 GHz band: band_idx 0
+		 * 5 GHz band: band_idx 1
+		 * 6 GHz band: band_idx 2
+		 * */
+		if (is_24ghz)
+			band_idx = 0;
+		else if (IS_5GHZ(control_freq))
+			band_idx = 1;
+		else if (is_6ghz_freq(control_freq))
+			band_idx = 2;
+
+
 		ucv_object_add(val, "csa_count", ucv_int64_new(data->ch_switch.count));
 		ucv_object_add(val, "frequency", ucv_int64_new(data->ch_switch.freq));
 		ucv_object_add(val, "sec_chan_offset", ucv_int64_new(data->ch_switch.ch_offset));
@@ -155,6 +179,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		ucv_object_add(val, "center_freq2", ucv_int64_new(data->ch_switch.cf2));
 		ucv_object_add(val, "ch_width", ucv_int64_new(ch_width));
 		ucv_object_add(val, "bw320_offset", ucv_int64_new(bw320_offset));
+		ucv_object_add(val, "band_idx", ucv_int64_new(band_idx));
 	}
 
 	ucv_put(wpa_ucode_call(4));
