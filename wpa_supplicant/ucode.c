@@ -310,10 +310,16 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 		else if (is_6ghz_freq(bss->freq))
 			band_idx = 2;
 
-		wpa_drv_channel_info(wpa_s, &ci);
-		freq = ci.frequency;
-		center_freq1 = ci.center_frq1;
-		chwidth=ci.chanwidth;
+		if (wpa_s->valid_links) {
+			freq = wpa_s->links[link_id].freq;
+			center_freq1 = wpa_s->links[link_id].center_freq1;
+			chwidth = wpa_s->links[link_id].width;
+		} else {
+			wpa_drv_channel_info(wpa_s, &ci);
+			freq = ci.frequency;
+			center_freq1 = ci.center_frq1;
+			chwidth=ci.chanwidth;
+		}
 
 		if (bss->freq != center_freq1) {
 			if (is_24ghz)

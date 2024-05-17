@@ -662,7 +662,7 @@ out:
 	wpa_printf(MSG_INFO, "    * seg0: %d\n",
 			hostapd_get_oper_centr_freq_seg0_idx(conf));
 	wpa_printf(MSG_INFO, "    * seg1: %d\n",
-			hostapd_get_oper_centr_freq_seg0_idx(conf));
+			hostapd_get_oper_centr_freq_seg1_idx(conf));
 	wpa_printf(MSG_INFO, "    * oper_chwidth: %d\n",
 			hostapd_get_oper_chwidth(conf));
 
