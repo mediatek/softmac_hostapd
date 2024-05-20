@@ -6892,6 +6892,8 @@ omit_rsnxe:
 		p += wpabuf_len(hapd->conf->assocresp_elements);
 	}
 
+	p = hostapd_eid_non_inheritance(hapd, p);
+
 out:
 	os_free(link->resp_sta_profile);
 	link->resp_sta_profile = os_memdup(buf, p - buf);
