@@ -479,7 +479,7 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	if (hapd->mld->eml_disable)
 		common_info_len -= 2; /* EML Capabilities (2) */
 
-	if (include_mld_id) {
+	if (include_mld_id && hostapd_get_mld_id(hapd)) {
 		/* AP MLD ID */
 		control |= BASIC_MULTI_LINK_CTRL_PRES_AP_MLD_ID;
 		common_info_len++;
@@ -539,7 +539,7 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 		   mld_cap);
 	wpabuf_put_le16(buf, mld_cap);
 
-	if (include_mld_id) {
+	if (include_mld_id && hostapd_get_mld_id(hapd)) {
 		wpa_printf(MSG_DEBUG, "MLD: AP MLD ID=0x%x",
 			   hostapd_get_mld_id(hapd));
 		wpabuf_put_u8(buf, hostapd_get_mld_id(hapd));
@@ -948,6 +948,7 @@ size_t hostapd_eid_eht_ml_beacon_len(struct hostapd_data *hapd,
 				     struct mld_info *info,
 				     bool include_mld_id)
 {
+	include_mld_id &= hostapd_get_mld_id(hapd);
 	return hostapd_eid_eht_ml_len(hapd, info, include_mld_id, false);
 }
 
