@@ -585,6 +585,7 @@ struct hostapd_mld {
 	u8 refcount;
 	bool started;
 	u16 link_reconf_in_progress;
+	u16 active_links;
 	u8 eml_disable;
 
 	struct hostapd_data *fbss;

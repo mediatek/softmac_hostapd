@@ -1047,6 +1047,22 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 			return -1;
 	}
 
+	/* Remove the CAC link from the active links of AP MLD temporarily to avoid
+	 * it being reported in the RNR of the affiliated APs of the same AP MLD
+	 */
+	if (iface->cac_started) {
+		int i;
+
+		for (i = 0; i < iface->num_bss; i++) {
+			struct hostapd_data *hapd = iface->bss[i];
+
+			if (!hapd->conf->mld_ap || !hapd->mld)
+				continue;
+
+			hapd->mld->active_links &= ~BIT(hapd->mld_link_id);
+		}
+	}
+
 	return 0;
 }
 
@@ -1378,6 +1394,8 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 			     int ht_enabled, int chan_offset, int chan_width,
 			     int cf1, int cf2)
 {
+	int i;
+
 	if (!hostapd_is_freq_in_current_hw_info(iface, freq)) {
 		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO,
 			DFS_EVENT_CAC_COMPLETED
@@ -1440,10 +1458,26 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 			 * sure the configured channel is available because this
 			 * CAC completion event could have been propagated from
 			 * another radio.
+			 * For a AP MLD, the setup of a DFS link after bootup CAC is
+			 * considered as link adding process via link reconfiguration.
 			 */
 			if (iface->state != HAPD_IFACE_ENABLED &&
-			    hostapd_is_dfs_chan_available(iface))
+			    hostapd_is_dfs_chan_available(iface)) {
+				for (i = 0; i < iface->num_bss; i++) {
+					struct hostapd_data *h, *hapd = iface->bss[i];
+
+					if (!hapd->conf->mld_ap || !hapd->mld)
+						continue;
+
+					hapd->mld->active_links |= BIT(hapd->mld_link_id);
+					for_each_mld_link(h, hapd)
+						h->mld->link_reconf_in_progress |=
+								BIT(h->mld_link_id);
+					hapd->mld->link_reconf_in_progress &=
+								~BIT(hapd->mld_link_id);
+				}
 				hostapd_setup_interface_complete(iface, 0);
+			}
 
 			iface->cac_started = 0;
 
@@ -1463,8 +1497,6 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 		iface->radar_background.primary_backup = 0;
 		hostapd_dfs_update_background_chain(iface);
 	} else if (iface->state == HAPD_IFACE_ENABLED) {
-		int i;
-
 		iface->cac_started = 0;
 		/* Clear all the CSA params if the switch to DFS channel fails */
 		for (i = 0; i < iface->num_bss; i++)
