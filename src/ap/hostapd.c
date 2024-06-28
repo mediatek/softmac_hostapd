@@ -5312,6 +5312,7 @@ int hostapd_mld_add_link(struct hostapd_data *hapd)
 
 	dl_list_add_tail(&mld->links, &hapd->link);
 	mld->num_links++;
+	mld->active_links |= BIT(hapd->mld_link_id);
 
 	wpa_printf(MSG_DEBUG, "AP MLD %s: Link ID %d added. num_links: %d",
 		   mld->name, hapd->mld_link_id, mld->num_links);
@@ -5340,6 +5341,7 @@ int hostapd_mld_remove_link(struct hostapd_data *hapd)
 
 	dl_list_del(&hapd->link);
 	mld->num_links--;
+	mld->active_links &= ~BIT(hapd->mld_link_id);
 
 	wpa_printf(MSG_DEBUG, "AP MLD %s: Link ID %d removed. num_links: %d",
 		   mld->name, hapd->mld_link_id, mld->num_links);
