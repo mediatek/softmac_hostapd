@@ -24,6 +24,10 @@
 #include "hw_features.h"
 #include "ap_drv_ops.h"
 
+#ifdef CONFIG_IEEE80211BE
+#include "scs.h"
+#endif
+
 
 u32 hostapd_sta_flags_to_drv(u32 flags)
 {
@@ -1696,3 +1700,12 @@ int hostapd_drv_csi_dump(struct hostapd_data *hapd, void *dump_buf)
 		return 0;
 	return hapd->driver->csi_dump(hapd->drv_priv, hapd->iconf->band_idx, dump_buf);
 }
+
+#ifdef CONFIG_IEEE80211BE
+int hostapd_drv_set_scs(struct hostapd_data *hapd, struct hostapd_scs_desc_info *info)
+{
+	if (!hapd->driver || !hapd->driver->set_scs)
+		return 0;
+	return hapd->driver->set_scs(hapd->drv_priv, info, hapd->mld_link_id);
+}
+#endif

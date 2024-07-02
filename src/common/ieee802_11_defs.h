@@ -1227,6 +1227,11 @@ struct ieee80211_mgmt {
 					 * Basic Multi-Link element (optional) */
 					u8 variable[];
 				} STRUCT_PACKED link_reconf_resp;
+				struct {
+					u8 action;
+					u8 dialog_token;
+					u8 variable[];
+				} STRUCT_PACKED scs;
 			} u;
 		} STRUCT_PACKED action;
 	} u;

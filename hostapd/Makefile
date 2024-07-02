@@ -383,6 +383,7 @@ ifdef CONFIG_IEEE80211BE
 CONFIG_IEEE80211AX=y
 CFLAGS += -DCONFIG_IEEE80211BE
 OBJS += ../src/ap/ieee802_11_eht.o
+OBJS += ../src/ap/scs.o
 endif
 
 ifdef CONFIG_IEEE80211AX
