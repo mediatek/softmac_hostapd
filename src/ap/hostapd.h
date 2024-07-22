@@ -814,17 +814,71 @@ struct hostapd_iface {
 			int power[5];
 		} *chan_info_list;
 		bool data_valid;
+		bool lpi_mode;
 	} afc;
 #endif /* CONFIG_AFC */
 };
 
 /* hostapd.c */
 #ifdef CONFIG_AFC
+
+enum afc_state {
+	AFC_DISABLE,
+	AFC_RESTART_IFACE,
+	AFC_LPI,
+	AFC_CONTINUE,
+};
+
+#define MAX_CHANNEL_NUM_6G 59
+
+/* The power unit is 0.5 dBm */
+#define AFC_MAXIMUM_POWER 72
+#define AFC_INVALID_POWER 127
+#define PSD_TO_DBM_OFFSET 26
+#define BW20_TO_RU26_OFFSET 20
+#define DOUBLE_BW_POWER 6
+
+#define RU26_OFFSET_20MHZ 20
+#define RU52_OFFSET_20MHZ 14
+#define RU78_OFFSET_20MHZ 10
+#define RU106_OFFSET_20MHZ 8
+#define RU132_OFFSET_20MHZ 6
+
+#define RU726_OFFSET_80MHZ 2
+#define RU1480_OFFSET_160MHZ 2
+#define RU1772_OFFSET_160MHZ 1
+#define RU2476_OFFSET_320MHZ 4
+#define RU2988_OFFSET_320MHZ 2
+#define RU3472_OFFSET_320MHZ 1
+
+enum afc_table_info {
+	afc_power_bw20,
+	afc_power_bw40,
+	afc_power_bw80,
+	afc_power_bw160,
+	afc_power_bw320_1,
+	afc_power_bw320_2,
+	afc_power_ru26,
+	afc_power_ru52,
+	afc_power_ru78,
+	afc_power_ru106,
+	afc_power_ru132,
+	afc_power_ru726,
+	afc_power_ru1480,
+	afc_power_ru1772,
+	afc_power_ru2476,
+	afc_power_ru2988,
+	afc_power_ru3472,
+	afc_power_table_num,
+};
+
 int hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
 				       int *power);
 int hostapd_afc_handle_request(struct hostapd_iface *iface);
 void hostapd_afc_stop(struct hostapd_iface *iface);
 void hostap_afc_disable_channels(struct hostapd_iface *iface);
+int hostapd_afc_translate_table(struct hostapd_iface *iface,
+				s8 ***power_table);
 #else
 static inline int
 hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
@@ -844,6 +898,12 @@ static inline void hostapd_afc_stop(struct hostapd_iface *iface)
 
 static inline void hostap_afc_disable_channels(struct hostapd_iface *iface)
 {
+}
+
+static inline int hostapd_afc_translate_table(struct hostapd_iface *iface,
+					      s8 ***power_table)
+{
+	return -EINVAL;
 }
 #endif /* CONFIG_AFC */
 

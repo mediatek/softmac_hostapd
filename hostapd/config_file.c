@@ -4019,6 +4019,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "afc_op_class") == 0) {
 		if (hostapd_afc_parse_op_class(conf, pos))
 			return 1;
+	} else if (os_strcmp(buf, "afc_max_timeout") == 0) {
+		conf->afc.max_timeout = atoi(pos);
 #endif /* CONFIG_AFC */
 	} else if (os_strcmp(buf, "mbssid") == 0) {
 		int mbssid = atoi(pos);
@@ -5340,6 +5342,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		conf->lpi_psd = !!en;
 	} else if (os_strcmp(buf, "sku_idx") == 0) {
 		conf->sku_idx = strtol(pos, NULL, 10);
+	} else if (os_strcmp(buf, "lpi_sku_idx") == 0) {
+		conf->lpi_sku_idx = strtol(pos, NULL, 10);
 	} else if (os_strcmp(buf, "lpi_bcn_enhance") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_bcn_enhance = !!en;

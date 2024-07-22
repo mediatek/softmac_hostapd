@@ -43,6 +43,7 @@
 #include "driver_nl80211.h"
 #include "common/mtk_vendor.h"
 #include "ap/ap_config.h"
+#include "ap/hostapd.h"
 
 #ifdef CONFIG_IEEE80211BE
 #include "ap/scs.h"
@@ -207,6 +208,8 @@ txpower_ctrl_policy[NUM_MTK_VENDOR_ATTRS_TXPOWER_CTRL] = {
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_IDX] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_BCN_ENHANCE] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_LINK_ID] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_TABLE] = { .type = NLA_BINARY },
+	[MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_LPI] = { .type = NLA_U8 },
 };
 
 static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)
@@ -16566,13 +16569,14 @@ fail:
 }
 
 static int nl80211_txpower_ctrl(void *priv, u8 lpi_psd, u8 sku_idx, u8 lpi_bcn_enhance,
-				u8 link_id)
+				u8 link_id, s8 **power_table, u8 lpi_mode)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	int ret;
+	struct nlattr *table_attr, *channel_list;
+	int ret = 0;
 
 	if (!drv->mtk_txpower_vendor_cmd_avail) {
 		wpa_printf(MSG_INFO,
@@ -16596,8 +16600,18 @@ static int nl80211_txpower_ctrl(void *priv, u8 lpi_psd, u8 sku_idx, u8 lpi_bcn_e
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_IDX, sku_idx);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_BCN_ENHANCE, lpi_bcn_enhance);
-	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LINK_ID, link_id);
 
+	if (link_id > -1)
+		nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LINK_ID, link_id);
+
+#ifdef CONFIG_AFC
+	if (power_table && *power_table) {
+		nla_put(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_TABLE,
+		        MAX_CHANNEL_NUM_6G * afc_power_table_num, power_table);
+	}
+#endif /* CONFIG_AFC */
+
+	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_LPI, lpi_mode);
 	nla_nest_end(msg, data);
 	ret = send_and_recv_cmd(drv, msg);
 	if (ret)

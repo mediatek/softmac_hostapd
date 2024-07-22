@@ -1331,6 +1331,7 @@ struct hostapd_config {
 		unsigned int n_op_class;
 		unsigned int *op_class;
 		int min_power;
+		int max_timeout;
 	} afc;
 #endif /* CONFIG_AFC */
 
@@ -1345,6 +1346,7 @@ struct hostapd_config {
 	u8 pp_mode;
 	u8 lpi_psd;
 	u8 sku_idx;
+	u8 lpi_sku_idx;
 	u8 lpi_bcn_enhance;
 };
 
