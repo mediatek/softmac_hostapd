@@ -483,7 +483,6 @@ void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links)
 		if (!(BIT(link->mld_link_id) & removed_links))
 			continue;
 
-		link->eht_mld_bss_critical_update = 0;
 		eloop_register_timeout(0, 0,
 				       hostapd_link_remove_timeout_handler,
 				       link, NULL);
@@ -4805,9 +4804,6 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 		return ret;
 	}
 
-	/* Change back to the final BPCC and CU flag */
-	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
-
 	settings->counter_offset_beacon[0] = hapd->cs_c_off_beacon;
 	settings->counter_offset_presp[0] = hapd->cs_c_off_proberesp;
 	settings->counter_offset_beacon[1] = hapd->cs_c_off_ecsa_beacon;
@@ -4941,6 +4937,7 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 					mode ? &mode->eht_capab[IEEE80211_MODE_AP] : NULL,
 					hostapd_get_punct_bitmap(h));
 		hapd->cs_freq_params.channel = 0;
+		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
 		ret = hostapd_build_beacon_data(h, &settings.beacon_after);
 		hostapd_change_config_freq(hapd, hapd->iconf,
 					   &old_freq, NULL);
@@ -4956,9 +4953,6 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 			free_beacon_data(&settings.beacon_after);
 			return ret;
 		}
-
-		/* Change back to the final BPCC and CU flag */
-		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
 
 		settings.counter_offset_sta_prof[cs_link_id][0] =
 						h->cs_c_off_sta_prof[cs_link_id];

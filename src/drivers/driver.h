@@ -6437,6 +6437,11 @@ enum wpa_event_type {
 	 * has been applied and a channel switch should be triggered.
 	 */
 	EVENT_PP_BITMAP_UPDATE,
+
+	/**
+	 * EVENT_CRIT_UPDATE - Notification of the status of a critical update event
+	 */
+	EVENT_CRIT_UPDATE,
 };
 
 
@@ -7455,6 +7460,19 @@ union wpa_event_data {
 		size_t resp_ie_len;
 		u16 removed_links;
 	} reconfig_info;
+
+	/**
+	 * struct crit_update_info - Data for EVENT_CRIT_UPDATE
+	 */
+	struct crit_update_info {
+		int link_id;
+		enum {
+			CRIT_UPDATE_NONE,
+			CRIT_UPDATE_SINGLE,
+			CRIT_UPDATE_ALL,
+			CRIT_UPDATE_FLAG,
+		} flag;
+	} crit_update_info;
 };
 
 /**
