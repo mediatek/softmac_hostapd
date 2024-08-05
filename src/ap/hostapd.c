@@ -4761,6 +4761,8 @@ int hostapd_change_config_freq(struct hostapd_data *hapd,
 
 		if (hostapd_set_freq_params(old_params, &info))
 			return -1;
+
+		old_params->op_class = conf->op_class;
 	}
 
 	switch (params->bandwidth) {
@@ -4806,6 +4808,7 @@ int hostapd_change_config_freq(struct hostapd_data *hapd,
 	conf->ieee80211n = params->ht_enabled;
 	conf->ieee80211ac = params->vht_enabled;
 	conf->secondary_channel = params->sec_channel_offset;
+	conf->op_class = params->op_class;
 	if (params->center_freq1 &&
 	    ieee80211_freq_to_chan(params->center_freq1, &seg0) ==
 	    NUM_HOSTAPD_MODES)
@@ -4949,6 +4952,7 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 
 	settings->freq_params.channel = chan;
 
+	settings->freq_params.op_class = hapd->iface->cs_oper_class;
 	ret = hostapd_change_config_freq(iface->bss[0], iface->conf,
 					 &settings->freq_params,
 					 &old_freq);
