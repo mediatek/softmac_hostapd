@@ -732,6 +732,8 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 		csa.freq_params.center_freq1 = intval;
 	if ((intval = ucv_int64_get(ucv_object_get(info, "center_freq2", NULL))) && !errno)
 		csa.freq_params.center_freq2 = intval;
+	if ((intval = ucv_int64_get(ucv_object_get(info, "punct_bitmap", NULL))) && !errno)
+		csa.freq_params.punct_bitmap = intval;
 
 	intval = ucv_int64_get(ucv_object_get(info, "band_idx", NULL));
 	band_idx = errno ? iface->conf->band_idx : intval;
@@ -746,6 +748,8 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 			csa.freq_params.center_freq1);
 	wpa_printf(MSG_INFO, "    * center_freq2 is %d\n",
 			csa.freq_params.center_freq2);
+	wpa_printf(MSG_INFO, "    * punct_bitmap is %d\n",
+			csa.freq_params.punct_bitmap);
 	wpa_printf(MSG_INFO, "    * band_idx is %d\n",
 			band_idx);
 

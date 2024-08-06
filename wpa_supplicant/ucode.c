@@ -179,6 +179,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		ucv_object_add(val, "center_freq2", ucv_int64_new(data->ch_switch.cf2));
 		ucv_object_add(val, "ch_width", ucv_int64_new(oper_chwidth));
 		ucv_object_add(val, "bw320_offset", ucv_int64_new(bw320_offset));
+		ucv_object_add(val, "punct_bitmap", ucv_int64_new(data->ch_switch.punct_bitmap));
 		ucv_object_add(val, "band_idx", ucv_int64_new(band_idx));
 	}
 

@@ -110,6 +110,7 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	uc_value_t *freq = uc_fn_arg(0);
 	uc_value_t *sec = uc_fn_arg(1);
 	int width = ucv_uint64_get(uc_fn_arg(2));
+	int punct_bitmap = ucv_uint64_get(uc_fn_arg(5));
 	int bw320_offset = 1, band_idx;
 	int freq_val, center_idx, center_ofs;
 	enum oper_chan_width chanwidth;
@@ -184,6 +185,7 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	ucv_object_add(ret, "sec_channel", ucv_int64_new(sec_channel));
 	ucv_object_add(ret, "frequency", ucv_int64_new(freq_val));
 	ucv_object_add(ret, "oper_chwidth", ucv_int64_new(chanwidth));
+	ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
 
 	if (chanwidth == CONF_OPER_CHWIDTH_USE_HT) {
 		center_idx = freq_val < 3000 ? 0 : channel + 2 * sec_channel;
