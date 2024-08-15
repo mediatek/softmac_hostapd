@@ -626,6 +626,15 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 	if (!errno)
 		hostapd_set_oper_chwidth(conf, intval);
 
+	intval = ucv_int64_get(ucv_object_get(info, "punct_bitmap", NULL));
+	if (!errno)
+		conf->punct_bitmap = intval;
+
+	conf->pp_mode = PP_USR_MODE;
+	if (iface->state == HAPD_IFACE_ENABLED &&
+	    hostapd_drv_pp_mode_set(iface->bss[0]) != 0)
+		return NULL;
+
 	intval = ucv_int64_get(ucv_object_get(info, "frequency", NULL));
 	if (!errno)
 		iface->freq = intval;

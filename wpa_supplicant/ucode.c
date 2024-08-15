@@ -282,6 +282,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	enum hostapd_hw_mode hw_mode;
 	int link_id = ucv_int64_get(link_obj);
 	u32 freq;
+	u16 punct_bitmap;
 
 	if (!wpa_s)
 		return NULL;
@@ -315,11 +316,13 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 			freq = wpa_s->links[link_id].freq;
 			center_freq1 = wpa_s->links[link_id].center_freq1;
 			chwidth = wpa_s->links[link_id].width;
+			punct_bitmap = wpa_s->links[link_id].punct_bitmap;
 		} else {
 			wpa_drv_channel_info(wpa_s, &ci);
 			freq = ci.frequency;
 			center_freq1 = ci.center_frq1;
-			chwidth=ci.chanwidth;
+			chwidth = ci.chanwidth;
+			punct_bitmap = ci.punct_bitmap;
 		}
 
 		if (bss->freq != center_freq1) {
@@ -345,6 +348,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 		ucv_object_add(ret, "ch_width", ucv_int64_new(oper_chwidth));
 		ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
 		ucv_object_add(ret, "band_idx", ucv_int64_new(band_idx));
+		ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
 	}
 
 #ifdef CONFIG_MESH
