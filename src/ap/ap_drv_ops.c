@@ -396,7 +396,7 @@ int hostapd_set_wds_sta(struct hostapd_data *hapd, char *ifname_wds,
 			const u8 *addr, int aid, int val)
 {
 	const char *bridge = NULL;
-	char ifName[IFNAMSIZ + 1];
+	char ifName[IFNAMSIZ + 1] = {0};
 
 	int mRet = 0;
 

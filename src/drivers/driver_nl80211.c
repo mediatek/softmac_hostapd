@@ -8852,7 +8852,7 @@ static int i802_set_wds_sta(void *priv, const u8 *addr, int aid, int val,
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	char name[IFNAMSIZ + 1];
+	char name[IFNAMSIZ + 1] = {0};
 	union wpa_event_data event;
 	bool add_br = false;
 	int ret;
