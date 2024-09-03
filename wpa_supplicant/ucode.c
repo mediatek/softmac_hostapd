@@ -125,6 +125,14 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		int is_24ghz;
 		u8 channel;
 
+		if (wpa_s->wpa_state < WPA_COMPLETED) {
+			wpa_printf(MSG_INFO,
+				   "ucode: mtk: receive channel switch event"
+				   "before association finished, reconnect\n");
+			wpa_supplicant_reconnect(wpa_s);
+			return;
+		}
+
 		control_freq = data->ch_switch.freq;
 		center_freq1 = data->ch_switch.cf1;
 
