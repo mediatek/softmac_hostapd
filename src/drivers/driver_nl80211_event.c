@@ -192,6 +192,7 @@ static const char * nl80211_command_to_string(enum nl80211_commands cmd)
 	C2S(NL80211_CMD_EPCS_CFG)
 	C2S(NL80211_CMD_ATTLM_EVENT)
 	C2S(NL80211_CMD_SET_ATTLM)
+	C2S(NL80211_CMD_TSF_OFFSET_EVENT)
 	C2S(NL80211_CMD_NOTIFY_CRIT_UPDATE)
 	C2S(__NL80211_CMD_AFTER_LAST)
 	}
@@ -1430,6 +1431,20 @@ static void mlme_event_attlm(struct wpa_driver_nl80211_data *drv,
 	}
 
 	wpa_supplicant_event(bss->ctx, EVENT_ATTLM, &data);
+}
+
+
+static void mlme_event_tsf_offset(struct wpa_driver_nl80211_data *drv,
+				  struct nlattr *link_id,
+				  struct nlattr *tsf_offset)
+{
+	union wpa_event_data event;
+
+	os_memset(&event, 0, sizeof(event));
+	event.tsf_event.link_id = nla_get_u8(link_id);
+	os_memcpy(event.tsf_event.tsf_offset, nla_data(tsf_offset), nla_len(tsf_offset));
+
+	wpa_supplicant_event(drv->ctx, EVENT_TSF_OFFSET, &event);
 }
 
 
@@ -4445,6 +4460,11 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		mlme_event_attlm(drv, tb[NL80211_ATTR_IFINDEX],
 				 tb[NL80211_ATTR_MLO_ATTLM_EVENT],
 				 tb[NL80211_ATTR_MLO_ATTLM_SWITCH_TIME_TSF_TU]);
+		break;
+	case NL80211_CMD_TSF_OFFSET_EVENT:
+		mlme_event_tsf_offset(drv,
+				      tb[NL80211_ATTR_MLO_LINK_ID],
+				      tb[NL80211_ATTR_MLO_TSF_OFFSET_VAL]);
 		break;
 	case NL80211_CMD_DISCONNECT:
 		mlme_event_disconnect(drv, tb[NL80211_ATTR_REASON_CODE],
