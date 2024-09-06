@@ -1585,6 +1585,17 @@ static void hostapd_event_update_crit_update_flag(struct hostapd_data *hapd, u8 
 		   type, hapd->eht_mld_bss_param_change, hapd->mld->name,
 		   hapd->mld_link_id);
 }
+
+void hostapd_event_tsf_offset(struct hostapd_data *hapd, s64 *tsf_offset)
+{
+	struct hostapd_mld *mld = hapd->mld;
+
+	if (!hapd->conf->mld_ap || !mld)
+		return;
+
+	os_memcpy(hapd->tsf_offset, tsf_offset, sizeof(hapd->tsf_offset));
+}
+
 #endif /* CONFIG_IEEE80211BE */
 
 
@@ -3018,6 +3029,14 @@ void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 	case EVENT_ATTLM:
 #ifdef CONFIG_IEEE80211BE
 		hostapd_event_attlm(hapd, &data->attlm_event);
+#endif /* CONFIG_IEEE80211BE */
+		break;
+	case EVENT_TSF_OFFSET:
+#ifdef CONFIG_IEEE80211BE
+		if (!data)
+			break;
+		hapd = switch_link_hapd(hapd, data->tsf_event.link_id);
+		hostapd_event_tsf_offset(hapd, data->tsf_event.tsf_offset);
 #endif /* CONFIG_IEEE80211BE */
 		break;
 	case EVENT_CONNECT_FAILED_REASON:
