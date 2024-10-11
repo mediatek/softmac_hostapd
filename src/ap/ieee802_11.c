@@ -5190,6 +5190,7 @@ static int add_associated_sta(struct hostapd_data *hapd,
 	     (!reassoc && (sta->flags & WLAN_STA_AUTHORIZED)))) {
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		wpa_auth_sm_event(sta->wpa_sm, WPA_DRV_STA_REMOVED);
+		ap_sta_set_authorized_flag(hapd, sta, 0);
 		set = 0;
 
 		 /* Do not allow the FT-over-DS exception to be used more than
