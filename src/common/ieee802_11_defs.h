@@ -1258,6 +1258,13 @@ struct ieee80211_mgmt {
 					u8 variable[];
 				} STRUCT_PACKED link_reconf_resp;
 				struct {
+					u8 action; /* Protected EHT - 1 */
+					u8 dialog_token;
+					le16 status_code;
+					/* TTLM element */
+					u8 variable[];
+				} STRUCT_PACKED neg_ttlm_resp;
+				struct {
 					u8 action;
 					u8 oui[3];
 					u8 oui_type;

@@ -330,8 +330,14 @@ void hostapd_link_reconf_resp_tx_status(struct hostapd_data *hapd,
 					struct sta_info *sta,
 					const struct ieee80211_mgmt *mgmt,
 					size_t len, int ok);
+void hostapd_neg_ttlm_resp_tx_status(struct hostapd_data *hapd,
+				     struct sta_info *sta,
+				     const struct ieee80211_mgmt *mgmt,
+				     size_t len, int ok);
 
 size_t hostapd_eid_eht_ml_tid_to_link_map_len(struct hostapd_data *hapd);
 u8 * hostapd_eid_eht_ml_tid_to_link_map(struct hostapd_data *hapd, u8 *eid);
 
+int ieee802_11_send_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr);
+void hostapd_teardown_neg_ttlm(struct hostapd_data *hapd, struct sta_info *sta);
 #endif /* IEEE802_11_H */

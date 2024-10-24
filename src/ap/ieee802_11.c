@@ -6880,7 +6880,7 @@ static int handle_action(struct hostapd_data *hapd,
 	struct sta_info *sta;
 	u8 *action __maybe_unused;
 
-	if (len < IEEE80211_HDRLEN + 2 + 1) {
+	if (len < IEEE80211_HDRLEN + 2) {
 		hostapd_logger(hapd, mgmt->sa, HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "handle_action - too short payload (len=%lu)",
@@ -7736,6 +7736,21 @@ static void handle_action_cb(struct hostapd_data *hapd,
 	    mgmt->u.action.u.link_reconf_resp.action ==
 	    WLAN_PROT_EHT_LINK_RECONFIG_RESPONSE) {
 		hostapd_link_reconf_resp_tx_status(hapd, sta, mgmt, len, ok);
+		return;
+	}
+
+	/* Neogiated TTLM response length is at least
+	 * - Header length
+	 * - Category: 1 byte
+	 * - Action code: 1 byte
+	 * - Dialog token: 1 byte
+	 * - Status code: 2 byte
+	 */
+	if (len >= IEEE80211_HDRLEN + 3 + 2 &&
+	    mgmt->u.action.category == WLAN_ACTION_PROTECTED_EHT &&
+	    mgmt->u.action.u.neg_ttlm_resp.action ==
+	    WLAN_PROT_EHT_T2L_MAPPING_RESPONSE) {
+		hostapd_neg_ttlm_resp_tx_status(hapd, sta, mgmt, len, ok);
 		return;
 	}
 #endif /* CONFIG_IEEE80211BE */
