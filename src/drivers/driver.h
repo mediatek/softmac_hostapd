@@ -5451,6 +5451,8 @@ struct wpa_driver_ops {
 	int (*link_remove)(void *priv, enum wpa_driver_if_type type,
 			   const char *ifname, u8 link_id);
 
+	int (*set_sta_ttlm)(void *priv, const char *addr,
+			    struct ieee80211_neg_ttlm *neg_ttlm);
 	/**
 	 * set_attlm - Set AP MLD advertised Tid-to-Link Mapping
 	 * @priv: Private driver interface data
