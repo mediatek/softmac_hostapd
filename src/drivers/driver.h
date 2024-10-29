@@ -2804,6 +2804,11 @@ struct wpa_mlo_signal_info {
 	struct wpa_signal_info links[MAX_NUM_MLD_LINKS];
 };
 
+struct wpa_neg_ttlm_info {
+	u16 dlink[IEEE80211_TTLM_NUM_TIDS];
+	u16 ulink[IEEE80211_TTLM_NUM_TIDS];
+};
+
 /**
  * struct wpa_mlo_reconfig_info - Information about user-requested add and/or
  * remove setup links for the current MLO association.
@@ -4558,6 +4563,20 @@ struct wpa_driver_ops {
 	 */
 	int (*setup_link_reconfig)(void *priv,
 				   struct wpa_mlo_reconfig_info *info);
+
+	/**
+	 * neg_ttlm_setup - set up a negotiated TTLM to AP MLD
+	 * @priv: Private driver interface data
+	 * @neg_ttlm: Neg-TTLM info structure
+	 */
+	int (*neg_ttlm_setup)(void *priv,
+			      struct wpa_neg_ttlm_info *neg_ttlm);
+
+	/**
+	 * neg_ttlm_teardown - tear down a negotiated TTLM
+	 * @priv: Private driver interface data
+	 */
+	int (*neg_ttlm_teardown)(void *priv);
 
 	/**
 	 * channel_info - Get parameters of the current operating channel
