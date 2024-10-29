@@ -886,6 +886,20 @@ static inline bool sec_prof_is_sae(int p)
 #define WLAN_PROT_EHT_LINK_RECONFIG_REQUEST 11
 #define WLAN_PROT_EHT_LINK_RECONFIG_RESPONSE 12
 
+#define IEEE80211_TTLM_MAX_CNT 2
+#define IEEE80211_TTLM_NUM_TIDS 8
+
+struct ieee80211_neg_ttlm {
+	u16 dlink[IEEE80211_TTLM_NUM_TIDS];
+	u16 ulink[IEEE80211_TTLM_NUM_TIDS];
+	bool valid;
+};
+
+struct neg_ttlm_req {
+	u8 dialog_token;
+	u8 variable[];
+};
+
 /**
  * struct attlm_settings - Setting for Advertised Tid-to-Link Mapping
  * @valid: whether this A-TTLM is still valid
