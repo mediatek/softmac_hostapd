@@ -440,6 +440,17 @@ static int wpa_cli_cmd_setup_link_reconfig(struct wpa_ctrl *ctrl, int argc,
 	return wpa_cli_cmd(ctrl, "SETUP_LINK_RECONFIG", 1, argc, argv);
 }
 
+static int wpa_cli_cmd_neg_ttlm_setup(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NEG_TTLM_SETUP", 9, argc, argv);
+}
+
+
+static int wpa_cli_cmd_neg_ttlm_teardown(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "NEG_TTLM_TEARDOWN");
+}
+
 
 static int wpa_cli_cmd_set(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
@@ -4223,6 +4234,12 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 #endif /* CONFIG_NAN */
 	{ "new_random_mac_address", wpa_cli_cmd_generate_new_mac, NULL,
 	  cli_cmd_flag_none, "= Generate new random MAC address" },
+	{ "neg_ttlm_setup", wpa_cli_cmd_neg_ttlm_setup, NULL,
+	  cli_cmd_flag_none,
+	  "<uplink/downlink/bidi> <tid0 bitmap> <tid1 bitmap> <tid2 bitmap> <tid3 bitmap> <tid4 bitmap> <tid5 bitmap> <tid6 bitmap> <tid7 bitmap> = Setup negotiated TTLM" },
+	{ "neg_ttlm_teardown", wpa_cli_cmd_neg_ttlm_teardown, NULL,
+	  cli_cmd_flag_none,
+	  "teardown the Neg-TTLM" },
 	{ NULL, NULL, NULL, cli_cmd_flag_none, NULL }
 };
 
