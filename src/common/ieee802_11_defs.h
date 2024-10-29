@@ -816,6 +816,29 @@
 #define WLAN_PROT_EHT_LINK_RECONFIG_REQUEST 11
 #define WLAN_PROT_EHT_LINK_RECONFIG_RESPONSE 12
 
+/**
+ * struct attlm_settings - Setting for Advertised Tid-to-Link Mapping
+ * @valid: whether this A-TTLM is still valid
+ * @direction: direction of this A-TTLM
+ * @disabled_links: disabled link ID bitmap
+ * @link_mapping_size: size of the link mapping of each TID
+ * @switch_time: duration in ms to establish the A-TTLM
+ * @switch_time_tsf_tu: time in TUs that the A-TTLM is established. It should be
+ * the bits 10 to 25 of the TSF
+ * @duration_tu: duration in ms that the A-TTLM lasts
+ * @start_time: the relative time that this A-TTLM is entablished
+ */
+struct attlm_settings {
+	bool valid;
+	u8 direction;
+	u16 disabled_links;
+	u8 link_mapping_size;
+	u16 switch_time;
+	u16 switch_time_tsf_tu;
+	u32 duration;
+	struct os_reltime start_time;
+};
+
 /* Radio Measurement capabilities (from RM Enabled Capabilities element)
  * IEEE Std 802.11-2020, 9.4.2.44, Table 9-179 */
 /* byte 1 (out of 5) */
