@@ -343,7 +343,7 @@ int nl80211_create_iface(struct wpa_driver_nl80211_data *drv,
 			 const char *ifname, enum nl80211_iftype iftype,
 			 const u8 *addr, int wds,
 			 int (*handler)(struct nl_msg *, void *),
-			 void *arg, int use_existing);
+			 void *arg, int use_existing, u32 radio_mask);
 void nl80211_remove_iface(struct wpa_driver_nl80211_data *drv, int ifidx);
 unsigned int nl80211_get_assoc_freq(struct wpa_driver_nl80211_data *drv);
 const u8 * nl80211_get_assoc_bssid(struct wpa_driver_nl80211_data *drv);
