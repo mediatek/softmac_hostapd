@@ -4750,17 +4750,18 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 	value = pos;
 
 	if (os_strcmp(config, "onoff") == 0) {
-		int mu = atoi(value);
-		if (mu < 0 || mu > 15) {
-			wpa_printf(MSG_ERROR, "Invalid value for mu");
-			return -1;
-		}
-		hapd->iconf->mu_onoff = (u8) mu;
-
-		if (hostapd_drv_mu_ctrl(hapd, MU_CTRL_ONOFF) == 0)
-			return os_snprintf(buf, buflen, "OK\n");
-		else
+		cnt = hostapd_parse_argument_helper(value, &val);
+		if (cnt == -1)
 			goto fail;
+		if (cnt < 1 || val[0] > 15)
+			goto para_fail;
+
+		hapd->iconf->mu_onoff = val[0];
+		os_free(val);
+		if (hostapd_drv_mu_ctrl(hapd, MU_CTRL_ONOFF) != 0)
+			goto fail;
+
+		return os_snprintf(buf, buflen, "OK\n");
 	}
 
 	if (hapd->iconf->muru_config == NULL)
@@ -4924,27 +4925,33 @@ fail:
 
 
 static int
-hostapd_ctrl_iface_get_mu(struct hostapd_data *hapd, char *buf,
-					 size_t buflen)
+hostapd_ctrl_iface_get_mu(struct hostapd_data *hapd, char *buf, size_t buflen)
 {
-	u8 mu_onoff;
+	u8 mu_onoff, radio_idx = 0;
 	char *pos, *end;
+	int ret;
 
 	pos = buf;
 	end = buf + buflen;
 
 	if (hapd->iface->state != HAPD_IFACE_ENABLED)
-		return os_snprintf(pos, end - pos, "Not allowed to get_mu when current state is %s\n",
+		return os_snprintf(pos, end - pos,
+				   "Not allowed to get_mu when current state is %s\n",
 				   hostapd_state_text(hapd->iface->state));
 
-	if (hostapd_drv_mu_dump(hapd, &mu_onoff) == 0) {
-		hapd->iconf->mu_onoff = mu_onoff;
-		return os_snprintf(pos, end - pos, "[hostapd_cli] = UL MU-MIMO: %d, DL MU-MIMO: %d, UL OFDMA: %d, DL OFDMA: %d\n",
-			!!(mu_onoff&BIT(3)), !!(mu_onoff&BIT(2)), !!(mu_onoff&BIT(1)), !!(mu_onoff&BIT(0)));
-	} else {
+	if (hostapd_drv_mu_dump(hapd, &mu_onoff)) {
 		wpa_printf(MSG_INFO, "ctrl iface failed to call");
 		return -1;
 	}
+
+	hapd->iconf->mu_onoff = mu_onoff;
+	if (hapd->iface->current_hw_info)
+		radio_idx = hapd->iface->current_hw_info->hw_idx;
+	ret = os_snprintf(pos, end - pos,
+			  "Radio %u: UL MU-MIMO: %d, DL MU-MIMO: %d, UL OFDMA: %d, DL OFDMA: %d\n",
+			  radio_idx, !!(mu_onoff & BIT(3)), !!(mu_onoff & BIT(2)),
+			  !!(mu_onoff & BIT(1)), !!(mu_onoff & BIT(0)));
+	return ret;
 }
 
 static int
@@ -5643,7 +5650,7 @@ hostapd_ctrl_iface_disable_beacon(struct hostapd_data *hapd, char *value,
 
 static int
 hostapd_ctrl_iface_set_csi(struct hostapd_data *hapd, char *cmd,
-					char *buf, size_t buflen)
+			   char *buf, size_t buflen)
 {
 	char *tmp;
 	u8 sta_mac[ETH_ALEN] = {0};
@@ -5779,7 +5786,7 @@ static int mt76_csi_to_json(char *fname, struct csi_resp_data *resp_buf)
 
 static int
 hostapd_ctrl_iface_dump_csi(struct hostapd_data *hapd, char *cmd,
-				char *buf, size_t buflen)
+			    char *buf, size_t buflen)
 {
 	char *tmp, *fname;
 	int data_cnt = 0, ret = 0;
@@ -6570,7 +6577,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							  reply_size);
 	} else if (os_strncmp(buf, "SET_MU ", 7) == 0) {
 		reply_len = hostapd_ctrl_iface_set_mu(hapd, buf + 7, reply, reply_size);
-	} else if (os_strncmp(buf, "GET_MU", 6) == 0) {
+	} else if (os_strncmp(buf, "GET_MU ", 7) == 0) {
 		reply_len = hostapd_ctrl_iface_get_mu(hapd, reply, reply_size);
 	} else if (os_strncmp(buf, "SET_THREE_WIRE ", 15) == 0) {
 		reply_len = hostapd_ctrl_iface_three_wire(hapd, buf + 15, reply, reply_size);
@@ -6621,7 +6628,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							      reply_size);
 	} else if (os_strncmp(buf, "SET_CSI ", 7) == 0) {
 		reply_len = hostapd_ctrl_iface_set_csi(hapd, buf + 8,
-							reply, reply_size);
+						       reply, reply_size);
 	} else if (os_strncmp(buf, "DUMP_CSI ", 8) == 0) {
 		reply_len = hostapd_ctrl_iface_dump_csi(hapd, buf + 9,
 							reply, reply_size);
