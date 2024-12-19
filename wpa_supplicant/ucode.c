@@ -16,6 +16,27 @@ static uc_resource_type_t *global_type, *iface_type;
 static uc_value_t *global, *iface_registry;
 static uc_vm_t *vm;
 
+static int
+wpas_ucode_get_radio_idx(struct wpa_supplicant *wpa_s, int freq)
+{
+	struct hostapd_multi_hw_info *multi_hw_info, *hw_info;
+	unsigned int num_multi_hws;
+	int i;
+
+	multi_hw_info = wpas_drv_get_multi_hw_info(wpa_s, &num_multi_hws);
+	if (!multi_hw_info)
+		return 0;
+
+	for (i = 0; i < num_multi_hws; i++) {
+		hw_info = &multi_hw_info[i];
+
+		if (hw_info->start_freq <= freq && hw_info->end_freq >= freq)
+			return hw_info->hw_idx;
+	}
+
+	return 0;
+}
+
 static uc_value_t *
 wpas_ucode_iface_get_uval(struct wpa_supplicant *wpa_s)
 {
@@ -100,7 +121,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	const char *state;
 	uc_value_t *val;
 	enum oper_chan_width oper_chwidth;
-	int control_freq, center_freq1, bw320_offset = 1, band_idx;
+	int control_freq, center_freq1, bw320_offset = 1, radio_idx;
 
 	if (event != EVENT_CH_SWITCH_STARTED &&
 	    event != EVENT_LINK_CH_SWITCH_STARTED)
@@ -121,10 +142,6 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 
 	if (event == EVENT_CH_SWITCH_STARTED ||
 	    event == EVENT_LINK_CH_SWITCH_STARTED) {
-		enum hostapd_hw_mode hw_mode;
-		int is_24ghz;
-		u8 channel;
-
 		if (wpa_s->wpa_state < WPA_COMPLETED) {
 			wpa_printf(MSG_INFO,
 				   "ucode: mtk: receive channel switch event"
@@ -163,22 +180,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		     center_freq1 == 6905)
 			bw320_offset = 2;
 
-		hw_mode = ieee80211_freq_to_chan(control_freq, &channel);
-		is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
-			hw_mode == HOSTAPD_MODE_IEEE80211B;
-		/*
-		 * Assume that the mapping between band and band_idx is
-		 * 2 GHz band: band_idx 0
-		 * 5 GHz band: band_idx 1
-		 * 6 GHz band: band_idx 2
-		 * */
-		if (is_24ghz)
-			band_idx = 0;
-		else if (IS_5GHZ(control_freq))
-			band_idx = 1;
-		else if (is_6ghz_freq(control_freq))
-			band_idx = 2;
-
+		radio_idx = wpas_ucode_get_radio_idx(wpa_s, control_freq);
 
 		ucv_object_add(val, "csa_count", ucv_int64_new(data->ch_switch.count));
 		ucv_object_add(val, "frequency", ucv_int64_new(data->ch_switch.freq));
@@ -188,7 +190,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		ucv_object_add(val, "ch_width", ucv_int64_new(oper_chwidth));
 		ucv_object_add(val, "bw320_offset", ucv_int64_new(bw320_offset));
 		ucv_object_add(val, "punct_bitmap", ucv_int64_new(data->ch_switch.punct_bitmap));
-		ucv_object_add(val, "band_idx", ucv_int64_new(band_idx));
+		ucv_object_add(val, "radio_idx", ucv_int64_new(radio_idx));
 	}
 
 	ucv_put(wpa_ucode_call(4));
@@ -286,7 +288,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	u8 op_class, channel;
 	enum chan_width chwidth;
 	enum oper_chan_width oper_chwidth = CONF_OPER_CHWIDTH_USE_HT;
-	int center_freq1, bw320_offset = 1, is_24ghz, band_idx;
+	int center_freq1, bw320_offset = 1, is_24ghz, radio_idx;
 	enum hostapd_hw_mode hw_mode;
 	int link_id = ucv_int64_get(link_obj);
 	u32 freq;
@@ -306,19 +308,8 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 
 		hw_mode = ieee80211_freq_to_chan(bss->freq, &channel);
 		is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
-			hw_mode == HOSTAPD_MODE_IEEE80211B;
-		/*
-		 * Assume that the mapping between band and band_idx is
-		 * 2 GHz band: band_idx 0
-		 * 5 GHz band: band_idx 1
-		 * 6 GHz band: band_idx 2
-		 * */
-		if (is_24ghz)
-			band_idx = 0;
-		else if (IS_5GHZ(bss->freq))
-			band_idx = 1;
-		else if (is_6ghz_freq(bss->freq))
-			band_idx = 2;
+			   hw_mode == HOSTAPD_MODE_IEEE80211B;
+		radio_idx = wpas_ucode_get_radio_idx(wpa_s, bss->freq);
 
 		if (wpa_s->valid_links) {
 			freq = wpa_s->links[link_id].freq;
@@ -355,7 +346,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 		ucv_object_add(ret, "frequency", ucv_int64_new(freq));
 		ucv_object_add(ret, "ch_width", ucv_int64_new(oper_chwidth));
 		ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
-		ucv_object_add(ret, "band_idx", ucv_int64_new(band_idx));
+		ucv_object_add(ret, "radio_idx", ucv_int64_new(radio_idx));
 		ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
 	}
 
