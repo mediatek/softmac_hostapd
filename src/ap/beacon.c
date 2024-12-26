@@ -3617,6 +3617,8 @@ int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 	case BSS_CRIT_UPDATE_EVENT_RECONFIG:
 	case BSS_CRIT_UPDATE_EVENT_ATTLM:
 		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
+		if (hapd != hostapd_mbssid_get_tx_bss(hapd))
+			update_txbss_beacon = true;
 		break;
 	case BSS_CRIT_UPDATE_EVENT_ADD_LINK:
 		/* only set the CU flag for the links in link_reconf_in_progress */

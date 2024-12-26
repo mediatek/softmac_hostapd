@@ -1091,6 +1091,7 @@ void hostapd_refresh_all_iface_beacons(struct hostapd_iface *hapd_iface);
 
 #ifdef CONFIG_IEEE80211BE
 bool hostapd_is_attlm_active(struct hostapd_data *hapd);
+bool hostapd_is_same_attlm(struct hostapd_data *hapd1, struct hostapd_data *hapd2);
 #ifdef CONFIG_TESTING_OPTIONS
 void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links);
 int hostapd_mld_set_attlm(struct hostapd_data *hapd);

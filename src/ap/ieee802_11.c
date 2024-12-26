@@ -9492,6 +9492,17 @@ static size_t hostapd_eid_mbssid_elem_len(struct hostapd_data *hapd,
 		    (bss != hapd || frame_type != WLAN_FC_STYPE_PROBE_RESP))
 			nontx_profile_len += hostapd_eid_eht_basic_ml_len(
 				bss, NULL, true, false);
+
+		if (hostapd_is_attlm_active(bss)) {
+			/* Include Adv-TTLM because it's different from TX-BSS */
+			if (!hostapd_is_same_attlm(tx_bss, bss))
+				nontx_profile_len += hostapd_eid_eht_attlm_len(bss);
+
+		} else {
+			/* Do not inherit Adv-TTLM from TX BSS */
+			if (hostapd_is_attlm_active(tx_bss))
+				ie_count++;
+		}
 #endif /* CONFIG_IEEE80211BE */
 
 		/* WFA vendor elements which cannot be inherited if one of them
@@ -9596,9 +9607,11 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 		u8 *eid_len_pos, *nontx_bss_start = eid;
 		const u8 *auth, *rsn = NULL, *rsnx = NULL;
 		u8 ie_count = 0, non_inherit_ie[3];
+		u8 ext_ie_count = 0, non_inherit_ext_ie[1];
 		size_t auth_len = 0, xrate_len;
 		u16 capab_info;
 		u8 mbssindex = i;
+		bool non_inherit_ttlm = false;
 
 		if (!bss || !bss->conf || !bss->started ||
 		    mbssid_known_bss(i, known_bss, known_bss_len))
@@ -9678,6 +9691,16 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 		    (bss != hapd || frame_type != WLAN_FC_STYPE_PROBE_RESP))
 			eid = hostapd_eid_eht_basic_ml_common(bss, eid, NULL,
 							      true, false);
+
+		if (hostapd_is_attlm_active(bss)) {
+			/* Include Adv-TTLM because it's different from TX-BSS */
+			if (!hostapd_is_same_attlm(tx_bss, bss))
+				eid = hostapd_eid_eht_attlm(bss, eid);
+		} else {
+			/* Do not inherit Adv-TTLM from TX BSS */
+			if (hostapd_is_attlm_active(tx_bss))
+				non_inherit_ttlm = true;
+		}
 #endif /* CONFIG_IEEE80211BE */
 		/* WFA vendor elements which cannot be inherited if one of them
 		 * is different from that of TxBSS.
@@ -9689,14 +9712,24 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 		eid = hostapd_get_rsne_override_2(bss, eid, end - eid);
 		eid = hostapd_get_rsnxe_override(bss, eid, end - eid);
 
-		if (ie_count) {
+		if (non_inherit_ttlm)
+			non_inherit_ext_ie[ext_ie_count++] =
+						WLAN_EID_EXT_TID_TO_LINK_MAPPING;
+
+		if (ie_count || ext_ie_count) {
 			*eid++ = WLAN_EID_EXTENSION;
-			*eid++ = 2 + ie_count + 1;
+			*eid++ = 2 + ie_count + ext_ie_count + 1;
 			*eid++ = WLAN_EID_EXT_NON_INHERITANCE;
 			*eid++ = ie_count;
-			os_memcpy(eid, non_inherit_ie, ie_count);
-			eid += ie_count;
-			*eid++ = 0; /* No Element ID Extension List */
+			if (ie_count) {
+				os_memcpy(eid, non_inherit_ie, ie_count);
+				eid += ie_count;
+			}
+			*eid++ = ext_ie_count;
+			if (ext_ie_count) {
+				os_memcpy(eid, non_inherit_ext_ie, ext_ie_count);
+				eid += ext_ie_count;
+			}
 		}
 
 		*eid_len_pos = (eid - eid_len_pos) - 1;
