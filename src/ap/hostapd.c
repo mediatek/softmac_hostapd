@@ -540,6 +540,32 @@ bool hostapd_is_attlm_active(struct hostapd_data *hapd)
 }
 
 
+bool hostapd_is_same_attlm(struct hostapd_data *hapd1, struct hostapd_data *hapd2)
+{
+	struct hostapd_data *link1, *link2;
+
+	/* Both are default TTLM */
+	if (!hostapd_is_attlm_active(hapd1) && !hostapd_is_attlm_active(hapd2))
+		return true;
+
+	if (!hostapd_is_attlm_active(hapd1) || !hostapd_is_attlm_active(hapd2))
+		return false;
+
+	/* make sure the configurations of link are the same */
+	if (hapd1->mld->valid_links != hapd2->mld->valid_links)
+		return false;
+
+	for_each_mld_link(link1, hapd1)
+		for_each_mld_link(link2, hapd2)
+			if (link1->mld_link_id == link2->mld_link_id &&
+			    link1->iface != link2->iface)
+				return false;
+
+	return hapd1->mld->new_attlm.disabled_links ==
+	       hapd2->mld->new_attlm.disabled_links;
+}
+
+
 #endif /* CONFIG_IEEE80211BE */
 
 
