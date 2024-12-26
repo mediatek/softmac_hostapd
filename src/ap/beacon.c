@@ -3456,6 +3456,7 @@ int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 				       enum bss_crit_update_event event)
 {
 	struct hostapd_data *h;
+	bool update_txbss_beacon = false;
 
 	if (!hapd->conf->mld_ap)
 		return 0;
@@ -3487,6 +3488,9 @@ int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 	case BSS_CRIT_UPDATE_EVENT_EHT_OPERATION:
 		hapd->eht_mld_bss_param_change += 1;
 		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_SINGLE;
+
+		if (hapd != hostapd_mbssid_get_tx_bss(hapd))
+			update_txbss_beacon = true;
 		break;
 	case BSS_CRIT_UPDATE_EVENT_RECONFIG:
 	case BSS_CRIT_UPDATE_EVENT_ATTLM:
@@ -3508,6 +3512,9 @@ int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 
 		h->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
 	}
+
+	if (update_txbss_beacon)
+		ieee802_11_set_beacon(hostapd_mbssid_get_tx_bss(hapd));
 
 	return 0;
 }
