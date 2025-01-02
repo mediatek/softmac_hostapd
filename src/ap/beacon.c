@@ -3461,6 +3461,8 @@ int ieee802_11_set_beacon(struct hostapd_data *hapd)
 
 	/* Generate per STA profiles for each affiliated APs */
 	for_each_mld_link(link_bss, hapd) {
+		if (!link_bss->started)
+			continue;
 		hostapd_gen_per_sta_profiles(link_bss);
 
 		if (link_bss->eht_mld_bss_critical_update == BSS_CRIT_UPDATE_FLAG &&
