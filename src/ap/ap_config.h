@@ -1315,6 +1315,7 @@ struct hostapd_config {
 	u8 eht_default_pe_duration;
 	u8 eht_bw320_offset;
 	bool require_eht;
+	u8 neg_ttlm_support_mode; /* Used for Wi-Fi 7 CERT 4.50 */
 #endif /* CONFIG_IEEE80211BE */
 
 	int ieee80211bn;
