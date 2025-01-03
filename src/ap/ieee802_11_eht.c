@@ -609,10 +609,13 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	mld_cap &= ~EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
 	mld_cap |= active_links & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
 
+	mld_cap |= EHT_ML_MLD_CAPA_LINK_RECONF_OP_SUPPORT;
 	/* TODO: Advertise T2LM based on driver support as well */
 	mld_cap |= EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_ALL_TO_ALL;
 
-	mld_cap |= EHT_ML_MLD_CAPA_LINK_RECONF_OP_SUPPORT;
+	/* For CERT wifi7 4.50 */
+	if (hapd->iconf->neg_ttlm_support_mode == 1)
+		mld_cap &= ~EHT_ML_MLD_CAPA_TID_TO_LINK_MAP_ALL_TO_ONE;
 
 	wpa_printf(MSG_DEBUG, "MLD: MLD Capabilities and Operations=0x%x",
 		   mld_cap);
