@@ -319,6 +319,8 @@ struct hostapd_config * hostapd_config_defaults(void)
 	conf->airtime_update_interval = AIRTIME_DEFAULT_UPDATE_INTERVAL;
 #endif /* CONFIG_AIRTIME_POLICY */
 
+	conf->background_auto_ctrl = true;
+
 	conf->edcca_enable = EDCCA_MODE_AUTO;
 	conf->edcca_compensation = EDCCA_DEFAULT_COMPENSATION;
 	conf->three_wire.ext_sel = THREE_WIRE_EXT_SEL_UNSET;
