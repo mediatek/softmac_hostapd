@@ -52,4 +52,5 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 			   struct csa_settings *background_settings,
 			   bool cac_required, bool bw_changed);
 
+
 #endif /* DFS_H */
