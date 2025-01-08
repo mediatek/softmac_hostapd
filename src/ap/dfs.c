@@ -20,7 +20,6 @@
 #include "dfs.h"
 #include "crypto/crypto.h"
 
-
 static struct hostapd_channel_data *
 dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 			u8 *oper_centr_freq_seg0_idx,
