@@ -7953,7 +7953,6 @@ static void handle_assoc(struct hostapd_data *hapd,
 #endif /* CONFIG_FILS */
 	int omit_rsnxe = 0;
 	bool set_beacon = false;
-	bool mld_addrs_not_translated = false;
 	bool epp_sta = false;
 	bool sae_pk = false;
 
@@ -8031,7 +8030,6 @@ static void handle_assoc(struct hostapd_data *hapd,
 				wpa_printf(MSG_DEBUG,
 					   "MLD: Switching to assoc hapd/station");
 				hapd = assoc_hapd;
-				mld_addrs_not_translated = true;
 			}
 
 			/* Allow link address to be changed if an SA query
@@ -8042,7 +8040,6 @@ static void handle_assoc(struct hostapd_data *hapd,
 				os_memcpy(sta->mld_info.links[_link].peer_addr,
 					  mgmt->sa, ETH_ALEN);
 			}
-
 		}
 	}
 #endif /* CONFIG_IEEE80211BE */
@@ -8447,10 +8444,9 @@ static void handle_assoc(struct hostapd_data *hapd,
 
 	if (resp >= 0)
 		reply_res = send_assoc_resp(hapd,
-					    mld_addrs_not_translated ?
-					    NULL : sta,
-					    mgmt->sa, resp, reassoc,
-					    pos, left, rssi, omit_rsnxe);
+					    sta, sta ? sta->addr : mgmt->sa,
+					    resp, reassoc, pos, left, rssi,
+					    omit_rsnxe);
 
 	if (set_beacon)
 		ieee802_11_update_beacons(hapd->iface);
