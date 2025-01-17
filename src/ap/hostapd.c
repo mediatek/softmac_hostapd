@@ -498,6 +498,15 @@ void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links)
 }
 
 
+bool hostapd_is_attlm_active(struct hostapd_data *hapd)
+{
+	if (!hostapd_is_mld_ap(hapd) || !hapd->mld)
+		return false;
+
+	return hapd->mld->new_attlm.valid;
+}
+
+
 int hostapd_mld_set_attlm(struct hostapd_data *hapd)
 {
 	if (!hapd->drv_priv)
