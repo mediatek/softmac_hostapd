@@ -33,6 +33,10 @@
 #include "ctrl_iface.h"
 #include "build_features.h"
 
+#ifdef CONFIG_IEEE80211BE
+#include "ap/scs.h"
+#endif
+
 struct hapd_global {
 	void **drv_priv;
 	size_t drv_count;
@@ -1113,6 +1117,12 @@ int main(int argc, char *argv[])
 	hostapd_ucode_init(&interfaces);
 	hostapd_epcs_init(&interfaces);
 
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_mtk_mscs_daemon_init(&interfaces)) {
+		wpa_printf(MSG_ERROR, "Failed to start MTK MSCS daemon");
+	}
+#endif
+
 	if (hostapd_global_run(&interfaces, daemonize, pid_file)) {
 		wpa_printf(MSG_ERROR, "Failed to start eloop");
 		goto out;
@@ -1121,6 +1131,9 @@ int main(int argc, char *argv[])
 	ret = 0;
 
  out:
+#ifdef CONFIG_IEEE80211BE
+	hostapd_mtk_mscs_daemon_deinit(&interfaces);
+#endif
 	hostapd_epcs_free(&interfaces);
 	hostapd_ucode_free();
 	hostapd_global_ctrl_iface_deinit(&interfaces);
