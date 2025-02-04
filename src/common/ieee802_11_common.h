@@ -136,6 +136,8 @@ struct ieee802_11_elems {
 	const u8 *uhr_operation;
 	const u8 *security_profile;
 
+	const u8 *mscs_desc;
+
 	u8 ssid_len;
 	u8 supp_rates_len;
 	u8 challenge_len;
@@ -214,6 +216,8 @@ struct ieee802_11_elems {
 	u8 uhr_capabilities_len;
 	u8 uhr_operation_len;
 	u8 security_profile_len;
+
+	size_t mscs_desc_len;
 
 	struct mb_ies_info mb_ies;
 
