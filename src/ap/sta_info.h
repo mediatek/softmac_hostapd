@@ -154,6 +154,7 @@ struct sta_info {
 	unsigned int ft_over_ds:1;
 	unsigned int external_dh_updated:1;
 	unsigned int post_csa_sa_query:1;
+	unsigned int mscs_assoc_included:1;
 
 	u16 auth_alg;
 
@@ -333,6 +334,7 @@ struct sta_info {
 	struct sta_info *mld_assoc_sta;
 	struct scs_session_status scs_session[SCS_MAX_CFG_CNT];
 	struct ieee80211_neg_ttlm neg_ttlm;
+	u16 mscs_assoc_setup_status;
 #endif /* CONFIG_IEEE80211BE */
 
 	u16 max_idle_period; /* if nonzero, the granted BSS max idle period in
