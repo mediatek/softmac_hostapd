@@ -1007,7 +1007,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 			u8 req_mode, int disassoc_timer, u8 valid_int,
 			const u8 *bss_term_dur, u8 dialog_token,
 			const char *url, const u8 *nei_rep, size_t nei_rep_len,
-			const u8 *mbo_attrs, size_t mbo_len)
+			const u8 *mbo_attrs, size_t mbo_len, u8 mbo_cert)
 {
 	u8 *buf, *pos;
 	struct ieee80211_mgmt *mgmt;
@@ -1085,7 +1085,8 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 		 * else schedule full disconnection.
 		 */
 		if (ap_sta_is_mld(hapd, sta) &&
-		    (req_mode & WNM_BSS_TM_REQ_LINK_REMOVAL_IMMINENT)) {
+		    ((req_mode & WNM_BSS_TM_REQ_LINK_REMOVAL_IMMINENT) ||
+		     mbo_cert == 2)) {
 			int i;
 			unsigned int links = 0;
 
