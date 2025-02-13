@@ -1422,7 +1422,8 @@ hostapd_bss_tr_send(struct hostapd_data *hapd, u8 *addr, bool disassoc_imminent,
 #endif
 
 	if (wnm_send_bss_tm_req(hapd, sta, req_mode, disassoc_timer, validity_period, NULL,
-				dialog_token, NULL, nr, nr_len, mbo_len ? mbo : NULL, mbo_len))
+				dialog_token, NULL, nr, nr_len, mbo_len ? mbo : NULL, mbo_len,
+				false))
 		return UBUS_STATUS_UNKNOWN_ERROR;
 
 	return 0;
