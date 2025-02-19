@@ -1439,6 +1439,12 @@ void handle_probe_req(struct hostapd_data *hapd,
 	int mld_id;
 	u16 links;
 #endif /* CONFIG_IEEE80211BE */
+	struct hostapd_ubus_request req = {
+		.type = HOSTAPD_UBUS_PROBE_REQ,
+		.mgmt_frame = mgmt,
+		.ssi_signal = ssi_signal,
+		.elems = &elems,
+	};
 
 	if (hapd->iconf->rssi_ignore_probe_request && ssi_signal &&
 	    ssi_signal < hapd->iconf->rssi_ignore_probe_request)
@@ -1492,7 +1498,7 @@ void handle_probe_req(struct hostapd_data *hapd,
 	 * is less likely to see them (Probe Request frame sent on a
 	 * neighboring, but partially overlapping, channel).
 	 */
-	if (elems.ds_params &&
+	if (elems.ds_params && 0 &&
 	    hapd->iface->current_mode &&
 	    (hapd->iface->current_mode->mode == HOSTAPD_MODE_IEEE80211G ||
 	     hapd->iface->current_mode->mode == HOSTAPD_MODE_IEEE80211B) &&
@@ -1625,6 +1631,12 @@ void handle_probe_req(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_P2P */
 
+	if (hostapd_ubus_handle_event(hapd, &req)) {
+		wpa_printf(MSG_DEBUG, "Probe request for " MACSTR " rejected by ubus handler.\n",
+		       MAC2STR(mgmt->sa));
+		return;
+	}
+
 	/* TODO: verify that supp_rates contains at least one matching rate
 	 * with AP configuration */
 
@@ -1643,7 +1655,7 @@ void handle_probe_req(struct hostapd_data *hapd,
 	if (hapd->conf->no_probe_resp_if_max_sta &&
 	    is_multicast_ether_addr(mgmt->da) &&
 	    is_multicast_ether_addr(mgmt->bssid) &&
-	    hapd->num_sta >= hapd->conf->max_num_sta &&
+	    hostapd_check_max_sta(hapd) &&
 	    !ap_get_sta(hapd, mgmt->sa)) {
 		wpa_printf(MSG_MSGDUMP, "%s: Ignore Probe Request from " MACSTR
 			   " since no room for additional STA",

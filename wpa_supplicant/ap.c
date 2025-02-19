@@ -1523,7 +1523,7 @@ int wpas_ap_wps_nfc_report_handover(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_WPS */
 
 
-#ifdef CONFIG_CTRL_IFACE
+#if defined(CONFIG_CTRL_IFACE) && defined(CONFIG_CTRL_IFACE_MIB)
 
 int ap_ctrl_iface_sta_first(struct wpa_supplicant *wpa_s,
 			    char *buf, size_t buflen)
@@ -1849,17 +1849,37 @@ int ap_switch_channel(struct wpa_supplicant *wpa_s,
 
 
 #ifdef CONFIG_CTRL_IFACE
+
+static int __ap_ctrl_iface_chanswitch(struct hostapd_iface *iface,
+				      struct csa_settings *settings)
+{
+#ifdef NEED_AP_MLME
+	if (!iface || !iface->bss[0])
+		return 0;
+
+	return hostapd_switch_channel(iface->bss[0], settings);
+#else
+	return -1;
+#endif
+}
+
+
 int ap_ctrl_iface_chanswitch(struct wpa_supplicant *wpa_s, const char *pos)
 {
 	struct csa_settings settings;
 	int ret = hostapd_parse_csa_settings(pos, &settings);
 
-	if (ret)
-		return ret;
+	if (!(wpa_s->ap_iface && wpa_s->ap_iface->bss[0]) &&
+	    !(wpa_s->ifmsh && wpa_s->ifmsh->bss[0]))
+		return -1;
 
 	settings.link_id = -1;
 
-	return ap_switch_channel(wpa_s, &settings);
+	ret = __ap_ctrl_iface_chanswitch(wpa_s->ap_iface, &settings);
+	if (ret)
+		return ret;
+
+	return __ap_ctrl_iface_chanswitch(wpa_s->ifmsh, &settings);
 }
 #endif /* CONFIG_CTRL_IFACE */
 

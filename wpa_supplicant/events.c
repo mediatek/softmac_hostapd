@@ -6245,8 +6245,8 @@ static int wpas_pasn_auth(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_PASN */
 
 
-void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
-			  union wpa_event_data *data)
+void supplicant_event(void *ctx, enum wpa_event_type event,
+		      union wpa_event_data *data)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	int resched;
@@ -6281,6 +6281,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		event_to_string(event), event);
 #endif /* CONFIG_NO_STDOUT_DEBUG */
 
+	wpas_ucode_event(wpa_s, event, data);
 	switch (event) {
 	case EVENT_AUTH:
 #ifdef CONFIG_FST
@@ -7213,7 +7214,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 }
 
 
-void wpa_supplicant_event_global(void *ctx, enum wpa_event_type event,
+void supplicant_event_global(void *ctx, enum wpa_event_type event,
 				 union wpa_event_data *data)
 {
 	struct wpa_supplicant *wpa_s;

@@ -18,6 +18,8 @@
 #include "utils/list.h"
 #include "ap_config.h"
 #include "drivers/driver.h"
+#include "ubus.h"
+#include "ucode.h"
 
 #define OCE_STA_CFON_ENABLED(hapd) \
 	((hapd->conf->oce & OCE_STA_CFON) && \
@@ -51,6 +53,10 @@ struct hapd_interfaces {
 	struct hostapd_config * (*config_read_cb)(const char *config_fname);
 	int (*ctrl_iface_init)(struct hostapd_data *hapd);
 	void (*ctrl_iface_deinit)(struct hostapd_data *hapd);
+	int (*ctrl_iface_recv)(struct hostapd_data *hapd,
+			       char *buf, char *reply, int reply_size,
+			       struct sockaddr_storage *from,
+			       socklen_t fromlen);
 	int (*for_each_interface)(struct hapd_interfaces *interfaces,
 				  int (*cb)(struct hostapd_iface *iface,
 					    void *ctx), void *ctx);
@@ -185,18 +191,38 @@ struct mld_link_info {
 };
 
 /**
+ * struct hostapd_openwrt_stats - OpenWrt custom STA/AP statistics
+ */
+struct hostapd_openwrt_stats {
+	struct {
+		u64 neighbor_report_tx;
+	} rrm;
+
+	struct {
+		u64 bss_transition_query_rx;
+		u64 bss_transition_request_tx;
+		u64 bss_transition_response_rx;
+	} wnm;
+};
+
+/**
  * struct hostapd_data - hostapd per-BSS data structure
  */
 struct hostapd_data {
 	struct hostapd_iface *iface;
 	struct hostapd_config *iconf;
 	struct hostapd_bss_config *conf;
+	struct hostapd_ubus_bss ubus;
+	struct hostapd_ucode_bss ucode;
 	int interface_added; /* virtual interface added for this BSS */
 	unsigned int started:1;
 	unsigned int disabled:1;
 	unsigned int reenable_beacon:1;
 
 	u8 own_addr[ETH_ALEN];
+
+	/* OpenWrt specific statistics */
+	struct hostapd_openwrt_stats openwrt_stats;
 
 	int num_sta; /* number of entries in sta_list */
 	struct sta_info *sta_list; /* STA info list head */
@@ -557,6 +583,7 @@ struct hostapd_mld {
  */
 struct hostapd_iface {
 	struct hapd_interfaces *interfaces;
+	struct hostapd_ucode_iface ucode;
 	void *owner;
 	char *config_fname;
 	struct hostapd_config *conf;
@@ -758,6 +785,7 @@ hostapd_alloc_bss_data(struct hostapd_iface *hapd_iface,
 		       struct hostapd_bss_config *bss);
 int hostapd_setup_interface(struct hostapd_iface *iface);
 int hostapd_setup_interface_complete(struct hostapd_iface *iface, int err);
+void hostapd_set_own_neighbor_report(struct hostapd_data *hapd);
 void hostapd_interface_deinit(struct hostapd_iface *iface);
 void hostapd_interface_free(struct hostapd_iface *iface);
 struct hostapd_iface * hostapd_alloc_iface(void);
@@ -768,6 +796,8 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 			   const char *config_fname, int debug);
 void hostapd_bss_setup_multi_link(struct hostapd_data *hapd,
 				  struct hapd_interfaces *interfaces);
+int hostapd_setup_bss(struct hostapd_data *hapd, int first, bool start_beacon);
+void hostapd_bss_deinit(struct hostapd_data *hapd);
 void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 			   int reassoc);
 void hostapd_interface_deinit_free(struct hostapd_iface *iface);
@@ -796,7 +826,9 @@ hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 void hostapd_cleanup_cs_params(struct hostapd_data *hapd);
 void hostapd_periodic_iface(struct hostapd_iface *iface);
 int hostapd_owe_trans_get_info(struct hostapd_data *hapd);
+void hostapd_owe_update_trans(struct hostapd_iface *iface);;
 void hostapd_ocv_check_csa_sa_query(void *eloop_ctx, void *timeout_ctx);
+int hostapd_check_max_sta(struct hostapd_data *hapd);
 
 void hostapd_switch_color(struct hostapd_data *hapd, u64 bitmap);
 void hostapd_cleanup_cca_params(struct hostapd_data *hapd);

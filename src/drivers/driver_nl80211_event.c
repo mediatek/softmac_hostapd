@@ -1254,6 +1254,7 @@ static void mlme_event_ch_switch(struct wpa_driver_nl80211_data *drv,
 				 struct nlattr *bw, struct nlattr *cf1,
 				 struct nlattr *cf2,
 				 struct nlattr *punct_bitmap,
+				 struct nlattr *count,
 				 int finished)
 {
 	struct i802_bss *bss;
@@ -1319,6 +1320,8 @@ static void mlme_event_ch_switch(struct wpa_driver_nl80211_data *drv,
 		data.ch_switch.cf1 = nla_get_u32(cf1);
 	if (cf2)
 		data.ch_switch.cf2 = nla_get_u32(cf2);
+	if (count)
+		data.ch_switch.count = nla_get_u32(count);
 
 	if (link) {
 		data.ch_switch.link_id = nla_get_u8(link);
@@ -4233,6 +4236,7 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				     tb[NL80211_ATTR_CENTER_FREQ1],
 				     tb[NL80211_ATTR_CENTER_FREQ2],
 				     tb[NL80211_ATTR_PUNCT_BITMAP],
+				     tb[NL80211_ATTR_CH_SWITCH_COUNT],
 				     0);
 		break;
 	case NL80211_CMD_CH_SWITCH_NOTIFY:
@@ -4245,6 +4249,7 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				     tb[NL80211_ATTR_CENTER_FREQ1],
 				     tb[NL80211_ATTR_CENTER_FREQ2],
 				     tb[NL80211_ATTR_PUNCT_BITMAP],
+				     NULL,
 				     1);
 		break;
 	case NL80211_CMD_DISCONNECT:

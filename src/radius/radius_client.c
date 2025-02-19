@@ -165,6 +165,8 @@ struct radius_client_data {
 	 */
 	void *ctx;
 
+	struct hostapd_ip_addr local_ip;
+
 	/**
 	 * conf - RADIUS client configuration (list of RADIUS servers to use)
 	 */
@@ -820,6 +822,30 @@ static void radius_close_acct_socket(struct radius_client_data *radius)
 	}
 }
 
+
+/**
+ * radius_client_send - Get local address for the RADIUS auth socket
+ * @radius: RADIUS client context from radius_client_init()
+ * @addr: pointer to store the address
+ *
+ * This function returns the local address for the connection to the RADIUS
+ * auth server. It also opens the socket if it's not available yet.
+ */
+int radius_client_get_local_addr(struct radius_client_data *radius,
+				 struct hostapd_ip_addr *addr)
+{
+	struct hostapd_radius_servers *conf = radius->conf;
+
+	if (conf->auth_server && radius->auth_sock < 0)
+		radius_client_init_auth(radius);
+
+	if (radius->auth_sock < 0)
+		return -1;
+
+	memcpy(addr, &radius->local_ip, sizeof(*addr));
+
+	return 0;
+}
 
 /**
  * radius_client_send - Send a RADIUS request
@@ -1733,6 +1759,10 @@ radius_change_server(struct radius_client_data *radius,
 			wpa_printf(MSG_DEBUG, "RADIUS local address: %s:%u",
 				   inet_ntoa(claddr.sin_addr),
 				   ntohs(claddr.sin_port));
+			if (auth) {
+				radius->local_ip.af = AF_INET;
+				radius->local_ip.u.v4 = claddr.sin_addr;
+			}
 		}
 		break;
 #ifdef CONFIG_IPV6
@@ -1744,6 +1774,10 @@ radius_change_server(struct radius_client_data *radius,
 				   inet_ntop(AF_INET6, &claddr6.sin6_addr,
 					     abuf, sizeof(abuf)),
 				   ntohs(claddr6.sin6_port));
+			if (auth) {
+				radius->local_ip.af = AF_INET6;
+				radius->local_ip.u.v6 = claddr6.sin6_addr;
+			}
 		}
 		break;
 	}

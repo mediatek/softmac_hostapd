@@ -26,6 +26,10 @@ static FILE *wpa_debug_tracing_file = NULL;
 #define WPAS_TRACE_PFX "wpas <%d>: "
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
+void (*wpa_printf_hook)(int level, const char *fmt, va_list ap);
+void (*wpa_hexdump_hook)(int level, const char *title, const void *buf,
+			 size_t len);
+void (*wpa_netlink_hook)(int tx, const void *data, size_t len);
 
 int wpa_debug_level = MSG_INFO;
 int wpa_debug_show_keys = 0;
@@ -206,9 +210,15 @@ void wpa_debug_close_linux_tracing(void)
  *
  * Note: New line '\n' is added to the end of the text when printing to stdout.
  */
-void wpa_printf(int level, const char *fmt, ...)
+void _wpa_printf(int level, const char *fmt, ...)
 {
 	va_list ap;
+
+	if (wpa_printf_hook) {
+		va_start(ap, fmt);
+		wpa_printf_hook(level, fmt, ap);
+		va_end(ap);
+	}
 
 	if (level >= wpa_debug_level) {
 #ifdef CONFIG_ANDROID_LOG
@@ -255,10 +265,13 @@ void wpa_printf(int level, const char *fmt, ...)
 }
 
 
-static void _wpa_hexdump(int level, const char *title, const u8 *buf,
+void _wpa_hexdump(int level, const char *title, const u8 *buf,
 			 size_t len, int show, int only_syslog)
 {
 	size_t i;
+
+	if (wpa_hexdump_hook)
+		wpa_hexdump_hook(level, title, buf, len);
 
 #ifdef CONFIG_DEBUG_LINUX_TRACING
 	if (wpa_debug_tracing_file != NULL) {
@@ -382,19 +395,7 @@ static void _wpa_hexdump(int level, const char *title, const u8 *buf,
 #endif /* CONFIG_ANDROID_LOG */
 }
 
-void wpa_hexdump(int level, const char *title, const void *buf, size_t len)
-{
-	_wpa_hexdump(level, title, buf, len, 1, 0);
-}
-
-
-void wpa_hexdump_key(int level, const char *title, const void *buf, size_t len)
-{
-	_wpa_hexdump(level, title, buf, len, wpa_debug_show_keys, 0);
-}
-
-
-static void _wpa_hexdump_ascii(int level, const char *title, const void *buf,
+void _wpa_hexdump_ascii(int level, const char *title, const void *buf,
 			       size_t len, int show)
 {
 	size_t i, llen;
@@ -504,20 +505,6 @@ file_done:
 		}
 	}
 #endif /* CONFIG_ANDROID_LOG */
-}
-
-
-void wpa_hexdump_ascii(int level, const char *title, const void *buf,
-		       size_t len)
-{
-	_wpa_hexdump_ascii(level, title, buf, len, 1);
-}
-
-
-void wpa_hexdump_ascii_key(int level, const char *title, const void *buf,
-			   size_t len)
-{
-	_wpa_hexdump_ascii(level, title, buf, len, wpa_debug_show_keys);
 }
 
 
@@ -644,7 +631,7 @@ void wpa_msg_register_ifname_cb(wpa_msg_get_ifname_func func)
 }
 
 
-void wpa_msg(void *ctx, int level, const char *fmt, ...)
+void _wpa_msg(void *ctx, int level, const char *fmt, ...)
 {
 	va_list ap;
 	char *buf;
@@ -682,7 +669,7 @@ void wpa_msg(void *ctx, int level, const char *fmt, ...)
 }
 
 
-void wpa_msg_ctrl(void *ctx, int level, const char *fmt, ...)
+void _wpa_msg_ctrl(void *ctx, int level, const char *fmt, ...)
 {
 	va_list ap;
 	char *buf;
