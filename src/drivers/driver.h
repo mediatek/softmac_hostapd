@@ -5773,8 +5773,8 @@ struct wpa_driver_ops {
 	* @power_table: power table generated from AFC response
 	* @lpi_mode: specify the current mode is whether lpi
 	*/
-	int (*txpower_ctrl)(void *priv, u8 lpi_psd, u8 sku_idx, u8 lpi_bcn_enhance,
-			    u8 link_id, s8 **power_table, u8 lpi_mode);
+	int (*txpower_ctrl)(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance,
+			    s8 link_id, s8 **power_table, u8 lpi_mode);
 };
 
 /**

@@ -1606,7 +1606,7 @@ int hostapd_drv_txpower_ctrl(struct hostapd_data *hapd)
 			goto out;
 	}
 
-	if (hapd->iface->afc.lpi_mode == true)
+	if (hapd->iface->afc.lpi_mode == true && hapd->iconf->lpi_sku_idx > -1)
 		sku_idx = hapd->iconf->lpi_sku_idx;
 #endif /* CONFIG_AFC */
 
