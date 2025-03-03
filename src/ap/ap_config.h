@@ -1413,8 +1413,8 @@ struct hostapd_config {
 	size_t muru_config_len;
 	u8 pp_mode;
 	u8 lpi_psd;
-	u8 sku_idx;
-	u8 lpi_sku_idx;
+	s8 sku_idx;
+	s8 lpi_sku_idx;
 	u8 lpi_bcn_enhance;
 };
 
