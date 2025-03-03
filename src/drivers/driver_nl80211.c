@@ -17348,7 +17348,8 @@ static int nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_e
 		goto fail;
 
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
-	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_IDX, sku_idx);
+	if (sku_idx > -1)
+		nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_IDX, sku_idx);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_BCN_ENHANCE, lpi_bcn_enhance);
 
 	if (link_id > -1)
