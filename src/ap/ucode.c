@@ -820,8 +820,8 @@ uc_hostapd_bss_rename(uc_vm_t *vm, size_t nargs)
 		if (!(sta->flags & WLAN_STA_WDS) || sta->pending_wds_enable)
 			continue;
 
-		snprintf(cur_name, sizeof(cur_name), "%s.sta%d", prev_ifname, sta->aid);
-		snprintf(new_name, sizeof(new_name), "%s.sta%d", ifname, sta->aid);
+		snprintf(cur_name, sizeof(cur_name), "%s.sta%d", prev_ifname, sta->aid - 64);
+		snprintf(new_name, sizeof(new_name), "%s.sta%d", ifname, sta->aid - 64);
 		hostapd_drv_if_rename(hapd, WPA_IF_AP_VLAN, cur_name, new_name);
 	}
 

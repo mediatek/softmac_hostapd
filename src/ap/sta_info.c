@@ -324,9 +324,11 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	ap_sta_hash_del(hapd, sta);
 	ap_sta_list_del(hapd, sta);
 
-	if (sta->aid > 0)
-		hapd->sta_aid[(sta->aid - 1) / 32] &=
-			~BIT((sta->aid - 1) % 32);
+	if (sta->aid - 64 > 0) {
+		struct hostapd_data *tx_bss = hostapd_mbssid_get_tx_bss(hapd);
+		tx_bss->sta_aid[(sta->aid - 1 - 64) / 32] &=
+			~BIT((sta->aid - 1 - 64) % 32);
+	}
 
 	hapd->num_sta--;
 	if (sta->nonerp_set) {
