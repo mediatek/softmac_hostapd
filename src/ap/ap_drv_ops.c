@@ -410,13 +410,13 @@ int hostapd_set_wds_sta(struct hostapd_data *hapd, char *ifname_wds,
 	if (hapd->conf->apup && hapd->conf->apup_peer_ifname_prefix[0]) {
 		mRet = os_snprintf(
 		            ifName, sizeof(ifName), "%s%d",
-		            hapd->conf->apup_peer_ifname_prefix, aid);
+		            hapd->conf->apup_peer_ifname_prefix, aid - 64);
 	}
 	else
 #endif // def CONFIG_APUP
 		mRet = os_snprintf(
 		            ifName, sizeof(ifName), "%s.sta%d",
-		            hapd->conf->iface, aid);
+		            hapd->conf->iface, aid - 64);
 
 	if (mRet >= (int) sizeof(ifName))
 		wpa_printf(MSG_WARNING,
