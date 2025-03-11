@@ -1839,6 +1839,11 @@ static int hostapd_cli_cmd_epcs(struct wpa_ctrl *ctrl, int argc, char *argv[])
 	return hostapd_cli_cmd(ctrl, "EPCS", 1, argc, argv);
 }
 
+static int hostapd_cli_cmd_del_mscs(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "DEL_MSCS", 1, argc, argv);
+}
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2115,6 +2120,8 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" = Teardown the Negotiated TTLM with the STA" },
 	{ "epcs", hostapd_cli_cmd_epcs, NULL,
 		" = Control EPCS priority access" },
+	{ "del_mscs", hostapd_cli_cmd_del_mscs, NULL,
+		" = Delete MSCS for the specific STA" },
 	{ NULL, NULL, NULL, NULL }
 };
 
