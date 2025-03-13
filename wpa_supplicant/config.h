@@ -48,6 +48,7 @@
 #define DEFAULT_EXTENDED_KEY_ID 0
 #define DEFAULT_SCAN_RES_VALID_FOR_CONNECT 5
 #define DEFAULT_MLD_CONNECT_BAND_PREF MLD_CONNECT_BAND_PREF_AUTO
+#define DEFAULT_MLD_ALLOWED_PHY 7
 
 #include "config_ssid.h"
 #include "wps/wps.h"
