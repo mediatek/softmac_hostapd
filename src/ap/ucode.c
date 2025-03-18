@@ -535,6 +535,9 @@ uc_hostapd_iface_stop(uc_vm_t *vm, size_t nargs)
 		}
 
 		if (hostapd_is_ml_partner(first_hapd, h_hapd)) {
+			if (h->state != HAPD_IFACE_ENABLED)
+				uc_hostapd_disable_iface(h);
+
 			for (j = 0; j < h->num_bss; j++) {
 				hostapd_drv_stop_ap(h->bss[j]);
 				h->bss[j]->beacon_set_done = 0;
@@ -550,7 +553,6 @@ static uc_value_t *
 uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 {
 	struct hostapd_iface *iface = uc_fn_thisval("hostapd.iface");
-	struct hostapd_data *tmp_hapd;
 	uc_value_t *info = uc_fn_arg(0);
 	struct hostapd_config *conf;
 	bool changed = false;
@@ -578,13 +580,22 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 
 #ifdef CONFIG_IEEE80211BE
 	if (hostapd_is_mld_ap(iface->bss[0])) {
-		for_each_mld_link(tmp_hapd, iface->bss[0]) {
-			if (tmp_hapd->iface->current_hw_info &&
-			    radio_idx == tmp_hapd->iface->current_hw_info->hw_idx) {
+		struct hapd_interfaces *interfaces = iface->interfaces;
+		struct hostapd_iface *tmp_iface;
+
+		for (i = 0; i < interfaces->count; i++) {
+			tmp_iface = interfaces->iface[i];
+
+			if (tmp_iface == iface ||
+			    !hostapd_is_ml_partner(iface->bss[0],
+						   tmp_iface->bss[0]))
+				continue;
+
+			if (iface->hw_idx != 255 && radio_idx == tmp_iface->hw_idx) {
 				wpa_printf(MSG_INFO,
 					   "ucode: mtk: MLD: switch to iface with radio_idx %d\n",
 					   radio_idx);
-				iface = tmp_hapd->iface;
+				iface = tmp_iface;
 				break;
 			}
 		}
