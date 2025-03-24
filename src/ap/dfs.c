@@ -1044,22 +1044,6 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 			return -1;
 	}
 
-	/* Remove the CAC link from the active links of AP MLD temporarily to avoid
-	 * it being reported in the RNR of the affiliated APs of the same AP MLD
-	 */
-	if (iface->cac_started) {
-		int i;
-
-		for (i = 0; i < iface->num_bss; i++) {
-			struct hostapd_data *hapd = iface->bss[i];
-
-			if (!hapd->conf->mld_ap || !hapd->mld)
-				continue;
-
-			hapd->mld->active_links &= ~BIT(hapd->mld_link_id);
-		}
-	}
-
 	return 0;
 }
 
@@ -1409,7 +1393,6 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 					if (!hapd->conf->mld_ap || !hapd->mld)
 						continue;
 
-					hapd->mld->active_links |= BIT(hapd->mld_link_id);
 					for_each_mld_link(h, hapd)
 						h->mld->link_reconf_in_progress |=
 								BIT(h->mld_link_id);
