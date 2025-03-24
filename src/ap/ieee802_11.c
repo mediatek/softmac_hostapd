@@ -9107,8 +9107,7 @@ static u8 * hostapd_eid_rnr_mlo(struct hostapd_data *hapd, u32 type,
 		iface = hapd->iface->interfaces->iface[i];
 
 		if (!iface || iface == hapd->iface ||
-		    hapd->iface->freq == iface->freq ||
-		    !(hapd->mld->active_links & BIT(hapd->mld_link_id)))
+		    hapd->iface->freq == iface->freq)
 			continue;
 
 		eid = hostapd_eid_rnr_iface(iface->bss[0], hapd, eid,
