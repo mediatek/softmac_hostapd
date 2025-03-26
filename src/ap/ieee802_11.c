@@ -6358,6 +6358,13 @@ static void handle_assoc(struct hostapd_data *hapd,
 		}
 	}
 
+	if (sta->sending_assoc) {
+		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE80211,
+			       HOSTAPD_LEVEL_DEBUG,
+			       "Drop subsequent assoc frame since previous one is under processing");
+		return;
+	}
+
 	if ((fc & WLAN_FC_RETRY) &&
 	    sta->last_seq_ctrl != WLAN_INVALID_MGMT_SEQ &&
 	    sta->last_seq_ctrl == seq_ctrl &&
@@ -6641,11 +6648,15 @@ static void handle_assoc(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_FILS */
 
-	if (resp >= 0)
+	if (resp >= 0) {
+		if (sta)
+			sta->sending_assoc = 1;
+
 		reply_res = send_assoc_resp(hapd,
 					    sta, sta ? sta->addr : mgmt->sa,
 					    resp, reassoc, pos, left, rssi,
 					    omit_rsnxe);
+	}
 
 	if (set_beacon)
 		ieee802_11_update_beacons(hapd->iface);
@@ -6661,6 +6672,7 @@ static void handle_assoc(struct hostapd_data *hapd,
 		     resp == WLAN_STATUS_SUCCESS) || sta->added_unassoc)) {
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		sta->added_unassoc = 0;
+		sta->sending_assoc = 0;
 	}
 }
 
@@ -7541,6 +7553,7 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 			   "handle_assoc_cb(reassoc=%d) - too short payload (len=%lu)",
 			   reassoc, (unsigned long) len);
 		hostapd_drv_sta_remove(hapd, sta->addr);
+		sta->sending_assoc = 0;
 		return;
 	}
 
@@ -7654,6 +7667,7 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 		wpa_printf(MSG_DEBUG, "FILS: TK configuration failed");
 		ap_sta_disconnect(hapd, sta, sta->addr,
 				  WLAN_REASON_UNSPECIFIED);
+		sta->sending_assoc = 0;
 		return;
 	}
 #endif /* CONFIG_FILS */
@@ -7680,6 +7694,7 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 
 handle_ml:
 	hostapd_ml_handle_assoc_cb(hapd, sta, ok);
+	sta->sending_assoc = 0;
 }
 
 
