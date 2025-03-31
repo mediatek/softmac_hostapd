@@ -1018,7 +1018,7 @@ static size_t hostapd_eid_eht_ml_len(struct mld_info *info,
 	for (link_id = 0; info && link_id < ARRAY_SIZE(info->links);
 	     link_id++) {
 		struct mld_link_info *link;
-		size_t sta_len = include_mld_id ? 21 : 22;
+		size_t sta_len = EHT_ML_STA_INFO_LEN;
 
 		link = &info->links[link_id];
 		if (!link->valid)
