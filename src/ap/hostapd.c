@@ -5497,10 +5497,9 @@ int hostapd_fill_cca_settings(struct hostapd_data *hapd,
 	old_color = iface->conf->he_op.he_bss_color;
 	iface->conf->he_op.he_bss_color = hapd->cca_color;
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_after);
+	iface->conf->he_op.he_bss_color = old_color;
 	if (ret)
 		return ret;
-
-	iface->conf->he_op.he_bss_color = old_color;
 
 	settings->cca_count = hapd->cca_count;
 	settings->cca_color = hapd->cca_color,
