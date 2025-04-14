@@ -213,7 +213,7 @@ static int wpa_get_primary_auth_cb(struct wpa_authenticator *wpa_auth,
 #endif /* CONFIG_IEEE80211BE */
 
 
-static struct wpa_authenticator *
+struct wpa_authenticator *
 wpa_get_primary_auth(struct wpa_authenticator *wpa_auth)
 {
 #ifdef CONFIG_IEEE80211BE
@@ -952,6 +952,10 @@ void wpa_deinit(struct wpa_authenticator *wpa_auth)
 			/* Assign ML primary authenticator to the next link
 			 * authenticator and start rekey timer.
 			 */
+#ifdef CONFIG_IEEE80211R_AP
+			wpa_ft_pmk_cache_handover(wpa_auth->ft_pmk_cache,
+						  next_pa->ft_pmk_cache);
+#endif /* CONFIG_IEEE80211R_AP */
 			next_pa->primary_auth = true;
 			pmksa_cache_auth_set_ctx(next_pa->ml_pmksa, next_pa);
 			if (next_pa->conf.wpa_group_rekey)
