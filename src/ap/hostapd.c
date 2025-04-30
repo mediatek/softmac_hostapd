@@ -1427,7 +1427,7 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 {
 	struct hostapd_bss_config *conf = hapd->conf;
 
-	if (!conf->start_disabled && ieee802_11_set_beacon(hapd) < 0)
+	if (ieee802_11_set_beacon(hapd) < 0)
 		return -1;
 
 #ifdef CONFIG_IEEE80211BE
@@ -1443,7 +1443,7 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 		}
 	}
 
-	if (flush_old_stations && !conf->start_disabled &&
+	if (flush_old_stations &&
 	    conf->broadcast_deauth && (hapd->conf->mld_ap && !hapd->mld->started)) {
 		u8 addr[ETH_ALEN];
 
@@ -1464,6 +1464,9 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 
 	hostapd_ubus_add_bss(hapd);
 	hostapd_ucode_add_bss(hapd);
+
+	if (conf->start_disabled)
+		hostapd_drv_beacon_ctrl(hapd, false);
 
 	return 0;
 }
