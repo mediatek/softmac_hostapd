@@ -28,6 +28,7 @@ struct sae_password_entry;
 struct mld_info;
 struct mld_link_info;
 struct rsn_pmksa_cache_entry;
+struct wpa_state_machine;
 
 enum link_parse_type {
 	LINK_PARSE_ASSOC,
@@ -329,7 +330,8 @@ int ieee80211_ml_process_link(struct hostapd_data *hapd,
 			      bool *set_beacon);
 void ieee80211_ml_build_assoc_resp(struct hostapd_data *hapd,
 				   struct mld_link_info *link,
-				   struct sta_info *sta);
+				   struct sta_info *sta,
+				   struct wpa_state_machine *sm);
 
 void ieee802_11_rx_protected_eht_action(struct hostapd_data *hapd,
 					const struct ieee80211_mgmt *mgmt,
