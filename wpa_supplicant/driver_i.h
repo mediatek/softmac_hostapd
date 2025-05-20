@@ -1332,4 +1332,25 @@ wpa_drv_nan_update_config(struct wpa_supplicant *wpa_s,
 
 #endif /* CONFIG_NAN */
 
+
+static inline struct hostapd_multi_hw_info *
+wpas_drv_get_multi_hw_info(struct wpa_supplicant *wpa_s,
+			   unsigned int *num_multi_hws)
+{
+	if (!wpa_s->driver->get_multi_hw_info)
+		return NULL;
+
+	return wpa_s->driver->get_multi_hw_info(wpa_s->drv_priv,
+						num_multi_hws);
+}
+
+static inline int
+wpas_drv_get_vif_radio_mask(struct wpa_supplicant *wpa_s, u32 *vif_radio_mask)
+{
+	if (!wpa_s->driver->get_vif_radio_mask)
+		return -1;
+
+	return wpa_s->driver->get_vif_radio_mask(wpa_s->drv_priv, vif_radio_mask);
+}
+
 #endif /* DRIVER_I_H */
