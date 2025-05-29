@@ -454,6 +454,7 @@ void clear_wpa_sm_for_all_sta(struct hostapd_data *hapd,
 			      struct wpa_state_machine *wpa_sm);
 bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta);
 void ap_cleanup_sta(struct hostapd_data *hapd, const u8 *addr);
+void hostapd_reset_assoc_stas(struct hostapd_data *hapd);
 
 static inline bool ap_sta_is_epp(const struct sta_info *sta)
 {

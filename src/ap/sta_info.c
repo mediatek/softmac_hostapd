@@ -2223,3 +2223,101 @@ void ap_cleanup_sta(struct hostapd_data *hapd, const u8 *addr) {
 	if (sta)
 		ap_free_sta(hapd, sta);
 }
+
+static void hostapd_reset_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
+{
+	struct hostapd_data *link_bss, *new_assoc_hapd = NULL;
+	struct sta_info *link_sta, *new_assoc_sta = NULL;
+	int i;
+
+	for_each_mld_link(link_bss, hapd) {
+		if (link_bss == hapd)
+			continue;
+
+		link_sta = ap_get_sta(link_bss, sta->addr);
+		if (!link_sta)
+			continue;
+
+		/* clear the flag WLAN_STA_ASSOC so that ap_get_sta() always
+		 * returns the sta_info belonging to the input hapd
+		 */
+		link_sta->flags &= ~WLAN_STA_ASSOC;
+	}
+
+	for_each_mld_link(link_bss, hapd) {
+		if (link_bss == hapd)
+			continue;
+
+		link_sta = ap_get_sta(link_bss, sta->addr);
+		if (!link_sta)
+			continue;
+
+		if (!new_assoc_hapd) {
+			new_assoc_hapd = link_bss;
+			new_assoc_sta = link_sta;
+			link_sta->eapol_sm = sta->eapol_sm;
+			os_memcpy(&link_sta->neg_ttlm, &sta->neg_ttlm,
+				  sizeof(sta->neg_ttlm));
+			wpa_reset_assoc_sm_info(new_assoc_sta->wpa_sm,
+						new_assoc_hapd->wpa_auth,
+						new_assoc_hapd->mld_link_id);
+
+			if (sta->flags & WLAN_STA_WDS) {
+				sta->flags &= ~WLAN_STA_WDS;
+				new_assoc_sta->flags |= WLAN_STA_WDS;
+			}
+
+			wpa_printf(MSG_DEBUG,
+				   "MLD: STA "MACSTR" new assoc link_id=%u",
+				   MAC2STR(sta->addr),
+				   new_assoc_hapd->mld_link_id);
+			break;
+		}
+	}
+
+	if (!new_assoc_hapd)
+		return;
+
+	for_each_mld_link(link_bss, hapd) {
+		link_sta = ap_get_sta(link_bss, sta->addr);
+		if (!link_sta)
+			continue;
+
+		link_sta->mld_assoc_link_id = new_assoc_hapd->mld_link_id;
+		link_sta->mld_assoc_sta = new_assoc_sta;
+		os_memcpy(&link_sta->mld_info, &sta->mld_info, sizeof(sta->mld_info));
+		for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
+			struct mld_link_info *li = &link_sta->mld_info.links[i];
+
+			li->resp_sta_profile = NULL;
+			li->resp_sta_profile_len = 0;
+		}
+	}
+
+	for_each_mld_link(link_bss, hapd) {
+		link_sta = ap_get_sta(link_bss, sta->addr);
+		if (!link_sta || link_sta == sta)
+			continue;
+
+		link_sta->flags |= WLAN_STA_ASSOC;
+	}
+}
+
+void hostapd_reset_assoc_stas(struct hostapd_data *hapd)
+{
+#ifdef CONFIG_IEEE80211BE
+	struct sta_info *sta, *prev;
+
+	sta = hapd->sta_list;
+	while (sta) {
+		prev = sta;
+		sta = sta->next;
+
+		if (ap_sta_is_mld(hapd, prev) &&
+		    prev->mld_assoc_link_id == hapd->mld_link_id) {
+			prev->flags &= ~WLAN_STA_ASSOC;
+			hostapd_reset_assoc_sta(hapd, prev);
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
+}

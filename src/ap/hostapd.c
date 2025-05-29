@@ -485,6 +485,7 @@ static void hostapd_link_remove_timeout_handler(void *eloop_data,
 
 	wpa_printf(MSG_DEBUG, "MLD: Remove link_id=%u", hapd->mld_link_id);
 
+	hostapd_reset_assoc_stas(hapd);
 	hostapd_free_link_stas(hapd);
 	hostapd_disable_iface(hapd->iface);
 	mld->removed_links &= ~BIT(link_id);
