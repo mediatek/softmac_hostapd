@@ -1418,6 +1418,7 @@ int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 	u8 mbo[10];
 	size_t mbo_len = 0;
 	u8 mbo_cert = 0;
+	bool is_excluded_bss = false;
 
 	if (hwaddr_aton(cmd, addr)) {
 		wpa_printf(MSG_DEBUG, "Invalid STA MAC address");
@@ -1473,6 +1474,7 @@ int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 
 		end++;
 		WPA_PUT_LE16(&bss_term_dur[10], atoi(end));
+		is_excluded_bss = true;
 	}
 
 	nei_len = ieee802_11_parse_candidate_list(cmd, nei_rep,
@@ -1518,10 +1520,13 @@ int hostapd_ctrl_iface_bss_tm_req(struct hostapd_data *hapd,
 		req_mode |= WNM_BSS_TM_REQ_DISASSOC_IMMINENT;
 		if (mbo_cert == 1)
 			/* Set own BSS neighbor report preference value as 0 */
-			hostapd_neighbor_set_own_report_pref(hapd, nei_rep, nei_len, 0);
+			is_excluded_bss = true;
 	}
 	if (os_strstr(cmd, " link_removal_imminent=1"))
 		req_mode |= WNM_BSS_TM_REQ_LINK_REMOVAL_IMMINENT;
+
+	if (is_excluded_bss)
+		hostapd_neighbor_set_own_report_pref(hapd, nei_rep, nei_len, 0);
 
 #ifdef CONFIG_MBO
 	hostapd_neighbor_set_pref_by_non_pref_chan(hapd, sta, nei_rep, nei_len);

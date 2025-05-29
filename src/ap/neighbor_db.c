@@ -103,18 +103,33 @@ int hostapd_neighbor_count(struct hostapd_data *hapd)
 
 
 int hostapd_neighbor_insert_buffer(struct hostapd_data *hapd, char *buf,
-        size_t buflen)
+				   size_t buflen)
 {
 	struct hostapd_neighbor_entry *nr;
 	char *pos = buf;
 
 	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry,
 			 list) {
+		struct neighbor_report_element *nre;
+		struct element *preference_subelem;
+
+		nre = (struct neighbor_report_element *)pos;
 		/* For neighbor report IE, we only need bssid and nr*/
 		*pos++ = WLAN_EID_NEIGHBOR_REPORT;
 		*pos++ = wpabuf_len(nr->nr);
 		os_memcpy(pos, wpabuf_head(nr->nr), wpabuf_len(nr->nr));
 		pos += wpabuf_len(nr->nr);
+
+		preference_subelem = (struct element *)
+			get_ie(nre->variable,
+			       nre->len - (6 + 4 + 1 + 1 + 1),
+			       WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE);
+		if (!preference_subelem) {
+			nre->len += 3;
+			*pos++ = WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE;
+			*pos++ = 1;
+			*pos++ = 0xff;
+		}
 	}
 
 	return pos - buf;
