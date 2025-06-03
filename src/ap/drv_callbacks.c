@@ -1527,9 +1527,14 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
 			/* FIXME do Neg-TTLM teardown to prevent overlap
 			 * with Adv-TTLM
 			 */
-			for_each_mld_link(p_hapd, hapd)
+			for_each_mld_link(p_hapd, hapd) {
 				ap_for_each_sta(p_hapd, teardown_sta_ttlm,
 						NULL);
+
+				if (mld->new_attlm.disabled_links &
+				    BIT(p_hapd->mld_link_id))
+					hostapd_deauth_single_link_sta(p_hapd);
+			}
 			break;
 		case EVENT_ATTLM_SWITCH_TIME_EXPIRED:
 			mld_indicate_disabled = true;
