@@ -437,6 +437,33 @@ static int hostapd_broadcast_wep_set(struct hostapd_data *hapd)
 
 #ifdef CONFIG_IEEE80211BE
 #ifdef CONFIG_TESTING_OPTIONS
+void hostapd_deauth_single_link_sta(struct hostapd_data *hapd)
+{
+	struct sta_info *sta;
+	struct mld_info *info;
+	int num_links, i;
+	u16 reason = WLAN_REASON_DEAUTH_LEAVING;
+
+	wpa_printf(MSG_DEBUG, "Deauthenticate single link STA on link_id=%u\n",
+		   hapd->mld_link_id);
+	for (sta = hapd->sta_list; sta; sta = sta->next) {
+		info = &sta->mld_info;
+		num_links = 0;
+
+		if (ap_sta_is_mld(hapd, sta)) {
+			for (i = 0; i < MAX_NUM_MLD_LINKS && num_links < 2; i++) {
+				if (info->links[i].valid)
+					num_links++;
+			}
+		}
+
+		if (num_links <= 1) {
+			hostapd_drv_sta_deauth(hapd, sta->addr, reason);
+			ap_sta_deauthenticate(hapd, sta, reason);
+		}
+	}
+}
+
 
 static void hostapd_link_remove_timeout_handler(void *eloop_data,
 						void *user_ctx)
