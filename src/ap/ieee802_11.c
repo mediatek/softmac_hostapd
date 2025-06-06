@@ -8291,7 +8291,8 @@ static bool hostapd_skip_rnr(size_t i, struct mbssid_ie_profiles *skip_profiles,
 #ifdef CONFIG_IEEE80211BE
 	/* If building for co-location and they are ML partners, no need to
 	 * include since the ML RNR will carry this. */
-	if (!mld_update && hostapd_is_ml_partner(reporting_hapd, bss))
+	if (!mld_update &&
+	    hostapd_mbssid_mld_match(reporting_hapd, bss, match_idx))
 		return true;
 
 	/* If building for ML RNR and they are not ML partners, don't include.
