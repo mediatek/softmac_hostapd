@@ -660,7 +660,7 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	struct hostapd_config *conf;
 	struct csa_settings csa = {};
 	uint64_t intval;
-	int i, ret = 0, radio_idx;
+	int i, ret = 0;
 
 	wpa_printf(MSG_INFO, "ucode: mtk: channel switch for %s\n", iface->phy);
 	if (!iface || ucv_type(info) != UC_OBJECT)
@@ -696,11 +696,6 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	if ((intval = ucv_int64_get(ucv_object_get(info, "punct_bitmap", NULL))) && !errno)
 		csa.freq_params.punct_bitmap = intval;
 
-	intval = ucv_int64_get(ucv_object_get(info, "radio_idx", NULL));
-	radio_idx = intval;
-	if (errno)
-		radio_idx = iface->current_hw_info ? iface->current_hw_info->hw_idx : 0;
-
 	wpa_printf(MSG_INFO, "ucode: mtk: switch channel information:\n");
 	wpa_printf(MSG_INFO, "    * freq is %d\n", csa.freq_params.freq);
 	wpa_printf(MSG_INFO, "    * bandwidth is %d\n", csa.freq_params.bandwidth);
@@ -712,25 +707,6 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 		   csa.freq_params.center_freq2);
 	wpa_printf(MSG_INFO, "    * punct_bitmap is %d\n",
 		   csa.freq_params.punct_bitmap);
-	wpa_printf(MSG_INFO, "    * radio_idx is %d\n", radio_idx);
-
-#ifdef CONFIG_IEEE80211BE
-	for (i = 0; i < iface->interfaces->count; i++) {
-		struct hostapd_iface *tmp_iface = iface->interfaces->iface[i];
-
-		if (tmp_iface->current_hw_info &&
-		    radio_idx == tmp_iface->current_hw_info->hw_idx) {
-			wpa_printf(MSG_INFO,
-				   "ucode: mtk: MLD: switch to iface with radio_idx %d\n",
-				   radio_idx);
-			iface = tmp_iface;
-			break;
-		}
-	}
-
-	if (iface->current_hw_info && radio_idx != iface->current_hw_info->hw_idx)
-		return NULL;
-#endif /* CONFIG_IEEE80211BE */
 
 	for (i = 0; i < iface->num_bss; i++) {
 		ret = hostapd_switch_channel(iface->bss[i], &csa);
