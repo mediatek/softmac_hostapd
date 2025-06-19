@@ -10019,7 +10019,7 @@ int nl80211_remove_link(struct i802_bss *bss, int link_id)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct i802_link *link;
 	struct nl_msg *msg;
-	int ret;
+	int ret, i;
 	u8 link_addr[ETH_ALEN];
 
 	wpa_printf(MSG_DEBUG, "nl80211: Remove link (ifindex=%d link_id=%u)",
@@ -10040,6 +10040,14 @@ int nl80211_remove_link(struct i802_bss *bss, int link_id)
 	/* Clear the active links and set the flink */
 	nl80211_update_active_links(bss, link_id);
 	bss->valid_links &= ~BIT(link_id);
+
+	/* Choose new deflink if we are removing that link */
+	if (bss->flink == link) {
+		for_each_link_default(bss->valid_links, i, 0) {
+			bss->flink = &bss->links[i];
+			break;
+		}
+	}
 
 	/* If this was the last link, reset default link */
 	if (!bss->valid_links) {
