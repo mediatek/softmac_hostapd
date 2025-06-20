@@ -3958,8 +3958,79 @@ static int hostapd_ctrl_iface_set_attlm(struct hostapd_data *hapd, char *cmd,
 	attlm->switch_time = switch_time;
 	attlm->disabled_links = hapd->conf->mld_allowed_links & disabled_links;
 	attlm->link_mapping_size = link_mapping_size;
+	os_get_reltime(&attlm->start_time);
 
 	return hostapd_mld_set_attlm(hapd);
+}
+
+static int
+hostapd_ctrl_iface_get_attlm(struct hostapd_data *hapd, char *buf, size_t buflen)
+{
+	struct attlm_settings *attlm;
+	struct os_reltime now, res;
+	char *pos, *end;
+	u16 switch_time = 0;
+	u32 duration;
+	int ret;
+
+	if (!hostapd_is_mld_ap(hapd))
+		return -1;
+
+	pos = buf;
+	end = buf + buflen;
+
+	if (!hostapd_is_attlm_active(hapd)) {
+		/* Default mapping */
+		ret = os_snprintf(pos, end - pos, "Default mapping\n");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+
+		return ret;
+	}
+
+	attlm = &hapd->mld->new_attlm;
+	os_get_reltime(&now);
+	os_reltime_sub(&now, &attlm->start_time, &res);
+	if (attlm->switch_time_tsf_tu != 0) {
+		switch_time = attlm->switch_time - (u32)os_reltime_in_ms(&res);
+		duration = attlm->duration;
+	} else {
+		duration = attlm->duration - (u32)os_reltime_in_ms(&res);
+	}
+
+	ret = os_snprintf(pos, end - pos, "Adv-TTLM Status:\n");
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "Direction: bi-direction\n");
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	/* Mapping Switch time */
+	ret = os_snprintf(pos, end - pos,
+			  "Remaining Mapping Switch Time: %u (ms)\n",
+			  switch_time);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	/* Expected Duration */
+	ret = os_snprintf(pos, end - pos, "Remaining Expected Duration: %u (ms)\n",
+			  duration);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	/* Link Mapping */
+	ret = os_snprintf(pos, end - pos, "Link Mapping: 0x%04x\n",
+			  hapd->mld->valid_links & ~attlm->disabled_links);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	return pos - buf;
 }
 
 static struct sta_info *hostapd_ctrl_read_sta(struct hostapd_data *hapd,
@@ -6818,6 +6889,9 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 		if (hostapd_ctrl_iface_set_attlm(hapd, buf + 10, reply,
 						 reply_size))
 			reply_len = -1;
+	} else if (os_strncmp(buf, "GET_ATTLM", 9) == 0) {
+		reply_len = hostapd_ctrl_iface_get_attlm(hapd, reply,
+							 reply_size);
 	} else if (os_strncmp(buf, "NEG_TTLM_TEARDOWN ", 18) == 0) {
 		if (hostapd_ctrl_iface_neg_ttlm_teardown(hapd, buf + 18))
 			reply_len = -1;
