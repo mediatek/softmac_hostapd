@@ -1822,6 +1822,12 @@ static int hostapd_cli_cmd_set_attlm(struct wpa_ctrl *ctrl, int argc,
 	return hostapd_cli_cmd(ctrl, "SET_ATTLM", 1, argc, argv);
 }
 
+static int hostapd_cli_cmd_get_attlm(struct wpa_ctrl *ctrl, int argc,
+				     char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "GET_ATTLM");
+}
+
 static int hostapd_cli_cmd_neg_ttlm_teardown(struct wpa_ctrl *ctrl, int argc,
 					     char *argv[])
 {
@@ -2156,6 +2162,8 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" [count=<count>] = Remove affiliated link of a MLD AP"},
 	{ "set_attlm", hostapd_cli_cmd_set_attlm, NULL,
 		" = Disable the affiliated AP of a MLD AP" },
+	{ "get_attlm", hostapd_cli_cmd_get_attlm, NULL,
+		" = Get the TTLM status of a AP MLD" },
 	{ "neg_ttlm_teardown", hostapd_cli_cmd_neg_ttlm_teardown, NULL,
 		" = Teardown the Negotiated TTLM with the STA" },
 	{ "get_neg_ttlm", hostapd_cli_cmd_get_neg_ttlm, NULL,
