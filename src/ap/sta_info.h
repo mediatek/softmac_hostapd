@@ -338,6 +338,7 @@ struct sta_info {
 			      * units of 1000 TUs */
 
 	u64 last_known_sta_id_timestamp;
+	bool mtk_sta;
 };
 
 

@@ -2703,6 +2703,7 @@ struct hostapd_sta_add_params {
 	s8 mld_link_id;
 	const u8 *mld_link_addr;
 	u16 eml_cap;
+	bool mtk_sta;
 };
 
 struct mac_address {
