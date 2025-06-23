@@ -555,6 +555,13 @@ struct hostapd_data {
 
 	s64 tsf_offset[MAX_NUM_MLD_LINKS];
 
+	u32 deauth_count_from_sta;
+	u32 deauth_count_from_ap_uc;
+	u32 deauth_count_from_ap_bc;
+	u32 disassoc_count_from_sta;
+	u32 disassoc_count_from_ap_uc;
+	u32 disassoc_count_from_ap_bc;
+
 #ifdef CONFIG_TESTING_OPTIONS
 	u8 eht_mld_link_removal_count;
 #endif /* CONFIG_TESTING_OPTIONS */

@@ -6537,6 +6537,47 @@ static bool hostapd_ml_handle_disconnect(struct hostapd_data *hapd,
 }
 
 
+static void update_disconnect_count(struct hostapd_data *hapd, bool is_deauth,
+				    bool from_sta, bool broadcast, const u8 *addr,
+				    u16 reason)
+{
+	u8 peer_addr[ETH_ALEN];
+
+	if (!hapd)
+		return;
+
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd) && hapd->mld && hapd->mld->fbss)
+		hapd = hapd->mld->fbss;
+#endif /* CONFIG_IEEE80211BE */
+
+	if (addr && !broadcast)
+		os_memcpy(peer_addr, addr, ETH_ALEN);
+	else
+		os_memset(peer_addr, 0xff, ETH_ALEN);
+	wpa_printf(MSG_INFO,
+		   "mtk: update disconnect counter: type=%s, from_sta=%d, "
+		   "addr="MACSTR", reason=%u\n",
+		   is_deauth ? "DEAUTH" : "DISASSOC", from_sta,
+		   MAC2STR(peer_addr), reason);
+	if (is_deauth) {
+		if (from_sta)
+			hapd->deauth_count_from_sta++;
+		else if (broadcast)
+			hapd->deauth_count_from_ap_bc++;
+		else
+			hapd->deauth_count_from_ap_uc++;
+	} else {
+		if (from_sta)
+			hapd->disassoc_count_from_sta++;
+		else if (broadcast)
+			hapd->disassoc_count_from_ap_bc++;
+		else
+			hapd->disassoc_count_from_ap_uc++;
+	}
+}
+
+
 static void handle_disassoc(struct hostapd_data *hapd,
 			    const struct ieee80211_mgmt *mgmt, size_t len)
 {
@@ -6557,6 +6598,9 @@ static void handle_disassoc(struct hostapd_data *hapd,
 			MAC2STR(mgmt->sa));
 		return;
 	}
+
+	update_disconnect_count(hapd, false, true, false, mgmt->sa,
+				le_to_host16(mgmt->u.disassoc.reason_code));
 
 	if (hostapd_ml_handle_disconnect(hapd, sta, mgmt, true))
 		return;
@@ -6589,6 +6633,9 @@ static void handle_deauth(struct hostapd_data *hapd,
 			MAC2STR(mgmt->sa));
 		return;
 	}
+
+	update_disconnect_count(hapd, true, true, false, mgmt->sa,
+				le_to_host16(mgmt->u.deauth.reason_code));
 
 	if (hostapd_ml_handle_disconnect(hapd, sta, mgmt, false))
 		return;
@@ -7429,8 +7476,11 @@ static void handle_deauth_cb(struct hostapd_data *hapd,
 			     size_t len, int ok)
 {
 	struct sta_info *sta;
-	if (is_multicast_ether_addr(mgmt->da))
+	if (is_multicast_ether_addr(mgmt->da)) {
+		update_disconnect_count(hapd, true, false, true, NULL,
+					le_to_host16(mgmt->u.deauth.reason_code));
 		return;
+	}
 	sta = ap_get_sta(hapd, mgmt->da);
 	if (!sta) {
 		wpa_printf(MSG_DEBUG, "handle_deauth_cb: STA " MACSTR
@@ -7444,6 +7494,8 @@ static void handle_deauth_cb(struct hostapd_data *hapd,
 		wpa_printf(MSG_DEBUG, "STA " MACSTR " did not acknowledge "
 			   "deauth", MAC2STR(sta->addr));
 
+	update_disconnect_count(hapd, true, false, false, mgmt->da,
+				le_to_host16(mgmt->u.deauth.reason_code));
 	ap_sta_deauth_cb(hapd, sta);
 }
 
@@ -7453,8 +7505,11 @@ static void handle_disassoc_cb(struct hostapd_data *hapd,
 			       size_t len, int ok)
 {
 	struct sta_info *sta;
-	if (is_multicast_ether_addr(mgmt->da))
+	if (is_multicast_ether_addr(mgmt->da)) {
+		update_disconnect_count(hapd, false, false, true, NULL,
+					le_to_host16(mgmt->u.disassoc.reason_code));
 		return;
+	}
 	sta = ap_get_sta(hapd, mgmt->da);
 	if (!sta) {
 		wpa_printf(MSG_DEBUG, "handle_disassoc_cb: STA " MACSTR
@@ -7468,6 +7523,8 @@ static void handle_disassoc_cb(struct hostapd_data *hapd,
 		wpa_printf(MSG_DEBUG, "STA " MACSTR " did not acknowledge "
 			   "disassoc", MAC2STR(sta->addr));
 
+	update_disconnect_count(hapd, false, false, false, mgmt->da,
+				le_to_host16(mgmt->u.disassoc.reason_code));
 	ap_sta_disassoc_cb(hapd, sta);
 }
 

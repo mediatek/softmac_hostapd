@@ -5746,6 +5746,21 @@ int hostapd_mld_remove_link(struct hostapd_data *hapd)
 		next_fbss = dl_list_entry(mld->links.next, struct hostapd_data,
 					  link);
 		mld->fbss = next_fbss;
+
+		if (mld->fbss) {
+			next_fbss->deauth_count_from_sta =
+				hapd->deauth_count_from_sta;
+			next_fbss->deauth_count_from_ap_uc =
+				hapd->deauth_count_from_ap_uc;
+			next_fbss->deauth_count_from_ap_bc =
+				hapd->deauth_count_from_ap_bc;
+			next_fbss->disassoc_count_from_sta =
+				hapd->disassoc_count_from_sta;
+			next_fbss->disassoc_count_from_ap_uc =
+				hapd->disassoc_count_from_ap_uc;
+			next_fbss->disassoc_count_from_ap_bc =
+				hapd->disassoc_count_from_ap_bc;
+		}
 	}
 
 	wpa_printf(MSG_DEBUG, "AP MLD %s: First link BSS set to %p",

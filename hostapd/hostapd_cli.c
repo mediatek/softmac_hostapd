@@ -1872,6 +1872,18 @@ static int hostapd_cli_cmd_dfs_detect_mode(struct wpa_ctrl *ctrl, int argc,
 	return hostapd_cli_cmd(ctrl, "DFS_DETECT_MODE", 1, argc, argv);
 }
 
+static int
+hostapd_cli_cmd_get_disconn_counter(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "GET_DISCONN_COUNTER");
+}
+
+static int
+hostapd_cli_cmd_clear_disconn_counter(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "CLEAR_DISCONN_COUNTER");
+}
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2158,6 +2170,10 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" = Get EDCCA threshold from driver" },
 	{ "dfs_detect_mode", hostapd_cli_cmd_dfs_detect_mode, NULL,
 		" = Set DFS detection mode" },
+	{ "get_disconn_counter", hostapd_cli_cmd_get_disconn_counter, NULL,
+		" = Get the disconnect counter" },
+	{ "clear_disconn_counter", hostapd_cli_cmd_clear_disconn_counter, NULL,
+		" = Clear the disconnect counter" },
 	{ NULL, NULL, NULL, NULL }
 };
 
