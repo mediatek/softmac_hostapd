@@ -4895,6 +4895,91 @@ hostapd_ctrl_iface_set_dfs_detect_mode(struct hostapd_data *hapd, char *value,
 
 
 static int
+hostapd_ctrl_iface_get_disconn_counter(struct hostapd_data *hapd, char *buf,
+				       size_t buflen)
+{
+	char *pos, *end;
+	int ret;
+
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd) && hapd->mld && hapd->mld->fbss)
+		hapd = hapd->mld->fbss;
+#endif /* CONFIG_IEEE80211BE */
+
+	pos = buf;
+	end = buf + buflen;
+
+	ret = os_snprintf(pos, end - pos, "Triggered by AP\n");
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Broadcast DEAUTH: %u\n",
+			  hapd->deauth_count_from_ap_bc);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Unicast DEAUTH: %u\n",
+			  hapd->deauth_count_from_ap_uc);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Broadcast DISASSOC: %u\n",
+			  hapd->disassoc_count_from_ap_bc);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Unicast DISASSOC: %u\n",
+			  hapd->disassoc_count_from_ap_uc);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "Triggered by STA\n");
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Unicast DEAUTH: %u\n",
+			  hapd->deauth_count_from_sta);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	ret = os_snprintf(pos, end - pos, "  - Unicast DISASSOC: %u\n",
+			  hapd->disassoc_count_from_sta);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	return pos - buf;
+}
+
+
+static int
+hostapd_ctrl_iface_clear_disconn_counter(struct hostapd_data *hapd, char *buf,
+					 size_t buflen)
+{
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd) && hapd->mld && hapd->mld->fbss)
+		hapd = hapd->mld->fbss;
+#endif /* CONFIG_IEEE80211BE */
+
+	hapd->deauth_count_from_sta = 0;
+	hapd->deauth_count_from_ap_uc = 0;
+	hapd->deauth_count_from_ap_bc = 0;
+	hapd->disassoc_count_from_sta = 0;
+	hapd->disassoc_count_from_ap_uc = 0;
+	hapd->disassoc_count_from_ap_bc = 0;
+
+	return 0;
+}
+
+
+static int
 hostapd_ctrl_iface_set_offchain(struct hostapd_data *hapd, char *cmd,
 				char *buf, size_t buflen)
 {
@@ -6770,6 +6855,12 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "DFS_DETECT_MODE ", 16) == 0) {
 		reply_len = hostapd_ctrl_iface_set_dfs_detect_mode(hapd, buf + 16,
 								   reply, reply_size);
+	} else if (os_strncmp(buf, "GET_DISCONN_COUNTER", 19) == 0) {
+		reply_len = hostapd_ctrl_iface_get_disconn_counter(hapd, reply,
+								   reply_size);
+	} else if (os_strncmp(buf, "CLEAR_DISCONN_COUNTER", 21) == 0) {
+		reply_len = hostapd_ctrl_iface_clear_disconn_counter(hapd, reply,
+								     reply_size);
 	} else if (os_strncmp(buf, "SET_OFFCHAIN", 12) == 0) {
 		reply_len = hostapd_ctrl_iface_set_offchain(hapd, buf + 12, reply, reply_size);
 	} else if (os_strncmp(buf, "GET_OFFCHAIN", 12) == 0) {
