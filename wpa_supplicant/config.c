@@ -2935,6 +2935,7 @@ static const struct parse_data ssid_fields[] = {
 	{ INT_RANGE(ssid_protection, 0, 1)},
 	{ INT_RANGE(rsn_overriding, 0, 2)},
 	{ INT_RANGE(sae_password_id_change, 0, 1)},
+	{ STR(mtk_vendor_element) },
 };
 
 #undef OFFSET
@@ -3119,6 +3120,7 @@ void wpa_config_free_ssid(struct wpa_ssid *ssid)
 	os_free(ssid->p2p2_client_list);
 	os_free(ssid->bssid_ignore);
 	os_free(ssid->bssid_accept);
+	os_free(ssid->mtk_vendor_element);
 #ifdef CONFIG_HT_OVERRIDES
 	os_free(ssid->ht_mcs);
 #endif /* CONFIG_HT_OVERRIDES */

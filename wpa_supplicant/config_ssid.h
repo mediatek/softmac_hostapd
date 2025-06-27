@@ -1349,6 +1349,12 @@ struct wpa_ssid {
 	 * sae_password_id_change - Whether to use changing SAE password IDs
 	 */
 	bool sae_password_id_change;
+
+	/**
+	 * mtk_vendor_element - Mediatek vendor specific element for Assoc
+	 *	Request frames
+	 */
+	char *mtk_vendor_element;
 };
 
 #endif /* CONFIG_SSID_H */

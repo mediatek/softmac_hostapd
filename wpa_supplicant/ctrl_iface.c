@@ -2341,7 +2341,14 @@ static int wpa_supplicant_ctrl_iface_status(struct wpa_supplicant *wpa_s,
 					return pos - buf;
 				pos += ret;
 			}
-
+			if (ssid->mtk_vendor_element) {
+				ret = os_snprintf(pos, end - pos,
+						  "mtk_vendor_element=%s\n",
+						  ssid->mtk_vendor_element);
+				if (os_snprintf_error(end - pos, ret))
+					return pos - buf;
+				pos += ret;
+			}
 			switch (ssid->mode) {
 			case WPAS_MODE_INFRA:
 				ret = os_snprintf(pos, end - pos,
