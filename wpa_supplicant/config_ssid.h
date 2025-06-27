@@ -1341,6 +1341,12 @@ struct wpa_ssid {
 	 */
 	int go_dik_id;
 
+	/**
+	 * mtk_vendor_element - Mediatek vendor specific element for Assoc
+	 *	Request frames
+	 */
+	char *mtk_vendor_element;
+
 };
 
 #endif /* CONFIG_SSID_H */

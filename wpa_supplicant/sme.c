@@ -1013,6 +1013,28 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		os_free(wpa_ie);
 	}
 
+	if (ssid->mtk_vendor_element &&
+	    wpa_s->vendor_elem[VENDOR_ELEM_ASSOC_REQ] == NULL) {
+		char *pos = ssid->mtk_vendor_element;
+		size_t len = os_strlen(pos) / 2;
+		struct ieee802_11_elems elems;
+		struct wpabuf *buf;
+
+		buf = wpabuf_alloc(len);
+		if (buf == NULL)
+			goto mtk_vendor_element_end;
+
+		if (hexstr2bin(pos, wpabuf_put(buf, len), len) < 0 ||
+		    ieee802_11_parse_elems(wpabuf_head_u8(buf), len, &elems, 0) ==
+		    ParseFailed) {
+			wpabuf_free(buf);
+			goto mtk_vendor_element_end;
+		}
+
+		wpa_s->vendor_elem[VENDOR_ELEM_ASSOC_REQ] = buf;
+		wpas_vendor_elem_update(wpa_s);
+	}
+mtk_vendor_element_end:
 	sme_add_assoc_req_ie(wpa_s, wpa_s->vendor_elem[VENDOR_ELEM_ASSOC_REQ]);
 
 #ifdef CONFIG_MBO
