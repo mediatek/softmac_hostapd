@@ -1393,7 +1393,7 @@ struct wpa_ssid {
 	 * 1 = check AP's extended capabilities
 	 * 2 = always enable
 	 */
-	int always_use_proxy_arp;
+	u8 always_use_proxy_arp;
 
 #ifdef CONFIG_PASN
 	/**
@@ -1418,6 +1418,12 @@ struct wpa_ssid {
 	 * This is a -1 terminated int_array of enabled security profiles.
 	 */
 	int *security_profiles;
+
+	/**
+	 * mtk_vendor_element - Mediatek vendor specific element for Assoc
+	 *	Request frames
+	 */
+	char *mtk_vendor_element;
 };
 
 #endif /* CONFIG_SSID_H */
