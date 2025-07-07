@@ -1809,6 +1809,15 @@ struct wpa_config {
 	int disable_btm;
 
 	/**
+	 * disable_rrm - Disable Radio Resource Management (RRM) in STA
+	 * - Set to 0 to enable RRM
+	 * - Set to 1 to disable RRM
+	 *
+	 * By default RRM is enabled
+	 */
+	int disable_rrm;
+
+	/**
 	 * extended_key_id - Extended Key ID support
 	 *
 	 * IEEE Std 802.11-2016 optionally allows to use Key ID 0 and 1 for PTK
