@@ -352,6 +352,11 @@ static void sme_auth_handle_rrm(struct wpa_supplicant *wpa_s,
 		   "RRM: Determining whether RRM can be used - device support: 0x%x",
 		   wpa_s->drv_rrm_flags);
 
+	if (wpa_s->conf->disable_rrm) {
+		wpa_printf(MSG_DEBUG, "RRM: Disabled by configuration");
+		return;
+	}
+
 	rrm_ie = wpa_bss_get_ie(bss, WLAN_EID_RRM_ENABLED_CAPABILITIES);
 	if (!rrm_ie || !(bss->caps & IEEE80211_CAP_RRM)) {
 		wpa_printf(MSG_DEBUG, "RRM: No RRM in network");

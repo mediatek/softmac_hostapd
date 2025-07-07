@@ -1776,6 +1776,8 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 			config->p2p_interface_random_mac_addr);
 	if (config->disable_btm)
 		fprintf(f, "disable_btm=1\n");
+	if (config->disable_rrm)
+		fprintf(f, "disable_rrm=1\n");
 	if (config->extended_key_id != DEFAULT_EXTENDED_KEY_ID)
 		fprintf(f, "extended_key_id=%d\n",
 			config->extended_key_id);
