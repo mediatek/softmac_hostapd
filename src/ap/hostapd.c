@@ -5158,6 +5158,13 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 		hostapd_cleanup_cs_params(hapd);
 	}
 
+	/* The color change process will be aborted when a channel switch is started.
+	 * Therefore, clear the CCA parameters here so that the beacon will not
+	 * contain the CCA IE.
+	 */
+	if (hapd->cca_in_progress)
+		hostapd_cleanup_cca_params(hapd);
+
 	chanwidth = hostapd_chan_width_from_freq_params(&settings->freq_params);
 
 	if (ieee80211_freq_to_channel_ext(
@@ -5540,6 +5547,13 @@ static void hostapd_switch_color_timeout_handler(void *eloop_data,
 	os_time_t delta_t;
 	unsigned int b;
 	int i, r;
+
+	/* If CSA is in progress, delay the color change */
+	if (hapd->csa_in_progress) {
+		eloop_register_timeout(5, 0, hostapd_switch_color_timeout_handler,
+				       hapd, NULL);
+		return;
+	}
 
 	 /* CCA can be triggered once the handler constantly receives
 	  * color collision events to for at least
