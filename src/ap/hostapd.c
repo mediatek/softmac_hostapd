@@ -5491,6 +5491,13 @@ static void hostapd_switch_color_timeout_handler(void *eloop_data,
 	unsigned int b;
 	int i, r;
 
+	/* If CSA is in progress, delay the color change */
+	if (hapd->csa_in_progress) {
+		eloop_register_timeout(5, 0, hostapd_switch_color_timeout_handler,
+				       hapd, NULL);
+		return;
+	}
+
 	 /* CCA can be triggered once the handler constantly receives
 	  * color collision events to for at least
 	  * DOT11BSS_COLOR_COLLISION_AP_PERIOD (50 s by default). */
