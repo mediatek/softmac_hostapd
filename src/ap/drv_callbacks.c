@@ -2900,6 +2900,7 @@ void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 		hostapd_client_poll_ok(hapd, data->client_poll.addr);
 		break;
 	case EVENT_RX_FROM_UNKNOWN:
+		hapd = switch_link_hapd(hapd, data->rx_from_unknown.link_id);
 		hostapd_rx_from_unknown_sta(hapd, data->rx_from_unknown.bssid,
 					    data->rx_from_unknown.addr,
 					    data->rx_from_unknown.wds);
