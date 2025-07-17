@@ -2774,7 +2774,7 @@ static void hostapd_event_pp_bitmap_update(struct hostapd_data *hapd,
 
 	/* Setup CSA request */
 	os_memset(&csa_settings, 0, sizeof(csa_settings));
-	csa_settings.cs_count = 5;
+	csa_settings.cs_count = 10;
 	csa_settings.block_tx = 0;
 	csa_settings.link_id = ch_switch->link_id;
 

@@ -1100,7 +1100,7 @@ static int hostapd_dfs_request_channel_switch(struct hostapd_iface *iface,
 
 	/* Setup CSA request */
 	os_memset(&csa_settings, 0, sizeof(csa_settings));
-	csa_settings.cs_count = 5;
+	csa_settings.cs_count = 10;
 	csa_settings.block_tx = 1;
 	csa_settings.link_id = -1;
 #ifdef CONFIG_IEEE80211BE
@@ -2137,8 +2137,8 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 	bool update_background = false;
 
 	if (!dfs_use_radar_background(iface)) {
-		if (settings->cs_count < 5)
-			settings->cs_count = 5;
+		if (settings->cs_count < 10)
+			settings->cs_count = 10;
 		settings->block_tx = cac_required;
 		return 0;
 	}
