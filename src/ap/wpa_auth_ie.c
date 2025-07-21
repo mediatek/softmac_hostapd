@@ -1291,6 +1291,7 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		u64 drv_flags = 0;
 		u64 drv_flags2 = 0;
 		bool ap_sae_offload = false;
+		u16 auth_alg = assoc_sm ? assoc_sm->auth_alg : sm->auth_alg;
 
 		if (wpa_auth->cb->get_drv_flags &&
 		    wpa_auth->cb->get_drv_flags(wpa_auth->cb_ctx, &drv_flags,
@@ -1313,7 +1314,7 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		 * can be used regardless of which PMKID(s) are indicated in the
 		 * (Re)Association Request frame. */
 		if (!ap_sae_offload && data.num_pmkid && !sm->pmksa &&
-		    sm->auth_alg == WLAN_AUTH_OPEN) {
+		    auth_alg == WLAN_AUTH_OPEN) {
 			wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_DEBUG,
 					 "No PMKSA cache entry found for SAE");
 			return WPA_INVALID_PMKID;
