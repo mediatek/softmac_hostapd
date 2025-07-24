@@ -380,6 +380,23 @@ static inline int hostapd_drv_switch_color(struct hostapd_data *hapd,
 
 	return hapd->driver->switch_color(hapd->drv_priv, settings);
 }
+
+static inline int hostapd_drv_add_btwt(struct hostapd_data *hapd,
+				       struct broadcast_twt_param *param)
+{
+	if (!hapd->driver || !hapd->driver->add_btwt || !hapd->drv_priv)
+		return -1;
+
+	return hapd->driver->add_btwt(hapd->drv_priv, param);
+}
+
+static inline int hostapd_drv_del_btwt(struct hostapd_data *hapd, u8 id)
+{
+	if (!hapd->driver || !hapd->driver->del_btwt || !hapd->drv_priv)
+		return -1;
+
+	return hapd->driver->del_btwt(hapd->drv_priv, id);
+}
 #endif /* CONFIG_IEEE80211AX */
 
 static inline int hostapd_drv_status(struct hostapd_data *hapd, char *buf,

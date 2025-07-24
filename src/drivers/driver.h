@@ -3008,6 +3008,21 @@ struct cca_settings {
 	int link_id;
 };
 
+/**
+ * struct broadcast_twt_param - Parameters for broadcast TWT service period
+ */
+struct broadcast_twt_param {
+	struct dl_list list;
+	u8 id;
+	u8 min_wake_dur;
+	u16 wake_intv_mantissa;
+	u8 wake_intv_exp;
+	bool trigger;
+	bool flow_type;
+	u8 recommendation;
+	u8 persist;
+};
+
 /* TDLS peer capabilities for send_tdls_mgmt() */
 enum tdls_peer_capability {
 	TDLS_PEER_HT = BIT(0),
@@ -4882,6 +4897,16 @@ struct wpa_driver_ops {
 	 * This function is used to move the BSS to its new color.
 	 */
 	int (*switch_color)(void *priv, struct cca_settings *settings);
+
+	/**
+	* add_btwt - add new broadcast twt service period
+	*/
+	int (*add_btwt)(void *priv, struct broadcast_twt_param *param);
+
+	/**
+	* del_btwt - delete broadcast twt service period
+	*/
+	int (*del_btwt)(void *priv, u8 id);
 
 	/**
 	 * add_tx_ts - Add traffic stream

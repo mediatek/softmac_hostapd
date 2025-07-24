@@ -399,6 +399,9 @@ struct hostapd_data {
 	struct os_reltime first_color_collision;
 	struct os_reltime last_color_collision;
 	u64 color_collision_bitmap;
+
+	struct dl_list btwt_sp_list; /* list of struct broadcast_twt_param */
+	u8 broadcast_twt_cnt;
 #endif /* CONFIG_IEEE80211AX */
 
 #ifdef CONFIG_P2P
@@ -1161,6 +1164,28 @@ static inline bool
 hostapd_is_eht_enabled(struct hostapd_data *hapd)
 {
 	return hapd->iconf->ieee80211be && !hapd->conf->disable_11be;
+}
+
+static inline u32 hostapd_get_radio_mask(struct hostapd_data *hapd)
+{
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->iface->current_hw_info) {
+		if (hapd->conf->mld_ap)
+			return hapd->iface->radio_mask;
+		else
+			return 1 << hapd->iface->current_hw_info->hw_idx;
+	}
+#endif /* CONFIG_IEEE80211BE */
+	return 0;
+}
+
+static inline int hostapd_twt_init(struct hostapd_data *hapd)
+{
+#ifdef CONFIG_IEEE80211AX
+	dl_list_init(&hapd->btwt_sp_list);
+	hapd->broadcast_twt_cnt = 0;
+#endif /* CONFIG_IEEE80211AX */
+	return 0;
 }
 
 #endif /* HOSTAPD_H */

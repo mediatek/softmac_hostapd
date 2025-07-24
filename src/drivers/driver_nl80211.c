@@ -12645,6 +12645,81 @@ error:
 	wpa_printf(MSG_DEBUG, "nl80211: Could not build color switch request");
 	return ret;
 }
+
+int nl80211_add_btwt(void *priv, struct broadcast_twt_param *param)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	struct nlattr *data;
+	int ret = -ENOBUFS;
+
+	wpa_printf(MSG_DEBUG, "nl80211: add Broadcast TWT, ifname=%s", bss->ifname);
+	msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_ADD_BROADCAST_TWT);
+	if (!msg)
+		goto fail;
+
+	data = nla_nest_start(msg, NL80211_ATTR_BROADCAST_TWT_PARAMS);
+	if (!data)
+		goto fail;
+
+	if (nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_ID, param->id) ||
+	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_MIN_WAKE_DUR, param->min_wake_dur) ||
+	    nla_put_u16(msg, NL80211_BROADCAST_TWT_ATTR_MANTISSA, param->wake_intv_mantissa) ||
+	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_EXPONENT, param->wake_intv_exp) ||
+	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_RECOMMENDATION, param->recommendation) ||
+	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_PERSISTENCE, param->persist) ||
+	    (param->trigger && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_TRIGGER)) ||
+	    (param->flow_type && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE)))
+		goto fail;
+
+	nla_nest_end(msg, data);
+
+	ret = send_and_recv_cmd(drv, msg);
+	if (ret)
+		wpa_printf(MSG_DEBUG, "Failed to add Broadcast TWT. ret=%d (%s)",
+			   ret, strerror(-ret));
+	return ret;
+
+fail:
+	nlmsg_free(msg);
+	wpa_printf(MSG_DEBUG, "nl80211: Could not build add broadcast TWT request");
+	return ret;
+}
+
+int nl80211_del_btwt(void *priv, u8 id)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	struct nlattr *data;
+	int ret = -ENOBUFS;
+
+	wpa_printf(MSG_DEBUG, "nl80211: del Broadcast TWT, ifname=%s", bss->ifname);
+	msg = nl80211_bss_msg(bss, 0, NL80211_CMD_DEL_BROADCAST_TWT);
+	if (!msg)
+		goto fail;
+
+	data = nla_nest_start(msg, NL80211_ATTR_BROADCAST_TWT_PARAMS);
+	if (!data)
+		goto fail;
+
+	if (nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_ID, id))
+		goto fail;
+
+	nla_nest_end(msg, data);
+
+	ret = send_and_recv_cmd(drv, msg);
+	if (ret)
+		wpa_printf(MSG_DEBUG, "Failed to del Broadcast TWT. ret=%d (%s)",
+			   ret, strerror(-ret));
+	return ret;
+
+fail:
+	nlmsg_free(msg);
+	wpa_printf(MSG_DEBUG, "nl80211: Could not build del broadcast TWT request");
+	return ret;
+}
 #endif /* CONFIG_IEEE80211AX */
 
 
@@ -17596,6 +17671,8 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.switch_channel = nl80211_switch_channel,
 #ifdef CONFIG_IEEE80211AX
 	.switch_color = nl80211_switch_color,
+	.add_btwt = nl80211_add_btwt,
+	.del_btwt = nl80211_del_btwt,
 #endif /* CONFIG_IEEE80211AX */
 #ifdef ANDROID_P2P
 	.set_noa = wpa_driver_set_p2p_noa,

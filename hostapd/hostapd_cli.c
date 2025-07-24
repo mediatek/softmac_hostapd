@@ -1911,6 +1911,24 @@ hostapd_cli_cmd_clear_disconn_counter(struct wpa_ctrl *ctrl, int argc, char *arg
 	return wpa_ctrl_command(ctrl, "CLEAR_DISCONN_COUNTER");
 }
 
+static int hostapd_cli_cmd_add_broadcast_twt(struct wpa_ctrl *ctrl, int argc,
+					     char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "ADD_BROADCAST_TWT", 4, argc, argv);
+}
+
+static int hostapd_cli_cmd_del_broadcast_twt(struct wpa_ctrl *ctrl, int argc,
+					     char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "DEL_BROADCAST_TWT", 1, argc, argv);
+}
+
+static int hostapd_cli_cmd_get_broadcast_twt(struct wpa_ctrl *ctrl, int argc,
+					     char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "GET_BROADCAST_TWT", 0, 0, NULL);
+}
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2012,6 +2030,15 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "color_change", hostapd_cli_cmd_color_change, NULL,
 	  "<color> = initiate BSS color change to set the specified color\n"
 	  "Value 0 will disable the color.\n"},
+	{ "add_btwt", hostapd_cli_cmd_add_broadcast_twt, NULL,
+	  "<id> <min_wake_dur> <wake_intv_manti> <wake_intv_exp>\n"
+	  "  [trigger=<0/1>] [flow_type=<0/1>]\n"
+	  "  [recommendation=0~7] [persist=0~255]\n"
+	  "  = Add Broadcast TWT" },
+	{ "del_btwt", hostapd_cli_cmd_del_broadcast_twt, NULL,
+		" <id> = Delete Broadcast TWT"},
+	{ "get_btwt", hostapd_cli_cmd_get_broadcast_twt, NULL,
+		" = Show existing Broadcast TWT"},
 #endif /* CONFIG_IEEE80211AX */
 	{ "notify_cw_change", hostapd_cli_cmd_notify_cw_change, NULL,
 	  "<channel_width> = 0 - 20 MHz, 1 - 40 MHz, 2 - 80 MHz, 3 - 160 MHz" },

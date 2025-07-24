@@ -2883,6 +2883,182 @@ static int hostapd_ctrl_iface_color_change(struct hostapd_iface *iface,
 	return -1;
 #endif /* NEED_AP_MLME */
 }
+
+static int
+hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
+				     char *buf, size_t buflen)
+{
+	char *pos = cmd, *end;
+	struct broadcast_twt_param *param;
+
+	param = os_malloc(sizeof(*param));
+	if (param == NULL)
+		return -ENOBUFS;
+
+	param->id = strtol(pos, &end, 10);
+	if (pos == end) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid btwt id");
+		goto fail;
+	}
+	pos = end;
+
+	param->min_wake_dur = strtol(pos, &end, 10);
+	if (pos == end) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid min_wake_dur");
+		goto fail;
+	}
+	pos = end;
+
+	param->wake_intv_mantissa = strtol(pos, &end, 10);
+	if (pos == end) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid wake_intv_mantissa");
+		goto fail;
+	}
+	pos = end;
+
+	param->wake_intv_exp = strtol(pos, &end, 10);
+	if (pos == end) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid wake_intv_exp");
+		goto fail;
+	}
+	pos = end;
+
+	param->trigger = 0;
+	param->flow_type = 0;
+	param->recommendation = 0;
+	param->persist = 255;
+
+	pos = os_strstr(cmd, "trigger=");
+	if (pos)
+		param->trigger = !!atoi(pos + 8);
+
+	pos = os_strstr(cmd, "flow_type=");
+	if (pos)
+		param->flow_type = !!atoi(pos + 10);
+
+	pos = os_strstr(cmd, "recommendation=");
+	if (pos)
+		param->recommendation = atoi(pos + 15);
+
+	pos = os_strstr(cmd, "persist=");
+	if (pos)
+		param->persist = atoi(pos + 8);
+
+	if (param->id > 31 ||
+	    param->wake_intv_exp > 31 ||
+	    param->recommendation > 7) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid argument");
+		goto fail;
+	}
+
+	if (hostapd_drv_add_btwt(hapd, param)) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: driver add fail");
+		goto fail;
+	}
+
+	hapd->broadcast_twt_cnt++;
+	dl_list_add_tail(&hapd->btwt_sp_list, &param->list);
+	ieee802_11_set_beacon_per_bss_only(hapd);
+
+	return os_snprintf(buf, buflen, "broadcast_twt: id=%hhu min_wake_dur=%hhu "
+			   "wake_intv_mantissa=%hu wake_intv_exp=%hu "
+			   "trigger=%hhu flow_type=%hhu "
+			   "recommendation=%hhu persist=%hhu in bssid=" MACSTR "\n",
+			   param->id, param->min_wake_dur, param->wake_intv_mantissa,
+			   param->wake_intv_exp, param->trigger, param->flow_type,
+			   param->recommendation, param->persist,
+			   MAC2STR(hapd->own_addr));
+
+fail:
+	os_free(param);
+	return -1;
+}
+
+static int
+hostapd_ctrl_iface_del_broadcast_twt(struct hostapd_data *hapd, char *cmd,
+				     char *buf, size_t buflen)
+{
+	char *pos = cmd, *end;
+	bool found = false;
+	int ret;
+	struct broadcast_twt_param *param, *iter;
+	u8 id;
+
+	if (hapd->broadcast_twt_cnt == 0) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: nothing to be deleted");
+		return -1;
+	}
+
+	id = strtol(pos, &end, 10);
+	if (pos == end) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid id provided");
+		return -1;
+	}
+	pos = end;
+
+	if (hostapd_drv_del_btwt(hapd, id)) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: driver delete fail");
+		return -1;
+	}
+
+	dl_list_for_each_safe(param, iter, &hapd->btwt_sp_list,
+			      struct broadcast_twt_param, list) {
+		if (param->id == id) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		wpa_printf(MSG_ERROR, "broadcast_twt: invalid id");
+		return -1;
+	}
+
+	hapd->broadcast_twt_cnt--;
+	dl_list_del(&param->list);
+	ieee802_11_set_beacon_per_bss_only(hapd);
+	ret = os_snprintf(buf, buflen, "broadcast_twt: id=%hhu in bssid="
+			  MACSTR " deleted\n", param->id,
+			  MAC2STR(hapd->own_addr));
+	os_free(param);
+	return ret;
+}
+
+static int
+hostapd_ctrl_iface_get_broadcast_twt(struct hostapd_data *hapd, char *buf, size_t buflen)
+{
+	int ret;
+	char *pos, *end;
+	struct broadcast_twt_param *param;
+
+	pos = buf;
+	end = buf + buflen;
+	ret = os_snprintf(pos, end - pos,
+			  "broadcast_twt: %u set(s) of broadcast twt\n",
+			  hapd->broadcast_twt_cnt);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	dl_list_for_each(param, &hapd->btwt_sp_list,
+			 struct broadcast_twt_param, list) {
+		ret = os_snprintf(pos, end - pos, "id=%hhu min_wake_dur=%hhu "
+				  "wake_intv_mantissa=%hu wake_intv_exp=%hhu "
+				  "trigger=%hhu flow_type=%hhu "
+				  "recommendation=%hhu persist=%hhu in bssid=" MACSTR "\n",
+				  param->id, param->min_wake_dur,
+				  param->wake_intv_mantissa, param->wake_intv_exp,
+				  param->trigger, param->flow_type,
+				  param->recommendation, param->persist,
+				  MAC2STR(hapd->own_addr));
+
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+
+	return pos - buf;
+}
 #endif /* CONFIG_IEEE80211AX */
 
 
@@ -6564,6 +6740,14 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "COLOR_CHANGE ", 13) == 0) {
 		if (hostapd_ctrl_iface_color_change(hapd->iface, buf + 13))
 			reply_len = -1;
+	} else if (os_strncmp(buf, "ADD_BROADCAST_TWT ", 18) == 0) {
+		reply_len = hostapd_ctrl_iface_add_broadcast_twt(hapd, buf + 18,
+				reply, reply_size);
+	} else if (os_strncmp(buf, "DEL_BROADCAST_TWT ", 18) == 0) {
+		reply_len = hostapd_ctrl_iface_del_broadcast_twt(hapd, buf + 18,
+				reply, reply_size);
+	} else if (os_strncmp(buf, "GET_BROADCAST_TWT", 17) == 0) {
+		reply_len = hostapd_ctrl_iface_get_broadcast_twt(hapd, reply, reply_size);
 #endif /* CONFIG_IEEE80211AX */
 	} else if (os_strncmp(buf, "NOTIFY_CW_CHANGE ", 17) == 0) {
 		if (hostapd_ctrl_iface_notify_cw_change(hapd, buf + 17))

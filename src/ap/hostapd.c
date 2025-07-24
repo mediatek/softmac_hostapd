@@ -1948,6 +1948,11 @@ setup_mld:
 		}
 	}
 
+	if (hostapd_twt_init(hapd)) {
+		wpa_printf(MSG_ERROR, "TWT initialization failed.");
+		return -1;
+	}
+
 	if (!hostapd_drv_none(hapd) && vlan_init(hapd)) {
 		wpa_printf(MSG_ERROR, "VLAN initialization failed.");
 		return -1;
