@@ -936,6 +936,9 @@ static u8 * hostapd_probe_resp_fill_elems(struct hostapd_data *hapd,
 		pos = hostapd_eid_he_capab(hapd, pos, IEEE80211_MODE_AP);
 		pos = hostapd_eid_he_operation(hapd, pos);
 
+		/* Broadcast Target Wake Time */
+		pos = hostapd_eid_twt(hapd, pos);
+
 		/* BSS Color Change Announcement element */
 		cca_pos = hostapd_eid_cca(hapd, pos);
 		if (cca_pos != pos)
@@ -2340,6 +2343,10 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 
 	tail_len += he_elem_len(hapd);
 
+#ifdef CONFIG_IEEE80211AX
+	if (hapd->iconf->ieee80211ax && !hapd->conf->disable_11ax)
+		tail_len += hostapd_eid_twt_len(hapd);
+#endif /* CONFIG_IEEE80211AX */
 #ifdef CONFIG_IEEE80211BE
 	if (hostapd_is_eht_enabled(hapd)) {
 		tail_len += hostapd_eid_eht_capab_len(hapd, IEEE80211_MODE_AP);
@@ -2538,6 +2545,9 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 		if (cca_pos != tailpos)
 			hapd->cca_c_off_beacon = cca_pos - tail - 2;
 		tailpos = cca_pos;
+
+		/* Broadcast Target Wake Time */
+		tailpos = hostapd_eid_twt(hapd, tailpos);
 
 		tailpos = hostapd_eid_spatial_reuse(hapd, tailpos);
 		tailpos = hostapd_eid_he_mu_edca_parameter_set(hapd, tailpos);

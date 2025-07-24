@@ -571,3 +571,70 @@ u8 * hostapd_eid_cca(struct hostapd_data *hapd, u8 *eid)
 
 	return eid;
 }
+
+size_t hostapd_eid_twt_len(struct hostapd_data *hapd)
+{
+	size_t len;
+
+	if (hapd->broadcast_twt_cnt == 0)
+		return 0;
+
+	/* Element ID: 1 octet
+	 * Length: 1 octet
+	 * Control field: 1 octet
+	 * TWT Parameter Information: 9 octets per BTWT service period
+	 * 	Request Type: 2 octets
+	 * 	Target Wake Time: 2 octets
+	 * 	Nominal Minimum TWT Wake Duration: 1 octet
+	 * 	TWT Wake Inverval Mantissa: 2 octets
+	 * 	Broadcast TWT info subfield: 2 octets
+	 */
+	len = 2 + 1 + 9 * hapd->broadcast_twt_cnt;
+
+	return len;
+}
+
+u8 * hostapd_eid_twt(struct hostapd_data *hapd, u8 *eid)
+{
+	struct broadcast_twt_param *param;
+	u8 *pos = eid;
+	u8 *control;
+	u8 cnt = 0;
+
+	if (hapd->broadcast_twt_cnt == 0)
+		return eid;
+
+	*pos++ = WLAN_EID_TWT;
+	*pos++ = 1 + hapd->broadcast_twt_cnt * sizeof(struct btwt_param_set_field); /* len */
+	control = pos++;
+
+	*control = TWT_CONTROL_NEG_TYPE_BROADCAST | TWT_CONTROL_RX_DISABLED;
+
+	dl_list_for_each(param, &hapd->btwt_sp_list,
+			 struct broadcast_twt_param, list) {
+		struct btwt_param_set_field *btwt_ie = (struct btwt_param_set_field *) pos;
+		u16 req_type = 0, btwt_info_val = 0;
+
+		req_type = TWT_SETUP_CMD_ACCEPT << 1;
+		req_type |= param->trigger << 4;
+		req_type |= param->flow_type << 6;
+		req_type |= param->recommendation << 7;
+		req_type |= param->wake_intv_exp << 10;
+
+		cnt++;
+		if (cnt == hapd->broadcast_twt_cnt)
+			req_type |= TWT_REQTYPE_LAST_BCAST_PARAM;
+
+		btwt_ie->req_type = host_to_le16(req_type);
+		btwt_ie->min_wake_dur = param->min_wake_dur;
+		btwt_ie->wake_intv_mantissa = host_to_le16(param->wake_intv_mantissa);
+
+		btwt_info_val = (param->id << 3);
+		btwt_info_val |= (param->persist << 8);
+		btwt_ie->btwt_info = host_to_le16(btwt_info_val);
+
+		pos += sizeof(*btwt_ie);
+	}
+
+	return pos;
+}

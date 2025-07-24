@@ -173,6 +173,8 @@ bool hostapd_get_ht_vht_twt_responder(struct hostapd_data *hapd);
 void hostapd_wfa_capab(struct hostapd_data *hapd, struct sta_info *sta,
 		       const u8 *pos, const u8 *end);
 u8 * hostapd_eid_cca(struct hostapd_data *hapd, u8 *eid);
+size_t hostapd_eid_twt_len(struct hostapd_data *hapd);
+u8 * hostapd_eid_twt(struct hostapd_data *hapd, u8 *eid);
 void hostapd_tx_status(struct hostapd_data *hapd, const u8 *addr,
 		       const u8 *buf, size_t len, int ack);
 void ieee802_11_rx_from_unknown(struct hostapd_data *hapd, const u8 *src,

@@ -5285,6 +5285,7 @@ void ieee80211_ml_build_assoc_resp(struct hostapd_data *hapd,
 	if (hostapd_is_he_enabled(hapd)) {
 		p = hostapd_eid_he_capab(hapd, p, IEEE80211_MODE_AP);
 		p = hostapd_eid_he_operation(hapd, p);
+		p = hostapd_eid_twt(hapd, p);
 		p = hostapd_eid_spatial_reuse(hapd, p);
 		p = hostapd_eid_he_mu_edca_parameter_set(hapd, p);
 		p = hostapd_eid_he_6ghz_band_cap(hapd, p);

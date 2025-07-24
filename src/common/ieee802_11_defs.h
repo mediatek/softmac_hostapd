@@ -3395,4 +3395,40 @@ struct neighbor_report_element {
 	u8 variable[0]; /* Optional Subelements */
 } STRUCT_PACKED;
 
+enum twt_setup_cmd {
+	TWT_SETUP_CMD_REQUEST,
+	TWT_SETUP_CMD_SUGGEST,
+	TWT_SETUP_CMD_DEMAND,
+	TWT_SETUP_CMD_GROUPING,
+	TWT_SETUP_CMD_ACCEPT,
+	TWT_SETUP_CMD_ALTERNATE,
+	TWT_SETUP_CMD_DICTATE,
+	TWT_SETUP_CMD_REJECT,
+};
+
+#define TWT_CONTROL_NDP			BIT(0)
+#define TWT_CONTROL_RESPONDER_PM_MODE	BIT(1)
+#define TWT_CONTROL_NEG_TYPE_BROADCAST	BIT(3)
+#define TWT_CONTROL_RX_DISABLED		BIT(4)
+#define TWT_CONTROL_WAKE_DUR_UNIT	BIT(5)
+
+#define TWT_REQTYPE_REQUEST		BIT(0)
+#define TWT_REQTYPE_SETUP_CMD		(BIT(1) | BIT(2) | BIT(3))
+#define TWT_REQTYPE_TRIGGER		BIT(4)
+#define TWT_REQTYPE_IMPLICIT		BIT(5)
+#define TWT_REQTYPE_LAST_BCAST_PARAM	BIT(5)
+#define TWT_REQTYPE_FLOWTYPE		BIT(6)
+#define TWT_REQTYPE_FLOWID		(BIT(7) | BIT(8) | BIT(9))
+#define TWT_REQTYPE_RECOMMENDATION	(BIT(7) | BIT(8) | BIT(9))
+#define TWT_REQTYPE_WAKE_INT_EXP	(BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14))
+#define TWT_REQTYPE_PROTECTION		BIT(15)
+
+struct btwt_param_set_field {
+	le16 req_type;
+	le16 twt;
+	u8 min_wake_dur;
+	le16 wake_intv_mantissa;
+	le16 btwt_info;
+} STRUCT_PACKED;
+
 #endif /* IEEE802_11_DEFS_H */
