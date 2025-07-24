@@ -702,8 +702,13 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 	sta = ap_get_sta(hapd, addr);
 	if (os_strstr(txtaddr, " tx=0")) {
 		hostapd_drv_sta_remove(hapd, addr);
-		if (sta)
+		if (sta) {
+#ifdef CONFIG_IEEE80211BE
+			if (hostapd_is_mld_ap(hapd))
+				ap_sta_remove_link_sta(hapd, sta);
+#endif /* CONFIG_IEEE80211BE */
 			ap_free_sta(hapd, sta);
+		}
 	} else {
 		hostapd_drv_sta_deauth(hapd, addr, reason);
 		if (sta)
