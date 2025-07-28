@@ -4073,6 +4073,19 @@ int hostapd_disable_mld(struct hostapd_data *hapd)
 		return -1;
 	}
 
+	if (mld->link_reconf_in_progress || mld->removed_links) {
+		wpa_printf(MSG_ERROR, "Cannot disable MLD during link reconfig");
+		return -1;
+	}
+
+	for_each_mld_link(h, hapd) {
+		if (h->csa_in_progress || h->cca_in_progress ||
+		    hostapd_is_attlm_active(h)) {
+			wpa_printf(MSG_ERROR, "Cannot disable MLD during CSA/CCA/ATTLM");
+			return -1;
+		}
+	}
+
 	for_each_mld_link(h, hapd)
 		hostapd_disable_bss(h);
 
