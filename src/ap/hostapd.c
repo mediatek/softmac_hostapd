@@ -163,10 +163,24 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
 	else
 		hostapd_set_drv_ieee8021x(hapd, hapd->conf->iface, 0);
 
-	if (hapd->conf->wpa && hapd->wpa_auth == NULL) {
+	if (hapd->wpa_auth) {
+		wpa_deinit(hapd->wpa_auth);
+		hapd->wpa_auth = NULL;
+		hostapd_set_privacy(hapd, 0);
+#ifdef CONFIG_WEP
+		hostapd_setup_encryption(hapd->conf->iface, hapd);
+#endif /* CONFIG_WEP */
+		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
+	}
+
+	if (hapd->conf->wpa) {
 		hostapd_setup_wpa(hapd);
 		if (hapd->wpa_auth)
 			wpa_init_keys(hapd->wpa_auth);
+	/* There are a lot of missing content in the WPA reconfiguration flow
+	 * compared to the WPA initialization flow, so deprecate it.
+	 */
+	/*
 	} else if (hapd->conf->wpa) {
 		const u8 *wpa_ie;
 		size_t wpa_ie_len;
@@ -175,14 +189,7 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
 		if (hostapd_set_generic_elem(hapd, wpa_ie, wpa_ie_len))
 			wpa_printf(MSG_ERROR, "Failed to configure WPA IE for "
 				   "the kernel driver.");
-	} else if (hapd->wpa_auth) {
-		wpa_deinit(hapd->wpa_auth);
-		hapd->wpa_auth = NULL;
-		hostapd_set_privacy(hapd, 0);
-#ifdef CONFIG_WEP
-		hostapd_setup_encryption(hapd->conf->iface, hapd);
-#endif /* CONFIG_WEP */
-		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
+	*/
 	}
 
 	hostapd_neighbor_sync_own_report(hapd);
