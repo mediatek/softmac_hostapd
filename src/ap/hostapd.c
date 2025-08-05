@@ -3064,7 +3064,7 @@ int hostapd_setup_interface_complete(struct hostapd_iface *iface, int err)
 	unsigned int i;
 	int not_ready_in_sync_ifaces = 0;
 
-	if (iface->state == HAPD_IFACE_ACS) {
+	if (iface->state == HAPD_IFACE_ACS || iface->state == HAPD_IFACE_HT_SCAN) {
 		int i;
 
 		for (i = 0; i < interfaces->count; i++) {
