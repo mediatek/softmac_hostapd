@@ -699,20 +699,33 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 #endif /* CONFIG_P2P_MANAGER */
 
 	sta = ap_get_sta(hapd, addr);
+	if (!sta && !is_broadcast_ether_addr(addr)) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR
+			   " not found for Deauthentication Request",
+			   MAC2STR(addr));
+		return -1;
+	}
+
 	if (os_strstr(txtaddr, " tx=0")) {
+		struct hostapd_data *assoc_hapd = hapd;
+		struct sta_info *assoc_sta = sta;
+
+		if (!sta)
+			return 0;
+
 		hostapd_drv_sta_remove(hapd, addr);
-		if (sta) {
 #ifdef CONFIG_IEEE80211BE
-			if (hostapd_is_mld_ap(hapd))
-				ap_sta_remove_link_sta(hapd, sta);
-#endif /* CONFIG_IEEE80211BE */
-			ap_free_sta(hapd, sta);
+		if (ap_sta_is_mld(hapd, sta)) {
+			assoc_sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
+			ap_sta_remove_link_sta(assoc_hapd, assoc_sta);
 		}
+#endif /* CONFIG_IEEE80211BE */
+		ap_free_sta(assoc_hapd, assoc_sta);
 	} else {
 		hostapd_drv_sta_deauth(hapd, addr, reason);
 		if (sta)
 			ap_sta_deauthenticate(hapd, sta, reason);
-		else if (addr[0] == 0xff)
+		else if (is_broadcast_ether_addr(addr))
 			hostapd_free_stas(hapd);
 	}
 
@@ -769,15 +782,33 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 #endif /* CONFIG_P2P_MANAGER */
 
 	sta = ap_get_sta(hapd, addr);
+	if (!sta && !is_broadcast_ether_addr(addr)) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR
+			   " not found for Disassociation Request",
+			   MAC2STR(addr));
+		return -1;
+	}
+
 	if (os_strstr(txtaddr, " tx=0")) {
+		struct hostapd_data *assoc_hapd = hapd;
+		struct sta_info *assoc_sta = sta;
+
+		if (!sta)
+			return 0;
+
 		hostapd_drv_sta_remove(hapd, addr);
-		if (sta)
-			ap_free_sta(hapd, sta);
+#ifdef CONFIG_IEEE80211BE
+		if (ap_sta_is_mld(hapd, sta)) {
+			assoc_sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
+			ap_sta_remove_link_sta(assoc_hapd, assoc_sta);
+		}
+#endif /* CONFIG_IEEE80211BE */
+		ap_free_sta(assoc_hapd, assoc_sta);
 	} else {
 		hostapd_drv_sta_disassoc(hapd, addr, reason);
 		if (sta)
 			ap_sta_disassociate(hapd, sta, reason);
-		else if (addr[0] == 0xff)
+		else if (is_broadcast_ether_addr(addr))
 			hostapd_free_stas(hapd);
 	}
 
