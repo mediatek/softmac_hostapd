@@ -3456,6 +3456,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			hostapd_ml_handle_disconnect(hapd, sta, mgmt, false);
 			hostapd_drv_sta_remove(hapd, sa);
 			resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+			sta = NULL;
 			goto fail;
 		}
 #endif /* CONFIG_IEEE80211BE */
