@@ -2765,7 +2765,7 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 					    background_settings.freq_params.he_enabled,
 					    background_settings.freq_params.eht_enabled,
 					    background_settings.freq_params.sec_channel_offset,
-					    oper_chwidth, seg0, seg1, true);
+					    oper_chwidth, seg0, seg1, true, false);
 		if (ret) {
 			wpa_printf(MSG_ERROR, "Background radar start dfs cac failed, %d",
 				   ret);
@@ -5163,7 +5163,7 @@ hostapd_ctrl_iface_set_offchain(struct hostapd_data *hapd, char *cmd,
 				  iface->conf->ieee80211ax,
 				  iface->conf->ieee80211be,
 				  secondary_chan, chwidth,
-				  seg0, seg1, true)) {
+				  seg0, seg1, true, true)) {
 		wpa_printf(MSG_ERROR, "DFS failed to start CAC offchannel");
 		iface->radar_background.channel = -1;
 		return -1;

@@ -1136,7 +1136,7 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 			  int he_enabled, bool eht_enabled,
 			  int sec_channel_offset, int oper_chwidth,
 			  int center_segment0, int center_segment1,
-			  bool radar_background)
+			  bool radar_background, bool update_state)
 {
 	struct hostapd_data *hapd = iface->bss[0];
 	struct hostapd_freq_params data;
@@ -1166,6 +1166,7 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 		return -1;
 	}
 	data.radar_background = radar_background;
+	data.dfs_state_update = update_state;
 	data.link_id = -1;
 
 #ifdef CONFIG_IEEE80211BE

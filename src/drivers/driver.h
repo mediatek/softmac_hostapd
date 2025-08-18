@@ -961,6 +961,11 @@ struct hostapd_freq_params {
 	 * op_class: Operating class of the channel
 	 */
 	u8 op_class;
+
+	/**
+	 * dfs_state_update - Whether DFS state update is requested
+	 */
+	bool dfs_state_update;
 };
 
 /**

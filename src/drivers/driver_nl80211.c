@@ -5709,6 +5709,9 @@ static int nl80211_put_freq_params(struct nl_msg *msg,
 	if (freq->radar_background &&
 	    nla_put_flag(msg, NL80211_ATTR_RADAR_BACKGROUND))
 		return -ENOBUFS;
+	if (freq->dfs_state_update &&
+	    nla_put_flag(msg, NL80211_ATTR_DFS_STATE_UPDATE))
+		return -ENOBUFS;
 
 	return 0;
 }
