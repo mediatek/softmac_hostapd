@@ -437,6 +437,6 @@ void hostapd_free_link_stas(struct hostapd_data *hapd);
 void clear_wpa_sm_for_each_partner_link(struct hostapd_data *hapd,
 					struct sta_info *psta);
 bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta);
-void ap_cleanup_sta(struct hostapd_data *hapd, u8 *addr);
+void ap_cleanup_sta(struct hostapd_data *hapd, const u8 *addr);
 
 #endif /* STA_INFO_H */

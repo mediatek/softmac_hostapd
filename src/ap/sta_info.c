@@ -2043,7 +2043,7 @@ bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta) {
 	return false;
 }
 
-void ap_cleanup_sta(struct hostapd_data *hapd, u8 *addr) {
+void ap_cleanup_sta(struct hostapd_data *hapd, const u8 *addr) {
 	struct hostapd_data *h;
 	struct sta_info *sta;
 
