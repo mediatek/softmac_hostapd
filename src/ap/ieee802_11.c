@@ -3692,7 +3692,7 @@ static void handle_auth(struct hostapd_data *hapd,
 				   "receive AUTH from associated STA "MACSTR
 				   ", do deauthentication\n",
 				   MAC2STR(sa));
-			hostapd_ml_handle_disconnect(hapd, sta, mgmt, false);
+			ap_cleanup_sta(hapd, sa);
 			hostapd_drv_sta_remove(hapd, sa);
 			resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
 			sta = NULL;
