@@ -2173,3 +2173,43 @@ bool ap_sta_in_list(struct hostapd_data *hapd, struct sta_info *sta) {
 	return false;
 }
 
+void ap_cleanup_sta(struct hostapd_data *hapd, u8 *addr) {
+	struct hostapd_data *h;
+	struct sta_info *sta;
+
+	sta = ap_get_sta(hapd, addr);
+	if (sta)
+		sta->flags &= ~WLAN_STA_ASSOC;
+
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd)) {
+		/* Clear the flag WLAN_STA_ASSOC so that ap_get_sta() must
+		 * return the sta_info of the input hapd or NULL.
+		 */
+		for_each_mld_link(h, hapd) {
+			if (h == hapd)
+				continue;
+
+			sta = ap_get_sta(h, addr);
+			if (!sta)
+				continue;
+
+			sta->flags &= ~WLAN_STA_ASSOC;
+		}
+
+		for_each_mld_link(h, hapd) {
+			if (h == hapd)
+				continue;
+
+			sta = ap_get_sta(h, addr);
+			if (!sta)
+				continue;
+
+			ap_free_sta(h, sta);
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
+	sta = ap_get_sta(hapd, addr);
+	if (sta)
+		ap_free_sta(hapd, sta);
+}
