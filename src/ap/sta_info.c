@@ -585,6 +585,11 @@ void hostapd_free_stas(struct hostapd_data *hapd)
 		sta = sta->next;
 		wpa_printf(MSG_DEBUG, "Removing station " MACSTR,
 			   MAC2STR(prev->addr));
+#ifdef CONFIG_IEEE80211BE
+		if (ap_sta_is_mld(hapd, prev) && !(hapd->mld &&
+		    (hapd->mld->removed_links & BIT(hapd->mld_link_id))))
+			ap_sta_remove_link_sta(hapd, prev);
+#endif /* CONFIG_IEEE80211BE */
 		ap_free_sta(hapd, prev);
 	}
 }
@@ -840,6 +845,8 @@ static void ap_handle_session_timer(void *eloop_ctx, void *timeout_ctx)
 		       "session timeout");
 	sta->acct_terminate_cause =
 		RADIUS_ACCT_TERMINATE_CAUSE_SESSION_TIMEOUT;
+	if (ap_sta_is_mld(hapd, sta))
+		ap_sta_remove_link_sta(hapd, sta);
 	ap_free_sta(hapd, sta);
 }
 
@@ -914,8 +921,11 @@ static void ap_sta_assoc_timeout(void *eloop_ctx, void *timeout_ctx)
 	if (sta->flags & WLAN_STA_AUTH)
 		ap_sta_deauthenticate(hapd, sta,
 				      WLAN_REASON_PREV_AUTH_NOT_VALID);
-	else
+	else {
+		if (ap_sta_is_mld(hapd, sta))
+			ap_sta_remove_link_sta(hapd, sta);
 		ap_free_sta(hapd, sta);
+	}
 }
 
 
