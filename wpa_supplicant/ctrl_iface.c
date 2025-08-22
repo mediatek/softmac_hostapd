@@ -6086,20 +6086,32 @@ static void wpa_supplicant_ctrl_iface_drop_sa(struct wpa_supplicant *wpa_s)
 
 
 static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
-					  char *addr)
+					  char *cmd)
 {
 #ifdef CONFIG_NO_SCAN_PROCESSING
 	return -1;
 #else /* CONFIG_NO_SCAN_PROCESSING */
-	u8 bssid[ETH_ALEN];
+	u8 bssid[ETH_ALEN], link_addr[ETH_ALEN];
+	bool set_link_addr = false;
+	char *pos;
 	struct wpa_bss *bss;
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 	struct wpa_radio_work *already_connecting;
 
-	if (hwaddr_aton(addr, bssid)) {
+	if (hwaddr_aton(cmd, bssid)) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: invalid "
-			   "address '%s'", addr);
+			   "cmd '%s'", cmd);
 		return -1;
+	}
+
+	pos = os_strstr(cmd, "link=");
+	if (pos) {
+		pos += 5;
+		if (hwaddr_aton(pos, link_addr))
+			wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: failed to parse link"
+				   " address from cmd %s", cmd);
+		else
+			set_link_addr = true;
 	}
 
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM " MACSTR, MAC2STR(bssid));
@@ -6110,7 +6122,8 @@ static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	bss = wpa_bss_get_connection(wpa_s, bssid, ssid->ssid, ssid->ssid_len);
+	bss = wpa_bss_get_connection(wpa_s, bssid, ssid->ssid, ssid->ssid_len,
+				     set_link_addr ? link_addr : NULL);
 	if (!bss) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: Target AP not found "
 			   "from BSS table");
