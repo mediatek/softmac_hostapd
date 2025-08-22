@@ -57,6 +57,9 @@ struct wpa_sm_ctx {
 			     size_t ies_len);
 	int (*send_ft_action)(void *ctx, u8 action, const u8 *target_ap,
 			      const u8 *ies, size_t ies_len);
+	u16 (*ft_get_valid_links)(void *ctx, u8 *assoc_link_id);
+	int (*ft_get_link_addr)(void *ctx, u8 *link_addr, u8 link_id,
+				bool is_assoc_resp);
 	int (*mark_authenticated)(void *ctx, const u8 *target_ap);
 #ifdef CONFIG_TDLS
 	int (*tdls_get_capa)(void *ctx, int *tdls_supported,
