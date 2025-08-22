@@ -749,6 +749,32 @@ static int wpa_supplicant_send_ft_action(void *ctx, u8 action,
 }
 
 
+static u16 wpa_supplicant_ft_get_valid_links(void *ctx, u8 *assoc_link_id)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (assoc_link_id)
+		*assoc_link_id = wpa_s->mlo_assoc_link_id;
+	return wpa_s->valid_links;
+}
+
+
+static int wpa_supplicant_ft_get_link_addr(void *ctx, u8 *link_addr, u8 link_id,
+					   bool is_assoc_resp)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (!link_addr || link_id > MAX_NUM_MLD_LINKS - 1)
+		return -1;
+
+	if (is_assoc_resp)
+		os_memcpy(link_addr, wpa_s->links[link_id].bssid, ETH_ALEN);
+	else
+		os_memcpy(link_addr, wpa_s->links[link_id].addr, ETH_ALEN);
+	return 0;
+}
+
+
 static int wpa_supplicant_mark_authenticated(void *ctx, const u8 *target_ap)
 {
 	struct wpa_supplicant *wpa_s = ctx;
@@ -1520,6 +1546,8 @@ int wpa_supplicant_init_wpa(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_IEEE80211R
 	ctx->update_ft_ies = wpa_supplicant_update_ft_ies;
 	ctx->send_ft_action = wpa_supplicant_send_ft_action;
+	ctx->ft_get_valid_links = wpa_supplicant_ft_get_valid_links;
+	ctx->ft_get_link_addr = wpa_supplicant_ft_get_link_addr;
 	ctx->mark_authenticated = wpa_supplicant_mark_authenticated;
 #endif /* CONFIG_IEEE80211R */
 #ifdef CONFIG_TDLS

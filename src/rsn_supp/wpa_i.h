@@ -376,6 +376,22 @@ static inline int wpa_sm_send_ft_action(struct wpa_sm *sm, u8 action,
 	return -1;
 }
 
+static inline u16 wpa_sm_get_valid_links(struct wpa_sm *sm, u8 *assoc_link_id)
+{
+	if (sm->ctx->ft_get_valid_links)
+		return sm->ctx->ft_get_valid_links(sm->ctx->ctx, assoc_link_id);
+	return 0;
+}
+
+static inline int wpa_sm_get_link_addr(struct wpa_sm *sm, u8 *link_addr, u8 link_id,
+				       bool is_assoc_resp)
+{
+	if(sm->ctx->ft_get_link_addr)
+		return sm->ctx->ft_get_link_addr(sm->ctx->ctx, link_addr, link_id,
+						 is_assoc_resp);
+	return -1;
+}
+
 static inline int wpa_sm_mark_authenticated(struct wpa_sm *sm,
 					    const u8 *target_ap)
 {
