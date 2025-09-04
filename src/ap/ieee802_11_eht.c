@@ -832,22 +832,24 @@ static u8 * hostapd_eid_eht_reconf_ml(struct hostapd_data *hapd, u8 *eid)
 	u16 control;
 	u8 *pos = eid;
 	unsigned int i;
+	bool found = false;
 
 	wpa_printf(MSG_DEBUG, "MLD: Reconfiguration ML");
 
 	/* First check if the element needs to be added */
-	for (i = 0; i < hapd->iface->interfaces->count; i++) {
-		other_hapd = hapd->iface->interfaces->iface[i]->bss[0];
-
-		wpa_printf(MSG_DEBUG, "MLD: Reconfiguration ML: %u",
+	for_each_mld_link(other_hapd, hapd){
+		wpa_printf(MSG_DEBUG, "MLD: link_id %u: Reconfiguration ML: %u",
+			   other_hapd->mld_link_id,
 			   other_hapd->eht_mld_link_removal_count);
 
-		if (other_hapd->eht_mld_link_removal_count)
+		if (other_hapd->eht_mld_link_removal_count) {
+			found = true;
 			break;
+		}
 	}
 
 	/* No link is going to be removed */
-	if (i == hapd->iface->interfaces->count)
+	if (!found)
 		return eid;
 
 	wpa_printf(MSG_DEBUG, "MLD: Reconfiguration ML: Adding element");
@@ -866,8 +868,7 @@ static u8 * hostapd_eid_eht_reconf_ml(struct hostapd_data *hapd, u8 *eid)
 	*pos++ = 1;
 
 	/* Add the per station profiles */
-	for (i = 0; i < hapd->iface->interfaces->count; i++) {
-		other_hapd = hapd->iface->interfaces->iface[i]->bss[0];
+	for_each_mld_link(other_hapd, hapd){
 		if (!other_hapd->eht_mld_link_removal_count)
 			continue;
 

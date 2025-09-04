@@ -487,7 +487,7 @@ static void hostapd_link_remove_timeout_handler(void *eloop_data,
 
 	hostapd_reset_assoc_stas(hapd);
 	hostapd_free_link_stas(hapd);
-	hostapd_disable_iface(hapd->iface);
+	hostapd_remove_bss(hapd->iface->interfaces, hapd->conf->iface);
 	mld->removed_links &= ~BIT(link_id);
 
 	for_each_mld_link(link, mld->fbss)
@@ -4564,10 +4564,12 @@ int hostapd_remove_bss(struct hapd_interfaces *interfaces, char *buf)
 
 		if (!os_strcmp(hapd_iface->conf->bss[0]->iface, buf)) {
 #ifdef CONFIG_IEEE80211BE
-			if (hostapd_is_mld_ap(hapd_iface->bss[0])) {
-				wpa_printf(MSG_ERROR, "Cannot remove MLD link\n");
-				return -1;
-			}
+			struct hostapd_data *hapd = hapd_iface->bss[0];
+
+			if (hostapd_is_mld_ap(hapd) &&
+			    !(hapd->mld && (hapd->mld->removed_links &
+					    BIT(hapd->mld_link_id))))
+				continue;
 #endif /* CONFIG_IEEE80211BE */
 
 			if (hapd_iface->conf->num_bss == 1) {
@@ -4598,14 +4600,15 @@ int hostapd_remove_bss(struct hapd_interfaces *interfaces, char *buf)
 			}
 		}
 
-		for (j = 0; j < hapd_iface->conf->num_bss; j++) {
+		for (j = 1; j < hapd_iface->conf->num_bss; j++) {
 			if (!os_strcmp(hapd_iface->conf->bss[j]->iface, buf)) {
 #ifdef CONFIG_IEEE80211BE
-				if (hostapd_is_mld_ap(hapd_iface->bss[j])) {
-					wpa_printf(MSG_ERROR,
-						   "Cannot remove MLD link\n");
-					return -1;
-				}
+				struct hostapd_data *hapd = hapd_iface->bss[j];
+
+				if (hostapd_is_mld_ap(hapd) && !(hapd->mld &&
+				    (hapd->mld->removed_links &
+				    BIT(hapd->mld_link_id))))
+					break;
 #endif /* CONFIG_IEEE80211BE */
 
 				hapd_iface->driver_ap_teardown =
