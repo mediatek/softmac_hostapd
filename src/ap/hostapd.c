@@ -3689,7 +3689,7 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 			   const char *config_fname, int debug)
 {
 	struct hostapd_iface *new_iface = NULL, *iface = NULL;
-	struct hostapd_data *hapd;
+	struct hostapd_data *hapd, *tmp_hapd;
 	struct hostapd_config *conf;
 	int k;
 	size_t i, bss_idx;
@@ -3716,14 +3716,6 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 	if (!conf)
 		return NULL;
 
-#ifdef CONFIG_IEEE80211BE
-	/* AP MLD can be enabled with the same interface name, so even if we
-	 * get the interface, we still need to allocate a new hostapd_iface
-	 * structure. */
-	if (conf->bss[0]->mld_ap)
-		iface = NULL;
-#endif /* CONFIG_IEEE80211BE */
-
 	if (iface) {
 		struct hostapd_bss_config **tmp_conf;
 		struct hostapd_data **tmp_bss;
@@ -3738,17 +3730,23 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 		}
 
 		ifname = conf->bss[0]->iface;
-		if (conf->bss[0]->mld_ap) {
-			if (!iface->bss[0]->conf->mld_ap) {
+		if (ifname[0] == '\0') {
+			wpa_printf(MSG_ERROR,
+				   "Invalid interface name %s", ifname);
+			hostapd_config_free(conf);
+			return NULL;
+		}
+
+		tmp_hapd = hostapd_interfaces_get_hapd(interfaces, ifname);
+		if (tmp_hapd) {
+			/* A BSS with an existing interface name can only be added
+			 * into a different hostapd_iface as a AP MLD link
+			 */
+			if (!conf->bss[0]->mld_ap || !tmp_hapd->conf->mld_ap ||
+			    iface == tmp_hapd->iface) {
 				wpa_printf(MSG_ERROR,
-					   "Cannot add a MLO BSS when the first BSS is non-MLO");
-				hostapd_config_free(conf);
-				return NULL;
-			}
-		} else {
-			if (ifname[0] != '\0' && ifname_in_use(interfaces, ifname)) {
-				wpa_printf(MSG_ERROR,
-					   "Interface name %s already in use", ifname);
+					   "Interface name %s already in use",
+					   ifname);
 				hostapd_config_free(conf);
 				return NULL;
 			}
@@ -3812,6 +3810,28 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 			hostapd_interface_deinit_free(new_iface);
 		return NULL;
 	}
+
+#ifdef CONFIG_IEEE80211BE
+	for (i = bss_idx; i < iface->conf->num_bss; i++) {
+		tmp_hapd = iface->bss[i];
+
+		if (!tmp_hapd->conf->mld_ap)
+			continue;
+
+		/* If the newly added BSS belongs to an AP MLD and the AP MLD
+		 * is started, it's a link-add request.
+		 */
+		if (tmp_hapd->mld && tmp_hapd->mld->started) {
+			struct hostapd_data *link;
+			struct hostapd_mld *mld = tmp_hapd->mld;
+
+			mld->link_reconf_in_progress = 0;
+			for_each_mld_link(link, tmp_hapd)
+				mld->link_reconf_in_progress |= BIT(link->mld_link_id);
+
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
 
 	return iface;
 }
