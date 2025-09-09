@@ -163,6 +163,16 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
 	else
 		hostapd_set_drv_ieee8021x(hapd, hapd->conf->iface, 0);
 
+	if (hapd->wpa_auth) {
+		wpa_deinit(hapd->wpa_auth);
+		hapd->wpa_auth = NULL;
+		hostapd_set_privacy(hapd, 0);
+#ifdef CONFIG_WEP
+		hostapd_setup_encryption(hapd->conf->iface, hapd);
+#endif /* CONFIG_WEP */
+		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
+	}
+
 	if (hapd->conf->wpa) {
 		hostapd_setup_wpa(hapd);
 		if (hapd->wpa_auth)
@@ -180,14 +190,6 @@ static void hostapd_reload_bss(struct hostapd_data *hapd)
 			wpa_printf(MSG_ERROR, "Failed to configure WPA IE for "
 				   "the kernel driver.");
 	*/
-	} else if (hapd->wpa_auth) {
-		wpa_deinit(hapd->wpa_auth);
-		hapd->wpa_auth = NULL;
-		hostapd_set_privacy(hapd, 0);
-#ifdef CONFIG_WEP
-		hostapd_setup_encryption(hapd->conf->iface, hapd);
-#endif /* CONFIG_WEP */
-		hostapd_set_generic_elem(hapd, (u8 *) "", 0);
 	}
 
 	hostapd_neighbor_sync_own_report(hapd);
