@@ -1188,4 +1188,7 @@ static inline int hostapd_twt_init(struct hostapd_data *hapd)
 	return 0;
 }
 
+struct hostapd_data *
+hostapd_interfaces_get_hapd(struct hapd_interfaces *interfaces,
+			    const char *ifname);
 #endif /* HOSTAPD_H */

@@ -8116,28 +8116,6 @@ hostapd_global_ctrl_iface_fst_detach(struct hapd_interfaces *interfaces,
 #endif /* CONFIG_FST */
 
 
-static struct hostapd_data *
-hostapd_interfaces_get_hapd(struct hapd_interfaces *interfaces,
-			    const char *ifname)
-{
-	size_t i, j;
-
-	for (i = 0; i < interfaces->count; i++) {
-		struct hostapd_iface *iface = interfaces->iface[i];
-
-		for (j = 0; j < iface->num_bss; j++) {
-			struct hostapd_data *hapd;
-
-			hapd = iface->bss[j];
-			if (os_strcmp(ifname, hapd->conf->iface) == 0)
-				return hapd;
-		}
-	}
-
-	return NULL;
-}
-
-
 static int hostapd_ctrl_iface_dup_param(struct hostapd_data *src_hapd,
 					struct hostapd_data *dst_hapd,
 					const char *param)
