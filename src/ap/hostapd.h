@@ -604,7 +604,6 @@ struct hostapd_sta_info {
 struct hostapd_mld {
 	char name[IFNAMSIZ + 1];
 	u8 mld_addr[ETH_ALEN];
-	u8 next_link_id;
 	u8 num_links;
 	/* Number of hostapd_data (hapd) referencing this. num_links cannot be
 	 * used since num_links can go to 0 even when a BSS is disabled and

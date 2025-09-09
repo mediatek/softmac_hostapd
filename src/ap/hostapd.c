@@ -3419,10 +3419,18 @@ struct hostapd_iface * hostapd_alloc_iface(void)
 #ifdef CONFIG_IEEE80211BE
 static void hostapd_bss_alloc_link_id(struct hostapd_data *hapd)
 {
-	if (hapd->conf->mld_link_id >= 0)
+	if (hapd->conf->mld_link_id >= 0) {
 		hapd->mld_link_id = hapd->conf->mld_link_id;
-	else
-		hapd->mld_link_id = hapd->mld->next_link_id++;
+	} else {
+		int i;
+
+		for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
+			if ((hapd->mld->valid_links & BIT(i)) == 0) {
+				hapd->mld_link_id = i;
+				break;
+			}
+		}
+	}
 	wpa_printf(MSG_DEBUG, "AP MLD: %s: Link ID %d assigned.",
 		   hapd->mld->name, hapd->mld_link_id);
 }
