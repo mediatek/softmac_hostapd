@@ -6506,6 +6506,9 @@ skip_pmkid_update:
 						       ies_len);
 			if (resp != WLAN_STATUS_SUCCESS)
 				goto out;
+			/* prevent the group keys from being reset after other sta
+			 * connect */
+			hapd->wpa_auth->group->first_sta_seen = true;
 		}
 #endif /* CONFIG_IEEE80211R_AP */
 
