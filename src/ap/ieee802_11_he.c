@@ -596,7 +596,7 @@ size_t hostapd_eid_twt_len(struct hostapd_data *hapd)
 
 u8 * hostapd_eid_twt(struct hostapd_data *hapd, u8 *eid)
 {
-	struct broadcast_twt_param *param;
+	struct broadcast_twt_entry *entry;
 	u8 *pos = eid;
 	u8 *control;
 	u8 cnt = 0;
@@ -605,14 +605,15 @@ u8 * hostapd_eid_twt(struct hostapd_data *hapd, u8 *eid)
 		return eid;
 
 	*pos++ = WLAN_EID_TWT;
-	*pos++ = 1 + hapd->broadcast_twt_cnt * sizeof(struct btwt_param_set_field); /* len */
+	*pos++ = 1 + hapd->broadcast_twt_cnt * sizeof(struct btwt_param_set_field);
 	control = pos++;
 
 	*control = TWT_CONTROL_NEG_TYPE_BROADCAST | TWT_CONTROL_RX_DISABLED;
 
-	dl_list_for_each(param, &hapd->btwt_sp_list,
-			 struct broadcast_twt_param, list) {
+	dl_list_for_each(entry, &hapd->btwt_sp_list,
+			 struct broadcast_twt_entry, list) {
 		struct btwt_param_set_field *btwt_ie = (struct btwt_param_set_field *) pos;
+		struct broadcast_twt_param *param = &entry->btwt;
 		u16 req_type = 0, btwt_info_val = 0;
 
 		req_type = TWT_SETUP_CMD_ACCEPT << 1;
@@ -631,6 +632,11 @@ u8 * hostapd_eid_twt(struct hostapd_data *hapd, u8 *eid)
 
 		btwt_info_val = (param->id << 3);
 		btwt_info_val |= (param->persist << 8);
+
+		/* TODO: The value of RTWT Schedule Info subfield shall be based on
+		 * the availability of RTWT schedule. */
+		if (param->recommendation == BTWT_RECOMMENDATION_RESTRICTED)
+			btwt_info_val |= RTWT_SCHEDULE_INFO_ACTIVE << 1;
 		btwt_ie->btwt_info = host_to_le16(btwt_info_val);
 
 		pos += sizeof(*btwt_ie);

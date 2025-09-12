@@ -3010,10 +3010,9 @@ struct cca_settings {
 };
 
 /**
- * struct broadcast_twt_param - Parameters for broadcast TWT service period
+ * struct broadcast_twt_param - Parameters for broadcast/restricted TWT service period
  */
 struct broadcast_twt_param {
-	struct dl_list list;
 	u8 id;
 	u8 min_wake_dur;
 	u16 wake_intv_mantissa;
@@ -3022,6 +3021,16 @@ struct broadcast_twt_param {
 	bool flow_type;
 	u8 recommendation;
 	u8 persist;
+
+	struct rtwt_param {
+		u8 dl_tid_bmp;
+		u8 ul_tid_bmp;
+	} rtwt;
+};
+
+struct broadcast_twt_entry {
+	struct dl_list list;
+	struct broadcast_twt_param btwt;
 };
 
 /* TDLS peer capabilities for send_tdls_mgmt() */
@@ -6644,6 +6653,11 @@ enum wpa_event_type {
 	 * EVENT_CRIT_UPDATE - Notification of the status of a critical update event
 	 */
 	EVENT_CRIT_UPDATE,
+
+	/**
+	 * EVENT_BCAST_TWT_ADD - Broadcast TWT parameters added/updated
+	 */
+	EVENT_BCAST_TWT_ADD,
 };
 
 
@@ -7690,6 +7704,11 @@ union wpa_event_data {
 			CRIT_UPDATE_FLAG,
 		} flag;
 	} crit_update_info;
+
+	/**
+	 * struct broadcast_twt_param - Data for EVENT_BCAST_TWT_ADD
+	 */
+	struct broadcast_twt_param btwt;
 };
 
 /**

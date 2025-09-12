@@ -3434,4 +3434,18 @@ struct btwt_param_set_field {
 	le16 btwt_info;
 } STRUCT_PACKED;
 
+
+/* IEEE 802.11be/D7.0, Table 9-348 Broadcast TWT Recommendation */
+enum btwt_recommendation {
+	BTWT_RECOMMENDATION_NO_CONSTRAINTS = 0,
+	BTWT_RECOMMENDATION_RESTRICTED = 4,
+};
+
+/* IEEE 802.11be/D7.0, Table 9-349a Restricted TWT Schedule Info subfield */
+enum rtwt_schedule_info {
+	RTWT_SCHEDULE_INFO_IDLE = 0,
+	RTWT_SCHEDULE_INFO_ACTIVE = 1,
+	RTWT_SCHEDULE_INFO_FULL = 2,
+	RTWT_SCHEDULE_INFO_MBSSID = 3,
+};
 #endif /* IEEE802_11_DEFS_H */

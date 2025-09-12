@@ -4440,6 +4440,84 @@ static void nl80211_notify_crit_update(struct wpa_driver_nl80211_data *drv,
 	wpa_supplicant_event(bss->ctx, EVENT_CRIT_UPDATE, &data);
 }
 
+#ifdef CONFIG_IEEE80211AX
+static void nl80211_add_btwt_event(struct wpa_driver_nl80211_data *drv,
+				   struct nlattr **tb)
+{
+	static const struct nla_policy btwt_policy[NL80211_BROADCAST_TWT_ATTR_MAX + 1] = {
+		[NL80211_BROADCAST_TWT_ATTR_ID] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_MIN_WAKE_DUR] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_MANTISSA] = { .type = NLA_U16 },
+		[NL80211_BROADCAST_TWT_ATTR_EXPONENT] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_TRIGGER] = { .type = NLA_FLAG },
+		[NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE] = { .type = NLA_FLAG },
+		[NL80211_BROADCAST_TWT_ATTR_RECOMMENDATION] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_PERSISTENCE] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP] = { .type = NLA_U8 },
+		[NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP] = { .type = NLA_U8 },
+	};
+	struct nlattr *btwt[NL80211_BROADCAST_TWT_ATTR_MAX + 1];
+	struct i802_bss *bss = NULL;
+	union wpa_event_data ev;
+	int ifidx = -1;
+
+	if (!tb[NL80211_ATTR_BROADCAST_TWT_PARAMS] || !tb[NL80211_ATTR_IFINDEX])
+		return;
+
+	ifidx = nla_get_u32(tb[NL80211_ATTR_IFINDEX]);
+	bss = get_bss_ifindex(drv, ifidx);
+	if (bss == NULL) {
+		wpa_printf(MSG_WARNING, "nl80211: Unknown ifindex (%d) for add_btwt",
+			   ifidx);
+		return;
+	}
+
+	if (nla_parse_nested(btwt, NL80211_BROADCAST_TWT_ATTR_MAX,
+			     tb[NL80211_ATTR_BROADCAST_TWT_PARAMS], btwt_policy) ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_ID] ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_MIN_WAKE_DUR] ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_MANTISSA] ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_EXPONENT] ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_RECOMMENDATION] ||
+	    !btwt[NL80211_BROADCAST_TWT_ATTR_PERSISTENCE]) {
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Failed to parse ADD_BROADCAST_TWT nested attributes");
+		return;
+	}
+
+	os_memset(&ev, 0, sizeof(ev));
+
+	ev.btwt.id = nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_ID]);
+	ev.btwt.min_wake_dur = nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_MIN_WAKE_DUR]);
+	ev.btwt.wake_intv_mantissa = nla_get_u16(btwt[NL80211_BROADCAST_TWT_ATTR_MANTISSA]);
+	ev.btwt.wake_intv_exp = nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_EXPONENT]);
+	ev.btwt.trigger = btwt[NL80211_BROADCAST_TWT_ATTR_TRIGGER] ? 1 : 0;
+	ev.btwt.flow_type = btwt[NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE] ? 1 : 0;
+	ev.btwt.recommendation = nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_RECOMMENDATION]);
+	ev.btwt.persist = nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_PERSISTENCE]);
+
+	ev.btwt.rtwt.dl_tid_bmp = btwt[NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP] ?
+		nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP]) : 0;
+	ev.btwt.rtwt.ul_tid_bmp = btwt[NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP] ?
+		nla_get_u8(btwt[NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP]) : 0;
+
+	wpa_printf(MSG_DEBUG, "nl80211: ADD_BROADCAST_TWT event on ifname=%s"
+			      " id=%u min_wake_dur=%u mantissa=%u exp=%u trigger=%d"
+			      " flow_type=%d recommendation=%d persist=%d",
+		   bss->ifname, ev.btwt.id, ev.btwt.min_wake_dur,
+		   ev.btwt.wake_intv_mantissa, ev.btwt.wake_intv_exp, ev.btwt.trigger,
+		   ev.btwt.flow_type, ev.btwt.recommendation, ev.btwt.persist);
+
+	if (btwt[NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP] ||
+	    btwt[NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP]) {
+		wpa_printf(MSG_DEBUG, " dl_tid_bitmap=0x%x ul_tid_bitmap=0x%x",
+			   ev.btwt.rtwt.dl_tid_bmp, ev.btwt.rtwt.ul_tid_bmp);
+	}
+
+	wpa_supplicant_event(bss->ctx, EVENT_BCAST_TWT_ADD, &ev);
+}
+#endif /* CONFIG_IEEE80211AX */
+
 
 static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				 struct nlattr **tb)
@@ -4737,6 +4815,11 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 	case NL80211_CMD_NOTIFY_CRIT_UPDATE:
 		nl80211_notify_crit_update(drv, tb);
 		break;
+#ifdef CONFIG_IEEE80211AX
+	case NL80211_CMD_ADD_BROADCAST_TWT:
+		nl80211_add_btwt_event(drv, tb);
+		break;
+#endif /* CONFIG_IEEE80211AX */
 	default:
 		wpa_dbg(drv->ctx, MSG_DEBUG, "nl80211: Ignored unknown event "
 			"(cmd=%d)", cmd);

@@ -2891,12 +2891,14 @@ hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 				     char *buf, size_t buflen)
 {
 	char *pos = cmd, *end;
+	struct broadcast_twt_entry *entry;
 	struct broadcast_twt_param *param;
 
-	param = os_malloc(sizeof(*param));
-	if (param == NULL)
+	entry = os_zalloc(sizeof(*entry));
+	if (entry == NULL)
 		return -ENOBUFS;
 
+	param = &entry->btwt;
 	param->id = strtol(pos, &end, 10);
 	if (pos == end) {
 		wpa_printf(MSG_ERROR, "broadcast_twt: invalid btwt id");
@@ -2925,9 +2927,6 @@ hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 	}
 	pos = end;
 
-	param->trigger = 0;
-	param->flow_type = 0;
-	param->recommendation = 0;
 	param->persist = 255;
 
 	pos = os_strstr(cmd, "trigger=");
@@ -2946,9 +2945,18 @@ hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 	if (pos)
 		param->persist = atoi(pos + 8);
 
-	if (param->id > 31 ||
-	    param->wake_intv_exp > 31 ||
-	    param->recommendation > 7) {
+	pos = os_strstr(cmd, "dl_tid_bitmap=");
+	if (pos)
+		param->rtwt.dl_tid_bmp = strtol(pos + 14, NULL, 0);
+
+	pos = os_strstr(cmd, "ul_tid_bitmap=");
+	if (pos)
+		param->rtwt.ul_tid_bmp = strtol(pos + 14, NULL, 0);
+
+	if (param->id > 31 || param->wake_intv_exp > 31 ||
+	    param->recommendation > 4 ||
+	    (param->recommendation != 4 &&
+	     (param->rtwt.dl_tid_bmp != 0 || param->rtwt.ul_tid_bmp != 0))) {
 		wpa_printf(MSG_ERROR, "broadcast_twt: invalid argument");
 		goto fail;
 	}
@@ -2959,20 +2967,23 @@ hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 	}
 
 	hapd->broadcast_twt_cnt++;
-	dl_list_add_tail(&hapd->btwt_sp_list, &param->list);
+	dl_list_add_tail(&hapd->btwt_sp_list, &entry->list);
 	ieee802_11_set_beacon_per_bss_only(hapd);
 
 	return os_snprintf(buf, buflen, "broadcast_twt: id=%hhu min_wake_dur=%hhu "
 			   "wake_intv_mantissa=%hu wake_intv_exp=%hu "
 			   "trigger=%hhu flow_type=%hhu "
-			   "recommendation=%hhu persist=%hhu in bssid=" MACSTR "\n",
+			   "recommendation=%hhu persist=%hhu "
+			   "restricted_twt: dl_tid_bitmap=0x%02x ul_tid_bitmap=0x%02x "
+			   "in bssid=" MACSTR "\n",
 			   param->id, param->min_wake_dur, param->wake_intv_mantissa,
 			   param->wake_intv_exp, param->trigger, param->flow_type,
 			   param->recommendation, param->persist,
+			   param->rtwt.dl_tid_bmp, param->rtwt.ul_tid_bmp,
 			   MAC2STR(hapd->own_addr));
 
 fail:
-	os_free(param);
+	os_free(entry);
 	return -1;
 }
 
@@ -2983,7 +2994,7 @@ hostapd_ctrl_iface_del_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 	char *pos = cmd, *end;
 	bool found = false;
 	int ret;
-	struct broadcast_twt_param *param, *iter;
+	struct broadcast_twt_entry *entry, *iter;
 	u8 id;
 
 	if (hapd->broadcast_twt_cnt == 0) {
@@ -3003,9 +3014,9 @@ hostapd_ctrl_iface_del_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 		return -1;
 	}
 
-	dl_list_for_each_safe(param, iter, &hapd->btwt_sp_list,
-			      struct broadcast_twt_param, list) {
-		if (param->id == id) {
+	dl_list_for_each_safe(entry, iter, &hapd->btwt_sp_list,
+			      struct broadcast_twt_entry, list) {
+		if (entry->btwt.id == id) {
 			found = true;
 			break;
 		}
@@ -3017,12 +3028,12 @@ hostapd_ctrl_iface_del_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 	}
 
 	hapd->broadcast_twt_cnt--;
-	dl_list_del(&param->list);
+	dl_list_del(&entry->list);
 	ieee802_11_set_beacon_per_bss_only(hapd);
 	ret = os_snprintf(buf, buflen, "broadcast_twt: id=%hhu in bssid="
-			  MACSTR " deleted\n", param->id,
+			  MACSTR " deleted\n", entry->btwt.id,
 			  MAC2STR(hapd->own_addr));
-	os_free(param);
+	os_free(entry);
 	return ret;
 }
 
@@ -3031,7 +3042,7 @@ hostapd_ctrl_iface_get_broadcast_twt(struct hostapd_data *hapd, char *buf, size_
 {
 	int ret;
 	char *pos, *end;
-	struct broadcast_twt_param *param;
+	struct broadcast_twt_entry *entry;
 
 	pos = buf;
 	end = buf + buflen;
@@ -3042,16 +3053,19 @@ hostapd_ctrl_iface_get_broadcast_twt(struct hostapd_data *hapd, char *buf, size_
 		return pos - buf;
 	pos += ret;
 
-	dl_list_for_each(param, &hapd->btwt_sp_list,
-			 struct broadcast_twt_param, list) {
+	dl_list_for_each(entry, &hapd->btwt_sp_list,
+			 struct broadcast_twt_entry, list) {
 		ret = os_snprintf(pos, end - pos, "id=%hhu min_wake_dur=%hhu "
 				  "wake_intv_mantissa=%hu wake_intv_exp=%hhu "
 				  "trigger=%hhu flow_type=%hhu "
-				  "recommendation=%hhu persist=%hhu in bssid=" MACSTR "\n",
-				  param->id, param->min_wake_dur,
-				  param->wake_intv_mantissa, param->wake_intv_exp,
-				  param->trigger, param->flow_type,
-				  param->recommendation, param->persist,
+				  "recommendation=%hhu persist=%hhu "
+				  "restricted_twt: dl_tid_bitmap=0x%02x ul_tid_bitmap=0x%02x "
+				  "in bssid=" MACSTR "\n",
+				  entry->btwt.id, entry->btwt.min_wake_dur,
+				  entry->btwt.wake_intv_mantissa, entry->btwt.wake_intv_exp,
+				  entry->btwt.trigger, entry->btwt.flow_type,
+				  entry->btwt.recommendation, entry->btwt.persist,
+				  entry->btwt.rtwt.dl_tid_bmp, entry->btwt.rtwt.ul_tid_bmp,
 				  MAC2STR(hapd->own_addr));
 
 		if (os_snprintf_error(end - pos, ret))

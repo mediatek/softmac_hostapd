@@ -3290,6 +3290,9 @@ hostapd_alloc_bss_data(struct hostapd_iface *hapd_iface,
 	dl_list_init(&hapd->sae_commit_queue);
 #endif /* CONFIG_SAE */
 	dl_list_init(&hapd->erp_keys);
+#ifdef CONFIG_IEEE80211AX
+	dl_list_init(&hapd->btwt_sp_list);
+#endif /* CONFIG_IEEE80211AX */
 
 	return hapd;
 }

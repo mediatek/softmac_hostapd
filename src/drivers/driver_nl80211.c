@@ -12677,7 +12677,10 @@ int nl80211_add_btwt(void *priv, struct broadcast_twt_param *param)
 	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_RECOMMENDATION, param->recommendation) ||
 	    nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_PERSISTENCE, param->persist) ||
 	    (param->trigger && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_TRIGGER)) ||
-	    (param->flow_type && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE)))
+	    (param->flow_type && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE)) ||
+	    (param->recommendation == 4 &&
+	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP, param->rtwt.dl_tid_bmp) &&
+	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP, param->rtwt.ul_tid_bmp)))
 		goto fail;
 
 	nla_nest_end(msg, data);

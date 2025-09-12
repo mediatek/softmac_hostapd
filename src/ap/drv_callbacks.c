@@ -2826,6 +2826,37 @@ static void hostapd_event_pp_bitmap_update(struct hostapd_data *hapd,
 }
 #endif /* CONFIG_IEEE80211BE */
 
+#ifdef CONFIG_IEEE80211AX
+static int hostapd_event_btwt_add(struct hostapd_data *hapd,
+				  union wpa_event_data *data)
+{
+	struct broadcast_twt_entry *entry = NULL, *it;
+	struct dl_list *list;
+
+	list = &hapd->btwt_sp_list;
+	dl_list_for_each(it, list, struct broadcast_twt_entry, list) {
+		if (it->btwt.id == data->btwt.id) {
+			entry = it;
+			break;
+		}
+	}
+	if (!entry) {
+		entry = os_zalloc(sizeof(*entry));
+		if (!entry)
+			return -1;
+
+		dl_list_add_tail(list, &entry->list);
+		hapd->broadcast_twt_cnt++;
+	}
+	os_memcpy(&entry->btwt, &data->btwt, sizeof(struct broadcast_twt_param));
+
+	ieee802_11_set_bss_critical_update(hapd,
+					   BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET);
+	ieee802_11_set_beacon_per_bss_only(hapd);
+
+	return 0;
+}
+#endif /* CONFIG_IEEE80211AX */
 
 void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 		       union wpa_event_data *data)
@@ -3240,6 +3271,13 @@ void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 		hostapd_mld_interface_freed(hapd);
 		break;
 #endif /* CONFIG_IEEE80211BE */
+#ifdef CONFIG_IEEE80211AX
+	case EVENT_BCAST_TWT_ADD:
+		if (!data)
+			break;
+		hostapd_event_btwt_add(hapd, data);
+		break;
+#endif /* CONFIG_IEEE80211AX */
 	default:
 		wpa_printf(MSG_DEBUG, "Unknown event %d", event);
 		break;
