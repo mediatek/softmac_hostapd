@@ -12653,7 +12653,7 @@ error:
 	return ret;
 }
 
-int nl80211_add_btwt(void *priv, struct broadcast_twt_param *param)
+int nl80211_add_btwt(void *priv, struct broadcast_twt_param *param, s8 link_id)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -12680,7 +12680,9 @@ int nl80211_add_btwt(void *priv, struct broadcast_twt_param *param)
 	    (param->flow_type && nla_put_flag(msg, NL80211_BROADCAST_TWT_ATTR_FLOW_TYPE)) ||
 	    (param->recommendation == 4 &&
 	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_DL_TID_BMP, param->rtwt.dl_tid_bmp) &&
-	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP, param->rtwt.ul_tid_bmp)))
+	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_UL_TID_BMP, param->rtwt.ul_tid_bmp)) ||
+	    (link_id != NL80211_DRV_LINK_ID_NA &&
+	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_LINK_ID, link_id)))
 		goto fail;
 
 	nla_nest_end(msg, data);
@@ -12697,7 +12699,7 @@ fail:
 	return ret;
 }
 
-int nl80211_del_btwt(void *priv, u8 id)
+int nl80211_del_btwt(void *priv, u8 id, s8 link_id)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -12714,7 +12716,9 @@ int nl80211_del_btwt(void *priv, u8 id)
 	if (!data)
 		goto fail;
 
-	if (nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_ID, id))
+	if (nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_ID, id) ||
+	    (link_id != NL80211_DRV_LINK_ID_NA &&
+	     nla_put_u8(msg, NL80211_BROADCAST_TWT_ATTR_LINK_ID, link_id)))
 		goto fail;
 
 	nla_nest_end(msg, data);

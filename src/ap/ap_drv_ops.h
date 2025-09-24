@@ -384,18 +384,28 @@ static inline int hostapd_drv_switch_color(struct hostapd_data *hapd,
 static inline int hostapd_drv_add_btwt(struct hostapd_data *hapd,
 				       struct broadcast_twt_param *param)
 {
+	s8 link_id = -1;
+
 	if (!hapd->driver || !hapd->driver->add_btwt || !hapd->drv_priv)
 		return -1;
-
-	return hapd->driver->add_btwt(hapd->drv_priv, param);
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->conf->mld_ap)
+		link_id = hapd->mld_link_id;
+#endif
+	return hapd->driver->add_btwt(hapd->drv_priv, param, link_id);
 }
 
 static inline int hostapd_drv_del_btwt(struct hostapd_data *hapd, u8 id)
 {
+	s8 link_id = -1;
+
 	if (!hapd->driver || !hapd->driver->del_btwt || !hapd->drv_priv)
 		return -1;
-
-	return hapd->driver->del_btwt(hapd->drv_priv, id);
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->conf->mld_ap)
+		link_id = hapd->mld_link_id;
+#endif
+	return hapd->driver->del_btwt(hapd->drv_priv, id, link_id);
 }
 #endif /* CONFIG_IEEE80211AX */
 

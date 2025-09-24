@@ -4912,12 +4912,12 @@ struct wpa_driver_ops {
 	/**
 	* add_btwt - add new broadcast twt service period
 	*/
-	int (*add_btwt)(void *priv, struct broadcast_twt_param *param);
+	int (*add_btwt)(void *priv, struct broadcast_twt_param *param, s8 link_id);
 
 	/**
 	* del_btwt - delete broadcast twt service period
 	*/
-	int (*del_btwt)(void *priv, u8 id);
+	int (*del_btwt)(void *priv, u8 id, s8 link_id);
 
 	/**
 	 * add_tx_ts - Add traffic stream
