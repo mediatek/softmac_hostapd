@@ -892,6 +892,8 @@ static inline bool sec_prof_is_sae(int p)
 struct ieee80211_neg_ttlm {
 	u16 dlink[IEEE80211_TTLM_NUM_TIDS];
 	u16 ulink[IEEE80211_TTLM_NUM_TIDS];
+	bool def_link_map;
+	bool link_map_size;
 	bool valid;
 };
 

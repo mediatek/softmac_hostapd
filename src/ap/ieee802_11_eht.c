@@ -3124,6 +3124,7 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 		}
 		*direction = IEEE80211_TTLM_DIRECTION_BOTH;
 		neg_ttlm->valid = true;
+		neg_ttlm->def_link_map = true;
 		return 0;
 	}
 
@@ -3141,6 +3142,7 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 		map_size = 1;
 	else
 		map_size = 2;
+	neg_ttlm->link_map_size = 2 - map_size;
 
 	for (tid = 0; tid < IEEE80211_TTLM_NUM_TIDS; tid++) {
 		u16 map;
