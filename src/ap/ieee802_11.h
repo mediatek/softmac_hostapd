@@ -369,6 +369,7 @@ void hostapd_get_uhr_capab(struct hostapd_data *hapd,
 			   struct ieee80211_uhr_capabilities *dest,
 			   size_t len);
 
+int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info *sta);
 int ieee802_11_send_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr);
 void hostapd_teardown_neg_ttlm(struct hostapd_data *hapd, struct sta_info *sta);
 size_t hostapd_eid_eht_epcs_ml_len(struct mld_info *mld);
