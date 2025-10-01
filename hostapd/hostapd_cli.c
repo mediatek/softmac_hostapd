@@ -1884,6 +1884,17 @@ static int hostapd_cli_cmd_negotiated_ttlm(struct wpa_ctrl *ctrl, int argc,
        return hostapd_cli_cmd(ctrl, "NEGOTIATED_TTLM", 1, argc, argv);
 }
 
+static int hostapd_cli_cmd_advertised_ttlm(struct wpa_ctrl *ctrl, int argc,
+					   char *argv[])
+{
+       if (argc < 4) {
+               printf("Invalid 'advertised_ttlm command' - needs at least 4 arguments\n");
+               return -1;
+       }
+
+       return hostapd_cli_cmd(ctrl, "ADVERTISED_TTLM", 3, argc, argv);
+}
+
 static int hostapd_cli_cmd_epcs(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	return hostapd_cli_cmd(ctrl, "EPCS", 1, argc, argv);
@@ -2237,6 +2248,9 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 		" = Get the Negotiated TTLM Status of the STA" },
 	{ "negotiated_ttlm", hostapd_cli_cmd_negotiated_ttlm, NULL,
 		" = send ttlm test commands" },
+	{ "advertised_ttlm", hostapd_cli_cmd_advertised_ttlm, NULL,
+		"ieee_link_map= map_switch_time= expected_dur= link_mapping_size=\n"
+		"= Trigger advertised TTLM"},
 	{ "epcs", hostapd_cli_cmd_epcs, NULL,
 		" = Control EPCS priority access" },
 	{ "del_mscs", hostapd_cli_cmd_del_mscs, NULL,

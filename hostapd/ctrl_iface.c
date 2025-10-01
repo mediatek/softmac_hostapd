@@ -4024,6 +4024,28 @@ static int hostapd_ctrl_iface_set_attlm(struct hostapd_data *hapd, char *cmd,
 				continue;
 		}
 
+		/* Align QCA's command format */
+		if (os_strncmp(token, "ieee_link_map=", 14) == 0) {
+			u16 enabled_links = strtol(token + 14, NULL, 0);
+			if ((enabled_links & valid_links) &&
+			    !(enabled_links & ~valid_links)) {
+				disabled_links = ~enabled_links & valid_links;
+				continue;
+			}
+		}
+
+		if (os_strncmp(token, "map_switch_time=", 16) == 0) {
+			switch_time = atoi(token + 16);
+			if (switch_time > 0 && switch_time <= MAX_SWITCH_TIME_MS)
+				continue;
+		}
+
+		if (os_strncmp(token, "expected_dur=", 13) == 0) {
+			duration = atoi(token + 13);
+			if (duration > 0 && duration <= MAX_DURATION_MS)
+				continue;
+		}
+
 		wpa_printf(MSG_INFO, "CTRL: Invalid SET_ATTLM parameter: %s",
 			   token);
 		return -1;
@@ -7153,6 +7175,9 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							    reply, reply_size);
 	} else if (os_strncmp(buf, "NEGOTIATED_TTLM ", 16) == 0) {
 		if (hostapd_ctrl_iface_negotiated_ttlm(hapd, buf + 16))
+			reply_len = -1;
+	} else if (os_strncmp(buf, "ADVERTISED_TTLM  ", 16) == 0) {
+		if (hostapd_ctrl_iface_set_attlm(hapd, buf + 16, reply, reply_size))
 			reply_len = -1;
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
