@@ -3475,6 +3475,7 @@ void hostapd_bss_setup_multi_link(struct hostapd_data *hapd,
 	os_strlcpy(mld->name, conf->iface, sizeof(conf->iface));
 	dl_list_init(&mld->links);
 	mld->ctrl_sock = -1;
+	mld->dialog_token = 1;
 	if (hapd->conf->ctrl_interface)
 		mld->ctrl_interface = os_strdup(hapd->conf->ctrl_interface);
 

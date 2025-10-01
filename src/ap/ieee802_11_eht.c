@@ -3163,6 +3163,42 @@ fail:
 	}
 }
 
+static void ieee802_11_rx_neg_ttlm_resp(struct hostapd_data *hapd, const u8 *addr,
+					const u8 *frm, size_t len)
+{
+	struct hostapd_data *assoc_hapd;
+	struct sta_info *sta;
+	struct ieee80211_neg_ttlm *neg_ttlm;
+	u16 status_code;
+	int ret = 0;
+
+	if (!hostapd_is_mld_ap(hapd))
+		return;
+
+	sta = ap_get_sta(hapd, addr);
+	if (!sta || !ap_sta_is_mld(hapd, sta))
+		return;
+
+	sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
+	if (!sta || sta->neg_ttlm.dialog_token != *frm)
+		return;
+
+	neg_ttlm = &sta->neg_ttlm;
+	status_code = le_to_host16(*(u16 *)(frm + 1));
+	if (status_code == WLAN_STATUS_SUCCESS) {
+		neg_ttlm->valid = true;
+		ret = hostapd_drv_set_sta_ttlm(assoc_hapd, sta->addr, neg_ttlm);
+		if (ret) {
+			ieee802_11_send_neg_ttlm_teardown(hapd, sta->addr);
+			hostapd_teardown_neg_ttlm(assoc_hapd, sta);
+			os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
+		}
+	} else {
+		wpa_printf(MSG_ERROR, "TTLM: STA rejected TTLM request");
+		os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
+	}
+}
+
 static void ieee802_11_rx_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr)
 {
 	struct hostapd_data *assoc_hapd;
@@ -3469,6 +3505,71 @@ ieee802_11_rx_epcs_teardown(struct hostapd_data *hapd, const u8 *addr,
 }
 
 
+int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info *sta)
+{
+	struct wpabuf *buf;
+	struct ieee80211_neg_ttlm *neg_ttlm = &sta->neg_ttlm;
+	u16 control = 0;
+	size_t len;
+	int ret, i;
+	bool map_size = neg_ttlm->link_map_size;
+
+	/* TODO currently do not support bi-direction Neg-TTLM */
+	for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
+		if (neg_ttlm->ulink[i] != neg_ttlm->dlink[i]) {
+			wpa_printf(MSG_ERROR,
+				   "Only Bi-direction Neg-TTLM is supported");
+			return -1;
+		}
+	}
+
+	/* TID-To-Link Mapping Request frame */
+	len = 1 + /* Protected EHT Action */
+	      1 + /* TID-To-Link Mapping Response */
+	      1; /* Dialog Token */
+
+	/* TID-To-Link Mapping Element for bi-direction */
+	len += 1 + /* Element ID */
+	       1 + /* len */
+	       1 + /* Element ID Extension */
+	       2 + /* Control */
+	       2 * IEEE80211_TTLM_NUM_TIDS; /* Link Mapping of each TID */
+
+	buf = wpabuf_alloc(len);
+	if (!buf)
+		return -1;
+
+	neg_ttlm->dialog_token = hapd->mld->dialog_token++;
+	if (hapd->mld->dialog_token == 0)
+		hapd->mld->dialog_token++;
+
+	wpabuf_put_u8(buf, WLAN_ACTION_PROTECTED_EHT);
+	wpabuf_put_u8(buf, WLAN_PROT_EHT_T2L_MAPPING_REQUEST);
+	wpabuf_put_u8(buf, neg_ttlm->dialog_token);
+	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+	wpabuf_put_u8(buf, len - 5);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_TID_TO_LINK_MAPPING);
+	control |= IEEE80211_TTLM_DIRECTION_BOTH;
+	control |= IEEE80211_TTLM_CONTROL_INDICATOR;
+	if (neg_ttlm->def_link_map)
+		control |= IEEE80211_TTLM_CONTROL_DEF_LINK_MAP;
+	if (map_size)
+		control |= IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE;
+	wpabuf_put_le16(buf, control);
+	for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
+		if (map_size)
+			wpabuf_put_u8(buf, neg_ttlm->ulink[i]);
+		else
+			wpabuf_put_le16(buf, neg_ttlm->ulink[i]);
+	}
+
+	ret = hostapd_drv_send_action(hapd, hapd->iface->freq, 0, sta->addr,
+				      wpabuf_head(buf), wpabuf_len(buf));
+	wpabuf_free(buf);
+
+	return ret;
+}
+
 int ieee802_11_send_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr)
 {
 	struct wpabuf *buf;
@@ -3556,6 +3657,7 @@ void ieee802_11_rx_protected_eht_action(struct hostapd_data *hapd,
 		return;
 	case WLAN_PROT_EHT_T2L_MAPPING_RESPONSE:
 		wpa_printf(MSG_INFO, "EHT: TTLM response");
+		ieee802_11_rx_neg_ttlm_resp(hapd, mgmt->sa, payload, plen);
 		return;
 	case WLAN_PROT_EHT_T2L_MAPPING_TEARDOWN:
 		wpa_printf(MSG_INFO, "EHT: TTLM teardown");

@@ -625,6 +625,9 @@ struct hostapd_mld {
 	struct dl_list ctrl_dst;
 	char *ctrl_interface; /* Directory for UNIX domain sockets */
 
+	/* dialog token for neg TTLM request */
+	u8 dialog_token;
+
 	bool epcs_disabled;
 };
 

@@ -825,6 +825,7 @@ struct ieee80211_neg_ttlm {
 	bool def_link_map;
 	bool link_map_size;
 	bool valid;
+	u8 dialog_token;
 };
 
 struct neg_ttlm_req {
