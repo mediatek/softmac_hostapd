@@ -3949,6 +3949,13 @@ static int hostapd_ctrl_iface_link_remove(struct hostapd_data *hapd, char *cmd,
 		return -1;
 	}
 
+	/* TODO Add support to remove link when MBSSID is enabled */
+	if (hapd->iconf->mbssid) {
+		wpa_printf(MSG_ERROR,
+			   "Removing a link from the MBSSID group is unsupported.");
+		return -1;
+	}
+
 	if (!count) {
 		wpa_printf(MSG_ERROR, "Invalid ap removal count");
 		return -1;
