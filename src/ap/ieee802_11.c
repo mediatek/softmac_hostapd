@@ -7187,6 +7187,15 @@ bool hostapd_is_multiple_link_mld(struct hostapd_data *hapd)
 	return false;
 }
 
+
+bool hostapd_is_mld_ap(struct hostapd_data *hapd)
+{
+	if (!hapd->conf->mld_ap)
+		return false;
+
+	return true;
+}
+
 #endif /* CONFIG_IEEE80211BE */
 
 
