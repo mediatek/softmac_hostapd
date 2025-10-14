@@ -2491,6 +2491,10 @@ static u8 * wpa_ft_bigtk_subelem(struct wpa_state_machine *sm, size_t *len,
 		gsm = sm->mld_links[link_id].wpa_auth->group;
 	}
 #endif
+	if (wpa_auth->conf.tx_bss_auth) {
+		wpa_auth = wpa_auth->conf.tx_bss_auth;
+		gsm = wpa_auth->group;
+	}
 	bigtk_len = wpa_cipher_key_len(wpa_auth->conf.group_mgmt_cipher);
 
 	/*
