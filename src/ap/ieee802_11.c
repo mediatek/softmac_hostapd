@@ -9619,8 +9619,8 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 		struct hostapd_bss_config *conf;
 		struct hostapd_bss_config *tx_conf = tx_bss->conf;
 		u8 *eid_len_pos, *nontx_bss_start = eid;
-		const u8 *auth, *rsn = NULL, *rsnx = NULL;
-		u8 ie_count = 0, non_inherit_ie[3];
+		const u8 *auth, *rsn = NULL, *rsnx = NULL, *mde = NULL;
+		u8 ie_count = 0, non_inherit_ie[4];
 		u8 ext_ie_count = 0, non_inherit_ext_ie[1];
 		size_t auth_len = 0, xrate_len;
 		u16 capab_info;
@@ -9685,6 +9685,12 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 				os_memcpy(eid, rsnx, 2 + rsnx[1]);
 				eid += 2 + rsnx[1];
 			}
+
+			mde = get_ie(auth, auth_len, WLAN_EID_MOBILITY_DOMAIN);
+			if (mde) {
+				os_memcpy(eid, mde, 2 + mde[1]);
+				eid += 2 + mde[1];
+			}
 		}
 
 		eid += hostapd_mbssid_ext_capa(bss, tx_bss, eid);
@@ -9698,6 +9704,9 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 			non_inherit_ie[ie_count++] = WLAN_EID_EXT_SUPP_RATES;
 		if (!rsnx && hostapd_wpa_ie(tx_bss, WLAN_EID_RSNX))
 			non_inherit_ie[ie_count++] = WLAN_EID_RSNX;
+		if (!mde && hostapd_wpa_ie(tx_bss, WLAN_EID_MOBILITY_DOMAIN))
+			non_inherit_ie[ie_count++] = WLAN_EID_MOBILITY_DOMAIN;
+
 #ifdef CONFIG_IEEE80211BE
 		/* For ML Probe Response frame, the solicited hapd's MLE will
 		 * be in the frame body */
