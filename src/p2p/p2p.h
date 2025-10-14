@@ -44,7 +44,7 @@ struct weighted_pcl;
 /**
  * P2P_MAX_REG_CLASSES - Maximum number of regulatory classes
  */
-#define P2P_MAX_REG_CLASSES 15
+#define P2P_MAX_REG_CLASSES 20
 
 /**
  * P2P_MAX_REG_CLASS_CHANNELS - Maximum number of channels per regulatory class

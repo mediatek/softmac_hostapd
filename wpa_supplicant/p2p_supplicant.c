@@ -4588,6 +4588,23 @@ static enum chan_allowed wpas_p2p_verify_channel(struct wpa_supplicant *wpa_s,
 }
 
 
+static bool is_dfs_chan_supported(struct wpa_supplicant *wpa_s,
+				  u8 op_class, u8 chan)
+{
+	if (!wpa_s->allow_p2p_assisted_dfs)
+		return false;
+
+	if (op_class >= 128 && op_class <= 130) {
+		int freq = ieee80211_chan_to_freq(NULL, op_class, chan);
+
+		if (ieee80211_is_dfs(freq, wpa_s->hw.modes,
+				     wpa_s->hw.num_modes))
+			return true;
+	}
+	return false;
+}
+
+
 static int wpas_p2p_setup_channels(struct wpa_supplicant *wpa_s,
 				   struct p2p_channels *chan,
 				   struct p2p_channels *cli_chan,
@@ -4624,6 +4641,8 @@ static int wpas_p2p_setup_channels(struct wpa_supplicant *wpa_s,
 			wpa_s->global->p2p_24ghz_social_channels = 1;
 		for (ch = o->min_chan; ch <= o->max_chan; ch += o->inc) {
 			enum chan_allowed res;
+			bool dfs_chan_supported = is_dfs_allowed ||
+				is_dfs_chan_supported(wpa_s, o->op_class, ch);
 
 			/* Check for non-continuous jump in channel index
 			 * incrementation */
@@ -4633,7 +4652,8 @@ static int wpas_p2p_setup_channels(struct wpa_supplicant *wpa_s,
 
 			res = wpas_p2p_verify_channel(wpa_s, mode, o->op_class,
 						      ch, o->bw);
-			if (res == ALLOWED) {
+			if (res == ALLOWED ||
+			    (res == RADAR && dfs_chan_supported)) {
 				if (reg == NULL) {
 					if (cla == P2P_MAX_REG_CLASSES)
 						continue;
