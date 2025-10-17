@@ -563,6 +563,14 @@ static void wpas_sme_set_mlo_links(struct wpa_supplicant *wpa_s,
 	for_each_link(usable_links, i) {
 		const u8 *bssid = bss->mld_links[i].bssid;
 
+		if (wpa_s->conf->freq_list &&
+		    !int_array_includes(wpa_s->conf->freq_list,
+					bss->mld_links[i].freq)) {
+			wpa_printf(MSG_DEBUG,
+				   "MLD: Skip the link on disallowed channel");
+			continue;
+		}
+
 		wpa_s->valid_links |= BIT(i);
 		os_memcpy(wpa_s->links[i].bssid, bssid, ETH_ALEN);
 		wpa_s->links[i].freq = bss->mld_links[i].freq;
