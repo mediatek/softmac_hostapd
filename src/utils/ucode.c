@@ -105,6 +105,8 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	uc_value_t *freq = uc_fn_arg(0);
 	uc_value_t *sec = uc_fn_arg(1);
 	int width = ucv_uint64_get(uc_fn_arg(2));
+	int punct_bitmap = ucv_uint64_get(uc_fn_arg(4));
+	int bw320_offset = 1;
 	int freq_val, center_idx, center_ofs;
 	enum oper_chan_width chanwidth;
 	enum hostapd_hw_mode hw_mode;
@@ -142,6 +144,9 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	case 9:
 		width = 3;
 		chanwidth = CONF_OPER_CHWIDTH_320MHZ;
+
+		/* bw320_offset is 1 for 320 MHz-1, and 2 for 320 MHz-2 */
+		bw320_offset = ucv_uint64_get(uc_fn_arg(3));
 		break;
 	default:
 		return NULL;
@@ -173,12 +178,19 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	ucv_object_add(ret, "hw_mode_str", ucv_string_new(modestr));
 	ucv_object_add(ret, "sec_channel", ucv_int64_new(sec_channel));
 	ucv_object_add(ret, "frequency", ucv_int64_new(freq_val));
+	ucv_object_add(ret, "oper_chwidth", ucv_int64_new(chanwidth));
+	ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
 
-	if (!sec_channel)
+	if (chanwidth == CONF_OPER_CHWIDTH_USE_HT) {
+		center_idx = freq_val < 3000 ? 0 : channel + 2 * sec_channel;
+		ucv_object_add(ret, "center_seg0_idx", ucv_int64_new(center_idx));
+		ucv_object_add(ret, "center_freq1",
+			       ucv_int64_new(freq_val + sec_channel * 10));
 		return ret;
+	}
 
 	if (freq_val >= 5900)
-		center_ofs = 0;
+		center_ofs = 32 * (1 - bw320_offset);
 	else if (freq_val >= 5745)
 		center_ofs = 20;
 	else
@@ -187,10 +199,7 @@ uc_value_t *uc_wpa_freq_info(uc_vm_t *vm, size_t nargs)
 	tmp_channel &= ~((8 << width) - 1);
 	center_idx = tmp_channel + center_ofs + (4 << width) - 1;
 
-	if (freq_val < 3000)
-		ucv_object_add(ret, "center_seg0_idx", ucv_int64_new(0));
-	else
-		ucv_object_add(ret, "center_seg0_idx", ucv_int64_new(center_idx));
+	ucv_object_add(ret, "center_seg0_idx", ucv_int64_new(center_idx));
 	center_idx = (center_idx - channel) * 5 + freq_val;
 	ucv_object_add(ret, "center_freq1", ucv_int64_new(center_idx));
 

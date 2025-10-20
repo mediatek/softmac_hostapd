@@ -11,6 +11,7 @@
 #include "acs.h"
 #include "ieee802_11_auth.h"
 #include "neighbor_db.h"
+#include "ieee802_11.h"
 #include <libubox/uloop.h>
 
 static uc_resource_type_t *global_type, *bss_type, *iface_type;
@@ -585,6 +586,9 @@ uc_hostapd_iface_stop(uc_vm_t *vm, size_t nargs)
 	if (!iface)
 		return NULL;
 
+	wpa_printf(MSG_INFO, "ucode: mtk: stop iface for %s in state %s\n",
+		   iface->phy, hostapd_state_text(iface->state));
+
 	if (iface->state != HAPD_IFACE_ENABLED)
 		uc_hostapd_disable_iface(iface);
 
@@ -611,6 +615,9 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 	if (!iface)
 		return NULL;
 
+	wpa_printf(MSG_INFO, "ucode: mtk: start iface for %s in state %s\n",
+		   iface->phy, hostapd_state_text(iface->state));
+
 	if (!info)
 		goto out;
 
@@ -630,7 +637,13 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 	UPDATE_VAL(op_class, "op_class");
 	UPDATE_VAL(hw_mode, "hw_mode");
 	UPDATE_VAL(channel, "channel");
-	UPDATE_VAL(secondary_channel, "sec_channel");
+
+	intval = ucv_int64_get(ucv_object_get(info, "sec_channel", NULL));
+	if (!errno) {
+		conf->secondary_channel = intval;
+		changed = true;
+	}
+
 	if (!changed &&
 	    (iface->bss[0]->beacon_set_done ||
 	     iface->state == HAPD_IFACE_DFS))
@@ -647,6 +660,15 @@ uc_hostapd_iface_start(uc_vm_t *vm, size_t nargs)
 	intval = ucv_int64_get(ucv_object_get(info, "oper_chwidth", NULL));
 	if (!errno)
 		hostapd_set_oper_chwidth(conf, intval);
+
+	intval = ucv_int64_get(ucv_object_get(info, "punct_bitmap", NULL));
+	if (!errno)
+		conf->punct_bitmap = intval;
+
+	conf->pp_mode = PP_USR_MODE;
+	if (iface->state == HAPD_IFACE_ENABLED &&
+	    hostapd_drv_pp_mode_set(iface->bss[0]) != 0)
+		return NULL;
 
 	intval = ucv_int64_get(ucv_object_get(info, "frequency", NULL));
 	if (!errno)
@@ -675,6 +697,17 @@ out:
 		hostapd_enable_iface(iface);
 		return ucv_boolean_new(true);
 	}
+
+	wpa_printf(MSG_INFO, "ucode: mtk: updated channel information:\n");
+	wpa_printf(MSG_INFO, "    * channel: %d\n", conf->channel);
+	wpa_printf(MSG_INFO, "    * op_class: %d\n", conf->op_class);
+	wpa_printf(MSG_INFO, "    * secondary channel: %d\n", conf->secondary_channel);
+	wpa_printf(MSG_INFO, "    * seg0: %d\n",
+		   hostapd_get_oper_centr_freq_seg0_idx(conf));
+	wpa_printf(MSG_INFO, "    * seg1: %d\n",
+		   hostapd_get_oper_centr_freq_seg1_idx(conf));
+	wpa_printf(MSG_INFO, "    * oper_chwidth: %d\n",
+		   hostapd_get_oper_chwidth(conf));
 
 	for (i = 0; i < iface->num_bss; i++) {
 		struct hostapd_data *hapd = iface->bss[i];
@@ -711,6 +744,7 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	uint64_t intval;
 	int i, ret = 0;
 
+	wpa_printf(MSG_INFO, "ucode: mtk: channel switch for %s\n", iface->phy);
 	if (!iface || ucv_type(info) != UC_OBJECT)
 		return NULL;
 
@@ -730,7 +764,8 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	if (errno)
 		intval = hostapd_get_oper_chwidth(conf);
 	if (intval)
-		csa.freq_params.bandwidth = 40 << intval;
+		csa.freq_params.bandwidth = 40 <<
+			(intval == CONF_OPER_CHWIDTH_320MHZ ? 3 : intval);
 	else
 		csa.freq_params.bandwidth = csa.freq_params.sec_channel_offset ? 40 : 20;
 
@@ -740,17 +775,20 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 		csa.freq_params.center_freq1 = intval;
 	if ((intval = ucv_int64_get(ucv_object_get(info, "center_freq2", NULL))) && !errno)
 		csa.freq_params.center_freq2 = intval;
+	if ((intval = ucv_int64_get(ucv_object_get(info, "punct_bitmap", NULL))) && !errno)
+		csa.freq_params.punct_bitmap = intval;
 
 	wpa_printf(MSG_INFO, "ucode: mtk: switch channel information:\n");
 	wpa_printf(MSG_INFO, "    * freq is %d\n", csa.freq_params.freq);
-	wpa_printf(MSG_INFO, "    * bandwidth is %d\n",
-			csa.freq_params.bandwidth);
+	wpa_printf(MSG_INFO, "    * bandwidth is %d\n", csa.freq_params.bandwidth);
 	wpa_printf(MSG_INFO, "    * sec_chan_offset is %d\n",
-			csa.freq_params.sec_channel_offset);
+		   csa.freq_params.sec_channel_offset);
 	wpa_printf(MSG_INFO, "    * center_freq1 is %d\n",
-			csa.freq_params.center_freq1);
+		   csa.freq_params.center_freq1);
 	wpa_printf(MSG_INFO, "    * center_freq2 is %d\n",
-			csa.freq_params.center_freq2);
+		   csa.freq_params.center_freq2);
+	wpa_printf(MSG_INFO, "    * punct_bitmap is %d\n",
+		   csa.freq_params.punct_bitmap);
 
 	for (i = 0; i < iface->num_bss; i++) {
 		ret = hostapd_switch_channel(iface->bss[i], &csa);

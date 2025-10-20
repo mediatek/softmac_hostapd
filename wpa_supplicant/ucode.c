@@ -9,6 +9,7 @@
 #include "config.h"
 #include "bss.h"
 #include "ucode.h"
+#include "driver_i.h"
 
 static struct wpa_global *wpa_global;
 static uc_resource_type_t *global_type, *iface_type;
@@ -129,8 +130,11 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 {
 	const char *state;
 	uc_value_t *val;
+	enum oper_chan_width oper_chwidth;
+	int control_freq, center_freq1, bw320_offset = 1;
 
-	if (event != EVENT_CH_SWITCH_STARTED)
+	if (event != EVENT_CH_SWITCH_STARTED &&
+	    event != EVENT_LINK_CH_SWITCH_STARTED)
 		return;
 
 	val = wpa_ucode_registry_get(iface_registry, wpa_s->ucode.idx);
@@ -146,12 +150,54 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	val = ucv_object_new(vm);
 	uc_value_push(ucv_get(val));
 
-	if (event == EVENT_CH_SWITCH_STARTED) {
+	if (event == EVENT_CH_SWITCH_STARTED ||
+	    event == EVENT_LINK_CH_SWITCH_STARTED) {
+		if (wpa_s->wpa_state < WPA_COMPLETED) {
+			wpa_printf(MSG_INFO,
+				   "ucode: mtk: receive channel switch event"
+				   "before association finished, reconnect\n");
+			wpa_supplicant_reconnect(wpa_s);
+			return;
+		}
+
+		control_freq = data->ch_switch.freq;
+		center_freq1 = data->ch_switch.cf1;
+
+		switch (data->ch_switch.ch_width) {
+		case CHAN_WIDTH_80:
+			oper_chwidth = CONF_OPER_CHWIDTH_80MHZ;
+			break;
+		case CHAN_WIDTH_80P80:
+			oper_chwidth = CONF_OPER_CHWIDTH_80P80MHZ;
+			break;
+		case CHAN_WIDTH_160:
+			oper_chwidth = CONF_OPER_CHWIDTH_160MHZ;
+			break;
+		case CHAN_WIDTH_320:
+			oper_chwidth = CONF_OPER_CHWIDTH_320MHZ;
+			break;
+		case CHAN_WIDTH_20_NOHT:
+		case CHAN_WIDTH_20:
+		case CHAN_WIDTH_40:
+		default:
+			oper_chwidth = CONF_OPER_CHWIDTH_USE_HT;
+			break;
+		}
+
+		/* Check bandwidth 320 MHz-2 */
+		if (oper_chwidth == CONF_OPER_CHWIDTH_320MHZ &&
+		    (center_freq1 == 6265) || center_freq1 == 6585 ||
+		     center_freq1 == 6905)
+			bw320_offset = 2;
+
 		ucv_object_add(val, "csa_count", ucv_int64_new(data->ch_switch.count));
 		ucv_object_add(val, "frequency", ucv_int64_new(data->ch_switch.freq));
 		ucv_object_add(val, "sec_chan_offset", ucv_int64_new(data->ch_switch.ch_offset));
-		ucv_object_add(val, "center_freq1", ucv_int64_new(data->ch_switch.cf1));
+		ucv_object_add(val, "center_freq1", ucv_int64_new(center_freq1));
 		ucv_object_add(val, "center_freq2", ucv_int64_new(data->ch_switch.cf2));
+		ucv_object_add(val, "oper_chwidth", ucv_int64_new(oper_chwidth));
+		ucv_object_add(val, "bw320_offset", ucv_int64_new(bw320_offset));
+		ucv_object_add(val, "punct_bitmap", ucv_int64_new(data->ch_switch.punct_bitmap));
 	}
 
 	ucv_put(wpa_ucode_call(4));
@@ -357,6 +403,61 @@ uc_wpas_iface_status_multi_ap(uc_vm_t *vm, uc_value_t *ret, struct wpa_supplican
 	ucv_object_add(obj, "vlanid", ucv_int64_new(multi_ap->vlanid));
 }
 
+static void
+uc_wpas_iface_status_channel_info(struct wpa_supplicant *wpa_s,
+				  uc_value_t *ret, int link_id)
+{
+	enum oper_chan_width oper_chwidth;
+	enum chan_width width;
+	int center_freq1, bw320_offset = 1;
+	u16 punct_bitmap;
+	u32 freq;
+
+	if (link_id >= 0) {
+		freq = wpa_s->links[link_id].freq;
+		center_freq1 = wpa_s->links[link_id].center_freq1;
+		width = wpa_s->links[link_id].width;
+		punct_bitmap = wpa_s->links[link_id].punct_bitmap;
+	} else {
+		struct wpa_channel_info ci;
+
+		wpa_drv_channel_info(wpa_s, &ci);
+		freq = ci.frequency;
+		center_freq1 = ci.center_frq1;
+		width = ci.chanwidth;
+		punct_bitmap = ci.punct_bitmap;
+	}
+
+	switch (width) {
+	case CHAN_WIDTH_80:
+		oper_chwidth = CONF_OPER_CHWIDTH_80MHZ;
+		break;
+	case CHAN_WIDTH_80P80:
+		oper_chwidth = CONF_OPER_CHWIDTH_80P80MHZ;
+		break;
+	case CHAN_WIDTH_160:
+		oper_chwidth = CONF_OPER_CHWIDTH_160MHZ;
+		break;
+	case CHAN_WIDTH_320:
+		oper_chwidth = CONF_OPER_CHWIDTH_320MHZ;
+
+		if (center_freq1 == 6265 || center_freq1 == 6585 ||
+		    center_freq1 == 6905)
+			bw320_offset = 2;
+		break;
+	case CHAN_WIDTH_20_NOHT:
+	case CHAN_WIDTH_20:
+	case CHAN_WIDTH_40:
+	default:
+		oper_chwidth = CONF_OPER_CHWIDTH_USE_HT;
+		break;
+	}
+
+	ucv_object_add(ret, "oper_chwidth", ucv_int64_new(oper_chwidth));
+	ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
+	ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
+}
+
 static uc_value_t *
 uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 {
@@ -372,8 +473,10 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	ucv_object_add(ret, "state", ucv_string_new(wpa_supplicant_state_txt(wpa_s->wpa_state)));
 
 	bss = wpa_s->current_bss;
-	if (bss)
+	if (bss) {
 		uc_wpas_iface_status_bss(ret, bss);
+		uc_wpas_iface_status_channel_info(wpa_s, ret, -1);
+	}
 
 	if (wpa_s->valid_links) {
 		unsigned int valid_links = wpa_s->valid_links;
@@ -391,6 +494,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 
 			link = ucv_object_new(vm);
 			uc_wpas_iface_status_bss(link, bss);
+			uc_wpas_iface_status_channel_info(wpa_s, link, i);
 			ucv_array_set(links, i, link);
 		}
 
