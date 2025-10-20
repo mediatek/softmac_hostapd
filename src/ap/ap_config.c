@@ -1556,6 +1556,14 @@ static int hostapd_config_check_bss(struct hostapd_bss_config *bss,
 			   "Cannot enable mld_ap when IEEE 802.11be is disabled");
 		return -1;
 	}
+
+#ifdef CONFIG_TESTING_OPTIONS
+	if (full_config && (bss->mld_link_id < -1 ||
+	    bss->mld_link_id > MAX_NUM_MLD_LINKS)) {
+		wpa_printf(MSG_ERROR, "Invalid MLD link ID");
+		return -1;
+	}
+#endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
 
 	if (full_config && bss->ignore_broadcast_ssid && conf->mbssid) {
