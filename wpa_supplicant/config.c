@@ -5107,6 +5107,7 @@ struct wpa_config * wpa_config_alloc_empty(const char *ctrl_interface,
 
 #ifdef CONFIG_TESTING_OPTIONS
 	config->mld_connect_band_pref = DEFAULT_MLD_CONNECT_BAND_PREF;
+	config->disable_mld = 0;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	config->security_profiles = DEFAULT_SECURITY_PROFILES;
@@ -6160,6 +6161,7 @@ static const struct global_parse_data global_fields[] = {
 	{ INT_RANGE(mld_force_single_link, 0, 1), 0 },
 #ifdef CONFIG_TESTING_OPTIONS
 	{ INT_RANGE(mld_connect_band_pref, 0, MLD_CONNECT_BAND_PREF_MAX), 0 },
+	{ INT_RANGE(disable_mld, 0, 1), 0 },
 	{ FUNC(mld_connect_bssid_pref), 0 },
 #endif /* CONFIG_TESTING_OPTIONS */
 	{ BOOL(ft_prepend_pmkid), CFG_CHANGED_FT_PREPEND_PMKID },

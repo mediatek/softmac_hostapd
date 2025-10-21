@@ -1881,6 +1881,7 @@ struct wpa_config {
 	}  mld_connect_band_pref;
 
 	u8 mld_connect_bssid_pref[ETH_ALEN];
+	int disable_mld;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	int mld_force_single_link;

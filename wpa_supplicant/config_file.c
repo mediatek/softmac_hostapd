@@ -1828,6 +1828,8 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 	if (config->mld_connect_band_pref != MLD_CONNECT_BAND_PREF_AUTO)
 		fprintf(f, "mld_connect_band_pref=%d\n",
 			config->mld_connect_band_pref);
+	if (config->disable_mld)
+		fprintf(f, "disable_mld=1\n");
 	if (!is_zero_ether_addr(config->mld_connect_bssid_pref))
 		fprintf(f, "mld_connect_bssid_pref=" MACSTR "\n",
 			MAC2STR(config->mld_connect_bssid_pref));

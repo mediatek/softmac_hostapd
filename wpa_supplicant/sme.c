@@ -1113,7 +1113,12 @@ static void wpas_sme_set_mlo_links(struct wpa_supplicant *wpa_s,
 
 	wpas_reset_mlo_info(wpa_s);
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_MLO) ||
+	    wpa_s->conf->disable_mld)
+#else
 	if (!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_MLO))
+#endif /* CONFIG_TESTING_OPTIONS */
 		return;
 
 	usable_links = wpa_bss_get_usable_links(wpa_s, bss, ssid, NULL);
