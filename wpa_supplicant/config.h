@@ -1862,6 +1862,7 @@ struct wpa_config {
 	u8 mld_connect_bssid_pref[ETH_ALEN];
 
 	int mld_force_single_link;
+	int disable_mld;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	/* Cipher version type */
