@@ -588,6 +588,22 @@ uc_wpas_iface_config(uc_vm_t *vm, size_t nargs)
 			wpa_s->conf->freq_list = freq_list;
 			ret = ucv_boolean_new(true);
 		}
+	} else if (!strcmp(name, "mld_assoc_band")) {
+		if (!get) {
+			char *band = ucv_string_get(val);
+			wpa_printf(MSG_INFO, "mtk: ucode: Set band mask to %s\n", band);
+			if (!strcmp(band, "2g")) {
+				wpa_s->setband_mask = WPA_SETBAND_2G;
+			} else if (!strcmp(band, "5g")) {
+				wpa_s->setband_mask = WPA_SETBAND_5G;
+			} else if (!strcmp(band, "6g")) {
+				wpa_s->setband_mask = WPA_SETBAND_6G;
+			} else {
+				wpa_printf(MSG_ERROR, "mtk: ucode: Invalid band %s\n", band);
+				ret = ucv_boolean_new(false);
+			}
+			ret = ucv_boolean_new(true);
+		}
 	}
 
 	return ret;
