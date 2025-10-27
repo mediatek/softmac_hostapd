@@ -567,12 +567,13 @@ static void wpas_sme_set_mlo_links(struct wpa_supplicant *wpa_s,
 
 	for_each_link(usable_links, i) {
 		const u8 *bssid = bss->mld_links[i].bssid;
+		int radio_idx;
 
-		if (wpa_s->conf->freq_list &&
-		    !int_array_includes(wpa_s->conf->freq_list,
-					bss->mld_links[i].freq)) {
-			wpa_printf(MSG_DEBUG,
-				   "MLD: Skip the link on disallowed channel");
+		wpa_printf(MSG_INFO, "MLD: check freq=%u\n", bss->mld_links[i].freq);
+		radio_idx = wpas_get_radio_idx_with_freq(wpa_s, bss->mld_links[i].freq);
+		if ((BIT(radio_idx) & wpa_s->vif_radio_mask) == 0) {
+			wpa_printf(MSG_INFO,
+				   "MLD: Skip the link on unused radio");
 			continue;
 		}
 

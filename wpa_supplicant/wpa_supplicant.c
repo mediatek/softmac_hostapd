@@ -7724,7 +7724,7 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 				     const struct wpa_interface *iface)
 {
 	struct wpa_driver_capa capa;
-	int capa_res;
+	int capa_res, ret;
 	u8 dfs_domain;
 
 	wpa_printf(MSG_DEBUG, "Initializing interface '%s' conf '%s' driver "
@@ -7900,6 +7900,14 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		}
 		wpa_s->support_6ghz = wpas_is_6ghz_supported(wpa_s, false);
 	}
+
+	wpa_s->multi_hw_info = wpas_drv_get_multi_hw_info(wpa_s, &wpa_s->num_multi_hws);
+	if (!wpa_s->multi_hw_info)
+		return -1;
+
+	ret = wpas_drv_get_vif_radio_mask(wpa_s, &wpa_s->vif_radio_mask);
+	if (ret || !wpa_s->vif_radio_mask)
+		return -1;
 
 	capa_res = wpa_drv_get_capa(wpa_s, &capa);
 	if (capa_res == 0) {
@@ -10263,4 +10271,19 @@ void wpas_update_dfs_ap_info(struct wpa_supplicant *wpa_s, int freq,
 		p2p_update_dfs_ap_info(wpa_s->global->p2p, freq, ap_ch_width,
 				       disconnect_evt);
 #endif /* CONFIG_P2P */
+}
+
+
+int wpas_get_radio_idx_with_freq(struct wpa_supplicant *wpa_s, int freq) {
+	struct hostapd_multi_hw_info *hw_info;
+	int i;
+
+	for (i = 0; i < wpa_s->num_multi_hws; i++) {
+		hw_info = &wpa_s->multi_hw_info[i];
+
+		if (hw_info->start_freq <= freq && hw_info->end_freq >= freq)
+			return hw_info->hw_idx;
+	}
+
+	return -1;
 }

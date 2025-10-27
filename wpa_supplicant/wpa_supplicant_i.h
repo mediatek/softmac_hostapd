@@ -1691,6 +1691,10 @@ struct wpa_supplicant {
 	struct nan_data *nan;
 	struct nan_cluster_config nan_config;
 #endif /* CONFIG_NAN */
+
+	struct hostapd_multi_hw_info *multi_hw_info;
+	unsigned int num_multi_hws;
+	unsigned int vif_radio_mask;
 };
 
 
@@ -2110,5 +2114,6 @@ int wpas_get_owe_trans_network(const u8 *owe_ie, const u8 **bssid,
 void wpas_update_dfs_ap_info(struct wpa_supplicant *wpa_s, int freq,
 			     enum chan_width ap_ch_width,
 			     bool disconnect_evt);
+int wpas_get_radio_idx_with_freq(struct wpa_supplicant *wpa_s, int freq);
 
 #endif /* WPA_SUPPLICANT_I_H */
