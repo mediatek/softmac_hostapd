@@ -1832,6 +1832,10 @@ struct wpa_supplicant {
 	 * interface can be created with the same address when M1 arrives.
 	 */
 	u8 pr_responder_src_addr[ETH_ALEN];
+
+	struct hostapd_multi_hw_info *multi_hw_info;
+	unsigned int num_multi_hws;
+	unsigned int vif_radio_mask;
 };
 
 
@@ -2263,6 +2267,7 @@ void wpas_update_dfs_ap_info(struct wpa_supplicant *wpa_s, int freq,
 			     enum chan_width ap_ch_width,
 			     bool disconnect_evt);
 void wpas_configure_frame_filters(struct wpa_supplicant *wpa_s);
+int wpas_get_radio_idx_with_freq(struct wpa_supplicant *wpa_s, int freq);
 
 static inline bool wpas_is_nan_iface(struct wpa_supplicant *wpa_s)
 {
