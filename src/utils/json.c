@@ -551,7 +551,7 @@ struct wpabuf * json_get_member_base64(struct json_token *json,
 }
 
 
-static const char * json_type_str(enum json_type type)
+static const char * json_type_str(enum hostapd_json_type type)
 {
 	switch (type) {
 	case JSON_VALUE:
