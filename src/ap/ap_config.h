@@ -1016,6 +1016,7 @@ struct hostapd_bss_config {
 	s8 mld_link_id;
 
 	u8 eml_disable;
+	u8 emlsr_on_one_link;
 
 	bool epcs_disabled;
 #ifdef CONFIG_TESTING_OPTIONS

@@ -15749,14 +15749,15 @@ static int nl80211_get_ext_capab(void *priv, enum wpa_driver_if_type type,
 
 
 static int nl80211_get_mld_capab(void *priv, enum wpa_driver_if_type type,
-				 u16 *eml_capa, u16 *mld_capa_and_ops)
+				 u16 *eml_capa, u16 *mld_capa_and_ops,
+				 u16 *ext_mld_capa_and_ops)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	enum nl80211_iftype nlmode;
 	unsigned int i;
 
-	if (!eml_capa || !mld_capa_and_ops)
+	if (!eml_capa || !mld_capa_and_ops || !ext_mld_capa_and_ops)
 		return -1;
 
 	nlmode = wpa_driver_nl80211_if_type(type);
@@ -15764,6 +15765,7 @@ static int nl80211_get_mld_capab(void *priv, enum wpa_driver_if_type type,
 	/* By default, set to zero */
 	*eml_capa = 0;
 	*mld_capa_and_ops = 0;
+	*ext_mld_capa_and_ops = 0;
 
 	/* Replace the default value if a per-interface type value exists */
 	for (i = 0; i < drv->num_iface_capa; i++) {
@@ -15771,6 +15773,8 @@ static int nl80211_get_mld_capab(void *priv, enum wpa_driver_if_type type,
 			*eml_capa = drv->iface_capa[i].eml_capa;
 			*mld_capa_and_ops =
 				drv->iface_capa[i].mld_capa_and_ops;
+			*ext_mld_capa_and_ops =
+				drv->iface_capa[i].ext_mld_capa_and_ops;
 			break;
 		}
 	}
