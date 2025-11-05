@@ -914,6 +914,15 @@ static void wiphy_info_extended_capab(struct wpa_driver_nl80211_data *drv,
 			   "nl80211: EML Capability: 0x%x MLD Capability: 0x%x",
 			   capa->eml_capa, capa->mld_capa_and_ops);
 
+		if (tb1[NL80211_ATTR_EML_CAPABILITY] &&
+		    tb1[NL80211_ATTR_EXT_MLD_CAPA_AND_OPS])
+			capa->ext_mld_capa_and_ops =
+				nla_get_u16(tb1[NL80211_ATTR_EXT_MLD_CAPA_AND_OPS]);
+
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Extended MLD Capabilities and Operations: 0x%x",
+			   capa->ext_mld_capa_and_ops);
+
 		drv->num_iface_capa++;
 		if (drv->num_iface_capa == NL80211_IFTYPE_MAX)
 			break;

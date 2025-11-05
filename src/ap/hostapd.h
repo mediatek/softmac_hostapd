@@ -616,6 +616,7 @@ struct hostapd_mld {
 	u16 valid_links;
 	u16 removed_links;
 	u8 eml_disable;
+	u8 emlsr_on_one_link;
 
 	struct attlm_settings new_attlm;
 	struct hostapd_data *fbss;
@@ -703,7 +704,7 @@ struct hostapd_iface {
 	const u8 *extended_capa, *extended_capa_mask;
 	unsigned int extended_capa_len;
 
-	u16 mld_eml_capa, mld_mld_capa;
+	u16 mld_eml_capa, mld_mld_capa, ext_mld_capa_and_ops;
 
 	unsigned int drv_max_acl_mac_addrs;
 

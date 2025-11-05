@@ -5374,10 +5374,12 @@ struct wpa_driver_ops {
 	 * @type: Interface type for which to get MLD capabilities
 	 * @eml_capa: EML capabilities
 	 * @mld_capa_and_ops: MLD Capabilities and Operations
+	 * @ext_mld_capa_and_ops: Extended MLD Capabilities and Operations
 	 * Returns: 0 on success or -1 on failure
 	 */
 	int (*get_mld_capab)(void *priv, enum wpa_driver_if_type type,
-			     u16 *eml_capa, u16 *mld_capa_and_ops);
+			     u16 *eml_capa, u16 *mld_capa_and_ops,
+			     u16 *ext_mld_capa_and_ops);
 
 	/**
 	 * p2p_lo_start - Start offloading P2P listen to device

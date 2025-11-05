@@ -1277,7 +1277,8 @@ void hostapd_get_mld_capa(struct hostapd_iface *iface)
 
 	hapd->driver->get_mld_capab(hapd->drv_priv, WPA_IF_AP_BSS,
 				    &iface->mld_eml_capa,
-				    &iface->mld_mld_capa);
+				    &iface->mld_mld_capa,
+				    &iface->ext_mld_capa_and_ops);
 }
 
 

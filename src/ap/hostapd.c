@@ -2787,6 +2787,8 @@ static void hostapd_mld_started(struct hostapd_iface *iface)
 
 		if (hapd->conf->eml_disable)
 			hapd->mld->eml_disable = hapd->conf->eml_disable;
+		if (hapd->conf->emlsr_on_one_link)
+			hapd->mld->emlsr_on_one_link = hapd->conf->emlsr_on_one_link;
 
 		if (hapd->conf->epcs_disabled)
 			hapd->mld->epcs_disabled = hapd->conf->epcs_disabled;

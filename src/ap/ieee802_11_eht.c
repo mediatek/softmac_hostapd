@@ -538,8 +538,12 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 		BASIC_MULTI_LINK_CTRL_PRES_BSS_PARAM_CH_COUNT |
 		BASIC_MULTI_LINK_CTRL_PRES_MLD_CAPA;
 
-	if (!hapd->mld->eml_disable)
+	if (!hapd->mld->eml_disable) {
 		control |= BASIC_MULTI_LINK_CTRL_PRES_EML_CAPA;
+
+		if (hapd->mld->emlsr_on_one_link)
+			control |= BASIC_MULTI_LINK_CTRL_PRES_EXT_MLD_CAP;
+	}
 
 	/*
 	 * Set the basic Multi-Link common information. Hard code the common
@@ -552,6 +556,9 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 
 	if (hapd->mld->eml_disable)
 		common_info_len -= 2; /* EML Capabilities (2) */
+
+	if (!hapd->mld->eml_disable && hapd->mld->emlsr_on_one_link)
+		common_info_len += 2; /* Extended MLD Capabilities and Operations (2) */
 
 	if (include_mld_id && hostapd_get_mld_id(hapd)) {
 		/* AP MLD ID */
@@ -603,6 +610,12 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	wpa_printf(MSG_DEBUG, "MLD: MLD Capabilities and Operations=0x%x",
 		   mld_cap);
 	wpabuf_put_le16(buf, mld_cap);
+
+	if (!hapd->mld->eml_disable && hapd->mld->emlsr_on_one_link) {
+		wpa_printf(MSG_DEBUG, "MLD: Extended MLD Capabilities=0x%x",
+			   hapd->iface->ext_mld_capa_and_ops);
+		wpabuf_put_le16(buf, hapd->iface->ext_mld_capa_and_ops);
+	}
 
 	if (include_mld_id && hostapd_get_mld_id(hapd)) {
 		wpa_printf(MSG_DEBUG, "MLD: AP MLD ID=0x%x",

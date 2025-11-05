@@ -147,6 +147,7 @@ struct wpa_driver_nl80211_data {
 		unsigned int ext_capa_len;
 		u16 eml_capa;
 		u16 mld_capa_and_ops;
+		u16 ext_mld_capa_and_ops;
 	} iface_capa[NL80211_IFTYPE_MAX];
 	unsigned int num_iface_capa;
 	unsigned int unique_drv_id;
