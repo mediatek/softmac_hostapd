@@ -721,6 +721,7 @@ struct hostapd_iface {
 		 */
 		unsigned int expand_ch:1;
 		int new_chwidth;
+		bool max_bw80;
 	} radar_background;
 
 	u16 hw_flags;

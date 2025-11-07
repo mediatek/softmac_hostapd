@@ -1820,6 +1820,7 @@ int hostapd_dfs_background_chan_update(struct hostapd_iface *iface, int freq,
 		break;
 	};
 
+	iface->radar_background.max_bw80 = true;
 	iface->radar_background.freq = freq;
 	iface->radar_background.channel = (freq - 5000) / 5;
 	iface->radar_background.centr_freq_seg0_idx = (cf1 - 5000) / 5;
@@ -2056,10 +2057,22 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 		 * available channel exists.
 		 */
 		if (!iface->radar_background.cac_started) {
+			bool subchan_ready;
+
 			iface->radar_background.temp_ch = 1;
-			chan = dfs_get_csa_channel(iface, n_chans, 0, DFS_AVAILABLE);
-			if (!chan)
-				update_background = true;
+			subchan_ready = (center - 40 == background_center ||
+					 center + 40 == background_center) &&
+					n_chans == 8;
+			if (iface->radar_background.max_bw80 && subchan_ready) {
+				chan = hw_get_channel_chan(iface->current_mode,
+							   iface->radar_background.channel,
+							   NULL);
+				n_chans /= 2;
+			} else {
+				chan = dfs_get_csa_channel(iface, n_chans, 0, DFS_AVAILABLE);
+				if (!chan)
+					update_background = true;
+			}
 		} else {
 			iface->radar_background.temp_ch = 0;
 			return 0;
@@ -2080,6 +2093,7 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 	freq_params->sec_channel_offset = 1;
 	freq_params->center_freq1 = chan->freq + (n_chans - 1) * 10;
 	freq_params->center_freq2 = 0;
+	freq_params->bandwidth = n_chans * 20;
 
 	return 1;
 
