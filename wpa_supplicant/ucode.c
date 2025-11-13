@@ -131,7 +131,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	const char *state;
 	uc_value_t *val;
 	enum oper_chan_width oper_chwidth;
-	int control_freq, center_freq1, bw320_offset = 1;
+	int control_freq, center_freq1, bw320_offset = 1, radio_idx;
 
 	if (event != EVENT_CH_SWITCH_STARTED &&
 	    event != EVENT_LINK_CH_SWITCH_STARTED)
@@ -190,6 +190,8 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 		     center_freq1 == 6905)
 			bw320_offset = 2;
 
+		radio_idx = wpas_get_radio_idx_with_freq(wpa_s, data->ch_switch.freq);
+		ucv_object_add(val, "radio_idx", ucv_int64_new(radio_idx));
 		ucv_object_add(val, "csa_count", ucv_int64_new(data->ch_switch.count));
 		ucv_object_add(val, "frequency", ucv_int64_new(data->ch_switch.freq));
 		ucv_object_add(val, "sec_chan_offset", ucv_int64_new(data->ch_switch.ch_offset));
@@ -409,7 +411,7 @@ uc_wpas_iface_status_channel_info(struct wpa_supplicant *wpa_s,
 {
 	enum oper_chan_width oper_chwidth;
 	enum chan_width width;
-	int center_freq1, bw320_offset = 1;
+	int center_freq1, bw320_offset = 1, radio_idx;
 	u16 punct_bitmap;
 	u32 freq;
 
@@ -453,6 +455,8 @@ uc_wpas_iface_status_channel_info(struct wpa_supplicant *wpa_s,
 		break;
 	}
 
+	radio_idx = wpas_get_radio_idx_with_freq(wpa_s, freq);
+	ucv_object_add(ret, "radio_idx", ucv_int64_new(radio_idx));
 	ucv_object_add(ret, "oper_chwidth", ucv_int64_new(oper_chwidth));
 	ucv_object_add(ret, "bw320_offset", ucv_int64_new(bw320_offset));
 	ucv_object_add(ret, "punct_bitmap", ucv_int64_new(punct_bitmap));
@@ -471,6 +475,7 @@ uc_wpas_iface_status(uc_vm_t *vm, size_t nargs)
 	ret = ucv_object_new(vm);
 
 	ucv_object_add(ret, "state", ucv_string_new(wpa_supplicant_state_txt(wpa_s->wpa_state)));
+	ucv_object_add(ret, "vif_radio_mask", ucv_int64_new(wpa_s->vif_radio_mask));
 
 	bss = wpa_s->current_bss;
 	if (bss) {
