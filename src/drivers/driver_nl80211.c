@@ -2746,11 +2746,15 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 		   bss->nl_mgmt);
 
 	/* NAN SDF Public Action */
-	if (nl80211_register_action_frame2(bss, NAN_PUB_ACTION, 6, true)) {
-		wpa_printf(MSG_INFO,
-			   "nl80211: Failed to subscribe to NAN public action frames");
-		nl_destroy_handles(&bss->nl_mgmt);
-		return -1;
+	if (nl80211_register_action_frame2(bss, NAN_PUB_ACTION, 6, true) < 0) {
+		/* fallback to non-multicast */
+		if (nl80211_register_action_frame2(bss, NAN_PUB_ACTION, 6,
+						   false) < 0) {
+			wpa_printf(MSG_INFO,
+				   "nl80211: Failed to subscribe to NAN public action frames");
+			nl_destroy_handles(&bss->nl_mgmt);
+			return -1;
+		}
 	}
 
 	nl80211_mgmt_handle_register_eloop(bss);
