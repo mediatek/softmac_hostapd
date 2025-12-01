@@ -336,12 +336,14 @@ int hostapd_set_sta_flags(struct hostapd_data *hapd, struct sta_info *sta)
 		return 0;
 	}
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap && hapd->mld->removed_links) {
 		wpa_printf(MSG_DEBUG,
 			   "%s: Do not update station flags (" MACSTR ")"
 			   " during ap link removal", __func__, MAC2STR(sta->addr));
 		return 0;
 	}
+#endif /* CONFIG_IEEE80211BE */
 
 	flags_or = total_flags & set_flags;
 	flags_and = total_flags | ~set_flags;
@@ -1484,8 +1486,10 @@ int hostapd_drv_configure_edcca_enable(struct hostapd_data *hapd)
 	if (!hapd->driver || !hapd->driver->configure_edcca_enable)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->configure_edcca_enable(hapd->drv_priv, link_id,
 						    hapd->iconf->edcca_enable,
@@ -1501,8 +1505,10 @@ int hostapd_drv_configure_edcca_threshold(struct hostapd_data *hapd,
 	if (!hapd->driver || !hapd->driver->configure_edcca_threshold)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->configure_edcca_threshold(hapd->drv_priv, link_id, threshold);
 }
@@ -1515,8 +1521,10 @@ int hostapd_drv_get_edcca(struct hostapd_data *hapd, const u8 mode, u8 *value)
 	if (!hapd->driver || !hapd->driver->get_edcca)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->get_edcca(hapd->drv_priv, link_id, mode, value);
 }
@@ -1528,8 +1536,10 @@ int hostapd_drv_mu_ctrl(struct hostapd_data *hapd, u8 mode)
 	if (!hapd->driver || !hapd->driver->mu_ctrl)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->mu_ctrl(hapd->drv_priv, mode, link_id);
 }
@@ -1541,8 +1551,10 @@ int hostapd_drv_mu_dump(struct hostapd_data *hapd, u8 *mu_onoff)
 	if (!hapd->driver || !hapd->driver->mu_dump)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->mu_dump(hapd->drv_priv, mu_onoff, link_id);
 }
@@ -1662,8 +1674,10 @@ int hostapd_drv_txpower_ctrl(struct hostapd_data *hapd)
 	if (!hapd->driver || !hapd->driver->txpower_ctrl)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 #ifdef CONFIG_AFC
 	lpi_mode = hapd->iface->afc.lpi_mode;
@@ -1700,8 +1714,10 @@ int hostapd_drv_ap_wireless(struct hostapd_data *hapd, u8 sub_vendor_id, int val
 	if (!hapd->driver || !hapd->driver->ap_wireless)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->ap_wireless(hapd->drv_priv, sub_vendor_id, value,
 					 link_id);
@@ -1714,8 +1730,10 @@ int hostapd_drv_ap_rfeatures(struct hostapd_data *hapd, u8 sub_vendor_id, int va
 	if (!hapd->driver || !hapd->driver->ap_rfeatures)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->ap_rfeatures(hapd->drv_priv, sub_vendor_id, value,
 					  link_id);
@@ -1728,8 +1746,10 @@ int hostapd_drv_ap_trig_type(struct hostapd_data *hapd, u8 enable, u8 type)
 	if (!hapd->driver || !hapd->driver->ap_trigtype)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->ap_trigtype(hapd->drv_priv, enable, type,
 					 link_id);
@@ -1742,8 +1762,10 @@ int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_ma
 	if (!hapd->driver || !hapd->driver->amnt_set)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->amnt_set(hapd->drv_priv, amnt_idx, amnt_sta_mac,
 				      link_id);
@@ -1756,8 +1778,10 @@ int hostapd_drv_amnt_dump(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_dump_
 	if (!hapd->driver || !hapd->driver->amnt_dump)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->amnt_dump(hapd->drv_priv, amnt_idx, amnt_dump_buf,
 				       link_id);
@@ -1779,6 +1803,7 @@ int hostapd_drv_background_radar_mode(struct hostapd_data *hapd)
 
 int hostapd_drv_pp_mode_set(struct hostapd_data *hapd)
 {
+#ifdef CONFIG_IEEE80211BE
 	s8 link_id = -1;
 
 	if (!hapd->driver || !hapd->driver->pp_mode_set ||
@@ -1793,6 +1818,9 @@ int hostapd_drv_pp_mode_set(struct hostapd_data *hapd)
 					 hapd->iconf->pp_mode,
 					 link_id,
 					 hapd->iconf->punct_bitmap);
+#else /* CONFIG_IEEE80211BE */
+	return 0;
+#endif /* CONFIG_IEEE80211BE */
 }
 
 int hostapd_drv_beacon_ctrl(struct hostapd_data *hapd, u8 beacon_mode)
@@ -1802,6 +1830,7 @@ int hostapd_drv_beacon_ctrl(struct hostapd_data *hapd, u8 beacon_mode)
 	return hapd->driver->beacon_ctrl(hapd->drv_priv, beacon_mode);
 }
 
+#ifdef CONFIG_IEEE80211BE
 int hostapd_drv_set_epcs(struct hostapd_data *hapd, struct epcs_entry *entry,
 			 struct mld_info *mld)
 {
@@ -1826,6 +1855,7 @@ int hostapd_drv_set_epcs(struct hostapd_data *hapd, struct epcs_entry *entry,
 
 	return ret;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 int hostapd_drv_csi_set(struct hostapd_data *hapd, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac)
 {
@@ -1834,8 +1864,10 @@ int hostapd_drv_csi_set(struct hostapd_data *hapd, u8 mode, u8 cfg, u8 v1, u32 v
 	if (!hapd->driver || !hapd->driver->csi_set)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->csi_set(hapd->drv_priv, link_id, mode, cfg, v1, v2, mac);
 }
@@ -1847,8 +1879,10 @@ int hostapd_drv_csi_dump(struct hostapd_data *hapd, void *dump_buf)
 	if (!hapd->driver || !hapd->driver->csi_dump)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->csi_dump(hapd->drv_priv, link_id, dump_buf);
 }
@@ -1869,8 +1903,10 @@ int hostapd_drv_dfs_tx_mode(struct hostapd_data *hapd, u8 dfs_tx_mode)
 	if (!hapd->driver || !hapd->driver->dfs_tx_mode)
 		return 0;
 
+#ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->dfs_tx_mode(hapd->drv_priv, link_id,
 					 dfs_tx_mode);

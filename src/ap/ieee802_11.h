@@ -328,6 +328,7 @@ void ieee80211_ml_build_assoc_resp(struct hostapd_data *hapd,
 				   struct mld_link_info *link,
 				   struct wpa_state_machine *sm);
 
+#ifdef CONFIG_IEEE80211BE
 void ieee802_11_rx_protected_eht_action(struct hostapd_data *hapd,
 					const struct ieee80211_mgmt *mgmt,
 					size_t len);
@@ -354,5 +355,6 @@ int ieee802_11_send_epcs_req(struct hostapd_data *hapd, struct mld_info *mld,
 int ieee802_11_send_epcs_resp(struct hostapd_data *hapd, struct mld_info *mld,
 			      u8 dialog_token, u16 status, u16 *wmm_idx_tbl);
 int ieee802_11_send_epcs_teardown(struct hostapd_data *hapd, struct mld_info *mld);
+#endif /* CONFIG_IEEE80211BE */
 bool hostapd_is_robust_av_scs_disabled(struct hostapd_data *hapd);
 #endif /* IEEE802_11_H */

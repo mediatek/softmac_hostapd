@@ -4063,6 +4063,7 @@ static u16 check_wmm(struct hostapd_data *hapd, struct sta_info *sta,
 	return WLAN_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_IEEE80211BE
 static void check_mscs_desc_elem(struct hostapd_data *hapd, struct sta_info *sta,
 				 struct ieee802_11_elems *elems)
 {
@@ -4074,6 +4075,7 @@ static void check_mscs_desc_elem(struct hostapd_data *hapd, struct sta_info *sta
 				 elems->mscs_desc_len);
 	sta->mscs_assoc_included = 1;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 static void check_mtk_vendor_elem(struct hostapd_data *hapd, struct sta_info *sta,
 				  struct ieee802_11_elems *elems)
@@ -7291,8 +7293,8 @@ static int handle_action(struct hostapd_data *hapd,
 	case WLAN_ACTION_ROBUST_AV_STREAMING:
 		hostapd_handle_robust_av_streaming(hapd, (const u8 *) mgmt, len);
 		return 1;
-	}
 #endif /* CONFIG_IEEE80211BE */
+	}
 
 	hostapd_logger(hapd, mgmt->sa, HOSTAPD_MODULE_IEEE80211,
 		       HOSTAPD_LEVEL_DEBUG,

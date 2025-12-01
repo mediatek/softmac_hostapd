@@ -566,17 +566,16 @@ struct hostapd_data {
 
 	s64 tsf_offset[MAX_NUM_MLD_LINKS];
 
+#ifdef CONFIG_TESTING_OPTIONS
+	u8 eht_mld_link_removal_count;
+#endif /* CONFIG_TESTING_OPTIONS */
+#endif /* CONFIG_IEEE80211BE */
 	u32 deauth_count_from_sta;
 	u32 deauth_count_from_ap_uc;
 	u32 deauth_count_from_ap_bc;
 	u32 disassoc_count_from_sta;
 	u32 disassoc_count_from_ap_uc;
 	u32 disassoc_count_from_ap_bc;
-
-#ifdef CONFIG_TESTING_OPTIONS
-	u8 eht_mld_link_removal_count;
-#endif /* CONFIG_TESTING_OPTIONS */
-#endif /* CONFIG_IEEE80211BE */
 
 #ifdef CONFIG_NAN_USD
 	struct nan_de *nan_de;
@@ -1000,7 +999,9 @@ void hostapd_cleanup_iface_partial(struct hostapd_iface *iface);
 int hostapd_add_iface(struct hapd_interfaces *ifaces, char *buf);
 int hostapd_remove_bss(struct hapd_interfaces *ifaces, char *buf);
 int hostapd_remove_iface(struct hapd_interfaces *ifaces, char *buf);
+#ifdef CONFIG_IEEE80211BE
 int hostapd_remove_mld(struct hapd_interfaces *ifaces, char *buf);
+#endif /* CONFIG_IEEE80211BE */
 void hostapd_channel_list_updated(struct hostapd_iface *iface, int initiator);
 void hostapd_set_state(struct hostapd_iface *iface, enum hostapd_iface_state s);
 const char * hostapd_state_text(enum hostapd_iface_state s);
@@ -1009,7 +1010,9 @@ void hostapd_chan_switch_config(struct hostapd_data *hapd,
 				struct hostapd_freq_params *freq_params);
 int hostapd_switch_channel(struct hostapd_data *hapd,
 			   struct csa_settings *settings);
+#ifdef CONFIG_IEEE80211BE
 int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count);
+#endif /* CONFIG_IEEE80211BE */
 void
 hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 				const struct hostapd_freq_params *freq_params);

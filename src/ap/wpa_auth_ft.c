@@ -2873,6 +2873,7 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 					   "key subelement");
 				return NULL;
 			}
+#ifdef CONFIG_IEEE80211BE
 		} else {
 			u8 *link_key_subelem;
 			size_t link_key_len;
@@ -2907,6 +2908,7 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 				subelem_len += link_key_len;
 				os_free(link_key_subelem);
 			}
+#endif /* CONFIG_IEEE80211BE */
 		}
 #ifdef CONFIG_OCV
 		if (wpa_auth_uses_ocv(sm)) {
@@ -4739,6 +4741,7 @@ static int wpa_ft_rrb_rx_resp(struct wpa_authenticator *primary_auth,
 	os_memset(&ctx, 0, sizeof(ctx));
 	ctx.nonce = f_nonce;
 
+#ifdef CONFIG_IEEE80211BE
 	/* Primary auth may not have corresponding sta state machine
 	 * search all the sta of the mld bss for the target wpa_auth */
 	if (primary_auth->is_ml) {
@@ -4750,7 +4753,9 @@ static int wpa_ft_rrb_rx_resp(struct wpa_authenticator *primary_auth,
 			if (wpa_auth_for_each_sta(target_auth, ft_get_sta_cb, &ctx))
 				break;
 		}
-	} else {
+	} else
+#endif /* CONFIG_IEEE80211BE */
+	{
 		if (wpa_auth_for_each_sta(primary_auth, ft_get_sta_cb, &ctx))
 			target_auth = primary_auth;
 	}
@@ -5319,11 +5324,13 @@ void wpa_ft_rrb_oui_rx(struct wpa_authenticator *wpa_auth, const u8 *src_addr,
 		return;
 	}
 
+#ifdef CONFIG_IEEE80211BE
 	if (ether_addr_equal(wpa_auth->mld_addr, dst_addr) && wpa_auth->is_ml &&
 	    !wpa_auth->primary_auth) {
 		wpa_printf(MSG_DEBUG, "MLD: FT: RRB frame handled by primary auth");
 		return;
 	}
+#endif /* CONFIG_IEEE80211BE */
 
 	auth = data + sizeof(u16);
 	wpa_hexdump(MSG_MSGDUMP, "FT: Authenticated payload", auth, alen);

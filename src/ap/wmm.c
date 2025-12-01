@@ -389,6 +389,7 @@ void hostapd_wmm_action(struct hostapd_data *hapd,
 		       action_code);
 }
 
+#ifdef CONFIG_IEEE80211BE
 size_t hostapd_eid_eht_epcs_ml_len(struct mld_info *mld)
 {
 	size_t len = 3 + sizeof(struct ieee80211_eht_ml) +
@@ -463,4 +464,5 @@ int hostapd_eid_eht_epcs_ml(struct hostapd_data *hapd, struct wpabuf *buf,
 
 	return 0;
 }
+#endif /* CONFIG_IEEE80211BE */
 

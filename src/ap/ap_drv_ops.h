@@ -182,8 +182,10 @@ int hostapd_drv_amnt_dump(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_dump_
 int hostapd_drv_background_radar_mode(struct hostapd_data *hapd);
 int hostapd_drv_pp_mode_set(struct hostapd_data *hapd);
 int hostapd_drv_beacon_ctrl(struct hostapd_data *hapd, u8 beacon_mode);
+#ifdef CONFIG_IEEE80211BE
 int hostapd_drv_set_epcs(struct hostapd_data *hapd, struct epcs_entry *entry,
 			 struct mld_info *mld);
+#endif /* CONFIG_IEEE80211BE */
 int hostapd_drv_csi_set(struct hostapd_data *hapd, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac);
 int hostapd_drv_csi_dump(struct hostapd_data *hapd, void *dump_buf);
 

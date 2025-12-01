@@ -2224,6 +2224,7 @@ void ap_cleanup_sta(struct hostapd_data *hapd, const u8 *addr) {
 		ap_free_sta(hapd, sta);
 }
 
+#ifdef CONFIG_IEEE80211BE
 static void hostapd_reset_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta)
 {
 	struct hostapd_data *link_bss, *new_assoc_hapd = NULL;
@@ -2302,6 +2303,7 @@ static void hostapd_reset_assoc_sta(struct hostapd_data *hapd, struct sta_info *
 		link_sta->flags |= WLAN_STA_ASSOC;
 	}
 }
+#endif /* CONFIG_IEEE80211BE */
 
 void hostapd_reset_assoc_stas(struct hostapd_data *hapd)
 {

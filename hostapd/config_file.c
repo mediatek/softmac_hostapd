@@ -5352,6 +5352,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		}
 		conf->amsdu = val;
 	} else if (os_strcmp(buf, "pp_mode") == 0) {
+#ifdef CONFIG_IEEE80211BE
 		int val = atoi(pos);
 
 		if ((val != PP_USR_MODE && conf->punct_bitmap) ||
@@ -5361,6 +5362,7 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		conf->pp_mode = (u8) val;
+#endif /* CONFIG_IEEE80211BE */
 	} else if (os_strcmp(buf, "lpi_psd") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_psd = !!en;

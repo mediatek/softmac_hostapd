@@ -2817,11 +2817,9 @@ static void hostapd_event_pp_bitmap_update(struct hostapd_data *hapd,
 		if (err)
 			break;
 
-#ifdef CONFIG_IEEE80211BE
 		if (iface->bss[i]->conf->mld_ap)
 			hostapd_update_aff_link_beacon(iface->bss[i],
 						       csa_settings.cs_count);
-#endif /* CONFIG_IEEE80211BE */
 	}
 }
 #endif /* CONFIG_IEEE80211BE */
@@ -2850,8 +2848,10 @@ static int hostapd_event_btwt_add(struct hostapd_data *hapd,
 	}
 	os_memcpy(&entry->btwt, &data->btwt, sizeof(struct broadcast_twt_param));
 
+#ifdef CONFIG_IEEE80211BE
 	ieee802_11_set_bss_critical_update(hapd,
 					   BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET);
+#endif /* CONFIG_IEEE80211BE */
 	ieee802_11_set_beacon_per_bss_only(hapd);
 
 	return 0;
@@ -3179,10 +3179,12 @@ void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
 		break;
 #endif /* NEED_AP_MLME */
 	case EVENT_PP_BITMAP_UPDATE:
+#ifdef CONFIG_IEEE80211BE
 		if (!data)
 			break;
 		hapd = switch_link_hapd(hapd, data->ch_switch.link_id);
 		hostapd_event_pp_bitmap_update(hapd, &data->ch_switch);
+#endif /* CONFIG_IEEE80211BE */
 		break;
 	case EVENT_INTERFACE_ENABLED:
 #ifdef CONFIG_IEEE80211BE

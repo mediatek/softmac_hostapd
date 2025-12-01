@@ -5896,6 +5896,7 @@ static int
 hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 			  size_t buflen)
 {
+#ifdef CONFIG_IEEE80211BE
 	char *config, *value;
 
 	config = cmd;
@@ -5928,14 +5929,21 @@ hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 		return -1;
 	}
 	return os_snprintf(buf, buflen, "OK\n");
+#else /* CONFIG_IEEE80211BE */
+	return os_snprintf(buf, buflen, "not supported");
+#endif /* CONFIG_IEEE80211BE */
 }
 
 static int
 hostapd_ctrl_iface_get_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 			  size_t buflen)
 {
+#ifdef CONFIG_IEEE80211BE
 	return os_snprintf(buf, buflen, "pp_mode: %d, punct_bitmap: 0x%04x\n",
 			   hapd->iconf->pp_mode, hapd->iconf->punct_bitmap);
+#else /* CONFIG_IEEE80211BE */
+	return os_snprintf(buf, buflen, "not supported");
+#endif /* CONFIG_IEEE80211BE */
 }
 
 static int
@@ -5956,6 +5964,7 @@ hostapd_ctrl_iface_disable_beacon(struct hostapd_data *hapd, char *value,
 
 }
 
+#ifdef CONFIG_IEEE80211BE
 static int
 hostapd_epcs_set_wmm_params(struct hapd_interfaces *ifaces,
 			    struct epcs_entry *entry, char *arg)
@@ -6267,6 +6276,7 @@ hostapd_ctrl_iface_epcs(struct hostapd_data *hapd, char *cmd, char *buf, size_t 
 
 	return os_snprintf(buf, len, "OK\n");
 }
+#endif /* CONFIG_IEEE80211BE */
 
 static int
 hostapd_ctrl_iface_set_csi(struct hostapd_data *hapd, char *cmd,
@@ -6455,6 +6465,7 @@ hostapd_ctrl_iface_dump_csi(struct hostapd_data *hapd, char *cmd,
 	return 0;
 }
 
+#ifdef CONFIG_IEEE80211BE
 static int
 hostapd_ctrl_iface_wmm(struct hostapd_data *hapd, char *cmd, char *buf,
 		       size_t buflen)
@@ -6549,6 +6560,7 @@ hostapd_ctrl_iface_del_mscs(struct hostapd_data *hapd, char *cmd,
 fail:
 	return os_snprintf(buf, buflen, "FAIL\n");
 }
+#endif /* CONFIG_IEEE80211BE */
 
 static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      char *buf, char *reply,
@@ -7283,6 +7295,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "DUMP_CSI ", 8) == 0) {
 		reply_len = hostapd_ctrl_iface_dump_csi(hapd, buf + 9,
 							reply, reply_size);
+#ifdef CONFIG_IEEE80211BE
 	} else if (os_strncmp(buf, "WMM", 3) == 0) {
 		reply_len = hostapd_ctrl_iface_wmm(hapd, buf + 4,
 						   reply, reply_size);
@@ -7290,6 +7303,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 		reply_len = hostapd_ctrl_iface_epcs(hapd, buf + 5, reply, reply_size);
 	} else if (os_strncmp(buf, "DEL_MSCS ", 9) == 0) {
 		reply_len = hostapd_ctrl_iface_del_mscs(hapd, buf + 9, reply, reply_size);
+#endif /* CONFIG_IEEE80211BE */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
@@ -8100,6 +8114,7 @@ static int hostapd_ctrl_bss_remove(struct hapd_interfaces *interfaces,
 }
 
 
+#ifdef CONFIG_IEEE80211BE
 static int hostapd_ctrl_mld_remove(struct hapd_interfaces *interfaces,
 				   char *buf)
 {
@@ -8109,6 +8124,7 @@ static int hostapd_ctrl_mld_remove(struct hapd_interfaces *interfaces,
 	}
 	return 0;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 
 static int hostapd_ctrl_iface_remove(struct hapd_interfaces *interfaces,
@@ -8509,9 +8525,11 @@ static void hostapd_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 	} else if (os_strncmp(buf, "REMOVE_BSS ", 11) == 0) {
 		if (hostapd_ctrl_bss_remove(interfaces, buf + 11) < 0)
 			reply_len = -1;
+#ifdef CONFIG_IEEE80211BE
 	} else if (os_strncmp(buf, "REMOVE_MLD ", 11) == 0) {
 		if (hostapd_ctrl_mld_remove(interfaces, buf + 11) < 0)
 			reply_len = -1;
+#endif /* CONFIG_IEEE80211BE */
 	} else if (os_strcmp(buf, "ATTACH") == 0) {
 		if (hostapd_global_ctrl_iface_attach(interfaces, &from,
 						     fromlen, NULL))

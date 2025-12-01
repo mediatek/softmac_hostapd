@@ -2281,6 +2281,7 @@ static u8 * hostapd_fils_discovery(struct hostapd_data *hapd,
 #endif /* CONFIG_FILS */
 
 
+#ifdef CONFIG_IEEE80211BE
 static void hostapd_fill_bcn_sta_profile(struct hostapd_data *hapd,
 					 struct mld_info *info)
 {
@@ -2340,6 +2341,7 @@ static void hostapd_fill_bcn_sta_profile(struct hostapd_data *hapd,
 		 */
 	}
 }
+#endif /* CONFIG_IEEE80211BE */
 
 int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 			       struct wpa_driver_ap_params *params)
@@ -2446,12 +2448,14 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 	os_memcpy(head->bssid, hapd->own_addr, ETH_ALEN);
 	head->u.beacon.beacon_int =
 		host_to_le16(hapd->iconf->beacon_int);
+#ifdef CONFIG_IEEE80211BE
 	/* if MLD AP hasn't finished setting up all links, also set beacon interval
 	 * to 0. This allows mac80211 to bypass some beacon active checks, for
 	 * example, when doing ACS
 	 */
 	if (hapd->conf->mld_ap && !hapd->mld->started)
 		head->u.beacon.beacon_int = host_to_le16(0);
+#endif /* CONFIG_IEEE80211BE */
 
 	/* hardware or low-level driver will setup seq_ctrl and timestamp */
 	capab_info = hostapd_own_capab_info(hapd);
@@ -2879,6 +2883,7 @@ static int __ieee802_11_set_beacon(struct hostapd_data *hapd)
 	int res, ret = -1, i;
 	struct hostapd_hw_modes *mode;
 
+#ifdef CONFIG_IEEE80211BE
 	/* skip setting beacon if other links are not started yet */
 	if (hapd->conf->mld_ap && !hapd->mld->started && hapd->beacon_set_done)
 		return 0;
@@ -2886,6 +2891,7 @@ static int __ieee802_11_set_beacon(struct hostapd_data *hapd)
 	/* skip setting beacon during ap link removal */
 	if (hapd->conf->mld_ap && hapd->mld->removed_links)
 		return 0;
+#endif /* CONFIG_IEEE80211BE */
 
 	if (!hapd->drv_priv) {
 		wpa_printf(MSG_ERROR, "Interface is disabled");
@@ -3622,6 +3628,7 @@ int ieee802_11_update_beacons(struct hostapd_iface *iface)
 }
 
 
+#ifdef CONFIG_IEEE80211BE
 int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 				       enum bss_crit_update_event event)
 {
@@ -3690,5 +3697,6 @@ int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 
 	return 0;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 #endif /* CONFIG_NATIVE_WINDOWS */
