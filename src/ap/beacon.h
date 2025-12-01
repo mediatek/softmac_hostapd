@@ -55,8 +55,10 @@ int ieee802_11_set_beacon_per_iface_only(struct hostapd_iface *iface);
 int ieee802_11_set_beacon_for_colocat(struct hostapd_data *hapd);
 int ieee802_11_set_beacon(struct hostapd_data *hapd);
 int ieee802_11_set_beacons(struct hostapd_iface *iface);
+#ifdef CONFIG_IEEE80211BE
 int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
 				       enum bss_crit_update_event event);
+#endif /* CONFIG_IEEE80211BE */
 int ieee802_11_update_beacons(struct hostapd_iface *iface);
 int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 			       struct wpa_driver_ap_params *params);

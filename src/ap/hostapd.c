@@ -1024,8 +1024,10 @@ static int hostapd_flush_old_stations(struct hostapd_data *hapd, u16 reason)
 void hostapd_bss_deinit_no_free(struct hostapd_data *hapd)
 {
 	hostapd_free_stas(hapd);
+#ifdef CONFIG_IEEE80211BE
 	/* do not flush stations during ap link removal */
 	if (!hapd->conf->mld_ap || !hapd->mld->removed_links)
+#endif /* CONFIG_IEEE80211BE */
 		hostapd_flush_old_stations(hapd, WLAN_REASON_DEAUTH_LEAVING);
 #ifdef CONFIG_WEP
 	hostapd_clear_wep(hapd);
@@ -1619,12 +1621,14 @@ int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 		flush_old_stations = 0;
 		wpa_printf(MSG_DEBUG,
 			   "MLD: %s: Setting non-first BSS", __func__);
+#ifdef CONFIG_IEEE80211BE
 	} else if (hapd->conf->mld_ap &&
 		   hapd->iface->state == HAPD_IFACE_DFS) {
 		/* Also, avoid flushing old STA when the first BSS of the MLD requires CAC. */
 		flush_old_stations = 0;
 		wpa_printf(MSG_DEBUG,
 			   "MLD: %s: Setting first BSS after CAC complete", __func__);
+#endif /* CONFIG_IEEE80211BE */
 	}
 
 	wpa_printf(MSG_DEBUG, "%s(hapd=%p (%s), first=%d)",
@@ -3794,6 +3798,7 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 			return NULL;
 		}
 
+#ifdef CONFIG_IEEE80211BE
 		tmp_hapd = hostapd_interfaces_get_hapd(interfaces, ifname);
 		if (tmp_hapd) {
 			/* A BSS with an existing interface name can only be added
@@ -3808,6 +3813,7 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 				return NULL;
 			}
 		}
+#endif /* CONFIG_IEEE80211BE */
 
 		tmp_conf = os_realloc_array(
 			iface->conf->bss, iface->conf->num_bss + 1,
@@ -4735,6 +4741,7 @@ int hostapd_remove_iface(struct hapd_interfaces *interfaces, char *buf)
 }
 
 
+#ifdef CONFIG_IEEE80211BE
 static int hostapd_remove_mld_link_by_idx(struct hostapd_iface *iface, int idx)
 {
 	size_t j;
@@ -4826,6 +4833,7 @@ int hostapd_remove_mld(struct hapd_interfaces *interfaces, char *buf)
 	hostapd_cleanup_unused_mlds(interfaces);
 	return 0;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 
 /**
@@ -5478,8 +5486,10 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_IEEE80211BE
 	/* Another CU in the new channel due to OP element modification */
 	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
+#endif /* CONFIG_IEEE80211BE */
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_after);
 
 	/* change back the configuration */
@@ -5584,6 +5594,7 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 		return -1;
 	}
 
+#ifdef CONFIG_IEEE80211BE
 	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_CSA);
 
 	if (hapd->conf->mld_ap) {
@@ -5591,6 +5602,7 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 		for_each_mld_link(link_bss, hapd)
 			hostapd_gen_per_sta_profiles(link_bss);
 	}
+#endif /* CONFIG_IEEE80211BE */
 
 	ret = hostapd_fill_csa_settings(hapd, settings);
 	if (ret)
@@ -5613,6 +5625,7 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 	return 0;
 }
 
+#ifdef CONFIG_IEEE80211BE
 int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 {
 	struct hostapd_data *h;
@@ -5684,6 +5697,7 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 
 	return 0;
 }
+#endif /* CONFIG_IEEE80211BE */
 
 
 void
