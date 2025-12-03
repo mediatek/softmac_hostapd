@@ -765,19 +765,6 @@ wpa_ft_get_session_timeout(struct wpa_authenticator *wpa_auth,
 }
 
 
-static int wpa_ft_add_tspec(struct wpa_authenticator *wpa_auth,
-			    const u8 *sta_addr,
-			    u8 *tspec_ie, size_t tspec_ielen)
-{
-	if (wpa_auth->cb->add_tspec == NULL) {
-		wpa_printf(MSG_DEBUG, "FT: add_tspec is not initialized");
-		return -1;
-	}
-	return wpa_auth->cb->add_tspec(wpa_auth->cb_ctx, sta_addr, tspec_ie,
-				       tspec_ielen);
-}
-
-
 #ifdef CONFIG_OCV
 static int wpa_channel_info(struct wpa_authenticator *wpa_auth,
 			       struct wpa_channel_info *ci)
@@ -2491,24 +2478,6 @@ static u8 * wpa_ft_process_rdie(struct wpa_state_machine *sm,
 		return pos;
 	}
 #endif /* NEED_AP_MLME */
-
-	if (parse.wmm_tspec && !sm->wpa_auth->conf.ap_mlme) {
-		int res;
-
-		res = wpa_ft_add_tspec(sm->wpa_auth, sm->addr, pos,
-				       sizeof(struct wmm_tspec_element));
-		if (res >= 0) {
-			if (res)
-				rdie->status_code = host_to_le16(res);
-			else {
-				/* TSPEC accepted; include updated TSPEC in
-				 * response */
-				rdie->descr_count = 1;
-				pos += sizeof(struct wmm_tspec_element);
-			}
-			return pos;
-		}
-	}
 
 	wpa_printf(MSG_DEBUG, "FT: No supported resource requested");
 	rdie->status_code = host_to_le16(WLAN_STATUS_UNSPECIFIED_FAILURE);

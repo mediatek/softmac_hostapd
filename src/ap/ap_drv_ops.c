@@ -530,16 +530,6 @@ int hostapd_sta_add(struct hostapd_data *hapd,
 }
 
 
-int hostapd_add_tspec(struct hostapd_data *hapd, const u8 *addr,
-		      u8 *tspec_ie, size_t tspec_ielen)
-{
-	if (hapd->driver == NULL || hapd->driver->add_tspec == NULL)
-		return 0;
-	return hapd->driver->add_tspec(hapd->drv_priv, addr, tspec_ie,
-				       tspec_ielen);
-}
-
-
 int hostapd_set_privacy(struct hostapd_data *hapd, int enabled)
 {
 	if (hapd->driver == NULL || hapd->driver->set_privacy == NULL)

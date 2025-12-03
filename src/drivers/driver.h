@@ -4684,20 +4684,6 @@ struct wpa_driver_ops {
 			 struct wpa_driver_sta_auth_params *params);
 
 	/**
-	 * add_tspec - Add traffic stream
-	 * @priv: Private driver interface data
-	 * @addr: MAC address of the station to associate
-	 * @tspec_ie: tspec ie buffer
-	 * @tspec_ielen: tspec ie length
-	 * Returns: 0 on success, -1 on failure
-	 *
-	 * This function adds the traffic steam for the station
-	 * and fills the medium_time in tspec_ie.
-	 */
-	 int (*add_tspec)(void *priv, const u8 *addr, u8 *tspec_ie,
-			  size_t tspec_ielen);
-
-	/**
 	 * add_sta_node - Add a station node in the driver
 	 * @priv: Private driver interface data
 	 * @addr: MAC address of the station to add

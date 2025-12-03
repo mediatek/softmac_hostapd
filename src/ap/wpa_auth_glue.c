@@ -1576,15 +1576,6 @@ static void hostapd_rrb_oui_receive(void *ctx, const u8 *src_addr,
 }
 
 
-static int hostapd_wpa_auth_add_tspec(void *ctx, const u8 *sta_addr,
-				      u8 *tspec_ie, size_t tspec_ielen)
-{
-	struct hostapd_data *hapd = ctx;
-	return hostapd_add_tspec(hapd, sta_addr, tspec_ie, tspec_ielen);
-}
-
-
-
 static int hostapd_wpa_register_ft_oui(struct hostapd_data *hapd,
 				       const char *ft_iface)
 {
@@ -1819,7 +1810,6 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 		.send_ft_action = hostapd_wpa_auth_send_ft_action,
 		.add_sta = hostapd_wpa_auth_add_sta,
 		.add_sta_ft = hostapd_wpa_auth_add_sta_ft,
-		.add_tspec = hostapd_wpa_auth_add_tspec,
 		.set_vlan = hostapd_wpa_auth_set_vlan,
 		.get_vlan = hostapd_wpa_auth_get_vlan,
 		.set_identity = hostapd_wpa_auth_set_identity,
