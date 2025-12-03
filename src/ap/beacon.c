@@ -1493,7 +1493,9 @@ void handle_probe_req(struct hostapd_data *hapd,
 	int ret;
 	u16 csa_offs[2];
 	size_t csa_offs_len;
+	/* We're not able to retrieve MLD address here
 	struct radius_sta rad_info;
+	*/
 	struct probe_resp_params params;
 	char *hex = NULL;
 #ifdef CONFIG_IEEE80211BE
@@ -1518,6 +1520,7 @@ void handle_probe_req(struct hostapd_data *hapd,
 		sta_track_add(hapd->iface, mgmt->sa, ssi_signal);
 	ie_len = len - IEEE80211_HDRLEN;
 
+	/* We're not able to retrieve MLD address here
 	ret = hostapd_allowed_address(hapd, mgmt->sa, (const u8 *) mgmt, len,
 				      &rad_info, 1);
 	if (ret == HOSTAPD_ACL_REJECT) {
@@ -1526,6 +1529,7 @@ void handle_probe_req(struct hostapd_data *hapd,
 			" due to ACL reject ", MAC2STR(mgmt->sa));
 		return;
 	}
+	*/
 
 	for (i = 0; hapd->probereq_cb && i < hapd->num_probereq_cb; i++)
 		if (hapd->probereq_cb[i].cb(hapd->probereq_cb[i].ctx,
