@@ -4599,20 +4599,6 @@ struct wpa_driver_ops {
 	 */
 	int (*channel_info)(void *priv, struct wpa_channel_info *channel_info);
 
-	/**
-	 * set_authmode - Set authentication algorithm(s) for static WEP
-	 * @priv: Private driver interface data
-	 * @authmode: 1=Open System, 2=Shared Key, 3=both
-	 * Returns: 0 on success, -1 on failure
-	 *
-	 * This function can be used to set authentication algorithms for AP
-	 * mode when static WEP is used. If the driver uses user space MLME/SME
-	 * implementation, there is no need to implement this function.
-	 *
-	 * DEPRECATED - use set_ap() instead
-	 */
-	int (*set_authmode)(void *priv, int authmode);
-
 #ifdef ANDROID
 	/**
 	 * driver_cmd - Execute driver-specific command
