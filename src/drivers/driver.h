@@ -4175,18 +4175,6 @@ struct wpa_driver_ops {
 			    int vlan_id, int link_id);
 
 	/**
-	 * commit - Optional commit changes handler (AP only)
-	 * @priv: driver private data
-	 * Returns: 0 on success, -1 on failure
-	 *
-	 * This optional handler function can be registered if the driver
-	 * interface implementation needs to commit changes (e.g., by setting
-	 * network interface up) at the end of initial configuration. If set,
-	 * this handler will be called after initial setup has been completed.
-	 */
-	int (*commit)(void *priv);
-
-	/**
 	 * set_radius_acl_auth - Notification of RADIUS ACL change
 	 * @priv: Private driver interface data
 	 * @mac: MAC address of the station

@@ -2729,17 +2729,11 @@ static int hostapd_setup_interface_complete_sync(struct hostapd_iface *iface,
 
 	hostapd_set_acl(hapd);
 
-	if (hostapd_driver_commit(hapd) < 0) {
-		wpa_printf(MSG_ERROR, "%s: Failed to commit driver "
-			   "configuration", __func__);
-		goto fail;
-	}
-
 	/*
 	 * WPS UPnP module can be initialized only when the "upnp_iface" is up.
 	 * If "interface" and "upnp_iface" are the same (e.g., non-bridge
-	 * mode), the interface is up only after driver_commit, so initialize
-	 * WPS after driver_commit.
+	 * mode), the interface is up only after the driver interface has been
+	 * initialized, so initialize WPS after that.
 	 */
 	for (j = 0; j < iface->num_bss; j++) {
 		if (hostapd_init_wps_complete(iface->bss[j]))

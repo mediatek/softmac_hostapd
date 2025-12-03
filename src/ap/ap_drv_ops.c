@@ -769,14 +769,6 @@ hostapd_get_hw_feature_data(struct hostapd_data *hapd, u16 *num_modes,
 }
 
 
-int hostapd_driver_commit(struct hostapd_data *hapd)
-{
-	if (hapd->driver == NULL || hapd->driver->commit == NULL)
-		return 0;
-	return hapd->driver->commit(hapd->drv_priv);
-}
-
-
 int hostapd_drv_none(struct hostapd_data *hapd)
 {
 	return hapd->driver && os_strcmp(hapd->driver->name, "none") == 0;
