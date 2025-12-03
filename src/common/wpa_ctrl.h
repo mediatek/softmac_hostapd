@@ -466,6 +466,9 @@ extern "C" {
  * Parameters: <STA addr> <Generational Capabilities Indication body> */
 #define WFA_GEN_CAPAB_RX "WFA-GEN-CAPAB "
 
+#define AFC_EVENT_RECEIVED "AFC-EVENT-RECEIVED "
+#define AFC_EVENT_COMPLETE "AFC-EVENT-COMPLETE "
+
 #ifndef BIT
 #define BIT(x) (1U << (x))
 #endif

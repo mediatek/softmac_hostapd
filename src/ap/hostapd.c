@@ -3035,6 +3035,11 @@ dfs_offload:
 	}
 #endif /* CONFIG_FST */
 
+#ifdef CONFIG_AFC
+	if (iface->afc.data_valid)
+		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_COMPLETE);
+#endif /* CONFIG_AFC */
+
 	hostapd_set_state(iface, HAPD_IFACE_ENABLED);
 	hostapd_owe_update_trans(iface);
 	airtime_policy_update_init(iface);

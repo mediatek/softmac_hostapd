@@ -14,6 +14,7 @@
 #include "utils/eloop.h"
 #include "utils/json.h"
 #include "common/hw_features_common.h"
+#include "common/wpa_ctrl.h"
 #include "hostapd.h"
 #include "acs.h"
 #include "hw_features.h"
@@ -811,8 +812,11 @@ static int hostapd_afc_send_receive(struct hostapd_iface *iface)
 		goto close_sock;
 
 	ret = hostapd_afc_parse_reply(iface, buf, ret);
-	if (ret)
+	if (ret) {
 		wpa_printf(MSG_ERROR, "Failed parsing AFC reply: %d", ret);
+		goto close_sock;
+	}
+	wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_RECEIVED);
 close_sock:
 	os_free(buf);
 	iface->afc_request = request_obj;
@@ -1035,6 +1039,7 @@ resched:
 		iface->afc.lpi_mode = true;
 		fallthrough;
 	case AFC_CONTINUE:
+		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_COMPLETE);
 		hostapd_drv_txpower_ctrl(iface->bss[0]);
 		break;
 	default:
