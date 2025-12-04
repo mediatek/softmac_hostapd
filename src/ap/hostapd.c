@@ -2792,6 +2792,9 @@ static void hostapd_mld_started(struct hostapd_iface *iface)
 
 		if (hapd->conf->epcs_disabled)
 			hapd->mld->epcs_disabled = hapd->conf->epcs_disabled;
+
+		if (hapd->conf->robust_av_scs_disabled)
+			hapd->mld->robust_av_scs_disabled = hapd->conf->robust_av_scs_disabled;
 	}
 #endif /* CONFIG_IEEE80211BE */
 }

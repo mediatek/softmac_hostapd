@@ -630,6 +630,7 @@ struct hostapd_mld {
 	u8 dialog_token;
 
 	bool epcs_disabled;
+	bool robust_av_scs_disabled;
 };
 
 #define HOSTAPD_MLD_MAX_REF_COUNT      0xFF

@@ -994,6 +994,7 @@ struct hostapd_bss_config {
 	u8 emlsr_on_one_link;
 
 	bool epcs_disabled;
+	bool robust_av_scs_disabled;
 #ifdef CONFIG_TESTING_OPTIONS
 	/*
 	 * If set indicate the AP as disabled in the RNR element included in the

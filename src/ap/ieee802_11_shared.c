@@ -532,6 +532,10 @@ u8 * hostapd_eid_ext_capab(struct hostapd_data *hapd, u8 *eid,
 		 * if ieee80211ac is not enabled (mainly 2.4G and 6G) */
 		if (i == 7 && !hapd->iconf->ieee80211ac)
 			*pos &= ~0x40;
+#ifdef CONFIG_IEEE80211BE
+		if (i == 6 && hostapd_is_robust_av_scs_disabled(hapd))
+			*pos &= ~0x40;
+#endif
 	}
 
 	while (len > 0 && eid[1 + len] == 0) {
@@ -1319,3 +1323,13 @@ void hostapd_wfa_capab(struct hostapd_data *hapd, struct sta_info *sta,
 	if (gen_capa)
 		hostapd_wfa_gen_capab(hapd, sta, gen_capa + 2, gen_capa[1]);
 }
+
+#ifdef CONFIG_IEEE80211BE
+bool hostapd_is_robust_av_scs_disabled(struct hostapd_data *hapd)
+{
+	if (hostapd_is_mld_ap(hapd))
+		return hapd->mld && hapd->mld->robust_av_scs_disabled;
+
+	return hapd->conf->robust_av_scs_disabled;
+}
+#endif
