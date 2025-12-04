@@ -480,6 +480,9 @@ void hostapd_handle_robust_av_streaming(struct hostapd_data *hapd, const u8 *buf
 {
 	const struct ieee80211_mgmt *mgmt = (const struct ieee80211_mgmt *) buf;
 
+	if (hostapd_is_robust_av_scs_disabled(hapd))
+		return;
+
 	/*
 	 * Check for enough bytes: header + (1B)Category + (1B)Action +
 	 * (1B)Dialog Token.
