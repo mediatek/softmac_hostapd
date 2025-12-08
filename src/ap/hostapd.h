@@ -609,6 +609,7 @@ struct hostapd_mld {
 	u8 refcount;
 	bool started;
 	u16 link_reconf_in_progress;
+	u16 allocated_links;
 	u16 valid_links;
 	u16 removed_links;
 	u8 eml_disable;
