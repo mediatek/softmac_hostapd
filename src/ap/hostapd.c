@@ -3433,8 +3433,9 @@ static void hostapd_bss_alloc_link_id(struct hostapd_data *hapd)
 		int i;
 
 		for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
-			if ((hapd->mld->valid_links & BIT(i)) == 0) {
+			if ((hapd->mld->allocated_links & BIT(i)) == 0) {
 				hapd->mld_link_id = i;
+				hapd->mld->allocated_links |= BIT(i);
 				break;
 			}
 		}
@@ -5963,6 +5964,7 @@ int hostapd_mld_remove_link(struct hostapd_data *hapd)
 	dl_list_del(&hapd->link);
 	mld->num_links--;
 	mld->valid_links &= ~BIT(hapd->mld_link_id);
+	mld->allocated_links &= ~BIT(hapd->mld_link_id);
 
 	wpa_printf(MSG_DEBUG, "AP MLD %s: Link ID %d removed. num_links: %d",
 		   mld->name, hapd->mld_link_id, mld->num_links);
