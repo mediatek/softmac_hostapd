@@ -6079,7 +6079,8 @@ static int wpa_driver_nl80211_set_ap(void *priv,
 			goto fail;
 	}
 
-	if (params->ubpr.unsol_bcast_probe_resp_interval &&
+	if (params->freq && is_6ghz_freq(params->freq->freq) &&
+	    params->ubpr.unsol_bcast_probe_resp_interval &&
 	    nl80211_unsol_bcast_probe_resp(bss, msg, &params->ubpr) < 0)
 		goto fail;
 
