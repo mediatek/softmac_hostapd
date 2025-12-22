@@ -972,8 +972,7 @@ static u8 * hostapd_probe_resp_fill_elems(struct hostapd_data *hapd,
 		pos = hostapd_eid_eht_capab(hapd, pos, IEEE80211_MODE_AP);
 		pos = hostapd_eid_eht_operation(hapd, pos);
 
-		if (hapd->conf->mld_ap)
-			pos = hostapd_eid_eht_ml_tid_to_link_map(hapd, pos);
+		pos = hostapd_eid_eht_attlm(hapd, pos);
 	}
 #endif /* CONFIG_IEEE80211BE */
 
@@ -2364,6 +2363,8 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 			 * switch */
 			tail_len += 6;
 		}
+
+		tail_len += hostapd_eid_eht_attlm_len(hapd);
 	}
 #endif /* CONFIG_IEEE80211BE */
 
@@ -2574,9 +2575,7 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 		tailpos = hostapd_eid_eht_capab(hapd, tailpos,
 						IEEE80211_MODE_AP);
 		tailpos = hostapd_eid_eht_operation(hapd, tailpos);
-		if (hapd->conf->mld_ap)
-			tailpos = hostapd_eid_eht_ml_tid_to_link_map(hapd,
-								     tailpos);
+		tailpos = hostapd_eid_eht_attlm(hapd, tailpos);
 	}
 #endif /* CONFIG_IEEE80211BE */
 
@@ -3006,6 +3005,7 @@ static bool is_restricted_ext_eid_in_sta_profile(u8 ext_id)
 {
 	switch (ext_id) {
 	case WLAN_EID_EXT_MULTI_LINK:
+	case WLAN_EID_EXT_TID_TO_LINK_MAPPING:
 		return true;
 	default:
 		return false;

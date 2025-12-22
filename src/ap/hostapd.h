@@ -589,6 +589,7 @@ struct hostapd_mld {
 	u16 removed_links;
 	u8 eml_disable;
 
+	struct attlm_settings new_attlm;
 	struct hostapd_data *fbss;
 	struct dl_list links; /* List head of all affiliated links */
 
@@ -981,6 +982,7 @@ struct hostapd_data * hostapd_mld_get_link_bss(struct hostapd_data *hapd,
 					       u8 link_id);
 int hostapd_link_remove(struct hostapd_data *hapd, u32 count);
 void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links);
+int hostapd_mld_set_attlm(struct hostapd_data *hapd);
 bool hostapd_is_ml_partner(struct hostapd_data *hapd1,
 			   struct hostapd_data *hapd2);
 u8 hostapd_get_mld_id(struct hostapd_data *hapd);
@@ -997,6 +999,8 @@ int hostapd_fill_cca_settings(struct hostapd_data *hapd,
 void hostapd_refresh_all_iface_beacons(struct hostapd_iface *hapd_iface);
 
 #ifdef CONFIG_IEEE80211BE
+
+void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_event);
 
 bool hostapd_mld_is_first_bss(struct hostapd_data *hapd);
 void hostapd_mld_interface_freed(struct hostapd_data *hapd);
