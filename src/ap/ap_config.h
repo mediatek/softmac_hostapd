@@ -1343,6 +1343,32 @@ struct hostapd_config {
 	u8 edcca_enable;
 	s8 edcca_compensation;
 	int *edcca_threshold;
+	struct {
+		u8 ext_sel;
+		u8 ceb_band_sel;
+	} three_wire;
+};
+
+#define THREE_WIRE_EXT_SEL_UNSET	0xff
+#define THREE_WIRE_EXT_SEL_DISABLE	0
+#define THREE_WIRE_EXT0_ENABLE		BIT(0)
+#define THREE_WIRE_EXT1_ENABLE		BIT(1)
+#define THREE_WIRE_EXT2_ENABLE		BIT(2)
+#define THREE_WIRE_EXT_SEL_MAX		(THREE_WIRE_EXT0_ENABLE | \
+					 THREE_WIRE_EXT1_ENABLE | \
+					 THREE_WIRE_EXT2_ENABLE)
+
+enum three_wire_ceb_band_sel {
+	THREE_WIRE_CEB_SEL_UNSET = 0xff,
+	THREE_WIRE_CEB_SEL_NONE = 0,
+	THREE_WIRE_CEB_SEL_BAND0,
+	THREE_WIRE_CEB_SEL_BAND1,
+	THREE_WIRE_CEB_SEL_BAND2,
+
+	/* keep last */
+	NUM_THREE_WIRE_CEB_BAND_SEL,
+	THREE_WIRE_CEB_BAND_SEL_MAX =
+		NUM_THREE_WIRE_CEB_BAND_SEL - 1
 };
 
 enum edcca_mode {

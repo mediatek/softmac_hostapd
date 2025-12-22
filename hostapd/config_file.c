@@ -5303,6 +5303,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		conf->edcca_compensation = (s8) val;
+	} else if (os_strcmp(buf, "three_wire_ext_sel") == 0) {
+		u8 en = atoi(pos);
+
+		conf->three_wire.ext_sel = en;
+	} else if (os_strcmp(buf, "ceb_band_sel") == 0) {
+		u8 en = atoi(pos);
+
+		conf->three_wire.ceb_band_sel = en;
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Line %d: unknown configuration item '%s'",

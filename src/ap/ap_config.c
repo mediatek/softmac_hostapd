@@ -320,6 +320,8 @@ struct hostapd_config * hostapd_config_defaults(void)
 
 	conf->edcca_enable = EDCCA_MODE_AUTO;
 	conf->edcca_compensation = EDCCA_DEFAULT_COMPENSATION;
+	conf->three_wire.ext_sel = THREE_WIRE_EXT_SEL_UNSET;
+	conf->three_wire.ceb_band_sel = THREE_WIRE_CEB_SEL_UNSET;
 
 	hostapd_set_and_check_bw320_offset(conf, 0);
 

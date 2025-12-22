@@ -1471,3 +1471,71 @@ int hostapd_drv_mu_dump(struct hostapd_data *hapd, u8 *mu_onoff)
 		return 0;
 	return hapd->driver->mu_dump(hapd->drv_priv, mu_onoff);
 }
+
+static void hostapd_update_three_wire_ctrl(struct hostapd_data *hapd)
+{
+	u8 ext_sel = THREE_WIRE_EXT_SEL_UNSET;
+	u8 ceb_band_sel = THREE_WIRE_CEB_SEL_UNSET;
+	int i;
+
+	for (i = 0; i < hapd->iface->interfaces->count; i++) {
+		struct hostapd_iface *iface =
+			hapd->iface->interfaces->iface[i];
+
+		if (!iface)
+			continue;
+
+		if (iface->conf->three_wire.ext_sel != THREE_WIRE_EXT_SEL_UNSET)
+			ext_sel = iface->conf->three_wire.ext_sel;
+		if (iface->conf->three_wire.ceb_band_sel != THREE_WIRE_CEB_SEL_UNSET)
+			ceb_band_sel = iface->conf->three_wire.ceb_band_sel;
+	}
+
+	if (ext_sel == THREE_WIRE_EXT_SEL_UNSET &&
+	    ceb_band_sel == THREE_WIRE_CEB_SEL_UNSET)
+		return;
+
+	for (i = 0; i < hapd->iface->interfaces->count; i++) {
+		struct hostapd_iface *iface =
+			hapd->iface->interfaces->iface[i];
+
+		if (!iface)
+			continue;
+
+		iface->conf->three_wire.ext_sel = ext_sel;
+		iface->conf->three_wire.ceb_band_sel = ceb_band_sel;
+	}
+}
+
+int hostapd_drv_three_wire_ctrl(struct hostapd_data *hapd)
+{
+	u8 ext_sel, ceb_band_sel;
+
+	if (!hapd->driver || !hapd->driver->three_wire_ctrl)
+		return 0;
+
+	if (hapd->iconf->three_wire.ext_sel == THREE_WIRE_EXT_SEL_UNSET &&
+	    hapd->iconf->three_wire.ceb_band_sel == THREE_WIRE_CEB_SEL_UNSET) {
+		hostapd_update_three_wire_ctrl(hapd);
+		return 0;
+	}
+
+	if (hapd->iconf->three_wire.ext_sel != THREE_WIRE_EXT_SEL_UNSET)
+		ext_sel = hapd->iconf->three_wire.ext_sel;
+	else
+		ext_sel = THREE_WIRE_EXT_SEL_DISABLE;
+
+	if (hapd->iconf->three_wire.ceb_band_sel != THREE_WIRE_CEB_SEL_UNSET)
+		ceb_band_sel = hapd->iconf->three_wire.ceb_band_sel;
+	else
+		ceb_band_sel = THREE_WIRE_CEB_SEL_NONE;
+
+	if (ext_sel > THREE_WIRE_EXT_SEL_MAX ||
+	    ceb_band_sel > THREE_WIRE_CEB_BAND_SEL_MAX) {
+		wpa_printf(MSG_ERROR, "Invalid value for three wire control\n");
+		return -1;
+	}
+
+	return hapd->driver->three_wire_ctrl(hapd->drv_priv,
+					     ext_sel, ceb_band_sel);
+}

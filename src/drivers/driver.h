@@ -5650,6 +5650,15 @@ struct wpa_driver_ops {
 	 */
 	 int (*mu_ctrl)(void *priv, u8 mu_onoff);
 	 int (*mu_dump)(void *priv, u8 *mu_onoff);
+
+	/**
+	 * three_wire_ctrl - set three_wire_ctrl mode
+	 * @priv: Private driver interface data
+	 * @ext_sel: external PTA selection for three wire control
+	 * @ceb_band_sel: CEB band selection for three wire control
+	 *
+	 */
+	 int (*three_wire_ctrl)(void *priv, const u8 ext_sel, const u8 ceb_band_sel);
 };
 
 /**

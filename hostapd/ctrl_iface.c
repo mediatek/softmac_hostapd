@@ -4189,6 +4189,48 @@ hostapd_ctrl_iface_get_mu(struct hostapd_data *hapd, char *buf,
 	}
 }
 
+static int
+hostapd_ctrl_iface_three_wire(struct hostapd_data *hapd, char *cmd,
+			      char *buf, size_t buflen)
+{
+	char *token, *context = NULL;
+	int i, ret;
+
+	while ((token = str_token(cmd, " ", &context))) {
+		if (os_strncmp(token, "ext_sel=", 8) == 0) {
+			hapd->iconf->three_wire.ext_sel = strtol(token + 8, NULL, 10);
+			continue;
+		}
+
+		if (os_strncmp(token, "ceb_band_sel=", 13) == 0) {
+			hapd->iconf->three_wire.ceb_band_sel = strtol(token + 13, NULL, 10);
+			continue;
+		}
+
+		wpa_printf(MSG_ERROR, "CTRL: Invalid THREE_WIRE parameter: %s", token);
+		goto fail;
+	}
+
+	for (i = 0; i < hapd->iface->interfaces->count; i++) {
+		struct hostapd_iface *iface =
+			hapd->iface->interfaces->iface[i];
+
+		if (!iface || iface == hapd->iface)
+			continue;
+
+		iface->conf->three_wire.ext_sel = hapd->iconf->three_wire.ext_sel;
+		iface->conf->three_wire.ceb_band_sel = hapd->iconf->three_wire.ceb_band_sel;
+	}
+
+	ret = hostapd_drv_three_wire_ctrl(hapd);
+	if (ret)
+		goto fail;
+
+	return os_snprintf(buf, buflen, "OK\n");
+
+fail:
+	return os_snprintf(buf, buflen, "FAIL\n");
+}
 
 static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      char *buf, char *reply,
@@ -4826,6 +4868,8 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							  reply_size);
 	} else if (os_strncmp(buf, "GET_MU", 6) == 0) {
 		reply_len = hostapd_ctrl_iface_get_mu(hapd, reply, reply_size);
+	} else if (os_strncmp(buf, "SET_THREE_WIRE ", 15) == 0) {
+		reply_len = hostapd_ctrl_iface_three_wire(hapd, buf + 15, reply, reply_size);
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
