@@ -1576,6 +1576,11 @@ static int hostapd_ctrl_iface_disable_bss(struct hostapd_data *hapd)
 	}
 #endif /* CONFIG_IEEE80211BE */
 
+	if (hapd->csa_in_progress || hapd->cca_in_progress) {
+		wpa_printf(MSG_ERROR, "Cannot disable BSS during CSA or CCA");
+		return -1;
+	}
+
 	if (hostapd_disable_bss(hapd) < 0) {
 		wpa_printf(MSG_ERROR, "Disabling of BSS failed");
 		return -1;
