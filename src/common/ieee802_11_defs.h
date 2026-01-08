@@ -2938,8 +2938,6 @@ struct eht_ml_basic_common_info {
 #define EHT_ML_MLD_CAPA_FREQ_SEP_FOR_STR_MASK         0x0f80
 #define EHT_ML_MLD_CAPA_AAR_SUPP                      0x1000
 #define EHT_ML_MLD_CAPA_LINK_RECONF_OP_SUPPORT        0x2000
-#define EHT_ML_MLD_CAPA_ALIGNED_TWT_SUPPORT           0x4000
-#define EHT_ML_MLD_CAPA_RESERVED                      0x8000
 
 #define EHT_ML_EXT_MLD_CAPA_OP_PARAM_UPDATE           0x0001
 #define EHT_ML_EXT_MLD_CAPA_OP_RECO_MAX_LINKS_MASK    0x001e
