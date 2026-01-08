@@ -542,7 +542,8 @@ static void wpas_sme_set_mlo_links(struct wpa_supplicant *wpa_s,
 	if (!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_MLO))
 		return;
 
-	usable_links = wpa_bss_get_usable_links(wpa_s, bss, ssid, NULL);
+	usable_links = wpa_bss_parse_basic_ml_element(wpa_s, bss, NULL,
+						      ssid, NULL);
 	if (!usable_links)
 		return;
 
