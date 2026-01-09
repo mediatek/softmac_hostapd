@@ -2639,9 +2639,16 @@ static void wpa_group_ensure_init(struct wpa_authenticator *wpa_auth,
 
 SM_STATE(WPA_PTK, AUTHENTICATION2)
 {
+	int link_id;
+
 	SM_ENTRY_MA(WPA_PTK, AUTHENTICATION2, wpa_ptk);
 
 	wpa_group_ensure_init(sm->wpa_auth, sm->group);
+#ifdef CONFIG_IEEE80211BE
+	for_each_sm_auth(sm, link_id)
+		wpa_group_ensure_init(sm->mld_links[link_id].wpa_auth,
+				      sm->mld_links[link_id].wpa_auth->group);
+#endif /* CONFIG_IEEE80211BE */
 	sm->ReAuthenticationRequest = false;
 
 	/*
