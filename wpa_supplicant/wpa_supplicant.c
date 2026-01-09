@@ -7902,11 +7902,13 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 	}
 
 	wpa_s->multi_hw_info = wpas_drv_get_multi_hw_info(wpa_s, &wpa_s->num_multi_hws);
-	if (!wpa_s->multi_hw_info)
+	if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_MLO) &&
+	    !wpa_s->multi_hw_info)
 		return -1;
 
 	ret = wpas_drv_get_vif_radio_mask(wpa_s, &wpa_s->vif_radio_mask);
-	if (ret || !wpa_s->vif_radio_mask)
+	if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_MLO) &&
+	    (ret || !wpa_s->vif_radio_mask))
 		return -1;
 
 	capa_res = wpa_drv_get_capa(wpa_s, &capa);
