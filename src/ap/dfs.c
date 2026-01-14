@@ -1018,9 +1018,8 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 		channel = dfs_get_valid_channel(iface, &sec, &cf1, &cf2, channel_type);
 
 		if (!channel ||
-		    (channel->chan == iface->conf->channel &&
-		    cf1 == hostapd_get_oper_centr_freq_seg0_idx(iface->conf) &&
-		    cf2 == hostapd_get_oper_centr_freq_seg1_idx(iface->conf))) {
+		    (cf1 == hostapd_get_oper_centr_freq_seg0_idx(iface->conf) &&
+		     cf2 == hostapd_get_oper_centr_freq_seg1_idx(iface->conf))) {
 			wpa_printf(MSG_ERROR, "Background radar could not get valid channel\n");
 			iface->radar_background.channel = -1;
 			return 0;
