@@ -4503,22 +4503,51 @@ void wpas_nan_de_rx_sdf(struct wpa_supplicant *wpa_s, const u8 *src,
 			const u8 *buf, size_t len, int rssi)
 {
 	bool store_peer;
+	unsigned int skip;
 
 	if (!wpa_s->nan_de)
 		return;
 
 	store_peer = nan_de_rx_sdf(wpa_s->nan_de, src, a3, freq, buf,
-				   len, rssi);
-
-	if (!store_peer)
-		return;
+				   len, rssi, NULL);
 
 #ifdef CONFIG_NAN
-	if (!wpas_nan_ready(wpa_s))
-		return;
-
-	nan_add_peer(wpa_s->nan, src, buf, len);
+	if (wpas_nan_ready(wpa_s) && store_peer)
+		nan_add_peer(wpa_s->nan, src, buf, len);
 #endif /* CONFIG_NAN */
+
+	for (skip = 0; ; skip++) {
+		const u8 *proxy_meta =
+			nan_de_get_attr(buf, len, NAN_ATTR_PROXY_META, skip);
+		const u8 *proxied_addr;
+		size_t proxy_meta_len;
+
+		if (!proxy_meta)
+			break;
+
+		proxy_meta++;
+		proxy_meta_len = WPA_GET_LE16(proxy_meta);
+		proxy_meta += 2;
+
+		/* Needs at least space for address plus SDA */
+		if (proxy_meta_len < ETH_ALEN + 12)
+			continue;
+
+		proxied_addr = proxy_meta;
+		proxy_meta += ETH_ALEN;
+		proxy_meta_len -= ETH_ALEN;
+
+		store_peer = nan_de_rx_sdf(wpa_s->nan_de, src, a3,
+					   freq, proxy_meta, proxy_meta_len,
+					   rssi, proxied_addr);
+
+#ifdef CONFIG_NAN
+		/* Only one SDA inside each Proxy Meta Attribute */
+		if (wpas_nan_ready(wpa_s) && store_peer)
+			nan_add_peer(wpa_s->nan, proxied_addr,
+				     proxy_meta, proxy_meta_len);
+#endif /* CONFIG_NAN */
+	}
 }
 
 

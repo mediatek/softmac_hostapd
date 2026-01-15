@@ -1264,7 +1264,7 @@ void nan_de_tx_wait_ended(struct nan_de *de)
 }
 
 
-static const u8 *
+const u8 *
 nan_de_get_attr(const u8 *buf, size_t len, enum nan_attr_id id,
 		unsigned int skip)
 {
@@ -1671,7 +1671,8 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			      enum nan_service_protocol_type srv_proto_type,
 			      const u8 *ssi, size_t ssi_len,
 			      bool range_limit, int rssi,
-			      const u8 *buf, size_t buf_len)
+			      const u8 *buf, size_t buf_len,
+			      const u8 *orig_addr)
 {
 	struct nan_discovery_result res;
 
@@ -1759,6 +1760,7 @@ send_event:
 	res.n_cipher_suites = cipher_suite_count;
 	res.pmkid_list = pmkid_count > 0 ? pmkid_list : NULL;
 	res.pmkid_count = pmkid_count;
+	res.orig_addr = orig_addr;
 
 	if (de->cb.discovery_result)
 		de->cb.discovery_result(de->cb.ctx, &res);
@@ -1930,7 +1932,8 @@ static bool nan_srf_match(struct nan_de *de, const u8 *srf, size_t srf_len)
 
 static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 			  unsigned int freq, const u8 *buf, size_t len,
-			  const u8 *sda, size_t sda_len, int rssi)
+			  const u8 *sda, size_t sda_len, int rssi,
+			  const u8 *orig_addr)
 {
 	const u8 *service_id;
 	u8 instance_id, req_instance_id, ctrl;
@@ -2065,6 +2068,10 @@ static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 						      srv->is_pr);
 		}
 
+		/* Ignore everything other than publish for proxied SDAs */
+		if (orig_addr && type != NAN_SRV_CTRL_PUBLISH)
+			break;
+
 		switch (type) {
 		case NAN_SRV_CTRL_PUBLISH:
 			ret |= nan_de_rx_publish(
@@ -2073,7 +2080,7 @@ static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 				req_instance_id, sdea_control, srv_proto_type,
 				ssi, ssi_len,
 				ctrl & NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
-				rssi, buf, len);
+				rssi, buf, len, orig_addr);
 			break;
 		case NAN_SRV_CTRL_SUBSCRIBE:
 			ret |= nan_de_rx_subscribe(
@@ -2096,7 +2103,8 @@ static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 
 
 bool nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
-		   unsigned int freq, const u8 *buf, size_t len, int rssi)
+		   unsigned int freq, const u8 *buf, size_t len, int rssi,
+		   const u8 *orig_addr)
 {
 	const u8 *sda;
 	u16 sda_len;
@@ -2121,7 +2129,11 @@ bool nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		sda_len = WPA_GET_LE16(sda);
 		sda += 2;
 		ret |= nan_de_rx_sda(de, peer_addr, a3, freq, buf, len,
-				     sda, sda_len, rssi);
+				     sda, sda_len, rssi, orig_addr);
+
+		/* Only one SDA inside each Proxy Meta attribute */
+		if (orig_addr)
+			break;
 	}
 
 	return ret;

@@ -42,6 +42,7 @@ struct nan_discovery_result {
 	bool pairing_setup_supp;
 	bool npk_nik_caching_supp;
 	u16 pbm;
+	const u8 *orig_addr;
 };
 
 struct nan_callbacks {
@@ -92,6 +93,8 @@ extern const u8 p2p_network_id[ETH_ALEN];
 
 bool nan_de_is_nan_network_id(const u8 *addr);
 bool nan_de_is_p2p_network_id(const u8 *addr);
+const u8 * nan_de_get_attr(const u8 *buf, size_t len, enum nan_attr_id id,
+			   unsigned int skip);
 struct nan_de * nan_de_init(const u8 *nmi, bool offload, bool ap,
 			    unsigned int max_listen,
 			    const struct nan_callbacks *cb);
@@ -107,7 +110,8 @@ void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst,
 void nan_de_tx_wait_ended(struct nan_de *de);
 
 bool nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
-		   unsigned int freq, const u8 *buf, size_t len, int rssi);
+		   unsigned int freq, const u8 *buf, size_t len, int rssi,
+		   const u8 *orig_addr);
 const u8 * nan_de_get_service_id(struct nan_de *de, int id);
 
 struct nan_publish_params {

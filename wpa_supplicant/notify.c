@@ -1159,7 +1159,7 @@ err:
 
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_DISCOVERY_RESULT
 		       "subscribe_id=%d publish_id=%d address=" MACSTR
-		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s%s%s pairing_setup_supp=%d npk_nik_caching_supp=%d pbm=0x%04x data_path=%d",
+		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s%s%s pairing_setup_supp=%d npk_nik_caching_supp=%d pbm=0x%04x data_path=%d%s",
 		       res->subscribe_id, res->peer_publish_id,
 		       MAC2STR(res->peer_addr),
 		       res->fsd, res->fsd_gas, res->srv_proto_type, ssi_hex,
@@ -1168,7 +1168,8 @@ err:
 		       cipher_suites_str ? " cipher_suites=" : "",
 		       cipher_suites_str ? cipher_suites_str : "",
 		       res->pairing_setup_supp, res->npk_nik_caching_supp,
-		       res->pbm, res->data_path);
+		       res->pbm, res->data_path,
+		       res->orig_addr ? " proxied" : "");
 	os_free(ssi_hex);
 	os_free(pmkid_hex);
 	os_free(cipher_suites_str);
@@ -1179,7 +1180,8 @@ err:
 					      res->peer_publish_id,
 					      res->peer_addr,
 					      res->fsd, res->fsd_gas,
-					      res->ssi, res->ssi_len);
+					      res->ssi, res->ssi_len,
+					      res->orig_addr);
 }
 
 

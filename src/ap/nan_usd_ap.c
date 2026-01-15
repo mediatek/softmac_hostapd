@@ -57,10 +57,11 @@ hostapd_nan_de_discovery_result(void *ctx, struct nan_discovery_result *res)
 				 res->ssi, res->ssi_len);
 	wpa_msg(hapd->msg_ctx, MSG_INFO, NAN_DISCOVERY_RESULT
 		"subscribe_id=%d publish_id=%d address=" MACSTR
-		" fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s",
+		" fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s",
 		res->subscribe_id, res->peer_publish_id,
 		MAC2STR(res->peer_addr), res->fsd, res->fsd_gas,
-		res->srv_proto_type, ssi_hex);
+		res->srv_proto_type, ssi_hex,
+		res->orig_addr ? " proxied" : "");
 	os_free(ssi_hex);
 }
 
@@ -189,7 +190,7 @@ void hostapd_nan_usd_rx_sdf(struct hostapd_data *hapd, const u8 *src,
 {
 	if (!hapd->nan_de)
 		return;
-	nan_de_rx_sdf(hapd->nan_de, src, a3, freq, buf, len, 0);
+	nan_de_rx_sdf(hapd->nan_de, src, a3, freq, buf, len, 0, NULL);
 }
 
 
