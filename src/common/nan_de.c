@@ -490,18 +490,16 @@ static void nan_buf_add_npba(const struct nan_de *de,
 }
 
 
-static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
-			  unsigned int wait_time,
-			  enum nan_service_control_type type,
-			  const u8 *dst, const u8 *a3, u8 req_instance_id,
-			  const struct wpabuf *ssi,
-			  const struct wpabuf *attrs,  u32 *cookie)
+static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
+				   struct nan_de_service *srv,
+				   enum nan_service_control_type type,
+				   u8 req_instance_id,
+				   const struct wpabuf *ssi,
+				   const struct wpabuf *attrs)
 {
-	struct wpabuf *buf;
 	size_t len = 0, sda_len, sdea_len;
 	u8 ctrl = type;
 	u16 sdea_ctrl = 0;
-	const u8 *forced_addr;
 	size_t cs_num = int_array_len(srv->cipher_suites_list);
 
 	/* Service Descriptor attribute */
@@ -558,9 +556,9 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			list_len * (sizeof(struct nan_sec_ctxt) + PMKID_LEN);
 	}
 
-	buf = nan_de_alloc_sdf(de, dst, len, type);
+	/* Nothing to put it into, just return the expected length */
 	if (!buf)
-		return;
+		return len;
 
 	/* Service Descriptor attribute */
 	wpabuf_put_u8(buf, NAN_ATTR_SDA);
@@ -630,9 +628,6 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 		wpabuf_put_buf(buf, srv->elems);
 	}
 
-	/* Use per-service source address if configured, otherwise use NMI */
-	forced_addr = srv->forced_addr_set ? srv->forced_addr : de->nmi;
-
 	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP)
 		nan_buf_add_npba(de, srv, buf);
 
@@ -674,6 +669,33 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 
 		WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
 	}
+
+	return len;
+}
+
+
+static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
+			  unsigned int wait_time,
+			  enum nan_service_control_type type,
+			  const u8 *dst, const u8 *a3, u8 req_instance_id,
+			  const struct wpabuf *ssi,
+			  const struct wpabuf *attrs, u32 *cookie)
+{
+	struct wpabuf *buf;
+	const u8 *forced_addr;
+	size_t len;
+
+	len = nan_de_sdf_attrs_put(NULL, de, srv, type, req_instance_id, ssi,
+				   attrs);
+
+	buf = nan_de_alloc_sdf(de, dst, len, type);
+	if (!buf)
+		return;
+
+	nan_de_sdf_attrs_put(buf, de, srv, type, req_instance_id, ssi, attrs);
+
+	/* Use per-service source address if configured, otherwise use NMI */
+	forced_addr = srv->forced_addr_set ? srv->forced_addr : de->nmi;
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
 		  dst, forced_addr, a3, buf, cookie, srv->id);
