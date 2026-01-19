@@ -12934,6 +12934,17 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	params.freq = NAN_USD_DEFAULT_FREQ;
 
 	while ((token = str_token(cmd, " ", &context))) {
+		if (os_strncmp(token, "orig_nmi=", 9) == 0) {
+			if (hwaddr_aton(token + 9, params.orig_nmi) < 0)
+				return -1;
+			continue;
+		}
+
+		if (os_strncmp(token, "instance_id=", 12) == 0) {
+			params.orig_id = atoi(token + 12);
+			continue;
+		}
+
 		if (os_strncmp(token, "service_name=", 13) == 0) {
 			service_name = token + 13;
 			continue;

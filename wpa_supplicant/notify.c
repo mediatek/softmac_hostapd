@@ -1105,6 +1105,7 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 {
 	char *ssi_hex, *pmkid_hex = NULL;
 	char *cipher_suites_str = NULL;
+	char proxied[100];
 
 	ssi_hex = os_zalloc(2 * res->ssi_len + 1);
 	if (!ssi_hex)
@@ -1157,6 +1158,13 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 	}
 err:
 
+	if (res->orig_addr)
+		os_snprintf(proxied, sizeof(proxied),
+			    " orig_nmi=" MACSTR " proxied",
+			    MAC2STR(res->orig_addr));
+	else
+		proxied[0] = '\0';
+
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_DISCOVERY_RESULT
 		       "subscribe_id=%d publish_id=%d address=" MACSTR
 		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s%s%s pairing_setup_supp=%d npk_nik_caching_supp=%d pbm=0x%04x data_path=%d%s",
@@ -1168,8 +1176,7 @@ err:
 		       cipher_suites_str ? " cipher_suites=" : "",
 		       cipher_suites_str ? cipher_suites_str : "",
 		       res->pairing_setup_supp, res->npk_nik_caching_supp,
-		       res->pbm, res->data_path,
-		       res->orig_addr ? " proxied" : "");
+		       res->pbm, res->data_path, proxied);
 	os_free(ssi_hex);
 	os_free(pmkid_hex);
 	os_free(cipher_suites_str);
