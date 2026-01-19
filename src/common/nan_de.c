@@ -502,6 +502,10 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	u16 sdea_ctrl = 0;
 	size_t cs_num = int_array_len(srv->cipher_suites_list);
 
+	/* Proxy attribute, proxy attribute length, and NMI address */
+	if (srv->publish.orig_id)
+		len += NAN_ATTR_HDR_LEN + ETH_ALEN;
+
 	/* Service Descriptor attribute */
 	sda_len = NAN_SERVICE_ID_LEN + 1 + 1 + 1;
 	if (srv->matching_filter_tx && wpabuf_len(srv->matching_filter_tx)) {
@@ -525,7 +529,14 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	sdea_len = 1 + 2;
 	if (ssi)
 		sdea_len += 2 + 4 + wpabuf_len(ssi);
-	len += NAN_ATTR_HDR_LEN + sdea_len;
+	if (srv->type == NAN_DE_PUBLISH) {
+		if (srv->publish.fsd)
+			sdea_ctrl |= NAN_SDEA_CTRL_FSD_REQ;
+		if (srv->publish.fsd_gas)
+			sdea_ctrl |= NAN_SDEA_CTRL_FSD_GAS;
+	}
+	if (ssi || sdea_ctrl)
+		len += NAN_ATTR_HDR_LEN + sdea_len;
 
 	/* Element Container attribute */
 	if (srv->elems)
@@ -536,7 +547,7 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 		len += NAN_ATTR_HDR_LEN + 1 + 1 + 1 + 2;
 
 	/* Reserve some additional space for extra attributes */
-	if (de->cb.add_extra_attrs)
+	if (de->cb.add_extra_attrs && !srv->publish.orig_id)
 		len += 256;
 
 	len += attrs ? wpabuf_len(attrs) : 0;
@@ -560,11 +571,20 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	if (!buf)
 		return len;
 
+	/* NAN Proxy Meta attribute */
+	if (srv->publish.orig_id) {
+		wpabuf_put_u8(buf, NAN_ATTR_PROXY_META);
+		wpabuf_put_le16(buf, len - NAN_ATTR_HDR_LEN);
+		wpabuf_put_data(buf, srv->publish.orig_nmi, ETH_ALEN);
+	}
+
 	/* Service Descriptor attribute */
 	wpabuf_put_u8(buf, NAN_ATTR_SDA);
 	wpabuf_put_le16(buf, sda_len);
 	wpabuf_put_data(buf, srv->service_id, NAN_SERVICE_ID_LEN);
-	wpabuf_put_u8(buf, srv->id); /* Instance ID */
+	/* Instance ID */
+	wpabuf_put_u8(buf,
+		      srv->publish.orig_id ? srv->publish.orig_id : srv->id);
 	wpabuf_put_u8(buf, req_instance_id); /* Requestor Instance ID */
 	wpabuf_put_u8(buf, ctrl);
 
@@ -592,10 +612,6 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	/* Service Descriptor Extension attribute */
 	if (srv->type == NAN_DE_PUBLISH || ssi) {
 		if (srv->type == NAN_DE_PUBLISH) {
-			if (srv->publish.fsd)
-				sdea_ctrl |= NAN_SDEA_CTRL_FSD_REQ;
-			if (srv->publish.fsd_gas)
-				sdea_ctrl |= NAN_SDEA_CTRL_FSD_GAS;
 			if (srv->gtk_required)
 				sdea_ctrl |= NAN_SDEA_CTRL_GTK_REQ;
 			if (srv->data_path) {
@@ -609,7 +625,9 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 		if (sdea_ctrl || ssi) {
 			wpabuf_put_u8(buf, NAN_ATTR_SDEA);
 			wpabuf_put_le16(buf, sdea_len);
-			wpabuf_put_u8(buf, srv->id); /* Instance ID */
+			/* Instance ID */
+			wpabuf_put_u8(buf, srv->publish.orig_id ?
+				      srv->publish.orig_id : srv->id);
 			wpabuf_put_le16(buf, sdea_ctrl);
 			if (ssi) {
 				wpabuf_put_le16(buf, 4 + wpabuf_len(ssi));
@@ -631,7 +649,7 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP)
 		nan_buf_add_npba(de, srv, buf);
 
-	if (de->cb.add_extra_attrs)
+	if (de->cb.add_extra_attrs && !srv->publish.orig_id)
 		de->cb.add_extra_attrs(de->cb.ctx, buf);
 
 	if (attrs) {
@@ -1848,6 +1866,10 @@ static bool nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 	/* Follow-up function processing of a receive Follow-up message for a
 	 * Subscribe or Publish instance */
 
+	/* No processing for when it is a proxied publish for another NMI */
+	if (srv->type == NAN_DE_PUBLISH && srv->publish.orig_id)
+		return false;
+
 	if (srv->type == NAN_DE_PUBLISH &&
 	    os_reltime_initialized(&srv->pause_state_end) &&
 	    (!ether_addr_equal(peer_addr, srv->sel_peer_addr) ||
@@ -2222,7 +2244,8 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 		return -1;
 	}
 
-	if (params->proximity_ranging && params->solicited && !elems) {
+	if (params->proximity_ranging && params->solicited && !elems &&
+	    !params->orig_id) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Unable to fetch proximity ranging params");
 		return -1;
@@ -2680,6 +2703,12 @@ int nan_de_transmit(struct nan_de *de, int handle,
 	if (srv->sync && !de->cluster_id_set) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Cannot transmit Follow-up, cluster ID not set");
+		return -1;
+	}
+
+	if (srv->type == NAN_DE_PUBLISH && srv->publish.orig_id) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot transmit Follow-up for proxied services");
 		return -1;
 	}
 

@@ -130,6 +130,10 @@ struct nan_publish_params {
 	/* Event conditions */
 	bool disable_events;
 
+	/* When acting as a proxy */
+	int orig_id;
+	u8 orig_nmi[ETH_ALEN];
+
 	/* Further Service Discovery flag */
 	bool fsd;
 

@@ -4610,7 +4610,9 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 	}
 #endif /* CONFIG_NAN */
 
-	if (p2p) {
+	if (params->orig_id) {
+		/* Do not add extra elems automatically here */
+	} else if (p2p) {
 		elems = wpas_p2p_usd_elems(wpa_s, service_name);
 		addr = wpa_s->global->p2p_dev_addr;
 	} else if (params->proximity_ranging) {
