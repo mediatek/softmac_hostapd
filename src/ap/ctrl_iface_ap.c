@@ -633,7 +633,7 @@ int hostapd_ctrl_iface_sta_next(struct hostapd_data *hapd, const char *txtaddr,
 		for_each_mld_link(h, hapd) {
 			tmp_sta = ap_get_sta(h, addr);
 			if (tmp_sta && (!tmp_sta->mld_info.mld_sta ||
-					tmp_sta == tmp_sta->mld_assoc_sta)) {
+			    tmp_sta->mld_assoc_link_id == h->mld_link_id)) {
 				sta = tmp_sta;
 				tmp_hapd = h;
 				break;
