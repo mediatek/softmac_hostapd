@@ -1068,6 +1068,7 @@ static int wpas_p2p_group_delete(struct wpa_supplicant *wpa_s,
 	wpa_s->p2p_group_common_freqs_num = 0;
 	wpa_s->p2p_go_do_acs = 0;
 	wpa_s->p2p_go_allow_dfs = 0;
+	wpa_s->p2p_neg_go_setup = false;
 
 	wpa_s->waiting_presence_resp = 0;
 
@@ -2583,6 +2584,7 @@ static void wpas_start_go(struct wpa_supplicant *wpa_s,
 	wpa_s->connect_without_scan = ssid;
 	wpa_s->reassociate = 1;
 	wpa_s->disconnected = 0;
+	wpa_s->p2p_neg_go_setup = group_formation;
 	wpa_dbg(wpa_s, MSG_DEBUG, "P2P: Request scan (that will be skipped) to "
 		"start GO)");
 	wpa_supplicant_req_scan(wpa_s, 0, 0);
@@ -4414,7 +4416,7 @@ static enum chan_allowed wpas_p2p_verify_80mhz(struct wpa_supplicant *wpa_s,
 						chans, num_chans);
 	if (!center_chan)
 		return NOT_ALLOWED;
-	if (!wpa_s->p2p_go_allow_dfs &&
+	if (!wpa_s->p2p_go_allow_dfs && !wpa_s->allow_p2p_assisted_dfs &&
 	    !is_6ghz && center_chan >= 58 && center_chan <= 138)
 		return NOT_ALLOWED; /* Do not allow DFS channels for P2P */
 
@@ -4718,7 +4720,8 @@ int wpas_p2p_get_sec_channel_offset_40mhz(struct wpa_supplicant *wpa_s,
 		 * driver offloaded DFS. */
 		if ((o->p2p == NO_P2P_SUPP &&
 		     (!is_dfs_global_op_class(o->op_class) ||
-		      !wpa_s->p2p_go_allow_dfs)) ||
+		      (!wpa_s->p2p_go_allow_dfs &&
+		       !wpa_s->allow_p2p_assisted_dfs))) ||
 		    (is_6ghz_op_class(o->op_class) &&
 		     wpa_s->conf->p2p_6ghz_disable))
 			continue;
@@ -4748,7 +4751,8 @@ int wpas_p2p_get_sec_channel_offset_40mhz(struct wpa_supplicant *wpa_s,
 					return get_6ghz_sec_channel(channel);
 				return (o->bw == BW40MINUS) ? -1 : 1;
 			}
-			if (ret == RADAR && wpa_s->p2p_go_allow_dfs) {
+			if (ret == RADAR && (wpa_s->p2p_go_allow_dfs ||
+					     wpa_s->allow_p2p_assisted_dfs)) {
 				/* Allow RADAR channels used for driver
 				 * offloaded DFS */
 				return (o->bw == BW40MINUS) ? -1 : 1;
@@ -4768,7 +4772,9 @@ int wpas_p2p_get_vht80_center(struct wpa_supplicant *wpa_s,
 	enum chan_allowed ret;
 
 	ret = wpas_p2p_verify_channel(wpa_s, mode, op_class, channel, BW80);
-	if (!(ret == ALLOWED || (ret == RADAR && wpa_s->p2p_go_allow_dfs)))
+	if (!(ret == ALLOWED ||
+	      (ret == RADAR && (wpa_s->p2p_go_allow_dfs ||
+				wpa_s->allow_p2p_assisted_dfs))))
 		return 0;
 
 	if (is_6ghz_op_class(op_class)) {
@@ -4792,8 +4798,26 @@ int wpas_p2p_get_vht160_center(struct wpa_supplicant *wpa_s,
 	enum chan_allowed ret;
 
 	ret = wpas_p2p_verify_channel(wpa_s, mode, op_class, channel, BW160);
-	if (!(ret == ALLOWED || (ret == RADAR && wpa_s->p2p_go_allow_dfs)))
+
+	/*
+	 * For 160 MHz operation on radar (DFS) channels:
+	 * - Check if DFS operation is allowed.
+	 * - Additionally, when coming up as part of GO negotiation with a peer
+	 *   (i.e., negotiated GO), do not allow upgrading to 160 MHz on radar
+	 *   channels unless assisted_dfs is set. For autonomous GO bring-up,
+	 *   allow as long as p2p_go_allow_dfs permits it.
+	 */
+	if (ret == RADAR) {
+		if (!wpa_s->p2p_go_allow_dfs && !wpa_s->allow_p2p_assisted_dfs)
+			return 0;
+
+		/* For negotiated GO, require assisted DFS */
+		if (wpa_s->p2p_neg_go_setup && !wpa_s->assisted_dfs)
+			return 0;
+	} else if (ret != ALLOWED) {
 		return 0;
+	}
+
 	if (is_6ghz_op_class(op_class)) {
 		chans = center_channels_6ghz_160mhz;
 		num_chans = ARRAY_SIZE(center_channels_6ghz_160mhz);
@@ -5793,6 +5817,20 @@ int wpas_p2p_mac_setup(struct wpa_supplicant *wpa_s)
 }
 
 
+static bool wpas_p2p_dfs_chan(void *ctx, int freq, u8 op_class, u8 chan)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (freq == 0) {
+		freq = ieee80211_chan_to_freq(NULL, op_class, chan);
+		if (freq < 0)
+			return false;
+	}
+
+	return ieee80211_is_dfs(freq, wpa_s->hw.modes, wpa_s->hw.num_modes);
+}
+
+
 /**
  * wpas_p2p_init - Initialize P2P module for %wpa_supplicant
  * @global: Pointer to global data from wpa_supplicant_init()
@@ -5867,6 +5905,7 @@ int wpas_p2p_init(struct wpa_global *global, struct wpa_supplicant *wpa_s)
 	p2p.parse_data_element = wpas_p2p_parse_data_element;
 	p2p.pasn_validate_pmkid = wpas_p2p_pasn_validate_pmkid;
 #endif /* CONFIG_PASN */
+	p2p.is_p2p_dfs_chan = wpas_p2p_dfs_chan;
 
 	os_memcpy(wpa_s->global->p2p_dev_addr, wpa_s->own_addr, ETH_ALEN);
 	os_memcpy(p2p.dev_addr, wpa_s->global->p2p_dev_addr, ETH_ALEN);
@@ -6863,12 +6902,15 @@ static int wpas_p2p_setup_freqs(struct wpa_supplicant *wpa_s, int freq,
 		else
 			ret = p2p_supported_freq_cli(wpa_s->global->p2p, freq);
 		if (!ret) {
-			if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_DFS_OFFLOAD) &&
+			if (((wpa_s->drv_flags &
+			      WPA_DRIVER_FLAGS_DFS_OFFLOAD) ||
+			     wpa_s->assisted_dfs) &&
 			    ieee80211_is_dfs(freq, wpa_s->hw.modes,
 					     wpa_s->hw.num_modes)) {
 				/*
-				 * If freq is a DFS channel and DFS is offloaded
-				 * to the driver, allow P2P GO to use it.
+				 * If freq is a DFS channel and either DFS is
+				 * offloaded to the driver or P2P assisted DFS
+				 * case is present, allow P2P GO to use it.
 				 */
 				wpa_printf(MSG_DEBUG,
 					   "P2P: The forced channel for GO (%u MHz) is DFS, and DFS is offloaded to the driver",

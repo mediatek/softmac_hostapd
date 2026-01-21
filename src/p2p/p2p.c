@@ -1428,7 +1428,17 @@ static int p2p_prepare_channel_pref(struct p2p_data *p2p,
 
 	p2p_dbg(p2p, "Prepare channel pref - force_freq=%u pref_freq=%u go=%d",
 		force_freq, pref_freq, go);
-	if (p2p_freq_to_channel(freq, &op_class, &op_channel) < 0) {
+
+	if (p2p->cfg->is_p2p_dfs_chan &&
+	    p2p->cfg->is_p2p_dfs_chan(p2p->cfg->cb_ctx, freq, 0, 0) &&
+	     p2p->dfs_ap_connected) {
+		if (ieee80211_chaninfo_to_channel(
+			    freq, p2p->sta_connected_chan_width, 0,
+			    &op_class, &op_channel) < 0) {
+			p2p_dbg(p2p, "Unsupported frequency %u MHz", freq);
+			return -1;
+		}
+	} else if (p2p_freq_to_channel(freq, &op_class, &op_channel) < 0) {
 		p2p_dbg(p2p, "Unsupported frequency %u MHz", freq);
 		return -1;
 	}
@@ -1576,6 +1586,20 @@ int p2p_prepare_channel(struct p2p_data *p2p, struct p2p_device *dev,
 	} else {
 		p2p_prepare_channel_best(p2p);
 	}
+
+	if (p2p->cfg->is_p2p_dfs_chan &&
+	    p2p->cfg->is_p2p_dfs_chan(p2p->cfg->cb_ctx, 0,
+				      p2p->op_reg_class, p2p->op_channel)) {
+		struct p2p_channels p2p_chanlist;
+
+		p2p_dfs_channel_filter(p2p, &p2p->channels, &p2p_chanlist, go);
+		p2p_channels_dump(p2p,
+				  "Filtered channel list with allowed DFS channels",
+				  &p2p_chanlist);
+		p2p_copy_channels(&p2p->channels, &p2p_chanlist,
+				  p2p->allow_6ghz);
+	}
+
 	p2p_channels_dump(p2p, "prepared channels", &p2p->channels);
 	if (go)
 		p2p_channels_remove_freqs(&p2p->channels, &p2p->no_go_freq);

@@ -1435,6 +1435,14 @@ struct p2p_config {
 	 * Returns: 0 on success, -1 on failure
 	 */
 	int (*pasn_validate_pmkid)(void *ctx, const u8 *addr, const u8 *pmkid);
+
+	/**
+	 *
+	 * is_p2p_dfs_chan - DFS channel check
+	 *
+	 * To check if a channel is a DFS channel.
+	 */
+	bool (*is_p2p_dfs_chan)(void *ctx, int freq, u8 op_class, u8 chan);
 };
 
 
