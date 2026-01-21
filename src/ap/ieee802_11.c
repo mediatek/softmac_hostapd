@@ -3447,8 +3447,8 @@ static void handle_auth(struct hostapd_data *hapd,
 #ifdef CONFIG_IEEE80211BE
 		/* TODO: When FTO successfully roams to target FTR,
 		 * we should clean up STA entry in current FTR. */
-		if (mld_sta && auth_transaction == 1 && !sta->added_unassoc &&
-		    auth_alg != WLAN_AUTH_FT) {
+		if ((mld_sta || ap_sta_is_mld(hapd, sta)) && auth_transaction == 1 &&
+		    !sta->added_unassoc && auth_alg != WLAN_AUTH_FT) {
 			wpa_printf(MSG_INFO,
 				   "receive AUTH from associated STA "MACSTR
 				   ", do deauthentication\n",
