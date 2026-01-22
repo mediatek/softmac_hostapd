@@ -5219,8 +5219,10 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 		return os_snprintf(buf, buflen, "OK\n");
 	}
 
-	if (hapd->iconf->muru_config == NULL)
+	if (hapd->iconf->muru_config == NULL) {
 		hapd->iconf->muru_config = os_zalloc(sizeof(struct connac3_muru));
+		hapd->iconf->muru_config_len = sizeof(struct connac3_muru);
+	}
 
 	muru = hapd->iconf->muru_config;
 	dl = &muru->dl;
@@ -5232,6 +5234,7 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 
 		os_free(hapd->iconf->muru_config);
 		hapd->iconf->muru_config = NULL;
+		hapd->iconf->muru_config_len = 0;
 
 		if (ret)
 			goto fail;
