@@ -11,7 +11,7 @@ enum mtk_nl80211_vendor_subcmds {
 	MTK_NL80211_VENDOR_SUBCMD_RFEATURE_CTRL = 0xc3,
 	MTK_NL80211_VENDOR_SUBCMD_WIRELESS_CTRL = 0xc4,
 	MTK_NL80211_VENDOR_SUBCMD_MU_CTRL = 0xc5,
-	MTK_NL80211_VENDOR_SUBCMD_PHY_CAPA_CTRL= 0xc6,
+	MTK_NL80211_VENDOR_SUBCMD_PHY_CAPA_CTRL = 0xc6,
 	MTK_NL80211_VENDOR_SUBCMD_EDCCA_CTRL = 0xc7,
 	MTK_NL80211_VENDOR_SUBCMD_3WIRE_CTRL = 0xc8,
 	MTK_NL80211_VENDOR_SUBCMD_IBF_CTRL = 0xc9,
@@ -23,6 +23,7 @@ enum mtk_nl80211_vendor_subcmds {
 	MTK_NL80211_VENDOR_SUBCMD_SCS_CTRL = 0xd0,
 	MTK_NL80211_VENDOR_SUBCMD_EPCS_CTRL = 0xd4,
 	MTK_NL80211_VENDOR_SUBCMD_DFS_TX_CTRL = 0xd5,
+	MTK_NL80211_VENDOR_SUBCMD_ABI_CONNAC2 = 0xd6,
 };
 
 enum mtk_vendor_element_id {
@@ -30,7 +31,7 @@ enum mtk_vendor_element_id {
 	MTK_VENDOR_ELEM_256QAM = 8,
 };
 
-enum mtk_nl80211_vendor_subevents {
+enum mtk_nl80211_vendor_events {
 	MTK_NL80211_VENDOR_EVENT_PP_BMP_UPDATE = 0x5,
 };
 
@@ -172,12 +173,13 @@ enum mtk_vendor_attr_wireless_ctrl {
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_UNSPEC,
 
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS,
-	MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_OFDMA,
+	MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_BA_BUFFER_SIZE,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_AMSDU,
+	MTK_VENDOR_ATTR_WIRELESS_CTRL_AMPDU,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_CERT = 9,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_RTS_SIGTA,
 	MTK_VENDOR_ATTR_WIRELESS_CTRL_MU_EDCA,
@@ -237,6 +239,9 @@ enum mtk_vendor_attr_mu_ctrl {
 	MTK_VENDOR_ATTR_MU_CTRL_MAX =
 		NUM_MTK_VENDOR_ATTRS_MU_CTRL - 1
 };
+
+#define MTK_VENDOR_ATTR_MU_CTRL_OFDMA_MODE	MTK_VENDOR_ATTR_MU_CTRL_STRUCT
+#define MTK_VENDOR_ATTR_MU_CTRL_OFDMA_VAL	MTK_VENDOR_ATTR_MU_CTRL_RADIO_IDX
 
 enum mtk_vendor_attr_ibf_ctrl {
 	MTK_VENDOR_ATTR_IBF_CTRL_UNSPEC,
@@ -367,12 +372,7 @@ enum mtk_vendor_attr_dfs_tx_ctrl {
 		NUM_MTK_VENDOR_ATTRS_DFS_TX_CTRL - 1
 };
 
-#define CSI_BW20_DATA_COUNT	64
-#define CSI_BW40_DATA_COUNT	128
-#define CSI_BW80_DATA_COUNT	256
-#define CSI_BW160_DATA_COUNT	512
 #define CSI_BW320_DATA_COUNT	1024
-#define ETH_ALEN 6
 
 struct csi_data {
 	u8 ch_bw;
@@ -422,7 +422,18 @@ enum {
 	MU_CTRL_ONOFF,
 };
 
-struct connac3_muru_comm {
+/*
+ * Connac2 (Wi-Fi 6) used these values in the same netlink attribute slots
+ * that Connac3 later assigned to MU_CTRL_STRUCT and MU_CTRL_RADIO_IDX.
+ * Keep them explicit instead of using the Connac3 enum names: the payload
+ * formats are different even though the numeric attribute IDs are shared.
+ */
+enum mtk_legacy_mu_ctrl_mode {
+	MTK_LEGACY_MU_CTRL_DL_USER_CNT = 1,
+	MTK_LEGACY_MU_CTRL_UL_USER_CNT = 2,
+};
+
+struct mtk_muru_comm {
 	u8 pda_pol;
 	u8 band;
 	u8 spe_idx;
@@ -435,7 +446,7 @@ struct connac3_muru_comm {
 	u8 _rsv[3];
 };
 
-struct connac3_muru_dl {
+struct mtk_muru_dl {
 	u8 user_num;
 	u8 tx_mode;
 	u8 bw;
@@ -481,7 +492,7 @@ struct connac3_muru_dl {
 	} usr[16];
 };
 
-struct connac3_muru_ul {
+struct mtk_muru_ul {
 	u8 user_num;
 	u8 tx_mode;
 
@@ -522,22 +533,22 @@ struct connac3_muru_ul {
 	} usr[16];
 };
 
-struct connac3_muru_dbg {
+struct mtk_muru_dbg {
 	/* HE TB RX Debug */
 	le32 rx_hetb_nonsf_en_bitmap;
 	le32 rx_hetb_cfg[2];
 };
 
-struct connac3_muru {
+struct mtk_muru {
 	le32 cfg_comm;
 	le32 cfg_dl;
 	le32 cfg_ul;
 	le32 cfg_dbg;
 
-	struct connac3_muru_comm comm;
-	struct connac3_muru_dl dl;
-	struct connac3_muru_ul ul;
-	struct connac3_muru_dbg dbg;
+	struct mtk_muru_comm comm;
+	struct mtk_muru_dl dl;
+	struct mtk_muru_ul ul;
+	struct mtk_muru_dbg dbg;
 };
 
 #define MURU_OFDMA_SCH_TYPE_DL	BIT(0)

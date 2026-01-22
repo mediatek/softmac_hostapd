@@ -1368,6 +1368,7 @@ struct hostapd_config {
 	u8 dfs_detect_mode;
 	u8 amsdu;
 	void *muru_config;
+	size_t muru_config_len;
 	u8 pp_mode;
 	u8 lpi_psd;
 	s8 sku_idx;

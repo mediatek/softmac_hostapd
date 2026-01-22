@@ -4969,11 +4969,11 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 	char *pos, *config, *value;
 	u8 i;
 	int cnt = 0, ret;
-	u16 *val;
-	struct connac3_muru *muru;
-	struct connac3_muru_dl *dl;
-	struct connac3_muru_ul *ul;
-	struct connac3_muru_comm *comm;
+	u16 *val = NULL;
+	struct mtk_muru *muru;
+	struct mtk_muru_dl *dl;
+	struct mtk_muru_ul *ul;
+	struct mtk_muru_comm *comm;
 
 	config = cmd;
 	pos = os_strchr(config, ' ');
@@ -4981,7 +4981,6 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 		*pos++ = '\0';
 
 	value = pos;
-
 	if (os_strcmp(config, "onoff") == 0) {
 		cnt = hostapd_parse_argument_helper(value, &val);
 		if (cnt == -1)
@@ -4997,19 +4996,52 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 		return os_snprintf(buf, buflen, "OK\n");
 	}
 
-	if (hapd->iconf->muru_config == NULL)
-		hapd->iconf->muru_config = os_zalloc(sizeof(struct connac3_muru));
+	if (hapd->iconf->muru_config == NULL) {
+		hapd->iconf->muru_config = os_zalloc(sizeof(struct mtk_muru));
+		hapd->iconf->muru_config_len = sizeof(struct mtk_muru);
+	}
 
 	muru = hapd->iconf->muru_config;
 	dl = &muru->dl;
 	ul = &muru->ul;
 	comm = &muru->comm;
 
+	if (os_strcmp(config, "ul_user_cnt") == 0 ||
+	    os_strcmp(config, "dl_user_cnt") == 0) {
+		cnt = hostapd_parse_argument_helper(value, &val);
+		if (cnt != 1 || val[0] > 255)
+			goto para_fail;
+
+		if (os_strcmp(config, "ul_user_cnt") == 0) {
+			ul->user_num = (u8) val[0];
+			comm->ppdu_format |= MURU_PPDU_HE_TRIG;
+			comm->sch_type |= MURU_OFDMA_SCH_TYPE_UL;
+			muru->cfg_ul |= host_to_le32(MURU_FIXED_UL_TOTAL_USER_CNT);
+		} else {
+			dl->user_num = (u8) val[0];
+			comm->ppdu_format |= MURU_PPDU_HE_MU;
+			comm->sch_type |= MURU_OFDMA_SCH_TYPE_DL;
+			muru->cfg_dl |= host_to_le32(MURU_FIXED_DL_TOTAL_USER_CNT);
+		}
+		muru->cfg_comm |= host_to_le32(MURU_COMM_SET);
+		os_free(val);
+
+		ret = hostapd_drv_mu_ctrl(hapd, MU_CTRL_UPDATE);
+		os_free(hapd->iconf->muru_config);
+		hapd->iconf->muru_config = NULL;
+		hapd->iconf->muru_config_len = 0;
+		if (ret)
+			goto fail;
+
+		goto out;
+	}
+
 	if (os_strncmp(config, "update", 6) == 0) {
 		ret = hostapd_drv_mu_ctrl(hapd, MU_CTRL_UPDATE);
 
 		os_free(hapd->iconf->muru_config);
 		hapd->iconf->muru_config = NULL;
+		hapd->iconf->muru_config_len = 0;
 
 		if (ret)
 			goto fail;
@@ -5147,6 +5179,7 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 		goto fail;
 	}
 
+out:
 	return os_snprintf(buf, buflen, "OK\n");
 
 para_fail:
@@ -5715,7 +5748,7 @@ hostapd_ctrl_iface_ap_wireless(struct hostapd_data *hapd, char *cmd,
 	if (os_strncmp(config, "fixed_mcs", 9) == 0)
 		sub_cmd = MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS;
 	else if (os_strncmp(config, "ofdma", 5) == 0)
-		sub_cmd = MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_OFDMA;
+		sub_cmd = MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA;
 	else if (os_strncmp(config, "ppdu_type", 9) == 0)
 		sub_cmd = MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE;
 	else if (os_strncmp(config, "nusers_ofdma", 12) == 0)

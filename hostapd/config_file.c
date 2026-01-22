@@ -872,6 +872,34 @@ static int hostapd_parse_intlist(int **int_list, char *val)
 }
 
 
+/*
+ * Connac2 hostapd configurations provided thresholds for 20/40/80 MHz only.
+ * Keep accepting that form with the unified driver and leave the 160 MHz
+ * threshold unchanged in firmware.
+ */
+static int hostapd_parse_edcca_threshold(int **threshold, char *val)
+{
+	int count = 1;
+	char *pos;
+
+	for (pos = val; *pos; pos++) {
+		if (*pos == ' ')
+			count++;
+	}
+
+	if (count != 3 && count != 4)
+		return -1;
+
+	if (hostapd_parse_intlist(threshold, val))
+		return -1;
+
+	if (count == 3)
+		(*threshold)[3] = 0x7f;
+
+	return 0;
+}
+
+
 static int hostapd_config_bss(struct hostapd_config *conf, const char *ifname)
 {
 	struct hostapd_bss_config **all, *bss;
@@ -5298,15 +5326,16 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		           pos, sizeof(bss->apup_peer_ifname_prefix));
 #endif // def CONFIG_APUP
 	} else if (os_strcmp(buf, "edcca_threshold") == 0) {
-		if (hostapd_parse_intlist(&conf->edcca_threshold, pos) ||
+		if (hostapd_parse_edcca_threshold(&conf->edcca_threshold, pos) ||
 		    conf->edcca_threshold[0] < EDCCA_MIN_CONFIG_THRES ||
 		    conf->edcca_threshold[0] > EDCCA_MAX_CONFIG_THRES ||
 		    conf->edcca_threshold[1] < EDCCA_MIN_CONFIG_THRES ||
 		    conf->edcca_threshold[1] > EDCCA_MAX_CONFIG_THRES ||
 		    conf->edcca_threshold[2] < EDCCA_MIN_CONFIG_THRES ||
 		    conf->edcca_threshold[2] > EDCCA_MAX_CONFIG_THRES ||
-		    conf->edcca_threshold[3] < EDCCA_MIN_CONFIG_THRES ||
-		    conf->edcca_threshold[3] > EDCCA_MAX_CONFIG_THRES) {
+		    (conf->edcca_threshold[3] != 0x7f &&
+		     (conf->edcca_threshold[3] < EDCCA_MIN_CONFIG_THRES ||
+		      conf->edcca_threshold[3] > EDCCA_MAX_CONFIG_THRES))) {
 			wpa_printf(MSG_ERROR, "Line %d: invalid edcca threshold",
 				   line);
 			return 1;
@@ -5367,14 +5396,16 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		}
 		conf->pp_mode = (u8) val;
 #endif /* CONFIG_IEEE80211BE */
-	} else if (os_strcmp(buf, "lpi_psd") == 0) {
+	} else if (os_strcmp(buf, "lpi_psd") == 0 ||
+		   os_strcmp(buf, "lpi_enable") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_psd = !!en;
 	} else if (os_strcmp(buf, "sku_idx") == 0) {
 		conf->sku_idx = strtol(pos, NULL, 10);
 	} else if (os_strcmp(buf, "lpi_sku_idx") == 0) {
 		conf->lpi_sku_idx = strtol(pos, NULL, 10);
-	} else if (os_strcmp(buf, "lpi_bcn_enhance") == 0) {
+	} else if (os_strcmp(buf, "lpi_bcn_enhance") == 0 ||
+		   os_strcmp(buf, "beacon_dup") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_bcn_enhance = !!en;
 	} else if (os_strcmp(buf, "sku_filename") == 0) {

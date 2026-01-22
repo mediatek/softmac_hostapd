@@ -3318,6 +3318,12 @@ struct driver_sta_mlo_info {
 	} links[MAX_NUM_MLD_LINKS];
 };
 
+struct wpa_driver_mu_params {
+	u8 mode;
+	u8 mu_onoff;
+	void *muru_config;
+};
+
 /**
  * struct nan_band_config - NAN band specific configuration
  *
@@ -5778,18 +5784,19 @@ struct wpa_driver_ops {
 	void (*nan_stop)(void *priv);
 #endif /* CONFIG_NAN */
 
-	int (*configure_edcca_enable)(void *priv, s8 link_id, const u8 edcca_enable,
+	int (*configure_edcca_enable)(void *priv, u8 radio_idx, const u8 edcca_enable,
 				      const s8 edcca_compensation);
-	int (*configure_edcca_threshold)(void *priv, s8 link_id, const int *threshold);
-	int (*get_edcca)(void *priv, s8 link_id, const u8 mode, u8 *value);
+	int (*configure_edcca_threshold)(void *priv, u8 radio_idx,
+					 const int *threshold);
+	int (*get_edcca)(void *priv, u8 radio_idx, const u8 mode, u8 *value);
 
 	/**
 	 * mu_ctrl - ctrl for UL/DL MURU
 	 * @priv: Private driver interface data
 	 *
 	 */
-	 int (*mu_ctrl)(void *priv, u8 mode, s8 link_id);
-	 int (*mu_dump)(void *priv, u8 *mu_onoff, s8 link_id);
+	 int (*mu_ctrl)(void *priv, u8 radio_idx, struct wpa_driver_mu_params *params);
+	 int (*mu_dump)(void *priv, u8 radio_idx, u8 *mu_onoff);
 
 	/**
 	 * beacon_ctrl - ctrl on off for beacon
@@ -5918,21 +5925,22 @@ struct wpa_driver_ops {
 	/**
 	 * csi_set - Set csi related mode and parameter
 	 * @priv: Private driver interface data
-	 * @link_id: MLD link id. -1 if this is an non-MLD AP
+	 * @radio_idx: Radio index
 	 * @mode: Csi mode parameter
 	 * @cfg: Csi config parameter
 	 * @v1: Value1
 	 * @v2: Value2
 	 * @mac: Station mac for station filter
 	 */
-	int (*csi_set)(void *priv, s8 link_id, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac);
+	int (*csi_set)(void *priv, u8 radio_idx, u8 mode, u8 cfg,
+		       u8 v1, u32 v2, u8 *mac);
 	/**
 	* csi_dump - Dump csi data to json file
 	* @priv: Private driver interface data
-	* @link_id: MLD link id. -1 if this is an non-MLD AP
+	* @radio_idx: Radio index
 	* @dump_buf: Dump_struct that store csi data and related info
 	*/
-	int (*csi_dump)(void *priv, s8 link_id, void *dump_buf);
+	int (*csi_dump)(void *priv, u8 radio_idx, void *dump_buf);
 	/**
 	* txpower_ctrl - ctrl txpower operation
 	* @priv: Private driver interface data
@@ -5957,10 +5965,10 @@ struct wpa_driver_ops {
 	/**
 	 * dfs_tx_mode - set dfs tx mode
 	 * @priv: Private driver interface data
-	 * @link_id: MLD link id. -1 if this is an non-MLD AP
+	 * @radio_idx: Radio index
 	 * @dfs_tx_mode: dfs tx mode
 	 */
-	int (*dfs_tx_mode)(void *priv, s8 link_id, u8 dfs_tx_mode);
+	int (*dfs_tx_mode)(void *priv, u8 radio_idx, u8 dfs_tx_mode);
 };
 
 /**

@@ -143,7 +143,7 @@ rfeature_ctrl_policy[NUM_MTK_VENDOR_ATTRS_RFEATURE_CTRL] = {
 static const struct nla_policy
 wireless_ctrl_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL] = {
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS] = {.type = NLA_U8 },
-	[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_OFDMA] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO] = {.type = NLA_U8 },
@@ -181,7 +181,9 @@ static struct nla_policy csi_ctrl_policy[NUM_MTK_VENDOR_ATTRS_CSI_CTRL] = {
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_TYPE] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL1] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2] = { .type = NLA_U32 },
-	[MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR] = { .type = NLA_BINARY,
+						.minlen = ETH_ALEN,
+						.maxlen = ETH_ALEN },
 	[MTK_VENDOR_ATTR_CSI_CTRL_DUMP_NUM] = { .type = NLA_U16 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_DATA] = { .type = NLA_NESTED },
 };
@@ -193,7 +195,9 @@ static struct nla_policy csi_data_policy[NUM_MTK_VENDOR_ATTRS_CSI_DATA] = {
 	[MTK_VENDOR_ATTR_CSI_DATA_SNR] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_DATA_BW] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_DATA_CH_IDX] = { .type = NLA_U8 },
-	[MTK_VENDOR_ATTR_CSI_DATA_TA] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_CSI_DATA_TA] = { .type = NLA_BINARY,
+					  .minlen = ETH_ALEN,
+					  .maxlen = ETH_ALEN },
 	[MTK_VENDOR_ATTR_CSI_DATA_NUM] = { .type = NLA_U32 },
 	[MTK_VENDOR_ATTR_CSI_DATA_I] = { .type = NLA_NESTED },
 	[MTK_VENDOR_ATTR_CSI_DATA_Q] = { .type = NLA_NESTED },
@@ -15533,17 +15537,14 @@ fail:
 
 
 #ifdef CONFIG_IEEE80211AX
-static int nl80211_mu_ctrl(void *priv, u8 mode, s8 link_id)
+static int
+nl80211_mu_ctrl(void *priv, u8 radio_idx, struct wpa_driver_mu_params *params)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
-	struct hostapd_config *cfg;
 	struct nl_msg *msg;
 	struct nlattr *data;
 	int ret = -ENOBUFS;
-	u8 radio_idx = 0;
 
 	if (!drv->mtk_mu_vendor_cmd_avail) {
 		wpa_printf(MSG_INFO,
@@ -15551,33 +15552,50 @@ static int nl80211_mu_ctrl(void *priv, u8 mode, s8 link_id)
 		return 0;
 	}
 
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	cfg = hapd->iconf;
-
 	if (!(msg = nl80211_bss_msg(bss, 0, NL80211_CMD_VENDOR)) ||
 		nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
 		nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD, MTK_NL80211_VENDOR_SUBCMD_MU_CTRL) ||
 		!(data = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA)))
 		goto fail;
 
-	switch (mode) {
+	switch (params->mode) {
 	case MU_CTRL_ONOFF:
-		if (hapd->iface->current_hw_info)
-			radio_idx = hapd->iface->current_hw_info->hw_idx;
-
-		if (nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_ONOFF, cfg->mu_onoff) ||
+		if (nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_ONOFF, params->mu_onoff) ||
 		    nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_RADIO_IDX, radio_idx))
 			goto fail;
 		break;
 	case MU_CTRL_UPDATE:
+		if (drv->mtk_vendor_connac_version == 2) {
+			const struct mtk_muru *muru = params->muru_config;
+			u8 legacy_mode, user_num;
+
+			/* Connac2 only implements the two user-count controls. */
+			if (muru->cfg_dl & host_to_le32(MURU_FIXED_DL_TOTAL_USER_CNT)) {
+				legacy_mode = MTK_LEGACY_MU_CTRL_DL_USER_CNT;
+				user_num = muru->dl.user_num;
+			} else if (muru->cfg_ul &
+				   host_to_le32(MURU_FIXED_UL_TOTAL_USER_CNT)) {
+				legacy_mode = MTK_LEGACY_MU_CTRL_UL_USER_CNT;
+				user_num = muru->ul.user_num;
+			} else {
+				wpa_printf(MSG_ERROR,
+					   "nl80211: legacy MU only supports DL/UL user count");
+				ret = -EOPNOTSUPP;
+				goto fail;
+			}
+
+			if (nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_OFDMA_MODE,
+				       legacy_mode) ||
+			    nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_OFDMA_VAL, user_num))
+				goto fail;
+			break;
+		}
 		if (nla_put(msg, MTK_VENDOR_ATTR_MU_CTRL_STRUCT,
-			    sizeof(struct connac3_muru), cfg->muru_config))
+			    sizeof(struct mtk_muru), params->muru_config))
 			goto fail;
 		break;
 	default:
-		wpa_printf(MSG_ERROR, "nl80211: Wrong mu mode %u!", mode);
+		wpa_printf(MSG_ERROR, "nl80211: Wrong mu mode %u!", params->mode);
 		ret = -EINVAL;
 		goto fail;
 	}
@@ -15632,28 +15650,19 @@ static int mu_dump_handler(struct nl_msg *msg, void *arg)
 	return 0;
 }
 
-static int nl80211_mu_dump(void *priv, u8 *mu_onoff, s8 link_id)
+static int nl80211_mu_dump(void *priv, u8 radio_idx, u8 *mu_onoff)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *attr;
 	int ret;
-	u8 radio_idx = 0;
 
 	if (!drv->mtk_mu_vendor_cmd_avail) {
 		wpa_printf(MSG_INFO,
 			   "nl80211: Driver does not support setting mu control");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	if (!(msg = nl80211_bss_msg(bss, NLM_F_DUMP, NL80211_CMD_VENDOR)) ||
 		nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
@@ -16070,17 +16079,14 @@ static int testing_nl80211_radio_disable(void *priv, int disabled)
 
 #endif /* CONFIG_TESTING_OPTIONS */
 
-static int nl80211_configure_edcca_enable(void *priv, s8 link_id,
-					  const u8 edcca_enable,
-					  const s8 edcca_compensation)
+static int
+nl80211_configure_edcca_enable(void *priv, u8 radio_idx, const u8 edcca_enable,
+			       const s8 edcca_compensation)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	u8 radio_idx = 0;
 	int ret;
 
 	if (!drv->mtk_edcca_vendor_cmd_avail) {
@@ -16088,12 +16094,6 @@ static int nl80211_configure_edcca_enable(void *priv, s8 link_id,
 			   "nl80211: Driver does not support setting EDCCA enable");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
@@ -16117,15 +16117,13 @@ static int nl80211_configure_edcca_enable(void *priv, s8 link_id,
 	return ret;
 }
 
-static int nl80211_configure_edcca_threshold(void *priv, s8 link_id, const int *threshold)
+static int
+nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	u8 radio_idx = 0;
 	int ret;
 
 	if (!drv->mtk_edcca_vendor_cmd_avail) {
@@ -16139,12 +16137,6 @@ static int nl80211_configure_edcca_threshold(void *priv, s8 link_id, const int *
 			   "nl80211: Input EDCCA threshold is empty!");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
@@ -16214,25 +16206,19 @@ static int edcca_info_handler(struct nl_msg *msg, void *arg)
 	*info++ = nla_get_u8(attr);
 
 	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL];
-	if (!attr) {
-		wpa_printf(MSG_ERROR, "nl80211: MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL");
-		return NL_SKIP;
-	}
-
-	*info = nla_get_u8(attr);
+	/* Connac2 returns only 20/40/80 MHz thresholds. */
+	*info = attr ? nla_get_u8(attr) : 0x7f;
 	return NL_SKIP;
 }
 
 
-static int nl80211_get_edcca(void *priv, s8 link_id, const u8 mode, u8 *value)
+static int
+nl80211_get_edcca(void *priv, u8 radio_idx, const u8 mode, u8 *value)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	u8 radio_idx = 0;
 	int ret;
 
 	if (!drv->mtk_edcca_vendor_cmd_avail) {
@@ -16240,12 +16226,6 @@ static int nl80211_get_edcca(void *priv, s8 link_id, const u8 mode, u8 *value)
 			   "nl80211: Driver does not support setting EDCCA threshold");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	if (!(msg = nl80211_drv_msg(drv, NLM_F_DUMP, NL80211_CMD_VENDOR)) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
@@ -17077,7 +17057,8 @@ nl80211_amnt_dump(void *priv, u8 amnt_idx, u8 *dump_buf, s8 link_id)
 	if (!data)
 		goto fail;
 
-	nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_CTRL_LINK_ID, link_id);
+	if (nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_CTRL_LINK_ID, link_id))
+		goto fail;
 	tb1 = nla_nest_start(msg, MTK_VENDOR_ATTR_AMNT_CTRL_DUMP | NLA_F_NESTED);
 	if (!tb1)
 		goto fail;
@@ -17288,29 +17269,20 @@ fail:
 #endif
 
 static int
-nl80211_csi_set(void *priv, s8 link_id, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac)
+nl80211_csi_set(void *priv, u8 radio_idx, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	void *tb1, *tb2;
-	int ret, i;
-	u8 radio_idx = 0;
+	void *tb1;
+	int ret;
 
 	if (!drv->mtk_csi_vendor_cmd_avail) {
 		wpa_printf(MSG_ERROR,
 			"nl80211: Driver does not support csi");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	msg = nl80211_bss_msg(bss, 0, NL80211_CMD_VENDOR);
 	if (!msg)
@@ -17325,7 +17297,8 @@ nl80211_csi_set(void *priv, s8 link_id, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac)
 	if (!data)
 		goto fail;
 
-	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
+	if (drv->mtk_vendor_connac_version > 2)
+		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
 
 	tb1 = nla_nest_start(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG | NLA_F_NESTED);
 	if (!tb1)
@@ -17334,19 +17307,22 @@ nl80211_csi_set(void *priv, s8 link_id, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *mac)
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_MODE, mode);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_TYPE, cfg);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL1, v1);
-	nla_put_u32(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	if (drv->mtk_vendor_connac_version == 2) {
+		if (v2 > 0xff) {
+			wpa_printf(MSG_ERROR,
+				   "nl80211: legacy CSI supports an 8-bit cfg value");
+			goto fail;
+		}
+		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	} else {
+		nla_put_u32(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	}
 
 	nla_nest_end(msg, tb1);
 
 	if (mac) {
-		tb2 = nla_nest_start(msg, MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR | NLA_F_NESTED);
-		if (!tb2)
+		if (nla_put(msg, MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR, ETH_ALEN, mac))
 			goto fail;
-
-		for (i = 0; i < ETH_ALEN; i++)
-			nla_put_u8(msg, i, mac[i]);
-
-		nla_nest_end(msg, tb2);
 	}
 
 	nla_nest_end(msg, data);
@@ -17402,9 +17378,12 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_BW] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_CH_IDX] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_TA] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_NUM] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_I] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_Q] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_INFO] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_TX_ANT] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_RX_ANT] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_MODE] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_CHAIN_INFO])) {
 		fprintf(stderr, "Attributes error for CSI data\n");
@@ -17427,11 +17406,7 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 
 	c->data_num = nla_get_u32(tb2[MTK_VENDOR_ATTR_CSI_DATA_NUM]);
 
-	idx = 0;
-	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_TA], rem) {
-		if (idx < ETH_ALEN)
-			c->ta[idx++] = nla_get_u8(cur);
-	}
+	os_memcpy(c->ta, nla_data(tb2[MTK_VENDOR_ATTR_CSI_DATA_TA]), ETH_ALEN);
 
 	idx = 0;
 	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_I], rem) {
@@ -17450,31 +17425,21 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
-static int
-nl80211_csi_dump(void *priv, s8 link_id, void *dump_buf)
+static int nl80211_csi_dump(void *priv, u8 radio_idx, void *dump_buf)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
 	int ret;
 	struct csi_resp_data *csi_resp;
 	u16 pkt_num, i;
-	u8 radio_idx = 0;
 
 	if (!drv->mtk_csi_vendor_cmd_avail) {
 		wpa_printf(MSG_INFO,
 			"nl80211: Driver does not support csi");
 		return 0;
 	}
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	csi_resp = (struct csi_resp_data *)dump_buf;
 	pkt_num =  csi_resp->usr_need_cnt;
@@ -17497,7 +17462,8 @@ nl80211_csi_dump(void *priv, s8 link_id, void *dump_buf)
 		if (!data)
 			goto fail;
 
-		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
+		if (drv->mtk_vendor_connac_version > 2)
+			nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
 		nla_put_u16(msg, MTK_VENDOR_ATTR_CSI_CTRL_DUMP_NUM, CSI_DUMP_PER_NUM);
 
 		nla_nest_end(msg, data);
@@ -17511,6 +17477,7 @@ fail:
 	nlmsg_free(msg);
 	return -ENOBUFS;
 }
+
 
 static int
 nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 link_id,
@@ -17543,7 +17510,7 @@ nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 
 		goto fail;
 
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
-	if (sku_filename[0])
+	if (sku_filename[0] && drv->mtk_vendor_connac_version > 2)
 		nla_put_string(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_FILENAME,
 			       sku_filename);
 	else if (sku_idx > -1)
@@ -17556,7 +17523,7 @@ nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 
 #ifdef CONFIG_AFC
 	if (power_table) {
 		nla_put(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_TABLE,
-		        MAX_CHANNEL_NUM_6G * afc_power_table_num, power_table);
+			MAX_CHANNEL_NUM_6G * afc_power_table_num, power_table);
 	}
 #endif /* CONFIG_AFC */
 
@@ -17574,15 +17541,12 @@ fail:
 	return -ENOBUFS;
 }
 
-static int nl80211_dfs_tx_mode(void *priv, s8 link_id, const u8 dfs_tx_mode)
+static int nl80211_dfs_tx_mode(void *priv, u8 radio_idx, const u8 dfs_tx_mode)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	struct i802_link *link = nl80211_get_link(bss, link_id);
-	struct hostapd_data *hapd = bss->ctx;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	u8 radio_idx = 0;
 	int ret;
 
 	if (!drv->mtk_dfs_tx_vendor_cmd_avail) {
@@ -17603,12 +17567,6 @@ static int nl80211_dfs_tx_mode(void *priv, s8 link_id, const u8 dfs_tx_mode)
 	data = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
 	if (!data)
 		goto fail;
-
-	if (link && link->ctx)
-		hapd = link->ctx;
-
-	if (hapd->iface->current_hw_info)
-		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	if (nla_put_u8(msg, MTK_VENDOR_ATTR_DFS_TX_CTRL_MODE, dfs_tx_mode) ||
 	    nla_put_u8(msg, MTK_VENDOR_ATTR_DFS_TX_CTRL_RADIO_IDX, radio_idx))
