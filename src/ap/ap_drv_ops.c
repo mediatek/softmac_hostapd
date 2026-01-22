@@ -1614,6 +1614,10 @@ static void hostapd_update_three_wire_ctrl(struct hostapd_data *hapd)
 	u8 ceb_band_sel = THREE_WIRE_CEB_SEL_UNSET;
 	int i;
 
+	/* Return since 11s mesh doesn't allocate interfaces */
+	if (!hapd->iface->interfaces)
+		return;
+
 	for (i = 0; i < hapd->iface->interfaces->count; i++) {
 		struct hostapd_iface *iface =
 			hapd->iface->interfaces->iface[i];
