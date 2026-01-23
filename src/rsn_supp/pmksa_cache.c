@@ -286,6 +286,49 @@ pmksa_cache_add(struct rsn_pmksa_cache *pmksa, const u8 *pmk, size_t pmk_len,
 }
 
 
+/**
+ * pmksa_cache_add_to_driver - Add PMKSA entry to driver with remaining lifetime
+ * @pmksa: Pointer to PMKSA cache data
+ * @entry: PMKSA cache entry
+ *
+ * Calculate the remaining PMK lifetime and reauthentication threshold based
+ * on the entry's expiration and reauthentication times relative to the current
+ * time, and configure the PMKSA entry to the driver with the current values.
+ */
+static void pmksa_cache_add_to_driver(struct rsn_pmksa_cache *pmksa,
+				      struct rsn_pmksa_cache_entry *entry)
+{
+	struct os_reltime now;
+	u32 remaining_lifetime;
+	u8 remaining_reauth_threshold;
+
+	if (!pmksa->sm)
+		return;
+
+	os_get_reltime(&now);
+
+	 /* Do not configure entries that have expired or require immediate
+	  * reauthentication. */
+	if (entry->expiration - now.sec < 1 ||
+	    entry->reauth_time - now.sec < 1)
+		return;
+
+	remaining_lifetime = entry->expiration - now.sec;
+	remaining_reauth_threshold = ((entry->reauth_time - now.sec) * 100) /
+				      remaining_lifetime;
+
+	/* Do not configure entries that have already reached reauthentication
+	 * threshold. */
+	if (!remaining_reauth_threshold)
+		return;
+
+	wpa_sm_add_pmkid(pmksa->sm, entry->network_ctx, entry->aa, entry->pmkid,
+			 entry->fils_cache_id_set ? entry->fils_cache_id : NULL,
+			 entry->pmk, entry->pmk_len, remaining_lifetime,
+			 remaining_reauth_threshold, entry->akmp);
+}
+
+
 struct rsn_pmksa_cache_entry *
 pmksa_cache_add_entry(struct rsn_pmksa_cache *pmksa,
 		      struct rsn_pmksa_cache_entry *entry)
@@ -390,12 +433,7 @@ pmksa_cache_add_entry(struct rsn_pmksa_cache *pmksa,
 	if (pmksa->notify_cb)
 		pmksa->notify_cb(entry, pmksa->ctx);
 
-	wpa_sm_add_pmkid(pmksa->sm, entry->network_ctx, entry->aa, entry->pmkid,
-			 entry->fils_cache_id_set ? entry->fils_cache_id : NULL,
-			 entry->pmk, entry->pmk_len,
-			 pmksa->sm->dot11RSNAConfigPMKLifetime,
-			 pmksa->sm->dot11RSNAConfigPMKReauthThreshold,
-			 entry->akmp);
+	pmksa_cache_add_to_driver(pmksa, entry);
 
 	return entry;
 }
@@ -824,33 +862,12 @@ pmksa_cache_init(void (*free_cb)(struct rsn_pmksa_cache_entry *entry,
 void pmksa_cache_reconfig(struct rsn_pmksa_cache *pmksa)
 {
 	struct rsn_pmksa_cache_entry *entry;
-	struct os_reltime now;
 
 	if (!pmksa || !pmksa->pmksa)
 		return;
 
-	os_get_reltime(&now);
-	for (entry = pmksa->pmksa; entry; entry = entry->next) {
-		u32 life_time;
-		u8 reauth_threshold;
-
-		if (entry->expiration - now.sec < 1 ||
-		    entry->reauth_time - now.sec < 1)
-			continue;
-
-		life_time = entry->expiration - now.sec;
-		reauth_threshold = (entry->reauth_time - now.sec) * 100 /
-			life_time;
-		if (!reauth_threshold)
-			continue;
-
-		wpa_sm_add_pmkid(pmksa->sm, entry->network_ctx, entry->aa,
-				 entry->pmkid,
-				 entry->fils_cache_id_set ?
-				 entry->fils_cache_id : NULL,
-				 entry->pmk, entry->pmk_len, life_time,
-				 reauth_threshold, entry->akmp);
-	}
+	for (entry = pmksa->pmksa; entry; entry = entry->next)
+		pmksa_cache_add_to_driver(pmksa, entry);
 }
 
 #else /* IEEE8021X_EAPOL */
