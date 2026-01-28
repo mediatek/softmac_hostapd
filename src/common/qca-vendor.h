@@ -2596,6 +2596,23 @@ enum qca_wlan_vendor_acs_hw_mode {
  * early (using QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA), without
  * waiting for the originally configured NoA duration to expire.
  *
+ * @QCA_WLAN_VENDOR_FEATURE_SUPPORT_PMKSA_CACHING_PRIVACY: Flag indicates that
+ *	the driver supports PMKSA caching privacy as defined in
+ *	IEEE P802.11bi/D4.0, 12.16.7. Userspace should enable PMKSA caching
+ *	privacy only when both %NL80211_EXT_FEATURE_ASSOC_FRAME_ENCRYPTION and
+ *	this feature flag are advertised by the driver.
+ *
+ *	When both the AP and the non-AP STA support PMKSA caching privacy and
+ *	association frame encryption, the driver shall include the PMKIDSNonce
+ *	in the (Re)Association Request frame. Upon successful non-FT
+ *	(re)association, indicated by %NL80211_CMD_CONNECT, %NL80211_CMD_ROAM,
+ *	or %QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH, wpa_supplicant shall
+ *	derive a new PMKID for the PMKSA entry used during the current
+ *	connection. The derivation uses the PMKIDANonce from the (Re)Association
+ *	Response frame and the PMKIDSNonce from the (Re)Association Request
+ *	frame. PMKR0Name randomization during FT reassociation will be handled
+ *	by the driver.
+ *
  * @NUM_QCA_WLAN_VENDOR_FEATURES: Number of assigned feature bits
  */
 enum qca_wlan_vendor_features {
@@ -2636,6 +2653,7 @@ enum qca_wlan_vendor_features {
 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_ASSISTED_DFS = 34,
 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA = 35,
 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA = 36,
+	QCA_WLAN_VENDOR_FEATURE_SUPPORT_PMKSA_CACHING_PRIVACY = 37,
 	NUM_QCA_WLAN_VENDOR_FEATURES /* keep last */
 };
 
