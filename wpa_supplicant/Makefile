@@ -2209,6 +2209,10 @@ LIBPASNSO += ../src/utils/os_$(CONFIG_OS).c
 LIBPASNSO += ../src/utils/config.c
 LIBPASNSO += ../src/utils/common.c
 
+ifndef CONFIG_NO_RANDOM_POOL
+LIBPASNSO += ../src/crypto/random.c
+endif
+
 ifdef NEED_BASE64
 LIBPASNSO += ../src/utils/base64.c
 endif
