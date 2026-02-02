@@ -4735,11 +4735,11 @@ static void handle_auth(struct hostapd_data *hapd,
 	int res, reply_res, ubus_resp;
 	u16 fc;
 	const u8 *challenge = NULL;
-	u8 resp_ies[2 + WLAN_AUTH_CHALLENGE_LEN];
+	u8 resp_ies[2 + WLAN_AUTH_CHALLENGE_LEN], tmp_dst[ETH_ALEN];
 	size_t resp_ies_len = 0;
 	u16 seq_ctrl;
 	struct radius_sta rad_info;
-	const u8 *dst, *sa;
+	const u8 *dst = NULL, *sa;
 	bool mld_sta = false;
 
 	if (len < IEEE80211_HDRLEN + sizeof(mgmt->u.auth)) {
@@ -5021,10 +5021,19 @@ static void handle_auth(struct hostapd_data *hapd,
 		 * we should clean up STA entry in current FTR. */
 		if ((mld_sta || ap_sta_is_mld(hapd, sta)) && auth_transaction == 1 &&
 		    !sta->added_unassoc && auth_alg != WLAN_AUTH_FT) {
+			struct mld_link_info *link =
+				&sta->mld_info.links[hapd->mld_link_id];
+
 			wpa_printf(MSG_INFO,
 				   "receive AUTH from associated STA "MACSTR
 				   ", do deauthentication\n",
 				   MAC2STR(sa));
+
+			if (ap_sta_is_mld(hapd, sta) && link->valid) {
+				os_memcpy(tmp_dst, link->peer_addr, ETH_ALEN);
+				dst = tmp_dst;
+			}
+
 			ap_cleanup_sta(hapd, sa);
 			hostapd_drv_sta_remove(hapd, sa);
 			resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
@@ -5295,7 +5304,8 @@ static void handle_auth(struct hostapd_data *hapd,
 	}
 
  fail:
-	dst = mgmt->sa;
+	if (!dst)
+		dst = mgmt->sa;
 
 #ifdef CONFIG_IEEE80211BE
 	if (ap_sta_is_mld(hapd, sta))
