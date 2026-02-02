@@ -13166,6 +13166,10 @@ enum qca_wlan_vendor_cfr_stop_reason {
  * and provides the corresponding reason code. The reason codes are defined
  * in enum qca_wlan_vendor_cfr_stop_reason.
  * Applicable for peer CFR events when CFR data format version is 3.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC: Optional (flag)
+ * This attribute indicates that the Wi-Fi firmware should fix RX antenna gain
+ * during CSI capturing. This is for CFR version 2 and version 3.
  */
 enum qca_wlan_vendor_peer_cfr_capture_attr {
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_INVALID = 0,
@@ -13217,6 +13221,7 @@ enum qca_wlan_vendor_peer_cfr_capture_attr {
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE = 46,
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS = 47,
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_STOP_REASON = 48,
+	QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC = 49,
 
 	/* Keep last */
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_AFTER_LAST,
