@@ -4932,7 +4932,10 @@ out:
 	if (resp != WLAN_STATUS_SUCCESS || assoc_wpa_sm) {
 		struct wpa_state_machine *sm = sta->wpa_sm;
 
+#ifdef CONFIG_IEEE80211BE
 		clear_wpa_sm_for_all_sta(hapd, sm);
+#endif /* CONFIG_IEEE80211BE */
+
 		wpa_auth_sta_deinit(sm);
 
 		/* Only keep a reference to the main wpa_sm and drop the

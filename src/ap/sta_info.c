@@ -1418,8 +1418,8 @@ int ap_sta_set_vlan(struct hostapd_data *hapd, struct sta_info *sta,
 	int ret;
 #ifdef CONFIG_IEEE80211BE
 	size_t i;
-#endif /* CONFIG_IEEE80211BE */
 	struct hapd_interfaces *interfaces = hapd->iface->interfaces;
+#endif /* CONFIG_IEEE80211BE */
 
 	ret = ap_sta_set_vlan_helper(hapd, sta, vlan_desc);
 	if (ret)
@@ -1547,8 +1547,8 @@ int ap_sta_bind_vlan(struct hostapd_data *hapd, struct sta_info *sta)
 	int ret;
 #ifdef CONFIG_IEEE80211BE
 	size_t i;
-#endif /* CONFIG_IEEE80211BE */
 	struct hapd_interfaces *interfaces = hapd->iface->interfaces;
+#endif /* CONFIG_IEEE80211BE */
 
 	ret = ap_sta_bind_vlan_helper(hapd, sta);
 	if (ret)

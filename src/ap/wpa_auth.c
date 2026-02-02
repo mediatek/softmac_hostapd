@@ -70,8 +70,10 @@ static void wpa_group_get(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
 static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
+#ifdef CONFIG_IEEE80211BE
 static void wpa_group_put_vlan(struct wpa_authenticator *wpa_auth,
 			       int vlan_id);
+#endif /* CONFIG_IEEE80211BE */
 static int ieee80211w_kde_len(struct wpa_state_machine *sm);
 static u8 * ieee80211w_kde_add(struct wpa_state_machine *sm, u8 *pos);
 static void wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
@@ -7063,6 +7065,7 @@ static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 }
 
 
+#ifdef CONFIG_IEEE80211BE
 static void wpa_group_put_vlan(struct wpa_authenticator *wpa_auth,
 			       int vlan_id)
 {
@@ -7071,6 +7074,7 @@ static void wpa_group_put_vlan(struct wpa_authenticator *wpa_auth,
 
 	wpa_group_put(wpa_auth, vlan_group);
 }
+#endif /* CONFIG_IEEE80211BE */
 
 
 /*
@@ -7927,7 +7931,6 @@ void wpa_reset_assoc_sm_info(struct wpa_state_machine *assoc_sm,
 }
 
 
-#ifdef CONFIG_IEEE80211BE
 /* wpa_select_vlan_wpa_group - Traverse through the wpa_group list and select
  * the one that matches the vlan_id.
  *
@@ -7955,7 +7958,6 @@ struct wpa_group * wpa_select_vlan_wpa_group(struct wpa_group *gsm, int vlan_id)
 
 	return vlan_gsm;
 }
-#endif /* CONFIG_IEEE80211BE */
 
 
 void wpa_auth_set_sae_pw_id(struct wpa_state_machine *sm,
