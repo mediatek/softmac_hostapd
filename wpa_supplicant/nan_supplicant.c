@@ -573,6 +573,35 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 
 	addr = wpa_s->own_addr;
 
+#ifdef CONFIG_NAN
+	if (params->sync) {
+		if (!(wpa_s->nan_drv_flags &
+		      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Cannot advertise sync service, driver does not support user space DE");
+			return -1;
+		}
+
+		if (!wpas_nan_ready(wpa_s)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Synchronized support is not enabled");
+			return -1;
+		}
+
+		if (p2p) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Sync discovery is not supported for P2P");
+			return -1;
+		}
+
+		if (params->proximity_ranging) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Sync discovery is not supported for PR");
+			return -1;
+		}
+	}
+#endif /* CONFIG_NAN */
+
 	if (p2p) {
 		elems = wpas_p2p_usd_elems(wpa_s, service_name);
 		addr = wpa_s->global->p2p_dev_addr;
@@ -582,7 +611,7 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 
 	publish_id = nan_de_publish(wpa_s->nan_de, service_name, srv_proto_type,
 				    ssi, elems, params, p2p);
-	if (publish_id >= 1 &&
+	if (publish_id >= 1 && !params->sync &&
 	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD) &&
 	    wpas_drv_nan_publish(wpa_s, addr, publish_id, service_name,
 				 nan_de_get_service_id(wpa_s->nan_de,
@@ -690,6 +719,34 @@ int wpas_nan_subscribe(struct wpa_supplicant *wpa_s,
 
 	addr = wpa_s->own_addr;
 
+#ifdef CONFIG_NAN
+	if (params->sync) {
+		if (!(wpa_s->nan_drv_flags &
+		      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Cannot subscribe sync, user space DE is not supported");
+			return -1;
+		}
+
+		if (!wpas_nan_ready(wpa_s)) {
+			wpa_printf(MSG_INFO, "NAN: Not ready (subscribe)");
+			return -1;
+		}
+
+		if (p2p) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Sync discovery is not supported for P2P (subscribe)");
+			return -1;
+		}
+
+		if (params->proximity_ranging) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Sync discovery is not supported for PR (subscribe)");
+			return -1;
+		}
+	}
+#endif /* CONFIG_NAN */
+
 	if (p2p) {
 		elems = wpas_p2p_usd_elems(wpa_s, service_name);
 		addr = wpa_s->global->p2p_dev_addr;
@@ -700,7 +757,7 @@ int wpas_nan_subscribe(struct wpa_supplicant *wpa_s,
 	subscribe_id = nan_de_subscribe(wpa_s->nan_de, service_name,
 					srv_proto_type, ssi, elems, params,
 					p2p);
-	if (subscribe_id >= 1 &&
+	if (subscribe_id >= 1 && !params->sync &&
 	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD) &&
 	    wpas_drv_nan_subscribe(wpa_s, addr, subscribe_id, service_name,
 				   nan_de_get_service_id(wpa_s->nan_de,
