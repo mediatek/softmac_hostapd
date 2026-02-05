@@ -9686,7 +9686,8 @@ static int wpa_driver_nl80211_send_action(struct i802_bss *bss,
 	    bss->flink->beacon_set)
 		offchanok = 0;
 
-	if (!freq && is_sta_interface(drv->nlmode))
+	if (!freq && (is_sta_interface(drv->nlmode) ||
+		      drv->nlmode == NL80211_IFTYPE_NAN))
 		offchanok = 0;
 
 	wpa_printf(MSG_DEBUG,
