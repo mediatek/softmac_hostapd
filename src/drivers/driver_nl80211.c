@@ -15255,23 +15255,14 @@ wpa_driver_get_multi_hw_info(void *priv, unsigned int *num_multi_hws)
 
 #ifdef CONFIG_NAN
 
-static int wpa_driver_nl80211_nan_start(void *priv,
-					struct nan_cluster_config *params)
+static int nl80211_nan_config(struct i802_bss *bss,
+			      struct wpa_driver_nl80211_data *drv,
+			      struct nan_cluster_config *params,
+			      enum nl80211_commands cmd)
 {
-	struct i802_bss *bss = priv;
-	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
 	struct nlattr *conf;
 	u32 bands = 0;
-	int ret;
-
-	if (drv->nlmode != NL80211_IFTYPE_NAN)
-		return -EOPNOTSUPP;
-
-	if (drv->nan_started)
-		return -EALREADY;
-
-	wpa_printf(MSG_DEBUG, "nl80211: Start/join NAN cluster");
 
 	if (params->dual_band > 1)
 		return -EINVAL;
@@ -15289,7 +15280,7 @@ static int wpa_driver_nl80211_nan_start(void *priv,
 		}
 	}
 
-	msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_START_NAN);
+	msg = nl80211_cmd_msg(bss, 0, cmd);
 	if (!msg || nla_put_u8(msg, NL80211_ATTR_NAN_MASTER_PREF,
 			       params->master_pref) ||
 	    (bands && nla_put_u32(msg, NL80211_ATTR_BANDS, bands))) {
@@ -15317,14 +15308,51 @@ static int wpa_driver_nl80211_nan_start(void *priv,
 	/* TODO: Set more attributes */
 	nla_nest_end(msg, conf);
 
-	ret = send_and_recv_resp(drv, msg, NULL, NULL);
+	return send_and_recv_resp(drv, msg, NULL, NULL);
+fail:
+	nlmsg_free(msg);
+	return -1;
+}
+
+
+static int wpa_driver_nl80211_nan_start(void *priv,
+					struct nan_cluster_config *params)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	int ret;
+
+	if (drv->nlmode != NL80211_IFTYPE_NAN)
+		return -EOPNOTSUPP;
+
+	if (drv->nan_started)
+		return -EALREADY;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Start/join NAN cluster");
+	ret = nl80211_nan_config(bss, drv, params, NL80211_CMD_START_NAN);
 	if (!ret)
 		drv->nan_started = 1;
 
 	return ret;
-fail:
-	nlmsg_free(msg);
-	return -1;
+}
+
+
+static int
+wpa_driver_nl80211_nan_change_config(void *priv,
+				     struct nan_cluster_config *params)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+
+	if (drv->nlmode != NL80211_IFTYPE_NAN)
+		return -EOPNOTSUPP;
+
+	if (!drv->nan_started)
+		return -EINVAL;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Update NAN configuration");
+	return nl80211_nan_config(bss, drv, params,
+				  NL80211_CMD_CHANGE_NAN_CONFIG);
 }
 
 
@@ -15512,5 +15540,6 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 #ifdef CONFIG_NAN
 	.nan_start = wpa_driver_nl80211_nan_start,
 	.nan_stop = wpa_driver_nl80211_nan_stop,
+	.nan_change_config = wpa_driver_nl80211_nan_change_config,
 #endif /* CONFIG_NAN */
 };
