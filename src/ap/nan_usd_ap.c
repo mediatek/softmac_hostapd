@@ -180,7 +180,7 @@ void hostapd_nan_usd_rx_sdf(struct hostapd_data *hapd, const u8 *src,
 {
 	if (!hapd->nan_de)
 		return;
-	nan_de_rx_sdf(hapd->nan_de, src, a3, freq, buf, len);
+	nan_de_rx_sdf(hapd->nan_de, src, a3, freq, buf, len, 0);
 }
 
 

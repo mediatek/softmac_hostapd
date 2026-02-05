@@ -67,7 +67,7 @@ int wpas_nan_de_init(struct wpa_supplicant *wpa_s);
 void wpas_nan_de_deinit(struct wpa_supplicant *wpa_s);
 void wpas_nan_de_rx_sdf(struct wpa_supplicant *wpa_s, const u8 *src,
 			const u8 *a3, unsigned int freq,
-			const u8 *buf, size_t len);
+			const u8 *buf, size_t len, int rssi);
 void wpas_nan_de_flush(struct wpa_supplicant *wpa_s);
 int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 		     enum nan_service_protocol_type srv_proto_type,
@@ -100,7 +100,7 @@ static inline void wpas_nan_de_deinit(struct wpa_supplicant *wpa_s)
 static inline
 void wpas_nan_de_rx_sdf(struct wpa_supplicant *wpa_s, const u8 *src,
 			const u8 *a3, unsigned int freq,
-			const u8 *buf, size_t len)
+			const u8 *buf, size_t len, int rssi)
 {}
 
 static inline void wpas_nan_de_flush(struct wpa_supplicant *wpa_s)

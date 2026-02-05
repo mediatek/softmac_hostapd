@@ -82,7 +82,7 @@ void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst);
 void nan_de_tx_wait_ended(struct nan_de *de);
 
 void nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
-		   unsigned int freq, const u8 *buf, size_t len);
+		   unsigned int freq, const u8 *buf, size_t len, int rssi);
 const u8 * nan_de_get_service_id(struct nan_de *de, int id);
 
 struct nan_publish_params {
@@ -128,6 +128,9 @@ struct nan_publish_params {
 	 */
 	const char *match_filter_tx;
 	const char *match_filter_rx;
+
+	/* RSSI range limit */
+	bool close_proximity;
 };
 
 /* Returns -1 on failure or >0 publish_id */
@@ -186,6 +189,9 @@ struct nan_subscribe_params {
 
 	/* Bloom filter index (0-3) */
 	u8 srf_bf_idx;
+
+	/* RSSI range limit */
+	bool close_proximity;
 };
 
 /* Returns -1 on failure or >0 subscribe_id */

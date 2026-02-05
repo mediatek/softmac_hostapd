@@ -535,11 +535,11 @@ void wpas_nan_de_deinit(struct wpa_supplicant *wpa_s)
 
 void wpas_nan_de_rx_sdf(struct wpa_supplicant *wpa_s, const u8 *src,
 			const u8 *a3, unsigned int freq,
-			const u8 *buf, size_t len)
+			const u8 *buf, size_t len, int rssi)
 {
 	if (!wpa_s->nan_de)
 		return;
-	nan_de_rx_sdf(wpa_s->nan_de, src, a3, freq, buf, len);
+	nan_de_rx_sdf(wpa_s->nan_de, src, a3, freq, buf, len, rssi);
 }
 
 

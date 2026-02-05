@@ -5692,7 +5692,7 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 		payload += 5;
 		plen -= 5;
 		wpas_nan_de_rx_sdf(wpa_s, mgmt->sa, mgmt->bssid, freq,
-				   payload, plen);
+				   payload, plen, rssi);
 		return;
 	}
 
