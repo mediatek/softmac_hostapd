@@ -105,6 +105,11 @@ int wpas_nan_start(struct wpa_supplicant *wpa_s)
 	cluster_config.master_pref = DEFAULT_NAN_MASTER_PREF;
 	cluster_config.dual_band = DEFAULT_NAN_DUAL_BAND;
 
+	if (wpa_s->nan_drv_flags & WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE) {
+		wpa_printf(MSG_DEBUG, "NAN: Enable DW notifications");
+		cluster_config.enable_dw_notif = true;
+	}
+
 	return nan_start(wpa_s->nan, &cluster_config);
 }
 
