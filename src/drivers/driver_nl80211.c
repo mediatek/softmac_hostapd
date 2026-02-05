@@ -15261,7 +15261,7 @@ static int nl80211_nan_config(struct i802_bss *bss,
 			      enum nl80211_commands cmd)
 {
 	struct nl_msg *msg;
-	struct nlattr *conf;
+	struct nlattr *conf, *bands_conf, *band;
 	u32 bands = 0;
 
 	if (params->dual_band > 1)
@@ -15305,7 +15305,83 @@ static int nl80211_nan_config(struct i802_bss *bss,
 			goto fail;
 	}
 
-	/* TODO: Set more attributes */
+	if (!is_zero_ether_addr(params->cluster_id) &&
+	    nla_put(msg, NL80211_NAN_CONF_CLUSTER_ID,
+		    ETH_ALEN, params->cluster_id))
+		goto fail;
+
+	if (params->scan_period &&
+	    nla_put_u16(msg, NL80211_NAN_CONF_SCAN_PERIOD,
+			params->scan_period))
+		goto fail;
+
+	if (params->scan_dwell_time &&
+	    nla_put_u16(msg, NL80211_NAN_CONF_SCAN_DWELL_TIME,
+			params->scan_dwell_time))
+		goto fail;
+
+	if (params->discovery_beacon_interval &&
+	    nla_put_u8(msg, NL80211_NAN_CONF_DISCOVERY_BEACON_INTERVAL,
+		       params->discovery_beacon_interval))
+		goto fail;
+
+	bands_conf = nla_nest_start(msg, NL80211_NAN_CONF_BAND_CONFIGS);
+	if (!bands_conf)
+		goto fail;
+
+	band = nla_nest_start(msg, 1);
+	if (!band)
+		goto fail;
+
+	if (nla_put_u8(msg, NL80211_NAN_BAND_CONF_BAND,
+		       NL80211_BAND_2GHZ) ||
+	    nla_put_s8(msg, NL80211_NAN_BAND_CONF_RSSI_CLOSE,
+		       params->low_band_cfg.rssi_close) ||
+	    nla_put_s8(msg, NL80211_NAN_BAND_CONF_RSSI_MIDDLE,
+		       params->low_band_cfg.rssi_middle) ||
+	    nla_put_u8(msg, NL80211_NAN_BAND_CONF_WAKE_DW,
+		       params->low_band_cfg.awake_dw_interval) ||
+	    (params->low_band_cfg.disable_scan &&
+	     nla_put_flag(msg, NL80211_NAN_BAND_CONF_DISABLE_SCAN)))
+		goto fail;
+
+	nla_nest_end(msg, band);
+
+	if (params->dual_band) {
+		band = nla_nest_start(msg, 2);
+		if (!band)
+			goto fail;
+
+		if (nla_put_u8(msg, NL80211_NAN_BAND_CONF_BAND,
+			       NL80211_BAND_5GHZ) ||
+		    nla_put_u16(msg, NL80211_NAN_BAND_CONF_FREQ,
+				params->high_band_cfg.frequency) ||
+		    nla_put_s8(msg, NL80211_NAN_BAND_CONF_RSSI_CLOSE,
+			       params->high_band_cfg.rssi_close) ||
+		    nla_put_s8(msg, NL80211_NAN_BAND_CONF_RSSI_MIDDLE,
+			       params->high_band_cfg.rssi_middle) ||
+		    nla_put_u8(msg, NL80211_NAN_BAND_CONF_WAKE_DW,
+			       params->high_band_cfg.awake_dw_interval) ||
+		    (params->high_band_cfg.disable_scan &&
+		     nla_put_flag(msg, NL80211_NAN_BAND_CONF_DISABLE_SCAN)))
+			goto fail;
+
+		nla_nest_end(msg, band);
+	}
+
+	nla_nest_end(msg, bands_conf);
+
+	if (params->extra_nan_attrs && params->extra_nan_attrs_len &&
+	    nla_put(msg, NL80211_NAN_CONF_EXTRA_ATTRS,
+		    params->extra_nan_attrs_len,
+		    params->extra_nan_attrs))
+		goto fail;
+
+	if (params->vendor_elems && params->vendor_elems_len &&
+	    nla_put(msg, NL80211_NAN_CONF_VENDOR_ELEMS,
+		    params->vendor_elems_len, params->vendor_elems))
+		goto fail;
+
 	nla_nest_end(msg, conf);
 
 	return send_and_recv_resp(drv, msg, NULL, NULL);
