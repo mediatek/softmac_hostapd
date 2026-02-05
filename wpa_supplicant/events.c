@@ -5686,7 +5686,6 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_FST */
 
-#ifdef CONFIG_NAN_USD
 	if (category == WLAN_ACTION_PUBLIC && plen >= 5 &&
 	    payload[0] == WLAN_PA_VENDOR_SPECIFIC &&
 	    WPA_GET_BE32(&payload[1]) == NAN_SDF_VENDOR_TYPE) {
@@ -5696,7 +5695,6 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 				   payload, plen);
 		return;
 	}
-#endif /* CONFIG_NAN_USD */
 
 #ifdef CONFIG_DPP
 	if (category == WLAN_ACTION_PUBLIC && plen >= 5 &&
@@ -6977,11 +6975,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			wpa_s, data->remain_on_channel.freq,
 			data->remain_on_channel.duration);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
 		wpas_nan_usd_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq,
 			data->remain_on_channel.duration);
-#endif /* CONFIG_NAN_USD */
 		break;
 	case EVENT_CANCEL_REMAIN_ON_CHANNEL:
 #ifdef CONFIG_OFFCHANNEL
@@ -6994,10 +6990,8 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		wpas_dpp_cancel_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
 		wpas_nan_usd_cancel_remain_on_channel_cb(
 			wpa_s, data->remain_on_channel.freq);
-#endif /* CONFIG_NAN_USD */
 		break;
 	case EVENT_EAPOL_RX:
 		wpa_supplicant_rx_eapol(wpa_s, data->eapol_rx.src,
@@ -7339,9 +7333,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 #ifdef CONFIG_DPP
 		wpas_dpp_tx_wait_expire(wpa_s);
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
 		wpas_nan_usd_tx_wait_expire(wpa_s);
-#endif /* CONFIG_NAN_USD */
 		break;
 	case EVENT_TID_LINK_MAP:
 		if (data)

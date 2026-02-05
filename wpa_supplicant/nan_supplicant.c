@@ -155,7 +155,6 @@ void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 
 #endif /* CONFIG_NAN */
 
-#ifdef CONFIG_NAN_USD
 
 static const char *
 tx_status_result_txt(enum offchannel_send_action_result result)
@@ -851,5 +850,3 @@ void wpas_nan_usd_state_change_notif(struct wpa_supplicant *wpa_s)
 			nan_de_config(ifs->nan_de, &cfg);
 	}
 }
-
-#endif /* CONFIG_NAN_USD */

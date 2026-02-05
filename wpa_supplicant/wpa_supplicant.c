@@ -855,9 +855,7 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 	wpa_s->dpp = NULL;
 #endif /* CONFIG_DPP */
 
-#ifdef CONFIG_NAN_USD
 	wpas_nan_de_deinit(wpa_s);
-#endif /* CONFIG_NAN_USD */
 
 #ifdef CONFIG_PASN
 	wpas_pasn_auth_stop(wpa_s);
@@ -1324,9 +1322,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		wpas_update_fils_connect_params(wpa_s);
 #endif /* CONFIG_FILS && IEEE8021X_EAPOL */
 
-#ifdef CONFIG_NAN_USD
 	wpas_nan_usd_state_change_notif(wpa_s);
-#endif /* CONFIG_NAN_USD */
 }
 
 
@@ -7986,10 +7982,8 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		return -1;
 #endif /* CONFIG_DPP */
 
-#ifdef CONFIG_NAN_USD
 	if (wpas_nan_de_init(wpa_s) < 0)
 		return -1;
-#endif /* CONFIG_NAN_USD */
 
 #ifdef CONFIG_NAN
 	wpa_s->nan_drv_flags = capa.nan_flags;

@@ -9210,9 +9210,7 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 
 	wpa_s->conf->ignore_old_scan_res = 0;
 
-#ifdef CONFIG_NAN_USD
 	wpas_nan_de_flush(wpa_s);
-#endif /* CONFIG_NAN_USD */
 
 	wpas_pr_flush(wpa_s);
 }
@@ -12732,7 +12730,7 @@ static int wpas_ctrl_ml_probe(struct wpa_supplicant *wpa_s, char *cmd)
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
 
 static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 				 char *buf, size_t buflen)
@@ -13192,7 +13190,7 @@ static int wpas_ctrl_nan_unpause_publish(struct wpa_supplicant *wpa_s,
 					    peer_addr);
 }
 
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
@@ -14201,7 +14199,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 #endif /* CONFIG_DPP3 */
 #endif /* CONFIG_DPP */
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
 	} else if (os_strncmp(buf, "NAN_PUBLISH ", 12) == 0) {
 		reply_len = wpas_ctrl_nan_publish(wpa_s, buf + 12, reply,
 						  reply_size);
@@ -14231,7 +14229,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 	} else if (os_strcmp(buf, "NAN_FLUSH") == 0) {
 		wpas_nan_de_flush(wpa_s);
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN || CONFIG_NAN_USD */
 #ifdef CONFIG_PASN
 	} else if (os_strncmp(buf, "PASN_START ", 11) == 0) {
 		if (wpas_ctrl_iface_pasn_start(wpa_s, buf + 11) < 0)

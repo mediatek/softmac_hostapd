@@ -1097,7 +1097,7 @@ void wpas_notify_hs20_t_c_acceptance(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_HS20 */
 
 
-#ifdef CONFIG_NAN_USD
+#if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
 
 void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 				      enum nan_service_protocol_type
@@ -1213,7 +1213,7 @@ void wpas_notify_nan_subscribe_terminated(struct wpa_supplicant *wpa_s,
 						  nan_reason_txt(reason));
 }
 
-#endif /* CONFIG_NAN_USD */
+#endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 
 #ifdef CONFIG_PR
