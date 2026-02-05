@@ -52,18 +52,19 @@ def reset_devs(dev, apdev):
             logger.exception("Failed to reset device " + d.ifname)
             ok = False
 
-    wpas = None
-    try:
-        wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5', monitor=False)
-        ifaces = wpas.global_request("INTERFACES").splitlines()
-        for iface in ifaces:
-            if iface.startswith("wlan"):
-                wpas.interface_remove(iface)
-    except Exception as e:
-        pass
-    if wpas:
-        wpas.close_ctrl()
-        del wpas
+    for ifname in ['/tmp/wpas-wlan5', '/tmp/wpas-wlan6', '/tmp/wpas-wlan7']:
+        wpas = None
+        try:
+            wpas = WpaSupplicant(global_iface=ifname, monitor=False)
+            ifaces = wpas.global_request("INTERFACES").splitlines()
+            for iface in ifaces:
+                if iface.startswith("wlan"):
+                    wpas.interface_remove(iface)
+        except Exception as e:
+            pass
+        if wpas:
+            wpas.close_ctrl()
+            del wpas
 
     try:
         hapd = HostapdGlobal()
@@ -658,18 +659,20 @@ def main():
                 print("Leaving devices in current state")
             else:
                 reset_ok = reset_devs(dev, apdev)
-            wpas = None
-            try:
-                wpas = WpaSupplicant(global_iface="/tmp/wpas-wlan5",
-                                     monitor=False)
-                rename_log(args.logdir, 'log5', name, wpas)
-                if not args.no_reset:
-                    wpas.remove_ifname()
-            except Exception as e:
-                pass
-            if wpas:
-                wpas.close_ctrl()
-                del wpas
+
+            for i in [5, 6, 7]:
+                wpas = None
+                try:
+                    wpas = WpaSupplicant(global_iface="/tmp/wpas-wlan%d" % i,
+                                         monitor=False)
+                    rename_log(args.logdir, 'log%d' % i, name, wpas)
+                    if not args.no_reset:
+                        wpas.remove_ifname()
+                except Exception as e:
+                    pass
+                if wpas:
+                    wpas.close_ctrl()
+                    del wpas
 
             for i in range(0, 3):
                 rename_log(args.logdir, 'log' + str(i), name, dev[i])
