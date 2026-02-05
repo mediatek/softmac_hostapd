@@ -3209,10 +3209,57 @@ struct driver_sta_mlo_info {
 	} links[MAX_NUM_MLD_LINKS];
 };
 
+/**
+ * struct nan_band_config - NAN band specific configuration
+ *
+ * For details on NAN band configuration, see the Wi-Fi Aware Specification
+ *
+ * @frequency: Frequency in MHz for the band
+ * @rssi_close: RSSI close threshold used for NAN state transition algorithm
+ * @rssi_middle: RSSI middle threshold used for NAN state transition algorithm
+ * @awake_dw_interval: Committed DW information
+ * @disable_scan: Disable scan for this band
+ */
+struct nan_band_config {
+	u16 frequency;
+	s8 rssi_close;
+	s8 rssi_middle;
+	u8 awake_dw_interval;
+	bool disable_scan;
+};
+
+/**
+ * struct nan_cluster_config - NAN cluster configuration
+ *
+ * @master_pref: Master preference for the cluster
+ * @dual_band: Dual band operation enabled
+ * @enable_dw_notif: Enable discovery window notifications
+ * @cluster_id: Cluster ID for the NAN cluster
+ * @scan_period: Period for NAN scan in seconds
+ * @scan_dwell_time: Dwell time for NAN scan in TUs per channel
+ * @discovery_beacon_interval: Interval for discovery beacon in TUs
+ * @low_band_cfg: Configuration for low band NAN operation
+ * @high_band_cfg: Configuration for high band NAN operation
+ * @extra_nan_attrs: Extra NAN attributes to be included in NAN beacons
+ * @extra_nan_attrs_len: Length of the extra NAN attributes
+ * @vendor_elems: Vendor specific elements to be included in NAN beacons
+ * @vendor_elems_len: Length of the vendor specific elements
+ */
 struct nan_cluster_config {
 	u8 master_pref;
 	u8 dual_band;
 	bool enable_dw_notif;
+
+	u8 cluster_id[ETH_ALEN];
+	u16 scan_period;
+	u16 scan_dwell_time;
+	u8 discovery_beacon_interval;
+	struct nan_band_config low_band_cfg;
+	struct nan_band_config high_band_cfg;
+	const u8 *extra_nan_attrs;
+	size_t extra_nan_attrs_len;
+	const u8 *vendor_elems;
+	size_t vendor_elems_len;
 };
 
 /**
