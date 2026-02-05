@@ -274,6 +274,23 @@ static int wpas_nan_de_tx(void *ctx, unsigned int freq, unsigned int wait_time,
 	struct wpa_supplicant *wpa_s = ctx;
 	struct wpas_nan_usd_tx_work *twork;
 
+	if (!freq && !wait_time) {
+		int ret;
+
+		wpa_printf(MSG_DEBUG, "NAN: SYNC TX NAN SDF A1=" MACSTR " A2="
+			   MACSTR " A3=" MACSTR " len=%zu",
+			   MAC2STR(dst), MAC2STR(src), MAC2STR(bssid),
+			   wpabuf_len(buf));
+		ret = wpa_drv_send_action(wpa_s, 0, 0, dst, src, bssid,
+					  wpabuf_head(buf), wpabuf_len(buf),
+					  1);
+		if (ret)
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to send sync action frame (%d)",
+				   ret);
+		return ret;
+	}
+
 	if (wpa_s->nan_usd_tx_work || wpa_s->nan_usd_listen_work) {
 		/* Reuse ongoing radio work */
 		return wpas_nan_de_tx_send(wpa_s, freq, wait_time, dst, src,
