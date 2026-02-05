@@ -1087,6 +1087,7 @@ void hostapd_config_free(struct hostapd_config *conf)
 	os_free(conf->acs_chan_bias);
 #endif /* CONFIG_ACS */
 	os_free(conf->edcca_threshold);
+	os_free(conf->muru_config);
 	wpabuf_free(conf->lci);
 	wpabuf_free(conf->civic);
 #ifdef CONFIG_AFC
