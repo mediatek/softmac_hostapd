@@ -77,12 +77,10 @@ struct sta_info * ap_get_sta(struct hostapd_data *hapd, const u8 *sta)
 
 #ifdef CONFIG_IEEE80211BE
 	if (hapd->conf->mld_ap && !s) {
-		u8 link_id;
+		struct hostapd_data *h;
 
-		for (link_id = 0; link_id < MAX_NUM_MLD_LINKS; link_id++) {
-			struct hostapd_data *h = hostapd_mld_get_link_bss(hapd, link_id);
-
-			if (!h)
+		for_each_mld_link(h, hapd) {
+			if (h == hapd)
 				continue;
 
 			for (s = h->sta_list; s; s = s->next)
