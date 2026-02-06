@@ -3157,9 +3157,9 @@ static void ieee802_11_rx_neg_ttlm_req(struct hostapd_data *hapd, const u8 *addr
 	}
 
 	neg_ttlm = &sta->neg_ttlm;
-	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
 	ret = ieee802_11_parse_neg_ttlm(hapd, elems.ttlm[0], elems.ttlm_len[0],
 					neg_ttlm, &direction);
+	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
 
 	if (ret) {
 		wpa_printf(MSG_ERROR, "Invalid TTLM format");
