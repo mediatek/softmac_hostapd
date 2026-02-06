@@ -5923,9 +5923,11 @@ struct wpa_driver_ops {
 	* @link_id: MLD link id. -1 if this is an non-MLD AP
 	* @power_table: power table generated from AFC response
 	* @lpi_mode: specify the current mode is whether lpi
+	* @sku_filename: used to indicate which sku path should be used
 	*/
 	int (*txpower_ctrl)(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance,
-			    s8 link_id, s8 *power_table, u8 lpi_mode);
+			    s8 link_id, s8 *power_table, u8 lpi_mode,
+			    const char *sku_filename);
 	/**
 	* get_vif_radio_mask - get the radio mask of the interface
 	* @priv: Private driver interface data

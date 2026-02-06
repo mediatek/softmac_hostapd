@@ -1699,7 +1699,8 @@ int hostapd_drv_txpower_ctrl(struct hostapd_data *hapd)
 					 hapd->iconf->lpi_bcn_enhance,
 					 link_id,
 					 afc_power_table,
-					 lpi_mode);
+					 lpi_mode,
+					 hapd->iconf->sku_filename);
 out:
 #ifdef CONFIG_AFC
 	os_free(afc_power_table);

@@ -212,6 +212,7 @@ txpower_ctrl_policy[NUM_MTK_VENDOR_ATTRS_TXPOWER_CTRL] = {
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_LINK_ID] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_TABLE] = { .type = NLA_BINARY },
 	[MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_LPI] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_FILENAME] = { .type = NLA_STRING },
 };
 
 static struct nl_sock * nl_create_handle(struct nl_cb *cb, const char *dbg)
@@ -17487,8 +17488,9 @@ fail:
 	return -ENOBUFS;
 }
 
-static int nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance,
-				s8 link_id, s8 *power_table, u8 lpi_mode)
+static int
+nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 link_id,
+		     s8 *power_table, u8 lpi_mode, const char *sku_filename)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -17517,7 +17519,10 @@ static int nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_e
 		goto fail;
 
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
-	if (sku_idx > -1)
+	if (sku_filename[0])
+		nla_put_string(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_FILENAME,
+			       sku_filename);
+	else if (sku_idx > -1)
 		nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_IDX, sku_idx);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_BCN_ENHANCE, lpi_bcn_enhance);
 

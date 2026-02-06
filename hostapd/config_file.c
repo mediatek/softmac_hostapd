@@ -5377,6 +5377,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "lpi_bcn_enhance") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_bcn_enhance = !!en;
+	} else if (os_strcmp(buf, "sku_filename") == 0) {
+		os_strlcpy(conf->sku_filename, pos, sizeof(conf->sku_filename));
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Line %d: unknown configuration item '%s'",

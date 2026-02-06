@@ -1373,6 +1373,8 @@ struct hostapd_config {
 	s8 sku_idx;
 	s8 lpi_sku_idx;
 	u8 lpi_bcn_enhance;
+#define SKU_FILENAME_MAX		64
+	char sku_filename[SKU_FILENAME_MAX];
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
