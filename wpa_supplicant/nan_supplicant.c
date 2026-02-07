@@ -1884,8 +1884,12 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		return 0;						\
 	}
 
-	/* 0 and 255 are reserved */
-	NAN_PARSE_INT(master_pref, 1, 254);
+	/* Wi-Fi Aware R5, Section 3.3.3: 1 and 255 are testing-only values. */
+#ifdef CONFIG_TESTING_OPTIONS
+	NAN_PARSE_INT(master_pref, 1, 255);
+#else /* CONFIG_TESTING_OPTIONS */
+	NAN_PARSE_INT(master_pref, 2, 254);
+#endif /* CONFIG_TESTING_OPTIONS */
 	NAN_PARSE_INT(dual_band, 0, 1);
 	NAN_PARSE_INT(scan_period, 0, 0xffff);
 	NAN_PARSE_INT(scan_dwell_time, 10, 150);
