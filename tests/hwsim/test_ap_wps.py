@@ -2507,6 +2507,7 @@ def test_ap_wps_pin_request_file(dev, apdev):
                            "wpa_key_mgmt": "WPA-PSK", "rsn_pairwise": "CCMP"})
     uuid = dev[0].get_status_field("uuid")
     pin = dev[0].wps_read_pin()
+    dev[0].flush_scan_cache()
     try:
         dev[0].scan_for_bss(apdev[0]['bssid'], freq="2412")
         dev[0].request("WPS_PIN %s %s" % (apdev[0]['bssid'], pin))
