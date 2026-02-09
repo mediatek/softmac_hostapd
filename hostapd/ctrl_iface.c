@@ -2449,6 +2449,19 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 
 	settings.link_id = -1;
 #ifdef CONFIG_IEEE80211BE
+	/* Reject if EHT is disabled in channel switch settings but the
+	 * interface has a BSS affiliated with an AP MLD where EHT is mandatory
+	 * to be enabled. */
+	if (!settings.freq_params.eht_enabled) {
+		for (i = 0; i < iface->num_bss; i++) {
+			if (iface->bss[i]->conf->mld_ap) {
+				wpa_printf(MSG_INFO,
+					   "Do not allow EHT to be disabled when the interface has an ML BSS");
+				return -1;
+			}
+		}
+	}
+
 	if (iface->num_bss && iface->bss[0]->conf->mld_ap)
 		settings.link_id = iface->bss[0]->mld_link_id;
 #endif /* CONFIG_IEEE80211BE */
