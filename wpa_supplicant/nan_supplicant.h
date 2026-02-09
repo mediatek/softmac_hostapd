@@ -151,6 +151,9 @@ void wpas_nan_usd_cancel_remain_on_channel_cb(struct wpa_supplicant *wpa_s,
 					      unsigned int freq)
 {}
 
+static inline void wpas_nan_usd_tx_wait_expire(struct wpa_supplicant *wpa_s)
+{}
+
 static inline
 int * wpas_nan_usd_all_freqs(struct wpa_supplicant *wpa_s)
 {
