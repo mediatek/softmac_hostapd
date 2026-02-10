@@ -1041,7 +1041,7 @@ u8 * hostapd_eid_eht_attlm(struct hostapd_data *hapd, u8 *eid)
 	}
 
 	/* Link Mapping of each TID (0 - 7) */
-	enabled_links = hapd->conf->mld_allowed_links & ~attlm->disabled_links;
+	enabled_links = hapd->mld->valid_links & ~attlm->disabled_links;
 	for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
 		if (!attlm->link_mapping_size) {
 			WPA_PUT_LE16(pos, enabled_links);

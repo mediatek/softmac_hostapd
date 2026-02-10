@@ -193,7 +193,7 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 	bss->rsnxe_capab_mask = ~0ULL;
 	bss->bss_termination_tsf = 0;
 #ifdef CONFIG_IEEE80211BE
-	bss->mld_allowed_links = 255;
+	bss->expected_mlo_link_num = -1;
 #endif /* CONFIG_IEEE80211BE */
 }
 

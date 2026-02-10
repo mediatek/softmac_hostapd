@@ -1004,8 +1004,10 @@ struct hostapd_bss_config {
 	/* The AP is part of an AP MLD */
 	u8 mld_ap;
 
-	/* Allowed link bitmap of the AP MLD to which the AP is affiliated */
-	u16 mld_allowed_links;
+	/* Total number of links that this AP MLD needs to set up.
+	 * -1 for not being used
+	 */
+	int expected_mlo_link_num;
 
 	/* The MLD ID to which the AP MLD is affiliated with */
 	u8 mld_id;

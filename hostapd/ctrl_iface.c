@@ -4296,7 +4296,7 @@ static int hostapd_ctrl_iface_set_attlm(struct hostapd_data *hapd, char *cmd,
 	attlm->direction = IEEE80211_TTLM_DIRECTION_BOTH;
 	attlm->duration = duration;
 	attlm->switch_time = switch_time;
-	attlm->disabled_links = hapd->conf->mld_allowed_links & disabled_links;
+	attlm->disabled_links = disabled_links;
 	attlm->link_mapping_size = link_mapping_size;
 	os_get_reltime(&attlm->start_time);
 

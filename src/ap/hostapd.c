@@ -2792,7 +2792,7 @@ static void hostapd_mld_started(struct hostapd_iface *iface)
 #ifdef CONFIG_IEEE80211BE
 	struct hostapd_data *hapd;
 	unsigned int i, j, k;
-	u16 valid_links;
+	u16 valid_links, num_links;
 
 	for (i = 0; i < iface->num_bss; i++) {
 		hapd = iface->bss[i];
@@ -2820,9 +2820,15 @@ static void hostapd_mld_started(struct hostapd_iface *iface)
 			}
 		}
 
-		if (hapd->conf->mld_allowed_links != valid_links &&
-		    hapd->conf->mld_allowed_links != 255 &&
-		    hapd->conf->mld_allowed_links != 0)
+		num_links = 0;
+		while (valid_links) {
+			num_links += (valid_links & 1);
+			valid_links >>= 1;
+		}
+
+		/* Not all of the AP MLD's links are ready */
+		if (hapd->conf->expected_mlo_link_num != num_links &&
+		    hapd->conf->expected_mlo_link_num != -1)
 			continue;
 
 		hapd->mld->started = 1;
