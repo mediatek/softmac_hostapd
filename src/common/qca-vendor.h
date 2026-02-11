@@ -14356,6 +14356,44 @@ enum qca_vendor_wlan_sta_guard_interval {
  * attributes representing the beacon miss data for the affiliated AP(s) in STA
  * mode. This uses attributes defined in
  * enum qca_wlan_vendor_attr_beacon_miss_stat.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS: Array of nested attributes and
+ * applicable only in STA mode. Contains per-link statistics for ML connection.
+ * Each link is identified by %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID: u8 attribute and applicable
+ * only in STA mode. MLO link ID for which the statistics are being reported.
+ * Used only for ML connections. This is mandatory attribute inside
+ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS and represents the MLO link ID
+ * of the nested attribute set.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS: u8 attribute and applicable only
+ * in STA mode. This represents the current operating Tx NSS with the
+ * affiliated AP. For non-ML connection, this attribute will be reported
+ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
+ * this attribute will be reported inside
+ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS: u8 attribute and applicable only
+ * in STA mode. This represents the current operating Rx NSS with the
+ * affiliated AP. For non-ML connection, this attribute will be reported
+ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
+ * this attribute will be reported inside
+ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS: u8 attribute and applicable
+ * only in STA mode. This represents the current operating Tx chains with the
+ * affiliated AP. For non-ML connection, this attribute will be reported
+ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
+ * this attribute will be reported inside
+ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS: u8 attribute and applicable
+ * only in STA mode. This represents the current operating Rx chains with the
+ * affiliated AP. For non-ML connection, this attribute will be reported
+ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
+ * this attribute will be reported inside
+ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
  */
 enum qca_wlan_vendor_attr_get_sta_info {
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_INVALID = 0,
@@ -14418,6 +14456,12 @@ enum qca_wlan_vendor_attr_get_sta_info {
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BW_PKT_COUNT = 57,
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_CCA_STAT = 58,
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BEACON_MISS_STAT = 59,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS = 60,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID = 61,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS = 62,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS = 63,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS = 64,
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS = 65,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_AFTER_LAST,
