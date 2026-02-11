@@ -52,6 +52,10 @@ struct nan_de_service {
 	u8 a3[ETH_ALEN];
 	bool a3_set;
 
+	/* Source MAC address for this service (optional) */
+	u8 forced_addr[ETH_ALEN];
+	bool forced_addr_set;
+
 	/* pauseState information for Publish function */
 	struct os_reltime pause_state_end;
 	u8 sel_peer_id;
@@ -273,6 +277,7 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	size_t len = 0, sda_len, sdea_len;
 	u8 ctrl = type;
 	u16 sdea_ctrl = 0;
+	const u8 *forced_addr;
 
 	/* Service Descriptor attribute */
 	sda_len = NAN_SERVICE_ID_LEN + 1 + 1 + 1;
@@ -364,8 +369,11 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 		wpabuf_put_buf(buf, srv->elems);
 	}
 
+	/* Use per-service source address if configured, otherwise use NMI */
+	forced_addr = srv->forced_addr_set ? srv->forced_addr : de->nmi;
+
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
-		  dst, de->nmi, a3, buf);
+		  dst, forced_addr, a3, buf);
 	wpabuf_free(buf);
 }
 
@@ -1625,7 +1633,8 @@ const u8 * nan_de_get_service_id(struct nan_de *de, int id)
 int nan_de_publish(struct nan_de *de, const char *service_name,
 		   enum nan_service_protocol_type srv_proto_type,
 		   const struct wpabuf *ssi, const struct wpabuf *elems,
-		   struct nan_publish_params *params, bool p2p)
+		   struct nan_publish_params *params, bool p2p,
+		   const u8 *addr)
 {
 	int publish_id;
 	struct nan_de_service *srv;
@@ -1727,6 +1736,13 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 	}
 
 	srv->sync = params->sync;
+
+	if (addr && params->forced_addr) {
+		os_memcpy(srv->forced_addr, addr, ETH_ALEN);
+		srv->forced_addr_set = true;
+		wpa_printf(MSG_DEBUG, "NAN: Using source address " MACSTR
+			   " for publish service", MAC2STR(srv->forced_addr));
+	}
 
 	/* Prepare for single and multi-channel states; starting with
 	 * single channel */
@@ -1877,7 +1893,8 @@ out:
 int nan_de_subscribe(struct nan_de *de, const char *service_name,
 		     enum nan_service_protocol_type srv_proto_type,
 		     const struct wpabuf *ssi, const struct wpabuf *elems,
-		     struct nan_subscribe_params *params, bool p2p)
+		     struct nan_subscribe_params *params, bool p2p,
+		     const u8 *addr)
 {
 	int subscribe_id;
 	struct nan_de_service *srv;
@@ -1995,6 +2012,13 @@ int nan_de_subscribe(struct nan_de *de, const char *service_name,
 		}
 
 		srv->srf_include = params->srf_include;
+	}
+
+	if (addr && params->forced_addr) {
+		os_memcpy(srv->forced_addr, addr, ETH_ALEN);
+		srv->forced_addr_set = true;
+		wpa_printf(MSG_DEBUG, "NAN: Using source address " MACSTR
+			   " for subscribe service", MAC2STR(srv->forced_addr));
 	}
 
 	wpa_printf(MSG_DEBUG, "NAN: Assigned new subscribe handle %d for %s",

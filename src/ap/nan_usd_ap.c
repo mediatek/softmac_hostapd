@@ -204,7 +204,7 @@ int hostapd_nan_usd_publish(struct hostapd_data *hapd, const char *service_name,
 		return -1;
 
 	publish_id = nan_de_publish(hapd->nan_de, service_name, srv_proto_type,
-				    ssi, elems, params, p2p);
+				    ssi, elems, params, p2p, NULL);
 	wpabuf_free(elems);
 	return publish_id;
 }
@@ -243,7 +243,8 @@ int hostapd_nan_usd_subscribe(struct hostapd_data *hapd,
 		return -1;
 
 	subscribe_id = nan_de_subscribe(hapd->nan_de, service_name,
-					srv_proto_type, ssi, elems, params, p2p);
+					srv_proto_type, ssi, elems, params, p2p,
+					NULL);
 	wpabuf_free(elems);
 	return subscribe_id;
 }

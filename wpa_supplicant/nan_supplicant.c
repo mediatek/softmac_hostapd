@@ -783,8 +783,16 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 		elems = wpas_pr_usd_elems(wpa_s);
 	}
 
+	if (params->forced_addr) {
+		if (!(wpa_s->drv_flags & WPA_DRIVER_FLAGS_MGMT_TX_RANDOM_TA)) {
+			wpa_printf(MSG_INFO, "NAN: Random TA not allowed");
+			return -1;
+		}
+		addr = params->forced_addr;
+	}
+
 	publish_id = nan_de_publish(wpa_s->nan_de, service_name, srv_proto_type,
-				    ssi, elems, params, p2p);
+				    ssi, elems, params, p2p, addr);
 	if (publish_id >= 1 && !params->sync &&
 	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD) &&
 	    wpas_drv_nan_publish(wpa_s, addr, publish_id, service_name,
@@ -928,9 +936,17 @@ int wpas_nan_subscribe(struct wpa_supplicant *wpa_s,
 		elems = wpas_pr_usd_elems(wpa_s);
 	}
 
+	if (params->forced_addr) {
+		if (!(wpa_s->drv_flags & WPA_DRIVER_FLAGS_MGMT_TX_RANDOM_TA)) {
+			wpa_printf(MSG_INFO, "NAN: Random TA not allowed");
+			return -1;
+		}
+		addr = params->forced_addr;
+	}
+
 	subscribe_id = nan_de_subscribe(wpa_s->nan_de, service_name,
 					srv_proto_type, ssi, elems, params,
-					p2p);
+					p2p, addr);
 	if (subscribe_id >= 1 && !params->sync &&
 	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD) &&
 	    wpas_drv_nan_subscribe(wpa_s, addr, subscribe_id, service_name,
