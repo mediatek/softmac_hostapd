@@ -1436,6 +1436,7 @@ static bool wpa_scan_res_ok(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
 	 * band, only H2E is allowed. */
 	sae_pwe = wpas_get_ssid_sae_pwe(wpa_s, ssid);
 	if ((sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
+	     wpa_key_mgmt_only_sae_ext_key(ssid->key_mgmt) ||
 	     is_6ghz_freq(bss->freq) || ssid->sae_password_id) &&
 	    sae_pwe != SAE_PWE_FORCE_HUNT_AND_PECK &&
 	    wpa_key_mgmt_only_sae(ssid->key_mgmt) &&
