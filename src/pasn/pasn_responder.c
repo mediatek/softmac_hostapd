@@ -452,7 +452,8 @@ static void handle_auth_pasn_comeback(struct pasn_data *pasn,
 		return;
 
 	wpa_pasn_build_auth_header(buf, pasn->bssid, own_addr, peer_addr, 2,
-				   WLAN_STATUS_ASSOC_REJECTED_TEMPORARILY);
+				   WLAN_STATUS_ASSOC_REJECTED_TEMPORARILY,
+				   pasn->auth_alg == WLAN_AUTH_EPPKE);
 
 	/*
 	 * Do not include the group as a part of the token since it is not going
@@ -510,7 +511,7 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 		goto fail;
 
 	wpa_pasn_build_auth_header(buf, pasn->bssid, own_addr, peer_addr, 2,
-				   status);
+				   status, pasn->auth_alg == WLAN_AUTH_EPPKE);
 
 	if (status != WLAN_STATUS_SUCCESS)
 		goto done;

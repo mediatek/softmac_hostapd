@@ -800,7 +800,7 @@ int pasn_auth_frame_hash(enum rsn_hash_alg alg, const u8 *data, size_t len,
 
 void wpa_pasn_build_auth_header(struct wpabuf *buf, const u8 *bssid,
 				const u8 *src, const u8 *dst,
-				u8 trans_seq, u16 status);
+				u8 trans_seq, u16 status, bool is_eppke);
 
 int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid,
 		      int akmp, int cipher);

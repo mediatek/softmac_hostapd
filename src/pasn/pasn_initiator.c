@@ -610,7 +610,8 @@ static struct wpabuf * wpas_pasn_build_auth_1(struct pasn_data *pasn,
 
 	wpa_pasn_build_auth_header(buf, pasn->bssid,
 				   pasn->own_addr, pasn->peer_addr,
-				   pasn->trans_seq + 1, WLAN_STATUS_SUCCESS);
+				   pasn->trans_seq + 1, WLAN_STATUS_SUCCESS,
+				   pasn->auth_alg == WLAN_AUTH_EPPKE);
 
 	pmkid = NULL;
 	if (wpa_key_mgmt_ft(pasn->akmp)) {
@@ -706,7 +707,8 @@ static struct wpabuf * wpas_pasn_build_auth_3(struct pasn_data *pasn)
 	wpa_pasn_build_auth_header(buf, pasn->bssid,
 				   pasn->own_addr, pasn->peer_addr,
 				   WLAN_AUTH_TR_SEQ_PASN_AUTH3,
-				   WLAN_STATUS_SUCCESS);
+				   WLAN_STATUS_SUCCESS,
+				   pasn->auth_alg == WLAN_AUTH_EPPKE);
 
 	wrapped_data_buf = wpas_pasn_get_wrapped_data(pasn);
 

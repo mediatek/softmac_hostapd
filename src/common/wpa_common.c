@@ -3993,7 +3993,7 @@ int wpa_parse_kde_ies(const u8 *buf, size_t len, struct wpa_eapol_ie_parse *ie)
 
 /*
  * wpa_pasn_build_auth_header - Add the MAC header and initialize Authentication
- * frame for PASN
+ * frame for PASN/EPPKE
  *
  * @buf: Buffer in which the header will be added
  * @bssid: The BSSID of the AP
@@ -4001,15 +4001,17 @@ int wpa_parse_kde_ies(const u8 *buf, size_t len, struct wpa_eapol_ie_parse *ie)
  * @dst: Destination address
  * @trans_seq: Authentication transaction sequence number
  * @status: Authentication status
+ * @is_eppke: EPPKE authentication
  */
 void wpa_pasn_build_auth_header(struct wpabuf *buf, const u8 *bssid,
 				const u8 *src, const u8 *dst,
-				u8 trans_seq, u16 status)
+				u8 trans_seq, u16 status, bool is_eppke)
 {
 	struct ieee80211_mgmt *auth;
+	u16 auth_alg = is_eppke ? WLAN_AUTH_EPPKE : WLAN_AUTH_PASN;
 
-	wpa_printf(MSG_DEBUG, "PASN: Add authentication header. trans_seq=%u",
-		   trans_seq);
+	wpa_printf(MSG_DEBUG, "%s: Add authentication header trans_seq=%u",
+		   is_eppke ? "EPPKE" : "PASN", trans_seq);
 
 	auth = wpabuf_put(buf, offsetof(struct ieee80211_mgmt,
 					u.auth.variable));
@@ -4022,7 +4024,7 @@ void wpa_pasn_build_auth_header(struct wpabuf *buf, const u8 *bssid,
 	os_memcpy(auth->bssid, bssid, ETH_ALEN);
 	auth->seq_ctrl = 0;
 
-	auth->u.auth.auth_alg = host_to_le16(WLAN_AUTH_PASN);
+	auth->u.auth.auth_alg = host_to_le16(auth_alg);
 	auth->u.auth.auth_transaction = host_to_le16(trans_seq);
 	auth->u.auth.status_code = host_to_le16(status);
 }
