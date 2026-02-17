@@ -1051,6 +1051,17 @@ int wpa_auth_sta_associated(struct wpa_authenticator *wpa_auth,
 	if (!wpa_auth || !wpa_auth->conf.wpa || !sm)
 		return -1;
 
+#ifdef CONFIG_ENC_ASSOC
+	if (sm->auth_alg == WLAN_AUTH_EPPKE) {
+		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_DEBUG,
+				"EPPKE authentication already completed - do not start 4-way handshake");
+		/* Go to PTKINITDONE state to allow GTK rekeying */
+		sm->wpa_ptk_state = WPA_PTK_PTKINITDONE;
+		sm->Pair = true;
+		return 0;
+	}
+#endif /* CONFIG_ENC_ASSOC */
+
 #ifdef CONFIG_IEEE80211R_AP
 	if (sm->ft_completed) {
 		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_DEBUG,
@@ -2534,6 +2545,11 @@ int wpa_auth_sm_event(struct wpa_state_machine *sm, enum wpa_event event)
 	    (event == WPA_AUTH || event == WPA_ASSOC))
 		remove_ptk = 0;
 #endif /* CONFIG_FILS */
+#ifdef CONFIG_ENC_ASSOC
+	if (sm->auth_alg == WLAN_AUTH_EPPKE &&
+	    (event == WPA_AUTH || event == WPA_ASSOC))
+		remove_ptk = 0;
+#endif /* CONFIG_ENC_ASSOC */
 
 	if (remove_ptk) {
 		sm->PTK_valid = false;
