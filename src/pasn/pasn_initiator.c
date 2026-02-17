@@ -583,7 +583,7 @@ static u8 wpas_pasn_get_wrapped_data_format(struct pasn_data *pasn)
 
 static struct wpabuf * wpas_pasn_build_auth_1(struct pasn_data *pasn,
 					      const struct wpabuf *comeback,
-					      bool verify)
+					      bool verify, bool full_hdr)
 {
 	struct wpabuf *buf, *pubkey = NULL, *wrapped_data_buf = NULL;
 	const u8 *pmkid;
@@ -608,10 +608,16 @@ static struct wpabuf * wpas_pasn_build_auth_1(struct pasn_data *pasn,
 
 	wrapped_data = wpas_pasn_get_wrapped_data_format(pasn);
 
-	wpa_pasn_build_auth_header(buf, pasn->bssid,
-				   pasn->own_addr, pasn->peer_addr,
-				   pasn->trans_seq + 1, WLAN_STATUS_SUCCESS,
-				   pasn->auth_alg == WLAN_AUTH_EPPKE);
+	if (full_hdr) {
+		wpa_pasn_build_auth_header(buf, pasn->bssid,
+					   pasn->own_addr, pasn->peer_addr,
+					   pasn->trans_seq + 1,
+					   WLAN_STATUS_SUCCESS,
+					   pasn->auth_alg == WLAN_AUTH_EPPKE);
+	} else {
+		wpabuf_put_le16(buf, pasn->trans_seq + 1);
+		wpabuf_put_le16(buf, WLAN_STATUS_SUCCESS);
+	}
 
 	pmkid = NULL;
 	if (wpa_key_mgmt_ft(pasn->akmp)) {
@@ -681,7 +687,8 @@ fail:
 }
 
 
-static struct wpabuf * wpas_pasn_build_auth_3(struct pasn_data *pasn)
+static struct wpabuf * wpas_pasn_build_auth_3(struct pasn_data *pasn,
+					      bool full_hdr)
 {
 	struct wpabuf *buf, *wrapped_data_buf = NULL;
 	u8 mic[WPA_PASN_MAX_MIC_LEN];
@@ -704,11 +711,16 @@ static struct wpabuf * wpas_pasn_build_auth_3(struct pasn_data *pasn)
 
 	wrapped_data = wpas_pasn_get_wrapped_data_format(pasn);
 
-	wpa_pasn_build_auth_header(buf, pasn->bssid,
-				   pasn->own_addr, pasn->peer_addr,
-				   WLAN_AUTH_TR_SEQ_PASN_AUTH3,
-				   WLAN_STATUS_SUCCESS,
-				   pasn->auth_alg == WLAN_AUTH_EPPKE);
+	if (full_hdr) {
+		wpa_pasn_build_auth_header(buf, pasn->bssid,
+					   pasn->own_addr, pasn->peer_addr,
+					   WLAN_AUTH_TR_SEQ_PASN_AUTH3,
+					   WLAN_STATUS_SUCCESS,
+					   pasn->auth_alg == WLAN_AUTH_EPPKE);
+	} else {
+		wpabuf_put_le16(buf, WLAN_AUTH_TR_SEQ_PASN_AUTH3);
+		wpabuf_put_le16(buf, WLAN_STATUS_SUCCESS);
+	}
 
 	wrapped_data_buf = wpas_pasn_get_wrapped_data(pasn);
 
@@ -1009,7 +1021,7 @@ static int wpas_pasn_send_auth_1(struct pasn_data *pasn, const u8 *own_addr,
 		   MAC2STR(pasn->peer_addr), pasn->akmp, pasn->cipher,
 		   pasn->group);
 
-	frame = wpas_pasn_build_auth_1(pasn, comeback, verify);
+	frame = wpas_pasn_build_auth_1(pasn, comeback, verify, true);
 	if (!frame) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed building 1st auth frame");
 		goto fail;
@@ -1425,7 +1437,7 @@ int wpa_pasn_auth_rx(struct pasn_data *pasn, const u8 *data, size_t len,
 		goto fail;
 	}
 
-	frame = wpas_pasn_build_auth_3(pasn);
+	frame = wpas_pasn_build_auth_3(pasn, true);
 	if (!frame) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed building 3rd auth frame");
 		goto fail;
