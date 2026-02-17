@@ -7981,41 +7981,66 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 	u8 rsc[WPA_KEY_RSC_LEN] = {0}, *gtk;
 	struct wpa_group *gsm = sm->group;
 	u8 hdr[2];
+	u8 *kde, *buf;
+	const u8 *ptr;
+	size_t slice_len;
+	const size_t buflen = 1024;
 
-	/* TODO: Make sure there is sufficient length for the element and also
-	 * support fragmentation of the Key Delivery element. */
+	/* TODO: Make sure there is sufficient length for the element */
+	buf = os_malloc(buflen);
+	if (!buf)
+		return eid;
 
-	/* ElementID(0xff)|Length(1B)|ElementID EXtn(1B)|RSC(8B)|KDE list */
-	*eid++ = WLAN_EID_EXTENSION;
-
-	if (!is_ml) {
-		/* GTK KDE: 0xdd|len(1B)|RSN Selector(4B)|KeyID(2B)|GTK| */
-		kde_len = 2 + RSN_SELECTOR_LEN + 2 + gsm->GTK_len +
-			ieee80211w_kde_len(sm);
-	} else {
-		kde_len = wpa_auth_ml_group_kdes_len(sm, KDE_ALL_LINKS);
-	}
-
-	*eid++ = 1 + WPA_KEY_RSC_LEN + kde_len;
-	*eid++ = WLAN_EID_EXT_KEY_DELIVERY;
-
-	/* RSC */
-	if (!is_ml && sm->group->wpa_group_state == WPA_GROUP_SETKEYSDONE)
-		wpa_auth_get_seqnum(sm->wpa_auth, NULL, gsm->GN, rsc);
-	os_memcpy(eid, rsc, WPA_KEY_RSC_LEN);
-	eid += WPA_KEY_RSC_LEN;
-
+	ptr = buf;
+	kde = buf;
 	if (is_ml) {
-		eid = wpa_auth_ml_group_kdes(sm, eid, KDE_ALL_LINKS);
+		kde = wpa_auth_ml_group_kdes(sm, kde, KDE_ALL_LINKS);
+		kde_len = wpa_auth_ml_group_kdes_len(sm, KDE_ALL_LINKS);
 	} else {
 		gtk = gsm->GTK[gsm->GN - 1];
 		gtk_len = gsm->GTK_len;
-		hdr[0] = gsm->GN & 0x03;
-		eid = wpa_add_kde(eid, RSN_KEY_DATA_GROUPKEY, hdr, 2,
+		hdr[0] = gsm->GN & 0x03; /* KeyID bits */
+		kde = wpa_add_kde(kde, RSN_KEY_DATA_GROUPKEY, hdr, sizeof(hdr),
 				  gtk, gtk_len);
-		eid = ieee80211w_kde_add(sm, eid);
+		kde = ieee80211w_kde_add(sm, kde);
+		/* GTK KDE: 0xdd|len(1B)|RSN Selector(4B)|KeyID(2B)|GTK| */
+		kde_len = 2 + RSN_SELECTOR_LEN + 2 + gsm->GTK_len +
+			ieee80211w_kde_len(sm);
 	}
 
+	if (!is_ml && sm->group->wpa_group_state == WPA_GROUP_SETKEYSDONE)
+		wpa_auth_get_seqnum(sm->wpa_auth, NULL, gsm->GN, rsc);
+
+	/*
+	 * As the Key Delivery element can exceed the size of 255 bytes need to
+	 * handle fragmentation.
+	 */
+	slice_len = kde_len <= 246 ? kde_len : 246;
+	/* ElementID(0xff)|Length(1B)|ElementID Extn(1B)|RSC(8B)|KDE list */
+	*eid++ = WLAN_EID_EXTENSION;
+	*eid++ = slice_len + 1 + WPA_KEY_RSC_LEN;
+	*eid++ = WLAN_EID_EXT_KEY_DELIVERY;
+	os_memcpy(eid, rsc, WPA_KEY_RSC_LEN);
+	eid += WPA_KEY_RSC_LEN;
+
+	os_memcpy(eid, ptr, slice_len);
+
+	ptr += slice_len;
+	eid += slice_len;
+	kde_len -= slice_len;
+
+	while (kde_len) {
+		slice_len = kde_len <= 255 ? kde_len : 255;
+		*eid++ = WLAN_EID_FRAGMENT;
+		*eid++ = slice_len;
+		os_memcpy(eid, ptr, slice_len);
+
+		ptr += slice_len;
+		eid += slice_len;
+		kde_len -= slice_len;
+	}
+
+	bin_clear_free(buf, buflen);
 	return eid;
 }
 
