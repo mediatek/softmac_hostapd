@@ -305,9 +305,9 @@ static struct wpabuf * pasn_get_fils_wd(struct pasn_data *pasn)
 
 	/* FILS Nonce */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
-	wpabuf_put_u8(buf, 1 + FILS_NONCE_LEN);
-	wpabuf_put_u8(buf, WLAN_EID_EXT_FILS_NONCE);
-	wpabuf_put_data(buf, fils->anonce, FILS_NONCE_LEN);
+	wpabuf_put_u8(buf, 1 + NONCE_LEN);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_NONCE);
+	wpabuf_put_data(buf, fils->anonce, NONCE_LEN);
 
 	/* FILS Session */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);

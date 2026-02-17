@@ -94,7 +94,7 @@ struct ieee802_11_elems {
 	const u8 *key_delivery;
 	const u8 *wrapped_data;
 	const u8 *fils_pk;
-	const u8 *fils_nonce;
+	const u8 *nonce;
 	const u8 *owe_dh;
 	const u8 *power_capab;
 	const u8 *roaming_cons_sel;

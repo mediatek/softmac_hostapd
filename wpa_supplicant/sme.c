@@ -2302,7 +2302,7 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 	struct ieee802_11_elems elems;
 	struct wpa_ssid *ssid = wpa_s->current_ssid;
 #ifdef CONFIG_FILS
-	u8 nonces[2 * FILS_NONCE_LEN];
+	u8 nonces[2 * NONCE_LEN];
 #endif /* CONFIG_FILS */
 #ifdef CONFIG_HT_OVERRIDES
 	struct ieee80211_ht_capabilities htcaps;
@@ -2394,8 +2394,8 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 			    wpa_s->sme.assoc_req_ie,
 			    wpa_s->sme.assoc_req_ie_len);
 
-		os_memcpy(nonces, snonce, FILS_NONCE_LEN);
-		os_memcpy(nonces + FILS_NONCE_LEN, anonce, FILS_NONCE_LEN);
+		os_memcpy(nonces, snonce, NONCE_LEN);
+		os_memcpy(nonces + NONCE_LEN, anonce, NONCE_LEN);
 		params.fils_nonces = nonces;
 		params.fils_nonces_len = sizeof(nonces);
 	}

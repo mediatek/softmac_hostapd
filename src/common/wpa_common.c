@@ -707,7 +707,7 @@ int fils_rmsk_to_pmk(int akmp, const u8 *rmsk, size_t rmsk_len,
 		     const u8 *snonce, const u8 *anonce, const u8 *dh_ss,
 		     size_t dh_ss_len, u8 *pmk, size_t *pmk_len)
 {
-	u8 nonces[2 * FILS_NONCE_LEN];
+	u8 nonces[2 * NONCE_LEN];
 	const u8 *addr[2];
 	size_t len[2];
 	size_t num_elem;
@@ -724,12 +724,12 @@ int fils_rmsk_to_pmk(int akmp, const u8 *rmsk, size_t rmsk_len,
 		return -1;
 
 	wpa_hexdump_key(MSG_DEBUG, "FILS: rMSK", rmsk, rmsk_len);
-	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, FILS_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, NONCE_LEN);
 	wpa_hexdump(MSG_DEBUG, "FILS: DHss", dh_ss, dh_ss_len);
 
-	os_memcpy(nonces, snonce, FILS_NONCE_LEN);
-	os_memcpy(&nonces[FILS_NONCE_LEN], anonce, FILS_NONCE_LEN);
+	os_memcpy(nonces, snonce, NONCE_LEN);
+	os_memcpy(&nonces[NONCE_LEN], anonce, NONCE_LEN);
 	addr[0] = rmsk;
 	len[0] = rmsk_len;
 	num_elem = 1;
@@ -739,10 +739,10 @@ int fils_rmsk_to_pmk(int akmp, const u8 *rmsk, size_t rmsk_len,
 		num_elem++;
 	}
 	if (wpa_key_mgmt_sha384(akmp))
-		res = hmac_sha384_vector(nonces, 2 * FILS_NONCE_LEN, num_elem,
+		res = hmac_sha384_vector(nonces, 2 * NONCE_LEN, num_elem,
 					 addr, len, pmk);
 	else
-		res = hmac_sha256_vector(nonces, 2 * FILS_NONCE_LEN, num_elem,
+		res = hmac_sha256_vector(nonces, 2 * NONCE_LEN, num_elem,
 					 addr, len, pmk);
 	if (res == 0)
 		wpa_hexdump_key(MSG_DEBUG, "FILS: PMK", pmk, *pmk_len);
@@ -805,7 +805,7 @@ int fils_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const u8 *spa, const u8 *aa,
 	 * KDK = L(FILS-Key-Data, ICK_bits + KEK_bits + TK_bits + FILS-FT_bits,
 	 *	   KDK_bits)
 	 */
-	data_len = 2 * ETH_ALEN + 2 * FILS_NONCE_LEN + dhss_len;
+	data_len = 2 * ETH_ALEN + 2 * NONCE_LEN + dhss_len;
 	data = os_malloc(data_len);
 	if (!data)
 		goto err;
@@ -814,10 +814,10 @@ int fils_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const u8 *spa, const u8 *aa,
 	pos += ETH_ALEN;
 	os_memcpy(pos, aa, ETH_ALEN);
 	pos += ETH_ALEN;
-	os_memcpy(pos, snonce, FILS_NONCE_LEN);
-	pos += FILS_NONCE_LEN;
-	os_memcpy(pos, anonce, FILS_NONCE_LEN);
-	pos += FILS_NONCE_LEN;
+	os_memcpy(pos, snonce, NONCE_LEN);
+	pos += NONCE_LEN;
+	os_memcpy(pos, anonce, NONCE_LEN);
+	pos += NONCE_LEN;
 	if (dhss)
 		os_memcpy(pos, dhss, dhss_len);
 
@@ -871,8 +871,8 @@ int fils_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const u8 *spa, const u8 *aa,
 
 	wpa_printf(MSG_DEBUG, "FILS: PTK derivation - SPA=" MACSTR
 		   " AA=" MACSTR, MAC2STR(spa), MAC2STR(aa));
-	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, FILS_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, NONCE_LEN);
 	if (dhss)
 		wpa_hexdump_key(MSG_DEBUG, "FILS: DHss", dhss, dhss_len);
 	wpa_hexdump_key(MSG_DEBUG, "FILS: PMK", pmk, pmk_len);
@@ -928,8 +928,8 @@ int fils_key_auth_sk(const u8 *ick, size_t ick_len, const u8 *snonce,
 	wpa_printf(MSG_DEBUG, "FILS: Key-Auth derivation: STA-MAC=" MACSTR
 		   " AP-BSSID=" MACSTR, MAC2STR(sta_addr), MAC2STR(bssid));
 	wpa_hexdump_key(MSG_DEBUG, "FILS: ICK", ick, ick_len);
-	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, FILS_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: SNonce", snonce, NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", anonce, NONCE_LEN);
 	wpa_hexdump(MSG_DEBUG, "FILS: gSTA", g_sta, g_sta_len);
 	wpa_hexdump(MSG_DEBUG, "FILS: gAP", g_ap, g_ap_len);
 
@@ -939,9 +939,9 @@ int fils_key_auth_sk(const u8 *ick, size_t ick_len, const u8 *snonce,
 	 *                      [ || gSTA || gAP ])
 	 */
 	addr[0] = snonce;
-	len[0] = FILS_NONCE_LEN;
+	len[0] = NONCE_LEN;
 	addr[1] = anonce;
-	len[1] = FILS_NONCE_LEN;
+	len[1] = NONCE_LEN;
 	addr[2] = sta_addr;
 	len[2] = ETH_ALEN;
 	addr[3] = bssid;

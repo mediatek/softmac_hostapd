@@ -987,16 +987,16 @@ static void process_fils_auth(struct wlantest *wt, struct wlantest_bss *bss,
 		sta->pairwise_cipher = data.pairwise_cipher;
 	}
 
-	if (!elems.fils_nonce) {
+	if (!elems.nonce) {
 		add_note(wt, MSG_INFO,
 			 "FILS Authentication frame missing nonce");
 		return;
 	}
 
 	if (ether_addr_equal(mgmt->sa, mgmt->bssid))
-		os_memcpy(sta->anonce, elems.fils_nonce, FILS_NONCE_LEN);
+		os_memcpy(sta->anonce, elems.nonce, NONCE_LEN);
 	else
-		os_memcpy(sta->snonce, elems.fils_nonce, FILS_NONCE_LEN);
+		os_memcpy(sta->snonce, elems.nonce, NONCE_LEN);
 }
 
 
@@ -1365,10 +1365,10 @@ static int try_rmsk(struct wlantest *wt, struct wlantest_bss *bss,
 	aad_len[1] = ETH_ALEN;
 	/* The STA's nonce */
 	aad[2] = sta->snonce;
-	aad_len[2] = FILS_NONCE_LEN;
+	aad_len[2] = NONCE_LEN;
 	/* The AP's nonce */
 	aad[3] = sta->anonce;
-	aad_len[3] = FILS_NONCE_LEN;
+	aad_len[3] = NONCE_LEN;
 	/*
 	 * The (Re)Association Request frame from the Capability Information
 	 * field to the FILS Session element (both inclusive).
@@ -1586,10 +1586,10 @@ static void decrypt_fils_assoc_resp(struct wlantest *wt,
 	aad_len[1] = ETH_ALEN;
 	/* The AP's nonce */
 	aad[2] = sta->anonce;
-	aad_len[2] = FILS_NONCE_LEN;
+	aad_len[2] = NONCE_LEN;
 	/* The STA's nonce */
 	aad[3] = sta->snonce;
-	aad_len[3] = FILS_NONCE_LEN;
+	aad_len[3] = NONCE_LEN;
 	/*
 	 * The (Re)Association Response frame from the Capability Information
 	 * field to the FILS Session element (both inclusive).

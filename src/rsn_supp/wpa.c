@@ -6083,12 +6083,12 @@ struct wpabuf * fils_build_auth(struct wpa_sm *sm, int dh_group, const u8 *md)
 		goto fail;
 	}
 
-	if (random_get_bytes(sm->fils_nonce, FILS_NONCE_LEN) < 0 ||
+	if (random_get_bytes(sm->fils_nonce, NONCE_LEN) < 0 ||
 	    random_get_bytes(sm->fils_session, FILS_SESSION_LEN) < 0)
 		goto fail;
 
 	wpa_hexdump(MSG_DEBUG, "FILS: Generated FILS Nonce",
-		    sm->fils_nonce, FILS_NONCE_LEN);
+		    sm->fils_nonce, NONCE_LEN);
 	wpa_hexdump(MSG_DEBUG, "FILS: Generated FILS Session",
 		    sm->fils_session, FILS_SESSION_LEN);
 
@@ -6153,10 +6153,10 @@ struct wpabuf * fils_build_auth(struct wpa_sm *sm, int dh_group, const u8 *md)
 
 	/* FILS Nonce */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION); /* Element ID */
-	wpabuf_put_u8(buf, 1 + FILS_NONCE_LEN); /* Length */
+	wpabuf_put_u8(buf, 1 + NONCE_LEN); /* Length */
 	/* Element ID Extension */
-	wpabuf_put_u8(buf, WLAN_EID_EXT_FILS_NONCE);
-	wpabuf_put_data(buf, sm->fils_nonce, FILS_NONCE_LEN);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_NONCE);
+	wpabuf_put_data(buf, sm->fils_nonce, NONCE_LEN);
 
 	/* FILS Session */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION); /* Element ID */
@@ -6281,12 +6281,12 @@ int fils_process_auth(struct wpa_sm *sm, const u8 *bssid, const u8 *data,
 		goto fail;
 	}
 
-	if (!elems.fils_nonce) {
+	if (!elems.nonce) {
 		wpa_printf(MSG_DEBUG, "FILS: No FILS Nonce field");
 		goto fail;
 	}
-	os_memcpy(sm->fils_anonce, elems.fils_nonce, FILS_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", sm->fils_anonce, FILS_NONCE_LEN);
+	os_memcpy(sm->fils_anonce, elems.nonce, NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: ANonce", sm->fils_anonce, NONCE_LEN);
 
 #ifdef CONFIG_IEEE80211R
 	if (wpa_key_mgmt_ft(sm->key_mgmt)) {
@@ -6745,11 +6745,9 @@ struct wpabuf * fils_build_assoc_req(struct wpa_sm *sm, const u8 **kek,
 	*kek_len = sm->ptk.kek_len;
 	wpa_hexdump_key(MSG_DEBUG, "FILS: KEK for AEAD", *kek, *kek_len);
 	*snonce = sm->fils_nonce;
-	wpa_hexdump(MSG_DEBUG, "FILS: SNonce for AEAD AAD",
-		    *snonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: SNonce for AEAD AAD", *snonce, NONCE_LEN);
 	*anonce = sm->fils_anonce;
-	wpa_hexdump(MSG_DEBUG, "FILS: ANonce for AEAD AAD",
-		    *anonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "FILS: ANonce for AEAD AAD", *anonce, NONCE_LEN);
 
 	return buf;
 }

@@ -3179,8 +3179,8 @@ int fils_auth_pmk_to_ptk(struct wpa_state_machine *sm, const u8 *pmk,
 	forced_memzero(ick, sizeof(ick));
 
 	/* Store nonces for (Re)Association Request/Response frame processing */
-	os_memcpy(sm->SNonce, snonce, FILS_NONCE_LEN);
-	os_memcpy(sm->ANonce, anonce, FILS_NONCE_LEN);
+	os_memcpy(sm->SNonce, snonce, NONCE_LEN);
+	os_memcpy(sm->ANonce, anonce, NONCE_LEN);
 
 	return res;
 }
@@ -3397,10 +3397,10 @@ int fils_decrypt_assoc(struct wpa_state_machine *sm, const u8 *fils_session,
 	aad_len[1] = ETH_ALEN;
 	/* The STA's nonce */
 	aad[2] = sm->SNonce;
-	aad_len[2] = FILS_NONCE_LEN;
+	aad_len[2] = NONCE_LEN;
 	/* The AP's nonce */
 	aad[3] = sm->ANonce;
-	aad_len[3] = FILS_NONCE_LEN;
+	aad_len[3] = NONCE_LEN;
 	/*
 	 * The (Re)Association Request frame from the Capability Information
 	 * field to the FILS Session element (both inclusive).
@@ -3456,10 +3456,10 @@ int fils_encrypt_assoc(struct wpa_state_machine *sm, u8 *buf,
 	aad_len[1] = ETH_ALEN;
 	/* The AP's nonce */
 	aad[2] = sm->ANonce;
-	aad_len[2] = FILS_NONCE_LEN;
+	aad_len[2] = NONCE_LEN;
 	/* The STA's nonce */
 	aad[3] = sm->SNonce;
-	aad_len[3] = FILS_NONCE_LEN;
+	aad_len[3] = NONCE_LEN;
 	/*
 	 * The (Re)Association Response frame from the Capability Information
 	 * field (the same offset in both Association and Reassociation

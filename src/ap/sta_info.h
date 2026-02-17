@@ -262,7 +262,7 @@ struct sta_info {
 #endif /* CONFIG_TAXONOMY */
 
 #ifdef CONFIG_FILS
-	u8 fils_snonce[FILS_NONCE_LEN];
+	u8 fils_snonce[NONCE_LEN];
 	u8 fils_session[FILS_SESSION_LEN];
 	u8 fils_erp_pmkid[PMKID_LEN];
 	u8 *fils_pending_assoc_req;

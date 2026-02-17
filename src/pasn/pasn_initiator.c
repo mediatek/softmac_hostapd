@@ -273,12 +273,12 @@ static struct wpabuf * wpas_pasn_fils_build_auth(struct pasn_data *pasn)
 		return NULL;
 	}
 
-	if (random_get_bytes(pasn->fils.nonce, FILS_NONCE_LEN) < 0 ||
+	if (random_get_bytes(pasn->fils.nonce, NONCE_LEN) < 0 ||
 	    random_get_bytes(pasn->fils.session, FILS_SESSION_LEN) < 0)
 		goto fail;
 
 	wpa_hexdump(MSG_DEBUG, "PASN: FILS: Nonce", pasn->fils.nonce,
-		    FILS_NONCE_LEN);
+		    NONCE_LEN);
 
 	wpa_hexdump(MSG_DEBUG, "PASN: FILS: Session", pasn->fils.session,
 		    FILS_SESSION_LEN);
@@ -301,9 +301,9 @@ static struct wpabuf * wpas_pasn_fils_build_auth(struct pasn_data *pasn)
 
 	/* FILS Nonce */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
-	wpabuf_put_u8(buf, 1 + FILS_NONCE_LEN);
-	wpabuf_put_u8(buf, WLAN_EID_EXT_FILS_NONCE);
-	wpabuf_put_data(buf, pasn->fils.nonce, FILS_NONCE_LEN);
+	wpabuf_put_u8(buf, 1 + NONCE_LEN);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_NONCE);
+	wpabuf_put_data(buf, pasn->fils.nonce, NONCE_LEN);
 
 	/* FILS Session */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
@@ -366,7 +366,7 @@ static int wpas_pasn_wd_fils_rx(struct pasn_data *pasn, struct wpabuf *wd)
 	struct wpa_ie_data rsne_data;
 	u8 rmsk[ERP_MAX_KEY_LEN];
 	size_t rmsk_len;
-	u8 anonce[FILS_NONCE_LEN];
+	u8 anonce[NONCE_LEN];
 	const u8 *data;
 	size_t buf_len;
 	struct wpabuf *fils_wd = NULL;
@@ -410,7 +410,7 @@ static int wpas_pasn_wd_fils_rx(struct pasn_data *pasn, struct wpabuf *wd)
 		return -1;
 	}
 
-	if (!elems.rsn_ie || !elems.fils_nonce || !elems.fils_nonce ||
+	if (!elems.rsn_ie || !elems.nonce || !elems.nonce ||
 	    !elems.wrapped_data) {
 		wpa_printf(MSG_DEBUG, "PASN: FILS: Missing IEs");
 		return -1;
@@ -435,9 +435,8 @@ static int wpas_pasn_wd_fils_rx(struct pasn_data *pasn, struct wpabuf *wd)
 		return -1;
 	}
 
-	wpa_hexdump(MSG_DEBUG, "PASN: FILS: ANonce", elems.fils_nonce,
-		    FILS_NONCE_LEN);
-	os_memcpy(anonce, elems.fils_nonce, FILS_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "PASN: FILS: ANonce", elems.nonce, NONCE_LEN);
+	os_memcpy(anonce, elems.nonce, NONCE_LEN);
 
 	wpa_hexdump(MSG_DEBUG, "PASN: FILS: FILS Session", elems.fils_session,
 		    FILS_SESSION_LEN);

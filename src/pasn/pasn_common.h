@@ -29,8 +29,8 @@ enum pasn_fils_state {
 
 struct pasn_fils {
 	u8 state;
-	u8 nonce[FILS_NONCE_LEN];
-	u8 anonce[FILS_NONCE_LEN];
+	u8 nonce[NONCE_LEN];
+	u8 anonce[NONCE_LEN];
 	u8 session[FILS_SESSION_LEN];
 	u8 erp_pmkid[PMKID_LEN];
 	bool completed;
