@@ -415,6 +415,12 @@ pasn_derive_keys(struct pasn_data *pasn,
 
 	pasn->pmk_len = pmk_len;
 	os_memcpy(pasn->pmk, pmk, pmk_len);
+
+#ifdef CONFIG_ENC_ASSOC
+	if (pasn->auth_alg == WLAN_AUTH_EPPKE && pasn->is_ml_peer)
+		own_addr = pasn->mld_addr;
+#endif /* CONFIG_ENC_ASSOC */
+
 	ret = pasn_pmk_to_ptk(pmk, pmk_len, peer_addr, own_addr,
 			      wpabuf_head(secret), wpabuf_len(secret),
 			      &pasn->ptk, pasn->akmp,
@@ -643,6 +649,11 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 	} else {
 		data = rsn_ie;
 	}
+
+#ifdef CONFIG_ENC_ASSOC
+	if (pasn->auth_alg == WLAN_AUTH_EPPKE && pasn->is_ml_peer)
+		own_addr = pasn->mld_addr;
+#endif /* CONFIG_ENC_ASSOC */
 
 	ret = pasn_mic(pasn->hash_alg, pasn->ptk.kck, pasn->ptk.kck_len,
 		       own_addr, peer_addr, data, data_len,
@@ -1018,6 +1029,19 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 		goto send_resp;
 	}
 
+#ifdef CONFIG_ENC_ASSOC
+	if (pasn->auth_alg == WLAN_AUTH_EPPKE && !pasn->authorized &&
+	    pasn->eppke_set_key) {
+		/* TODO: Support VLAN ID assignment based on configured
+		 * SAE passwords. */
+		pasn->eppke_set_key(pasn->cb_ctx,
+				    wpa_cipher_to_alg(pasn->cipher),
+				    peer_addr, 0, pasn->ptk.tk,
+				    pasn->ptk.tk_len);
+		pasn->tk_configured = true;
+	}
+#endif /* CONFIG_ENC_ASSOC */
+
 	wpabuf_free(pasn->auth1);
 	pasn->auth1 = wpabuf_alloc_copy(((const u8 *) mgmt) + IEEE80211_HDRLEN,
 					len - IEEE80211_HDRLEN);
@@ -1098,6 +1122,11 @@ int handle_auth_pasn_3(struct pasn_data *pasn, const u8 *own_addr,
 			   "PASN: Public key should not be included");
 		goto fail;
 	}
+
+#ifdef CONFIG_ENC_ASSOC
+	if (pasn->auth_alg == WLAN_AUTH_EPPKE && pasn->is_ml_peer)
+		own_addr = pasn->mld_addr;
+#endif /* CONFIG_ENC_ASSOC */
 
 	/* Verify the MIC */
 	copy_len = len - offsetof(struct ieee80211_mgmt, u.auth);

@@ -47,7 +47,11 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 					      unsigned int wait),
 			     int (*validate_custom_pmkid)(void *ctx,
 							  const u8 *addr,
-							  const u8 *pmkid))
+							  const u8 *pmkid),
+			     int (*eppke_set_key)(void *ctx, enum wpa_alg alg,
+						  const u8 *addr, int vlan_id,
+						  const u8 *key,
+						  size_t key_len))
 {
 	if (!pasn)
 		return;
@@ -55,6 +59,9 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 	pasn->cb_ctx = cb_ctx;
 	pasn->send_mgmt = send_mgmt;
 	pasn->validate_custom_pmkid = validate_custom_pmkid;
+#ifdef CONFIG_ENC_ASSOC
+	pasn->eppke_set_key = eppke_set_key;
+#endif /* CONFIG_ENC_ASSOC */
 }
 
 

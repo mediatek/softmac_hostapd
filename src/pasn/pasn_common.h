@@ -140,6 +140,10 @@ struct pasn_data {
 	u16 comeback_idx;
 	u16 *comeback_pending_idx;
 	struct wpabuf *frame;
+#ifdef CONFIG_ENC_ASSOC
+	bool authorized;
+	bool tk_configured;
+#endif /* CONFIG_ENC_ASSOC */
 
 	/**
 	 * send_mgmt - Function handler to transmit a Management frame
@@ -165,6 +169,10 @@ struct pasn_data {
 	int (*prepare_data_element)(void *ctx, const u8 *peer_addr);
 
 	int (*parse_data_element)(void *ctx, const u8 *data, size_t len);
+#ifdef CONFIG_ENC_ASSOC
+	int (*eppke_set_key)(void *ctx, enum wpa_alg alg, const u8 *addr,
+			     int vlan_id, const u8 *key, size_t key_len);
+#endif /* CONFIG_ENC_ASSOC */
 };
 
 /* Initiator */
@@ -207,7 +215,12 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 					      unsigned int wait),
 			     int (*validate_custom_pmkid)(void *ctx,
 							  const u8 *addr,
-							  const u8 *pmkid));
+							  const u8 *pmkid),
+			     int (*eppke_set_key)(void *ctx, enum wpa_alg alg,
+						  const u8 *addr, int vlan_id,
+						  const u8 *key,
+						  size_t key_len));
+
 void pasn_enable_kdk_derivation(struct pasn_data *pasn);
 void pasn_disable_kdk_derivation(struct pasn_data *pasn);
 
