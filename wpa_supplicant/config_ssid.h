@@ -1344,6 +1344,16 @@ struct wpa_ssid {
 	 * sae_password_id_change - Whether to use changing SAE password IDs
 	 */
 	bool sae_password_id_change;
+
+	/**
+	 * pmksa_privacy - Enable/disable PMKSA caching privacy
+	 * 0 = PMKSA caching privacy enabled
+	 * 1 = PMKSA caching privacy disabled
+	 *
+	 * When enabled, a unique PMKID will be generated for each subsequent
+	 * connection even if the same cached PMKSA is reused.
+	 */
+	int pmksa_privacy;
 };
 
 #endif /* CONFIG_SSID_H */

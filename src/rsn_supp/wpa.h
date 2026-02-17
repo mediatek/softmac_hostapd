@@ -146,6 +146,7 @@ enum wpa_sm_conf_params {
 	WPA_PARAM_URNM_MFPR_X20,
 	WPA_PARAM_SAE_PW_ID_CHANGE,
 	WPA_PARAM_ASSOC_ENC,
+	WPA_PARAM_PMKSA_CACHING_PRIVACY,
 };
 
 enum wpa_rsn_override {
@@ -691,5 +692,6 @@ struct wpabuf * wpa_sm_known_sta_identification(struct wpa_sm *sm, const u8 *aa,
 						u64 timestamp);
 int wpa_sm_install_mlo_group_keys(struct wpa_sm *sm, const u8 *key_data,
 				  size_t key_data_len, u16 added_links_bitmap);
+bool wpa_sm_pmksa_privacy_supported(struct wpa_sm *sm);
 
 #endif /* WPA_H */

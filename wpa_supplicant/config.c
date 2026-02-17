@@ -2840,6 +2840,9 @@ static const struct parse_data ssid_fields[] = {
 	{ INT_RANGE(ssid_protection, 0, 1)},
 	{ INT_RANGE(rsn_overriding, 0, 2)},
 	{ INT_RANGE(sae_password_id_change, 0, 1)},
+#ifdef CONFIG_PMKSA_PRIVACY
+	{ INT_RANGE(pmksa_privacy, 0, 1)},
+#endif /* CONFIG_PMKSA_PRIVACY */
 };
 
 #undef OFFSET

@@ -333,6 +333,10 @@ int wpa_gen_rsnxe(struct wpa_sm *sm, u8 *rsnxe, size_t rsnxe_len)
 		capab |= BIT(WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) |
 			BIT(WLAN_RSNX_CAPAB_KEK_IN_PASN);
 #endif /* CONFIG_ENC_ASSOC */
+#ifdef CONFIG_PMKSA_PRIVACY
+	if (sm->pmksa_privacy)
+		capab |= BIT(WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
+#endif /* CONFIG_PMKSA_PRIVACY */
 
 	if (!capab)
 		return 0; /* no supported extended RSN capabilities */
