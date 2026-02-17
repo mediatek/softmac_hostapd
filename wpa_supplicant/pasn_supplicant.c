@@ -716,7 +716,8 @@ static void wpas_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 		capab |= BIT(WLAN_RSNX_CAPAB_SPP_A_MSDU);
 
 	pasn_set_rsnxe_caps(pasn, capab);
-	pasn_register_callbacks(pasn, wpa_s, wpas_pasn_send_mlme, NULL, NULL);
+	pasn_register_callbacks(pasn, wpa_s, wpas_pasn_send_mlme, NULL, NULL,
+				NULL);
 	ssid = wpa_config_get_network(wpa_s->conf, awork->network_id);
 
 #ifdef CONFIG_SAE
@@ -974,7 +975,8 @@ int wpas_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 	wpabuf_free(pasn->frame);
 	pasn->frame = NULL;
 
-	pasn_register_callbacks(pasn, wpa_s, wpas_pasn_send_mlme, NULL, NULL);
+	pasn_register_callbacks(pasn, wpa_s, wpas_pasn_send_mlme, NULL, NULL,
+				NULL);
 	ret = wpa_pasn_auth_rx(pasn, (const u8 *) mgmt, len, &pasn_data);
 	if (ret == 0) {
 		ptksa_cache_add(wpa_s->ptksa, pasn->own_addr, pasn->peer_addr,

@@ -144,6 +144,9 @@ struct pasn_data {
 	bool authorized;
 	bool tk_configured;
 #endif /* CONFIG_ENC_ASSOC */
+#ifdef CONFIG_PMKSA_PRIVACY
+	bool pmksa_caching_privacy;
+#endif /* CONFIG_PMKSA_PRIVACY */
 
 	/**
 	 * send_mgmt - Function handler to transmit a Management frame
@@ -173,6 +176,9 @@ struct pasn_data {
 	int (*eppke_set_key)(void *ctx, enum wpa_alg alg, const u8 *addr,
 			     int vlan_id, const u8 *key, size_t key_len);
 #endif /* CONFIG_ENC_ASSOC */
+	struct rsn_pmksa_cache_entry *
+	(*pmksa_cache_search)(void *ctx, const u8 *spa, const u8 *pmkid,
+			      bool is_ml);
 };
 
 /* Initiator */
@@ -227,7 +233,11 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 			     int (*eppke_set_key)(void *ctx, enum wpa_alg alg,
 						  const u8 *addr, int vlan_id,
 						  const u8 *key,
-						  size_t key_len));
+						  size_t key_len),
+			     struct rsn_pmksa_cache_entry *
+			     (*pmksa_cache_search)(void *ctx, const u8 *spa,
+						   const u8 *pmkid,
+						   bool is_ml));
 
 void pasn_enable_kdk_derivation(struct pasn_data *pasn);
 void pasn_disable_kdk_derivation(struct pasn_data *pasn);

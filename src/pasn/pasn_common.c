@@ -52,7 +52,10 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 			     int (*eppke_set_key)(void *ctx, enum wpa_alg alg,
 						  const u8 *addr, int vlan_id,
 						  const u8 *key,
-						  size_t key_len))
+						  size_t key_len),
+			     struct rsn_pmksa_cache_entry *
+			     (*pmksa_cache_search)(void *ctx, const u8 *spa,
+						   const u8 *pmkid, bool is_ml))
 {
 	if (!pasn)
 		return;
@@ -63,6 +66,7 @@ void pasn_register_callbacks(struct pasn_data *pasn, void *cb_ctx,
 #ifdef CONFIG_ENC_ASSOC
 	pasn->eppke_set_key = eppke_set_key;
 #endif /* CONFIG_ENC_ASSOC */
+	pasn->pmksa_cache_search = pmksa_cache_search;
 }
 
 

@@ -7285,7 +7285,7 @@ int p2p_pasn_auth_rx(struct p2p_data *p2p, const struct ieee80211_mgmt *mgmt,
 	pasn_register_callbacks(pasn, p2p->cfg->cb_ctx,
 				p2p->cfg->pasn_send_mgmt,
 				p2p->cfg->pasn_validate_pmkid,
-				NULL);
+				NULL, NULL);
 	auth_transaction = le_to_host16(mgmt->u.auth.auth_transaction);
 
 	if (dev->role == P2P_ROLE_PAIRING_INITIATOR &&

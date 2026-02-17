@@ -2991,6 +2991,43 @@ static int hapd_pasn_send_mlme(void *ctx, const u8 *data, size_t data_len,
 }
 
 
+static struct rsn_pmksa_cache_entry *
+pmksa_cache_search(void *ctx, const u8 *spa, const u8 *pmkid, bool is_ml)
+{
+	struct hostapd_data *hapd = ctx;
+	struct rsn_pmksa_cache_entry *entry;
+	struct rsn_pmksa_cache *pmksa = wpa_auth_get_pmksa_cache(hapd->wpa_auth,
+								 is_ml);
+
+	entry = pmksa_cache_auth_get(pmksa, spa, pmkid);
+	if (entry)
+		return entry;
+
+#ifdef CONFIG_IEEE80211BE
+	if (is_ml) {
+		struct hostapd_data *tmp_hapd;
+
+		/* Search in link caches of each affiliated AP MLD link */
+		for_each_mld_link(tmp_hapd, hapd) {
+			pmksa = wpa_auth_get_pmksa_cache(tmp_hapd->wpa_auth,
+							 false);
+			entry = pmksa_cache_auth_get(pmksa, spa, pmkid);
+			if (entry)
+				return entry;
+		}
+	} else if (hapd->conf->mld_ap) {
+		/* Search in the MLD cache */
+		pmksa = wpa_auth_get_pmksa_cache(hapd->wpa_auth, true);
+		entry = pmksa_cache_auth_get(pmksa, spa, pmkid);
+		if (entry)
+			return entry;
+	}
+#endif /* CONFIG_IEEE80211BE */
+
+	return NULL;
+}
+
+
 #ifdef CONFIG_ENC_ASSOC
 static int eppke_set_key(void *ctx, enum wpa_alg alg, const u8 *addr,
 			 int vlan_id, const u8 *key, size_t key_len)
@@ -3012,9 +3049,12 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 	struct pasn_data *pasn = sta->pasn;
 
 	pasn_register_callbacks(pasn, hapd, hapd_pasn_send_mlme,
-				NULL, eppke_set_key);
+				NULL, eppke_set_key, pmksa_cache_search);
 	pasn_set_bssid(pasn, hapd->own_addr);
 	pasn_set_own_addr(pasn, hapd->own_addr);
+#ifdef CONFIG_PMKSA_PRIVACY
+	pasn->pmksa_caching_privacy = hapd->conf->pmksa_caching_privacy;
+#endif /* CONFIG_PMKSA_PRIVACY */
 #if defined(CONFIG_IEEE80211BE) && defined(CONFIG_ENC_ASSOC)
 	/* Per IEEE802.11bi/D4.0, 12.16.9 (Enhanced privacy
 	 * protection key exchange), if (Re)Association frame

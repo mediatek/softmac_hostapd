@@ -702,6 +702,35 @@ fail:
 }
 
 
+static struct rsn_pmksa_cache_entry *
+pasn_resp_find_pmksa(struct pasn_data *pasn, const struct ieee80211_mgmt *mgmt,
+		     const struct ieee802_11_elems *elems, const u8 *peer_addr,
+		     const u8 *pmkid)
+{
+#ifdef CONFIG_PMKSA_PRIVACY
+	/* Per IEEE 802.11bi/D4.0, 12.16.7 (PMKSA caching privacy), a STA can
+	 * randomize its MAC address or MLD MAC address to avoid tracking based
+	 * on the MAC address. With PMKSA caching privacy, PMKSA entries can
+	 * still be found using the latest derived PMKID. In this cases, the MAC
+	 * address matching is not used. */
+	if (pasn->pmksa_cache_search &&
+	    mgmt->u.auth.auth_alg == WLAN_AUTH_EPPKE &&
+	    pasn->pmksa_caching_privacy &&
+	    ieee802_11_rsnx_capab_len(elems->rsnxe, elems->rsnxe_len,
+				      WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY)) {
+		struct rsn_pmksa_cache_entry *pmksa;
+
+		pmksa = pasn->pmksa_cache_search(pasn->cb_ctx, NULL, pmkid,
+						 pasn->is_ml_peer);
+		if (pmksa)
+			return pmksa;
+	}
+#endif /* CONFIG_PMKSA_PRIVACY */
+
+	return pmksa_cache_auth_get(pasn->pmksa, peer_addr, pmkid);
+}
+
+
 int handle_auth_pasn_1(struct pasn_data *pasn,
 		       const u8 *own_addr, const u8 *peer_addr,
 		       const struct ieee80211_mgmt *mgmt, size_t len,
@@ -1014,7 +1043,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 					pmkid = rsn_data.pmkid;
 				}
 
-				pmksa = pmksa_cache_auth_get(pasn->pmksa,
+				pmksa = pasn_resp_find_pmksa(pasn, mgmt, &elems,
 							     peer_addr,
 							     pmkid);
 				if (pmksa) {
