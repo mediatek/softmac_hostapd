@@ -2845,6 +2845,70 @@ int rsn_pmkid_suite_b_192(const u8 *kck, size_t kck_len, const u8 *aa,
 #endif /* CONFIG_SUITEB192 */
 
 
+#ifdef CONFIG_PMKSA_PRIVACY
+/**
+ * rsn_pmkid_privacy - Calculate a new PMKID for PMKSA caching privacy
+ * @pmkid_anonce: Authenticator nonce (ANonce)
+ * @pmkid_snonce: Supplicant nonce (SNonce)
+ * @akmp: Negotiated key management protocol
+ * @pmk_len: PMK length in bytes
+ * @pmkid: Buffer for returning PMKID
+ * Returns: 0 on success, -1 on failure
+ *
+ * IEEE P802.11bi/D4.0, 12.16.7.2 (PMKID privacy)
+ * PMKID = Truncate-128(Hash("PMK Name" || PMKIDANonce || PMKIDSNonce))
+ */
+int rsn_pmkid_privacy(const u8 *pmkid_anonce, const u8 *pmkid_snonce,
+		      int akmp, size_t pmk_len, u8 *pmkid)
+{
+	const char *label = "PMK Name";
+	const u8 *addr[3];
+	const size_t len[3] = { 8, NONCE_LEN, NONCE_LEN };
+	unsigned char hash[SHA512_MAC_LEN];
+
+	wpa_hexdump(MSG_DEBUG, "PMKID privacy: PMKIDANonce",
+		    pmkid_anonce, NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "PMKID privacy: PMKIDSNonce",
+		    pmkid_snonce, NONCE_LEN);
+
+	addr[0] = (const u8 *) label;
+	addr[1] = pmkid_anonce;
+	addr[2] = pmkid_snonce;
+
+	if (0) {
+#if defined(CONFIG_FILS) || defined(CONFIG_SHA384)
+	} else if (wpa_key_mgmt_sha384(akmp)) {
+		wpa_printf(MSG_DEBUG, "RSN: Derive PMKID using SHA-384");
+		if (sha384_vector(3, addr, len, hash) < 0)
+			return -1;
+#endif /* CONFIG_FILS || CONFIG_SHA384 */
+#ifdef CONFIG_SAE
+	} else if (wpa_key_mgmt_sae_ext_key(akmp)) {
+		if (pmk_len == 64) {
+			if (sha512_vector(3, addr, len, hash) < 0)
+				return -1;
+		} else if (pmk_len == 48) {
+			if (sha384_vector(3, addr, len, hash) < 0)
+				return -1;
+		} else {
+			if (sha256_vector(3, addr, len, hash) < 0)
+				return -1;
+		}
+#endif /* CONFIG_SAE */
+	} else {
+		wpa_printf(MSG_DEBUG, "RSN: Derive PMKID using SHA-256");
+		if (sha256_vector(3, addr, len, hash) < 0)
+			return -1;
+	}
+
+	wpa_hexdump(MSG_DEBUG, "PMKID privacy: new PMKID", hash, PMKID_LEN);
+	os_memcpy(pmkid, hash, PMKID_LEN);
+
+	return 0;
+}
+#endif /* CONFIG_PMKSA_PRIVACY */
+
+
 /**
  * wpa_cipher_txt - Convert cipher suite to a text string
  * @cipher: Cipher suite (WPA_CIPHER_* enum)
