@@ -2437,6 +2437,8 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS2_SUPPORT_NAN			0x0000000080000000ULL
 /** Driver supports P2P assisted DFS */
 #define WPA_DRIVER_FLAGS2_P2P_ASSISTED_DFS		0x0000000100000000ULL
+/** Driver supports (Re)Association Request/Response frame encryption */
+#define WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION	0x0000000200000000ULL
 	u64 flags2;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
