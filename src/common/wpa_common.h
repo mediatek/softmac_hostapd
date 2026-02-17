@@ -815,7 +815,7 @@ int wpa_pasn_validate_rsne(const struct wpa_ie_data *data);
 int wpa_pasn_parse_parameter_ie(const u8 *data, u8 len, bool from_ap,
 				struct wpa_pasn_params_data *pasn_params);
 
-void wpa_pasn_add_rsnxe(struct wpabuf *buf, u16 capab);
+void wpa_pasn_add_rsnxe(struct wpabuf *buf, u32 capab);
 int wpa_pasn_add_extra_ies(struct wpabuf *buf, const u8 *extra_ies, size_t len);
 
 void rsn_set_snonce_cookie(u8 *snonce);

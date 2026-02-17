@@ -624,7 +624,7 @@ static void wpas_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	const u8 *indic;
 	u16 fils_info;
 #endif /* CONFIG_FILS */
-	u16 capab = 0;
+	u32 capab = 0;
 	bool derive_kdk;
 	int ret;
 

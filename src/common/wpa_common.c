@@ -4408,23 +4408,38 @@ int wpa_pasn_parse_parameter_ie(const u8 *data, u8 len, bool from_ap,
 }
 
 
-void wpa_pasn_add_rsnxe(struct wpabuf *buf, u16 capab)
+void wpa_pasn_add_rsnxe(struct wpabuf *buf, u32 capab)
 {
 	size_t flen;
 
-	flen = (capab & 0xff00) ? 2 : 1;
 	if (!capab)
 		return; /* no supported extended RSN capabilities */
+
+	/* Determine how many octets are needed to represent capab */
+	if (capab & 0xFF000000)
+		flen = 4;
+	else if (capab & 0x00FF0000)
+		flen = 3;
+	else if (capab & 0x0000FF00)
+		flen = 2;
+	else
+		flen = 1;
+
 	if (wpabuf_tailroom(buf) < 2 + flen)
 		return;
 	capab |= flen - 1; /* bit 0-3 = Field length (n - 1) */
 
 	wpabuf_put_u8(buf, WLAN_EID_RSNX);
 	wpabuf_put_u8(buf, flen);
-	wpabuf_put_u8(buf, capab & 0x00ff);
-	capab >>= 8;
-	if (capab)
-		wpabuf_put_u8(buf, capab);
+
+	/* Write the little endian capability field octet-by-octet */
+	wpabuf_put_u8(buf, capab & 0x000000FF);
+	if (flen > 1)
+		wpabuf_put_u8(buf, (capab >> 8) & 0x000000FF);
+	if (flen > 2)
+		wpabuf_put_u8(buf, (capab >> 16) & 0x000000FF);
+	if (flen > 3)
+		wpabuf_put_u8(buf, (capab >> 24) & 0x000000FF);
 }
 
 
