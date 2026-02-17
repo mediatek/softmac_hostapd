@@ -1313,6 +1313,12 @@ int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 		goto fail;
 	}
 
+	if (pasn->derive_kek) {
+		wpa_printf(MSG_DEBUG, "PASN: Derive PTK-KEK");
+		pasn->kek_len = wpa_kek_len(pasn->akmp, pasn->pmk_len);
+		wpa_printf(MSG_DEBUG, "PASN: kek_len=%zu", pasn->kek_len);
+	}
+
 	ret = pasn_pmk_to_ptk(pasn->pmk, pasn->pmk_len,
 			      pasn->own_addr, pasn->peer_addr,
 			      wpabuf_head(secret), wpabuf_len(secret),
