@@ -814,7 +814,7 @@ void wpa_pasn_add_parameter_ie(struct wpabuf *buf, u16 pasn_group,
 int wpa_pasn_add_wrapped_data(struct wpabuf *buf,
 			      struct wpabuf *wrapped_data_buf);
 
-int wpa_pasn_validate_rsne(const struct wpa_ie_data *data);
+int wpa_pasn_validate_rsne(const struct wpa_ie_data *data, bool is_eppke);
 int wpa_pasn_parse_parameter_ie(const u8 *data, u8 len, bool from_ap,
 				struct wpa_pasn_params_data *pasn_params);
 

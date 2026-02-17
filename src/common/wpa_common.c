@@ -4268,23 +4268,29 @@ int wpa_pasn_add_wrapped_data(struct wpabuf *buf,
 
 
 /*
- * wpa_pasn_validate_rsne - Validate PSAN specific data of RSNE
+ * wpa_pasn_validate_rsne - Validate PASN/EPPKE specific data of RSNE
  * @data: Parsed representation of an RSNE
+ * @is_eppke: EPPKE Authentication
  * Returns -1 for invalid data; otherwise 0
  */
-int wpa_pasn_validate_rsne(const struct wpa_ie_data *data)
+int wpa_pasn_validate_rsne(const struct wpa_ie_data *data, bool is_eppke)
 {
-	u16 capab = WPA_CAPABILITY_MFPC | WPA_CAPABILITY_MFPR;
+	u16 capab = WPA_CAPABILITY_MFPC;
+
+	if (!is_eppke)
+		capab |= WPA_CAPABILITY_MFPR;
 
 	if (data->proto != WPA_PROTO_RSN)
 		return -1;
 
 	if ((data->capabilities & capab) != capab) {
-		wpa_printf(MSG_DEBUG, "PASN: Invalid RSNE capabilities");
+		wpa_printf(MSG_DEBUG, "%s: Invalid RSNE capabilities",
+			   is_eppke ? "EPPKE" : "PASN");
 		return -1;
 	}
 
-	if (!data->has_group || data->group_cipher != WPA_CIPHER_GTK_NOT_USED) {
+	if (!data->has_group ||
+	    (!is_eppke && data->group_cipher != WPA_CIPHER_GTK_NOT_USED)) {
 		wpa_printf(MSG_DEBUG, "PASN: Invalid group data cipher");
 		return -1;
 	}
@@ -4315,12 +4321,12 @@ int wpa_pasn_validate_rsne(const struct wpa_ie_data *data)
 	case WPA_KEY_MGMT_PASN:
 		break;
 	default:
-		wpa_printf(MSG_ERROR, "PASN: invalid key_mgmt: 0x%0x",
-			   data->key_mgmt);
+		wpa_printf(MSG_ERROR, "%s: invalid key_mgmt: 0x%0x",
+			   is_eppke ? "EPPKE" : "PASN", data->key_mgmt);
 		return -1;
 	}
 
-	if (data->mgmt_group_cipher != WPA_CIPHER_GTK_NOT_USED) {
+	if (!is_eppke && (data->mgmt_group_cipher != WPA_CIPHER_GTK_NOT_USED)) {
 		wpa_printf(MSG_DEBUG, "PASN: Invalid group mgmt cipher");
 		return -1;
 	}

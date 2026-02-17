@@ -2926,7 +2926,7 @@ static int pasn_wd_handle_fils(struct hostapd_data *hapd, struct sta_info *sta,
 		return -1;
 	}
 
-	ret = wpa_pasn_validate_rsne(&rsne_data);
+	ret = wpa_pasn_validate_rsne(&rsne_data, false);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "PASN: FILS: Failed validating RSNE");
 		return -1;
