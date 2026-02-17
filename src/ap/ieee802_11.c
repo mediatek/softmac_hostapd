@@ -3229,7 +3229,7 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 		   MAC2STR(sta->addr));
 
 	if (trans_seq == WLAN_AUTH_TR_SEQ_PASN_AUTH1) {
-		if (sta->pasn) {
+		if (sta->pasn && sta->auth_alg != WLAN_AUTH_EPPKE) {
 			wpa_printf(MSG_DEBUG,
 				   "PASN: Not expecting transaction == 1");
 			return;
