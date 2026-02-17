@@ -141,8 +141,8 @@ static void pmksa_cache_set_expiration(struct rsn_pmksa_cache *pmksa)
 }
 
 
-static void pmksa_cache_from_eapol_data(struct rsn_pmksa_cache_entry *entry,
-					struct eapol_state_machine *eapol)
+void pmksa_cache_from_eapol_data(struct rsn_pmksa_cache_entry *entry,
+				 struct eapol_state_machine *eapol)
 {
 	struct vlan_description *vlan_desc;
 

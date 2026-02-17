@@ -4522,6 +4522,9 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 	const u8 *wpa_ie;
 	size_t wpa_ie_len;
 	const u8 *p2p_dev_addr = NULL;
+#ifdef CONFIG_PMKSA_PRIVACY
+	bool derive_next_pmkid = true;
+#endif /* CONFIG_PMKSA_PRIVACY */
 #ifdef CONFIG_SAE
 	bool epp_sta = false;
 
@@ -4784,6 +4787,74 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 			sta->flags |= WLAN_STA_SPP_AMSDU;
 		else
 			sta->flags &= ~WLAN_STA_SPP_AMSDU;
+
+#ifdef CONFIG_PMKSA_PRIVACY
+	/* Per IEEE 802.11bi/D4.0, 12.16.7 (PMKSA caching privacy), when both
+	 * the AP and non-AP STA support PMKSA caching privacy, the non-AP STA
+	 * shall include a Nonce element in the (Re)Association Request frame.
+	 * Skip Nonce element processing for partner AP MLD links. */
+#ifdef CONFIG_IEEE80211BE
+	if (ap_sta_is_mld(hapd, sta) &&
+	    hapd->mld_link_id != sta->mld_assoc_link_id)
+		derive_next_pmkid = false;
+#endif /* CONFIG_IEEE80211BE */
+
+	if (derive_next_pmkid && ap_sta_is_epp(sta) &&
+	    hapd->conf->pmksa_caching_privacy &&
+	    ieee802_11_rsnx_capab_len(elems->rsnxe, elems->rsnxe_len,
+				      WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY)) {
+		int akmp;
+		size_t pmk_len;
+		u8 *pmkid_next;
+
+		if (!elems->nonce) {
+			wpa_printf(MSG_DEBUG, "STA " MACSTR
+				   " did not include Nonce element to compute next PMKID",
+				   MAC2STR(sta->addr));
+			goto skip_pmkid_update;
+		}
+		os_memcpy(sta->snonce, elems->nonce, NONCE_LEN);
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: Received SNonce to compute next PMKID",
+			    sta->snonce, NONCE_LEN);
+
+		switch (sta->auth_alg) {
+		case WLAN_AUTH_EPPKE:
+			if (!sta->pasn) {
+				wpa_printf(MSG_INFO,
+					   "EPPKE: Missing PASN data - cannot derive a new PMKID");
+				goto skip_pmkid_update;
+			}
+			pmk_len = sta->pasn->pmk_len;
+			pmkid_next = sta->epp_pmkid_next;
+			break;
+		default:
+			wpa_printf(MSG_INFO,
+				   "EPP: Unsupported auth alg %u for PMKID privacy",
+				   sta->auth_alg);
+			goto skip_pmkid_update;
+		}
+
+		if (random_get_bytes(sta->anonce, NONCE_LEN) < 0)
+			goto skip_pmkid_update;
+		wpa_hexdump_key(MSG_DEBUG,
+				"EPP: Generated ANonce to compute next PMKID",
+				sta->anonce, NONCE_LEN);
+
+		akmp = wpa_auth_sta_key_mgmt(sta->wpa_sm);
+		if (akmp < 0 ||
+		    wpa_auth_epp_derive_new_pmkid(sta->anonce, sta->snonce,
+						  akmp, pmk_len,
+						  pmkid_next) < 0) {
+			wpa_printf(MSG_INFO,
+				   "EPP: Failed to generate new PMKID");
+			goto skip_pmkid_update;
+		}
+		wpa_hexdump_key(MSG_DEBUG, "EPP: New PMKID",
+				pmkid_next, PMKID_LEN);
+	}
+skip_pmkid_update:
+#endif /* CONFIG_PMKSA_PRIVACY */
 
 #ifdef CONFIG_IEEE80211R_AP
 		if (sta->auth_alg == WLAN_AUTH_FT) {
@@ -5778,6 +5849,29 @@ rsnxe_done:
 	if (sta && sta->auth_alg == WLAN_AUTH_EPPKE &&
 	    status_code == WLAN_STATUS_SUCCESS) {
 		reply->frame_control |= WLAN_FC_PROTECTED;
+
+#ifdef CONFIG_PMKSA_PRIVACY
+		/* Include a Nonce element (ANonce) to compute next PMKID */
+		if (wpa_auth_ap_sta_support_pmkid_privacy(sta->wpa_sm)) {
+			switch (sta->auth_alg) {
+			case WLAN_AUTH_EPPKE:
+				break;
+			default:
+				wpa_printf(MSG_INFO,
+					   "EPP: Unsupported auth alg %u for PMKID privacy support",
+					   sta->auth_alg);
+				goto skip_nonce;
+			}
+
+			*p++ = WLAN_EID_EXTENSION; /* Element ID */
+			*p++ = 1 + NONCE_LEN; /* Length */
+			*p++ = WLAN_EID_EXT_NONCE; /* Element ID Extension */
+			os_memcpy(p, sta->anonce, NONCE_LEN);
+			p += NONCE_LEN;
+		}
+	skip_nonce:
+#endif /* CONFIG_PMKSA_PRIVACY */
+
 		p = wpa_auth_write_assoc_resp_eppke(sta->wpa_sm, p,
 						    buf + buflen - p,
 						    ap_sta_is_mld(hapd, sta));
@@ -7410,6 +7504,79 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 		mlme_associate_indication(hapd, sta);
 
 	ap_sta_set_sa_query_timeout(hapd, sta, 0);
+
+#ifdef CONFIG_PMKSA_PRIVACY
+	if (ok && status == WLAN_STATUS_SUCCESS && sta->epp_sta &&
+	    wpa_auth_ap_sta_support_pmkid_privacy(sta->wpa_sm)) {
+		bool is_ml = ap_sta_is_mld(hapd, sta);
+		struct rsn_pmksa_cache_entry *entry, *next;
+		struct rsn_pmksa_cache *pmksa, *t_pmksa;
+		const u8 *pmkid_cur, *pmkid_next;
+
+		switch (sta->auth_alg) {
+		case WLAN_AUTH_EPPKE:
+			if (!sta->pasn) {
+				wpa_printf(MSG_INFO, "EPP: Missing PASN data");
+				goto skip_update;
+			}
+			pmkid_cur = sta->pasn->epp_pmkid_cur;
+			pmkid_next = sta->epp_pmkid_next;
+			break;
+		default:
+			wpa_printf(MSG_INFO,
+				   "EPP: Unsupported auth alg %u for PMKID privacy support",
+				   sta->auth_alg);
+			goto skip_update;
+		}
+
+		pmksa = t_pmksa = wpa_auth_get_pmksa_cache(hapd->wpa_auth,
+							   is_ml);
+
+		entry = pmksa_cache_auth_get(t_pmksa, NULL, pmkid_cur);
+		if (entry)
+			goto update_pmksa_entry;
+
+#ifdef CONFIG_IEEE80211BE
+		if (!entry && is_ml) {
+			struct hostapd_data *tmp_hapd;
+
+			/* Search in link caches of each AP MLD link */
+			for_each_mld_link(tmp_hapd, hapd) {
+				t_pmksa = wpa_auth_get_pmksa_cache(
+					tmp_hapd->wpa_auth, false);
+				entry = pmksa_cache_auth_get(t_pmksa, NULL,
+							     pmkid_cur);
+				if (entry)
+					break;
+			}
+		} else if (!entry && !is_ml && hapd->conf->mld_ap) {
+			/* Search in the MLD cache */
+			t_pmksa = wpa_auth_get_pmksa_cache(hapd->wpa_auth,
+							   true);
+			entry = pmksa_cache_auth_get(t_pmksa, NULL, pmkid_cur);
+		}
+#endif /* CONFIG_IEEE80211BE */
+
+update_pmksa_entry:
+		if (entry) {
+			wpa_printf(MSG_DEBUG,
+				   "EPP: PMKSA caching privacy on - update PMKSA cache entry");
+			next = os_memdup(entry, sizeof(*entry));
+			if (!next)
+				goto skip_update;
+			os_memcpy(next->pmkid, pmkid_next, PMKID_LEN);
+			os_memcpy(next->spa, sta->addr, PMKID_LEN);
+			next->vlan_desc = NULL;
+			next->identity = NULL;
+			next->dpp_pkhash = NULL;
+			next->cui = NULL;
+			pmksa_cache_from_eapol_data(next, sta->eapol_sm);
+			pmksa_cache_free_entry(t_pmksa, entry);
+			pmksa_cache_auth_add_entry(pmksa, next);
+		}
+	}
+skip_update:
+#endif /* CONFIG_PMKSA_PRIVACY */
 
 	if (sta->eapol_sm == NULL) {
 		/*

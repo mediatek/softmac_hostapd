@@ -8068,6 +8068,32 @@ u8 * wpa_auth_write_assoc_resp_eppke(struct wpa_state_machine *sm,
 #endif /* CONFIG_ENC_ASSOC */
 
 
+#ifdef CONFIG_PMKSA_PRIVACY
+
+int wpa_auth_epp_derive_new_pmkid(const u8 *anonce, const u8 *snonce,
+				  int akmp, size_t pmk_len, u8 *pmkid)
+{
+	return rsn_pmkid_privacy(anonce, snonce, akmp, pmk_len, pmkid);
+}
+
+
+bool wpa_auth_ap_sta_support_pmkid_privacy(struct wpa_state_machine *sm)
+{
+	struct wpa_auth_config *conf;
+
+	if (!sm)
+		return false;
+
+	conf = &sm->wpa_auth->conf;
+
+	return conf->assoc_frame_encryption &&
+		ieee802_11_rsnx_capab(sm->rsnxe,
+				      WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
+}
+
+#endif /* CONFIG_PMKSA_PRIVACY */
+
+
 void wpa_reset_assoc_sm_info(struct wpa_state_machine *assoc_sm,
 			     struct wpa_authenticator *wpa_auth,
 			     u8 mld_assoc_link_id)

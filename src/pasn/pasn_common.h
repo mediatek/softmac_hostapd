@@ -146,6 +146,7 @@ struct pasn_data {
 #endif /* CONFIG_ENC_ASSOC */
 #ifdef CONFIG_PMKSA_PRIVACY
 	bool pmksa_caching_privacy;
+	u8 epp_pmkid_cur[PMKID_LEN];
 #endif /* CONFIG_PMKSA_PRIVACY */
 
 	/**
