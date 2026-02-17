@@ -9339,6 +9339,16 @@ enum qca_wlan_vendor_hang_reason {
 	QCA_WLAN_HANG_FLUSH_LOGS = 35,
 	/* Host wakeup because of page fault */
 	QCA_WLAN_HANG_HOST_WAKEUP_REASON_PAGE_FAULT = 36,
+	/* Timeout waiting for response of unified vdev connect command from the
+	 * firmware. This command combines peer create, vdev start, peer assoc,
+	 * and vdev up operations to optimize link switch time.
+	 */
+	QCA_WLAN_HANG_VDEV_UNIFIED_CONNECT_RESP_TIMEOUT = 37,
+	/* Timeout waiting for response of unified vdev disconnect command from
+	 * the firmware. This command combines peer delete, vdev stop, and vdev
+	 * down operations to optimize link switch time.
+	 */
+	QCA_WLAN_HANG_VDEV_UNIFIED_DISCONNECT_RESP_TIMEOUT = 38,
 };
 
 /**
