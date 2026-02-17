@@ -2306,7 +2306,7 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 				pasn_get_cipher(pasn),
 				dot11RSNAConfigPMKLifetime,
 				pasn_get_ptk(pasn), NULL, NULL,
-				pasn_get_akmp(pasn));
+				pasn_get_akmp(pasn), pasn->auth_alg);
 
 		if (pasn->pmksa_entry)
 			wpa_sm_set_cur_pmksa(wpa_s->wpa, pasn->pmksa_entry);

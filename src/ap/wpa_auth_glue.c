@@ -1119,7 +1119,7 @@ static void hostapd_store_ptksa(void *ctx, const u8 *addr,int cipher,
 	struct hostapd_data *hapd = ctx;
 
 	ptksa_cache_add(hapd->ptksa, hapd->own_addr, addr, cipher, life_time,
-			ptk, NULL, NULL, 0);
+			ptk, NULL, NULL, 0, 0);
 }
 
 

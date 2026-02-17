@@ -1412,7 +1412,7 @@ static void wpa_supplicant_store_ptk(void *ctx, const u8 *addr, int cipher,
 	struct wpa_supplicant *wpa_s = ctx;
 
 	ptksa_cache_add(wpa_s->ptksa, wpa_s->own_addr, addr, cipher, life_time,
-			ptk, NULL, NULL, 0);
+			ptk, NULL, NULL, 0, 0);
 }
 
 

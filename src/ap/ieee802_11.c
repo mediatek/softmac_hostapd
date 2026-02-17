@@ -3288,7 +3288,8 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 			ptksa_cache_add(hapd->ptksa, hapd->own_addr, sta->addr,
 					pasn_get_cipher(sta->pasn), 43200,
 					pasn_get_ptk(sta->pasn), NULL, NULL,
-					pasn_get_akmp(sta->pasn));
+					pasn_get_akmp(sta->pasn),
+					sta->pasn->auth_alg);
 #ifdef CONFIG_ENC_ASSOC
 			/* TODO: Support VLAN ID assignment based on configured
 			 * SAE passwords. */

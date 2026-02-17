@@ -983,7 +983,7 @@ int wpas_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 				pasn_get_ptk(pasn),
 				wpa_s->pasn_params ? wpas_pasn_deauth_cb : NULL,
 				wpa_s->pasn_params ? wpa_s : NULL,
-				pasn_get_akmp(pasn));
+				pasn_get_akmp(pasn), pasn->auth_alg);
 
 		if (pasn->pmksa_entry)
 			wpa_sm_set_cur_pmksa(wpa_s->wpa, pasn->pmksa_entry);
