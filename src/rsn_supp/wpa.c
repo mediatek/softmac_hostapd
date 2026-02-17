@@ -3158,7 +3158,8 @@ static void wpa_supplicant_process_mlo_1_of_2(struct wpa_sm *sm,
 	u8 i;
 	struct wpa_eapol_ie_parse ie;
 
-	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm)) {
+	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm) &&
+	    !wpa_eppke_is_completed(sm)) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
 			"MLO RSN: Group Key Handshake started prior to completion of 4-way handshake");
 		goto failed;
@@ -3394,7 +3395,8 @@ static void wpa_supplicant_process_1_of_2(struct wpa_sm *sm,
 	struct wpa_eapol_ie_parse ie;
 	u16 gtk_len;
 
-	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm)) {
+	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm) &&
+	    !wpa_eppke_is_completed(sm)) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
 			"RSN: Group Key Handshake started prior to completion of 4-way handshake");
 		goto failed;
@@ -4573,6 +4575,16 @@ void wpa_sm_notify_assoc(struct wpa_sm *sm, const u8 *bssid)
 		clear_keys = 0;
 	}
 #endif /* CONFIG_FILS */
+#ifdef CONFIG_ENC_ASSOC
+	if (sm->eppke_completed) {
+		/*
+		 * Clear portValid to kick EAPOL state machine to re-enter
+		 * AUTHENTICATED state to get the EAPOL port Authorized.
+		 */
+		wpa_supplicant_key_neg_complete(sm, sm->bssid, 1);
+		clear_keys = 0;
+	}
+#endif /* CONFIG_ENC_ASSOC */
 
 	if (clear_keys) {
 		/*
@@ -4621,6 +4633,9 @@ void wpa_sm_notify_disassoc(struct wpa_sm *sm)
 	sm->ft_reassoc_completed = 0;
 	sm->ft_protocol = 0;
 #endif /* CONFIG_IEEE80211R */
+#ifdef CONFIG_ENC_ASSOC
+	sm->eppke_completed = 0;
+#endif /* CONFIG_ENC_ASSOC */
 
 	/* Keys are not needed in the WPA state machine anymore */
 	wpa_sm_drop_sa(sm);
@@ -7729,3 +7744,13 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 }
 
 #endif /* CONFIG_ENC_ASSOC */
+
+
+bool wpa_eppke_is_completed(struct wpa_sm *sm)
+{
+#ifdef CONFIG_ENC_ASSOC
+	return sm && sm->eppke_completed;
+#else /* CONFIG_ENC_ASSOC */
+	return false;
+#endif /* CONFIG_ENC_ASSOC */
+}

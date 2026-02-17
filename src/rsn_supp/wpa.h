@@ -281,6 +281,7 @@ void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm, enum rsn_hash_alg hash,
 			    const u8 *ptk_kck, size_t ptk_kck_len,
 			    const u8 *ptk_kek, size_t ptk_kek_len);
 int wpa_fils_is_completed(struct wpa_sm *sm);
+bool wpa_eppke_is_completed(struct wpa_sm *sm);
 void wpa_sm_pmksa_cache_reconfig(struct wpa_sm *sm);
 int wpa_sm_set_mlo_params(struct wpa_sm *sm, const struct wpa_sm_mlo *mlo);
 void wpa_sm_set_driver_bss_selection(struct wpa_sm *sm,
@@ -517,6 +518,11 @@ static inline void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm, const u8 *ptk_kck,
 static inline int wpa_fils_is_completed(struct wpa_sm *sm)
 {
 	return 0;
+}
+
+static inline bool wpa_eppke_is_completed(struct wpa_sm *sm)
+{
+	return false;
 }
 
 static inline void wpa_sm_pmksa_cache_reconfig(struct wpa_sm *sm)
