@@ -179,6 +179,11 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 #endif /* CONFIG_PASN */
 	bss->urnm_mfpr_x20 = -1;
 	bss->urnm_mfpr = -1;
+#ifdef CONFIG_ENC_ASSOC
+	bss->assoc_frame_encryption = 0;
+	bss->pmksa_caching_privacy = 0;
+	bss->eap_using_authentication_frames = 0;
+#endif /* CONFIG_ENC_ASSOC */
 }
 
 

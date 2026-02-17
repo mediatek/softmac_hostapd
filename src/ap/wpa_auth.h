@@ -290,6 +290,11 @@ struct wpa_auth_config {
 	unsigned int secure_ltf:1;
 	unsigned int secure_rtt:1;
 	unsigned int prot_range_neg:1;
+#ifdef CONFIG_ENC_ASSOC
+	unsigned int assoc_frame_encryption:1;
+	unsigned int pmksa_caching_privacy:1;
+	unsigned int eap_using_authentication_frames:1;
+#endif /* CONFIG_ENC_ASSOC */
 
 	int owe_ptk_workaround;
 	u8 transition_disable;

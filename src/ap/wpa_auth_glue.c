@@ -81,6 +81,12 @@ static void hostapd_wpa_auth_config_update(struct hostapd_data *hapd,
 		!!(hapd->iface->drv_flags2 &
 		   WPA_DRIVER_FLAGS2_PROT_RANGE_NEG_AP);
 
+#ifdef CONFIG_ENC_ASSOC
+	if (!(hapd->iface->drv_flags2 &
+	      WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION))
+		_conf->assoc_frame_encryption = 0;
+#endif /* CONFIG_ENC_ASSOC  */
+
 #ifdef CONFIG_IEEE80211BE
 	_conf->mld_addr = NULL;
 	_conf->link_id = -1;
@@ -112,6 +118,12 @@ static void hostapd_wpa_auth_conf(struct hostapd_iface *iface,
 
 	os_memset(wconf, 0, sizeof(*wconf));
 	wconf->wpa = conf->wpa;
+#ifdef CONFIG_ENC_ASSOC
+	wconf->assoc_frame_encryption = conf->assoc_frame_encryption;
+	wconf->pmksa_caching_privacy = conf->pmksa_caching_privacy;
+	wconf->eap_using_authentication_frames =
+		conf->eap_using_authentication_frames;
+#endif /* CONFIG_ENC_ASSOC */
 	wconf->extended_key_id = conf->extended_key_id;
 	wconf->wpa_key_mgmt = conf->wpa_key_mgmt;
 	wconf->rsn_override_key_mgmt = conf->rsn_override_key_mgmt;

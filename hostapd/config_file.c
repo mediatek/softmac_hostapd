@@ -2865,6 +2865,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		bss->extended_key_id = val;
+#ifdef CONFIG_ENC_ASSOC
+	} else if (os_strcmp(buf, "assoc_frame_encryption") == 0) {
+		bss->assoc_frame_encryption = atoi(pos);
+	} else if (os_strcmp(buf, "pmksa_caching_privacy") == 0) {
+		bss->pmksa_caching_privacy = atoi(pos);
+	} else if (os_strcmp(buf, "eap_using_authentication_frames") == 0) {
+		bss->eap_using_authentication_frames = atoi(pos);
+#endif /* CONFIG_ENC_ASSOC  */
 	} else if (os_strcmp(buf, "wpa_group_rekey") == 0) {
 		bss->wpa_group_rekey = atoi(pos);
 		bss->wpa_group_rekey_set = 1;
