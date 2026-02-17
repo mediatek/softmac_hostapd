@@ -4187,6 +4187,17 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 
 	/* Start IEEE 802.1X authentication process for new stations */
 	ieee802_1x_new_station(hapd, sta);
+
+#ifdef CONFIG_ENC_ASSOC
+		if (ap_sta_is_epp(sta) && sta->wpa_sm && sta->pasn) {
+			wpa_store_eppke_pmk_ptk_sm(sta->wpa_sm,
+						   &sta->pasn->ptk,
+						   sta->pasn->pmk,
+						   sta->pasn->pmk_len);
+			wpa_auth_set_ptk_rekey_timer(sta->wpa_sm);
+		}
+#endif /* CONFIG_ENC_ASSOC */
+
 	if (reassoc) {
 		if (sta->auth_alg != WLAN_AUTH_FT &&
 		    sta->auth_alg != WLAN_AUTH_FILS_SK &&
