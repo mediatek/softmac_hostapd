@@ -5149,6 +5149,9 @@ int wpa_sm_set_param(struct wpa_sm *sm, enum wpa_sm_conf_params param,
 	case WPA_PARAM_SAE_PW_ID_CHANGE:
 		sm->sae_pw_id_change = !!value;
 		break;
+	case WPA_PARAM_ASSOC_ENC:
+		sm->assoc_encryption = !!value;
+		break;
 	default:
 		break;
 	}

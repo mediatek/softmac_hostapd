@@ -145,6 +145,7 @@ enum wpa_sm_conf_params {
 	WPA_PARAM_URNM_MFPR,
 	WPA_PARAM_URNM_MFPR_X20,
 	WPA_PARAM_SAE_PW_ID_CHANGE,
+	WPA_PARAM_ASSOC_ENC,
 };
 
 enum wpa_rsn_override {

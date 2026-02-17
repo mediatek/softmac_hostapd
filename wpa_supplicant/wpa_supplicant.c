@@ -454,6 +454,7 @@ void wpa_supplicant_set_non_wpa_policy(struct wpa_supplicant *wpa_s,
 	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_MGMT_GROUP,
 			 wpa_s->mgmt_group_cipher);
 	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SSID_PROTECTION, 0);
+	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_ASSOC_ENC, 0);
 
 	pmksa_cache_clear_current(wpa_s->wpa);
 	os_memset(&mlo, 0, sizeof(mlo));
@@ -2288,6 +2289,27 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	} else {
 		wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SSID_PROTECTION, false);
 	}
+
+#ifdef CONFIG_ENC_ASSOC
+	if (ssid->ssid_protection && proto == WPA_PROTO_RSN &&
+	    (wpa_s->drv_flags2 &
+	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION)) {
+		bool assoc_enc;
+
+		/* Enable association frame encryption based on the AP
+		 * advertising support for it to avoid potential
+		 * interoperability issues with incorrect AP behavior if we
+		 * were to send an "unexpected" RSNXE with multiple octets of
+		 * payload. */
+		assoc_enc = ieee802_11_rsnx_capab(
+			bss_rsnx, WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION);
+		if (!skip_default_rsne)
+			wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_ASSOC_ENC,
+					 assoc_enc);
+	} else {
+		wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_ASSOC_ENC, false);
+	}
+#endif /* CONFIG_ENC_ASSOC */
 
 	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SPP_AMSDU,
 			 (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SPP_AMSDU) &&
