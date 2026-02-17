@@ -3545,6 +3545,16 @@ static void wpas_parse_connection_info(struct wpa_supplicant *wpa_s,
 	if (req_elems.rrm_enabled)
 		wpa_s->rrm.rrm_used = 1;
 
+#ifdef CONFIG_PMKSA_PRIVACY
+	if (wpa_s->assoc_resp_encrypted && resp_elems.nonce) {
+		os_memcpy(wpa_s->pmkid_anonce, resp_elems.nonce, NONCE_LEN);
+		wpa_s->pmkid_anonce_set = true;
+		wpa_hexdump(MSG_DEBUG,
+			    "PMKID privacy: ANonce in Assoc Response",
+			    wpa_s->pmkid_anonce, NONCE_LEN);
+	}
+#endif /* CONFIG_PMKSA_PRIVACY */
+
 	sta_supported_chan_width = get_supported_channel_width(&req_elems);
 	ap_operation_chan_width = get_operation_channel_width(&resp_elems);
 	if (wpa_s->connection_vht || wpa_s->connection_he ||

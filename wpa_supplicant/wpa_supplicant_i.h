@@ -1691,6 +1691,8 @@ struct wpa_supplicant {
 #ifdef CONFIG_PMKSA_PRIVACY
 	u8 pmkid_snonce[NONCE_LEN];
 	bool pmkid_snonce_set;
+	u8 pmkid_anonce[NONCE_LEN];
+	bool pmkid_anonce_set;
 #endif /* CONFIG_PMKSA_PRIVACY */
 };
 
