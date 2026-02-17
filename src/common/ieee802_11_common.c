@@ -350,6 +350,7 @@ static int ieee802_11_parse_extension(const u8 *pos, size_t elen,
 			break;
 		elems->key_delivery = pos;
 		elems->key_delivery_len = elen;
+		total_len = &elems->key_delivery_len;
 		break;
 	case WLAN_EID_EXT_WRAPPED_DATA:
 		elems->wrapped_data = pos;

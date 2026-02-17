@@ -169,7 +169,7 @@ struct ieee802_11_elems {
 	u8 fils_key_confirm_len;
 	size_t fils_hlp_len;
 	u8 fils_ip_addr_assign_len;
-	u8 key_delivery_len;
+	size_t key_delivery_len;
 	size_t wrapped_data_len;
 	u8 fils_pk_len;
 	u8 owe_dh_len;

@@ -7661,6 +7661,8 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 	struct ieee802_11_elems elems;
 	struct wpa_eapol_ie_parse kde;
 	const u8 *rsc;
+	struct wpabuf *buf = NULL;
+	int ret = -1;
 
 	if (!sm || !sm->ptk_set) {
 		wpa_printf(MSG_DEBUG, "ENC_ASSOC: No KEK available");
@@ -7715,10 +7717,14 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 	/* TODO: Check for RSNE/RSNXE mismatch for per-STA profile for MLO */
 
 	/* Key Delivery element */
-	if (!elems.key_delivery) {
+	buf = ieee802_11_defrag(elems.key_delivery, elems.key_delivery_len,
+				true);
+	if (!buf) {
 		wpa_printf(MSG_DEBUG, "ENC_ASSOC: No Key Delivery element");
 		return -1;
 	}
+	elems.key_delivery = wpabuf_head(buf);
+	elems.key_delivery_len = wpabuf_len(buf);
 
 	/* Parse Key Delivery element: RSC followed by group key KDEs */
 	rsc = elems.key_delivery;
@@ -7726,21 +7732,24 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 				     elems.key_delivery_len - WPA_KEY_RSC_LEN,
 				     &kde) < 0) {
 		wpa_printf(MSG_DEBUG, "ENC_ASSOC: Failed to parse KDEs");
-		return -1;
+		goto fail;
 	}
 
 	if ((valid_links == -1 &&
 	     process_key_delivery(sm, &kde, rsc) < 0) ||
 	    (valid_links != -1 &&
 	     process_key_delivery_ml(sm, &kde, valid_links) < 0))
-		return -1;
+		goto fail;
 
 	wpa_sm_set_rekey_offload(sm);
 
 	wpa_printf(MSG_DEBUG, "ENC_ASSOC: Association completed successfully");
 	sm->eppke_completed = 1;
 
-	return 0;
+	ret = 0;
+fail:
+	wpabuf_free(buf);
+	return ret;
 }
 
 #endif /* CONFIG_ENC_ASSOC */
