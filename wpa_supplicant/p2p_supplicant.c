@@ -4609,8 +4609,10 @@ static int wpas_p2p_setup_channels(struct wpa_supplicant *wpa_s,
 		const struct oper_class_map *o = &global_op_class[op];
 		unsigned int ch;
 		struct p2p_reg_class *reg = NULL, *cli_reg = NULL;
+		bool is_dfs_allowed = is_dfs_global_op_class(o->op_class) &&
+			wpa_s->allow_p2p_assisted_dfs;
 
-		if (o->p2p == NO_P2P_SUPP ||
+		if ((!is_dfs_allowed && o->p2p == NO_P2P_SUPP) ||
 		    (is_6ghz_op_class(o->op_class) && p2p_disable_6ghz))
 			continue;
 

@@ -1452,6 +1452,9 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 			config->p2p_chan_switch_req_enable);
 	if (config->p2p_reg_info)
 		fprintf(f, "p2p_reg_info=%d\n", config->p2p_reg_info);
+	if (config->p2p_assisted_dfs_chan_enable)
+		fprintf(f, "p2p_assisted_dfs_chan_enable=%d\n",
+			config->p2p_assisted_dfs_chan_enable);
 
 	if (WPA_GET_BE32(config->ip_addr_go))
 		fprintf(f, "ip_addr_go=%u.%u.%u.%u\n",

@@ -907,6 +907,15 @@ struct wpa_config {
 	bool p2p_chan_switch_req_enable;
 	int p2p_reg_info;
 
+	/**
+	 * p2p_assisted_dfs_chan_enable - Enable DFS channels for assisted DFS
+	 *
+	 * Enables DFS channels for AP assisted P2P DFS operations when the
+	 * underlying driver provides assisted P2P DFS support.
+	 * By default: 0 (disabled)
+	 */
+	bool p2p_assisted_dfs_chan_enable;
+
 	struct wpabuf *wps_vendor_ext_m1;
 
 #define MAX_WPS_VENDOR_EXT 10

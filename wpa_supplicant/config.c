@@ -5721,6 +5721,7 @@ static const struct global_parse_data global_fields[] = {
 	{ BOOL(p2p_twt_power_mgmt), 0 },
 	{ BOOL(p2p_chan_switch_req_enable), 0 },
 	{ INT(p2p_reg_info), 0 },
+	{ INT(p2p_assisted_dfs_chan_enable), 0 },
 	{ INT(dik_cipher), 0},
 	{ BIN(dik), 0 },
 #endif /* CONFIG_P2P */
