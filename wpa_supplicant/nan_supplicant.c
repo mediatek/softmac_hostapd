@@ -459,8 +459,8 @@ static int wpas_nan_de_tx(void *ctx, unsigned int freq, unsigned int wait_time,
 		return -1;
 	}
 
-	if (radio_add_work(wpa_s, freq, "nan-usd-tx", 0,
-			   wpas_nan_usd_start_tx_cb, twork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "nan-usd-tx", 0,
+			    wpas_nan_usd_start_tx_cb, twork)) {
 		wpas_nan_usd_tx_work_free(twork);
 		return -1;
 	}
@@ -550,8 +550,8 @@ static int wpas_nan_de_listen(void *ctx, unsigned int freq,
 	lwork->freq = freq;
 	lwork->duration = duration;
 
-	if (radio_add_work(wpa_s, freq, "nan-usd-listen", 0,
-			   wpas_nan_usd_start_listen_cb, lwork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "nan-usd-listen", 0,
+			    wpas_nan_usd_start_listen_cb, lwork)) {
 		os_free(lwork);
 		return -1;
 	}

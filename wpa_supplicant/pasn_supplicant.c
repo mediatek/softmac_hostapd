@@ -866,8 +866,8 @@ int wpas_pasn_auth_start(struct wpa_supplicant *wpa_s,
 		}
 	}
 
-	if (radio_add_work(wpa_s, bss->freq, "pasn-start-auth", 1,
-			   wpas_pasn_auth_start_cb, awork) < 0) {
+	if (!radio_add_work(wpa_s, bss->freq, "pasn-start-auth", 1,
+			    wpas_pasn_auth_start_cb, awork)) {
 		wpas_pasn_free_auth_work(awork);
 		return -1;
 	}

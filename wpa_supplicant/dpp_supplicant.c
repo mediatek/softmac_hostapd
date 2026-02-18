@@ -1071,8 +1071,8 @@ static int wpas_dpp_listen_start(struct wpa_supplicant *wpa_s,
 		return -1;
 	lwork->freq = freq;
 
-	if (radio_add_work(wpa_s, freq, "dpp-listen", 0, dpp_start_listen_cb,
-			   lwork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "dpp-listen", 0, dpp_start_listen_cb,
+			    lwork)) {
 		wpas_dpp_listen_work_free(lwork);
 		return -1;
 	}

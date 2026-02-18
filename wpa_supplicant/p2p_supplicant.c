@@ -537,8 +537,8 @@ static int wpas_p2p_scan(void *ctx, enum p2p_scan_type type, int freq,
 	wpabuf_free(ies);
 
 	radio_remove_works(wpa_s, "p2p-scan", 0);
-	if (radio_add_work(wpa_s, 0, "p2p-scan", 0, wpas_p2p_trigger_scan_cb,
-			   params) < 0)
+	if (!radio_add_work(wpa_s, 0, "p2p-scan", 0, wpas_p2p_trigger_scan_cb,
+			    params))
 		goto fail;
 	return 0;
 
@@ -1825,8 +1825,8 @@ static int wpas_send_action_work(struct wpa_supplicant *wpa_s,
 	awork->wait_time = wait_time;
 	os_memcpy(awork->buf, buf, len);
 
-	if (radio_add_work(wpa_s, freq, "p2p-send-action", 1,
-			   wpas_send_action_cb, awork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "p2p-send-action", 1,
+			    wpas_send_action_cb, awork)) {
 		os_free(awork);
 		return -1;
 	}
@@ -1991,8 +1991,8 @@ static int wpas_p2p_initiate_pasn_auth(struct wpa_supplicant *wpa_s,
 	awork->freq = freq;
 	os_memcpy(awork->peer_addr, peer_addr, ETH_ALEN);
 
-	if (radio_add_work(wpa_s, freq, "p2p-pasn-start-auth", 1,
-			   wpas_p2p_pasn_auth_start_cb, awork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "p2p-pasn-start-auth", 1,
+			    wpas_p2p_pasn_auth_start_cb, awork)) {
 		wpas_p2p_pasn_free_auth_work(awork);
 		return -1;
 	}
@@ -3292,8 +3292,8 @@ static int wpas_start_listen(void *ctx, unsigned int freq,
 		}
 	}
 
-	if (radio_add_work(wpa_s, freq, "p2p-listen", 0, wpas_start_listen_cb,
-			   lwork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "p2p-listen", 0, wpas_start_listen_cb,
+			    lwork)) {
 		wpas_p2p_listen_work_free(lwork);
 		return -1;
 	}
@@ -5710,8 +5710,8 @@ static int wpas_p2p_initiate_pasn_verify(struct wpa_supplicant *wpa_s,
 		awork->ssid_len = ssid_len;
 	}
 
-	if (radio_add_work(wpa_s, freq, "p2p-pasn-start-auth", 1,
-			   wpas_p2p_pasn_auth_start_cb, awork) < 0) {
+	if (!radio_add_work(wpa_s, freq, "p2p-pasn-start-auth", 1,
+			    wpas_p2p_pasn_auth_start_cb, awork)) {
 		wpas_p2p_pasn_free_auth_work(awork);
 		return -1;
 	}

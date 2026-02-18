@@ -9345,8 +9345,8 @@ static int wpas_ctrl_radio_work_add(struct wpa_supplicant *wpa_s, char *cmd,
 		wpa_s->ext_work_id++;
 	ework->id = wpa_s->ext_work_id;
 
-	if (radio_add_work(wpa_s, freq, ework->type, 0, wpas_ctrl_radio_work_cb,
-			   ework) < 0) {
+	if (!radio_add_work(wpa_s, freq, ework->type, 0,
+			    wpas_ctrl_radio_work_cb, ework)) {
 		os_free(ework);
 		return -1;
 	}

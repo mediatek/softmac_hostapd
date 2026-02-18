@@ -1592,8 +1592,8 @@ void sme_authenticate(struct wpa_supplicant *wpa_s,
 	wpa_s->sme.sae_group_index = 0;
 #endif /* CONFIG_SAE */
 
-	if (radio_add_work(wpa_s, bss->freq, "sme-connect", 1,
-			   sme_auth_start_cb, cwork) < 0)
+	if (!radio_add_work(wpa_s, bss->freq, "sme-connect", 1,
+			    sme_auth_start_cb, cwork))
 		wpas_connect_work_free(cwork);
 }
 

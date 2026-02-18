@@ -919,8 +919,8 @@ int gas_query_req(struct gas_query *gas, const u8 *dst, int freq,
 		" dialog_token=%u freq=%d",
 		MAC2STR(query->addr), query->dialog_token, query->freq);
 
-	if (radio_add_work(gas->wpa_s, freq, "gas-query", 0, gas_query_start_cb,
-			   query) < 0) {
+	if (!radio_add_work(gas->wpa_s, freq, "gas-query", 0,
+			    gas_query_start_cb, query)) {
 		query->req = NULL; /* caller will free this in error case */
 		gas_query_free(query, 1);
 		return -1;

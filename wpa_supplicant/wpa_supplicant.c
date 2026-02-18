@@ -3010,8 +3010,8 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 	cwork->bss = bss;
 	cwork->ssid = ssid;
 
-	if (radio_add_work(wpa_s, bss ? bss->freq : 0, "connect", 1,
-			   wpas_start_assoc_cb, cwork) < 0) {
+	if (!radio_add_work(wpa_s, bss ? bss->freq : 0, "connect", 1,
+			    wpas_start_assoc_cb, cwork)) {
 		os_free(cwork);
 	}
 }
@@ -7505,7 +7505,7 @@ void radio_work_check_next(struct wpa_supplicant *wpa_s)
  * @next: Force as the next work to be executed
  * @cb: Callback function for indicating when radio is available
  * @ctx: Context pointer for the work (work->ctx in cb())
- * Returns: 0 on success, -1 on failure
+ * Returns: Pointer to the newly created work, or %NULL on failure
  *
  * This function is used to request time for an operation that requires
  * exclusive radio control. Once the radio is available, the registered callback
@@ -7522,10 +7522,11 @@ void radio_work_check_next(struct wpa_supplicant *wpa_s)
  * Setting this to 0 indicates that the work item may use multiple channels or
  * requires exclusive control of the radio.
  */
-int radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
-		   const char *type, int next,
-		   void (*cb)(struct wpa_radio_work *work, int deinit),
-		   void *ctx)
+struct wpa_radio_work *
+radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
+	       const char *type, int next,
+	       void (*cb)(struct wpa_radio_work *work, int deinit),
+	       void *ctx)
 {
 	struct wpa_radio *radio = wpa_s->radio;
 	struct wpa_radio_work *work;
@@ -7533,7 +7534,7 @@ int radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
 
 	work = os_zalloc(sizeof(*work));
 	if (work == NULL)
-		return -1;
+		return NULL;
 	wpa_dbg(wpa_s, MSG_DEBUG, "Add radio work '%s'@%p", type, work);
 	os_get_reltime(&work->time);
 	work->freq = freq;
@@ -7568,7 +7569,7 @@ int radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
 		radio_work_check_next(wpa_s);
 	}
 
-	return 0;
+	return work;
 }
 
 
