@@ -528,5 +528,7 @@ int nan_convert_sched_to_avail_attrs(struct nan_data *nan, u8 sequence_id,
 				     size_t n_chans,
 				     struct nan_chan_schedule *chans,
 				     struct wpabuf *buf);
+bool nan_peer_pairing_supported(struct nan_data *nan, const u8 *addr);
+bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr);
 
 #endif /* NAN_H */

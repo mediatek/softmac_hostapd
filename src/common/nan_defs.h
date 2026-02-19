@@ -512,4 +512,17 @@ struct nan_shared_key {
 	u8 key[0]; /* IEEE 802.11 RSNA Key Descriptor */
 } STRUCT_PACKED;
 
+/* Wi-Fi Aware spec v4.0, Table 141 (Capability Info field) */
+#define NAN_DEV_CAPA_EXT_INFO_0_REG_VALID         BIT(0)
+#define NAN_DEV_CAPA_EXT_INFO_0_AP_TYPE_POS       1
+#define NAN_DEV_CAPA_EXT_INFO_0_AP_TYPE_MASK      (BIT(1) | BIT(2) | BIT(3))
+#define NAN_DEV_CAPA_EXT_INFO_INDOOR_AP           0
+#define NAN_DEV_CAPA_EXT_INFO_SP_AP               1
+#define NAN_DEV_CAPA_EXT_INFO_VLP_AP              2
+#define NAN_DEV_CAPA_EXT_INFO_INDOOR_ENABLED_AP   3
+#define NAN_DEV_CAPA_EXT_INFO_INDOOR_SP_AP        4
+
+#define NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP     BIT(0)
+#define NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING   BIT(1)
+
 #endif /* NAN_DEFS_H */

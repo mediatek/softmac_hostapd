@@ -949,6 +949,20 @@ static void nan_parse_peer_elem_container(struct nan_data *nan,
 }
 
 
+static void nan_parse_peer_dev_capa_ext(struct nan_data *nan,
+					struct nan_peer *peer,
+					struct nan_attrs *attrs)
+{
+	if (!attrs->dev_capa_ext || attrs->dev_capa_ext_len <= 1)
+		return;
+
+	peer->info.pairing_support = attrs->dev_capa_ext[1] &
+		NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP;
+	peer->info.npk_nik_caching_support = attrs->dev_capa_ext[1] &
+		NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING;
+}
+
+
 /*
  * nan_parse_device_attrs - Parse device attributes and build availability info
  *
@@ -984,6 +998,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_merge_peer_info(&peer->info, &info);
 	nan_parse_peer_device_capa(nan, peer, &attrs);
 	nan_parse_peer_elem_container(nan, peer, &attrs);
+	nan_parse_peer_dev_capa_ext(nan, peer, &attrs);
 
 	nan_peer_dump(nan, peer);
 	ret = 0;
@@ -2113,4 +2128,28 @@ int nan_convert_sched_to_avail_attrs(struct nan_data *nan, u8 sequence_id,
 	return nan_add_avail_attrs(nan, sequence_id, map_ids_bitmap,
 				   NAN_AVAIL_ENTRY_CTRL_TYPE_COND,
 				   n_chans, chans, buf);
+}
+
+
+bool nan_peer_pairing_supported(struct nan_data *nan, const u8 *addr)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return false;
+
+	return peer->info.pairing_support;
+}
+
+
+bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return false;
+
+	return peer->info.npk_nik_caching_support;
 }
