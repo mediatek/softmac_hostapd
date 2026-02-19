@@ -94,12 +94,12 @@ enum nan_reason {
 /* Service Descriptor attribute (SDA) */
 
 /* Service Control field */
-#define NAN_SRV_CTRL_TYPE_MASK (BIT(0) | BIT(1))
-#define NAN_SRV_CTRL_MATCHING_FILTER BIT(2)
-#define NAN_SRV_CTRL_RESP_FILTER BIT(3)
-#define NAN_SRV_CTRL_SRV_INFO BIT(4)
-#define NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED BIT(5)
-#define NAN_SRV_CTRL_BINDING_BITMAP BIT(6)
+#define NAN_SRV_CTRL_TYPE_MASK                (BIT(0) | BIT(1))
+#define NAN_SRV_CTRL_MATCHING_FILTER          BIT(2)
+#define NAN_SRV_CTRL_RESP_FILTER              BIT(3)
+#define NAN_SRV_CTRL_SRV_INFO                 BIT(4)
+#define NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED  BIT(5)
+#define NAN_SRV_CTRL_BINDING_BITMAP           BIT(6)
 
 enum nan_service_control_type {
 	NAN_SRV_CTRL_PUBLISH = 0,
@@ -110,16 +110,16 @@ enum nan_service_control_type {
 /* Service Descriptor Extension attribute (SDEA) */
 
 /* SDEA Control field */
-#define NAN_SDEA_CTRL_FSD_REQ BIT(0)
-#define NAN_SDEA_CTRL_FSD_GAS BIT(1)
-#define NAN_SDEA_CTRL_DATA_PATH_REQ BIT(2)
+#define NAN_SDEA_CTRL_FSD_REQ        BIT(0)
+#define NAN_SDEA_CTRL_FSD_GAS        BIT(1)
+#define NAN_SDEA_CTRL_DATA_PATH_REQ  BIT(2)
 #define NAN_SDEA_CTRL_DATA_PATH_TYPE BIT(3)
-#define NAN_SDEA_CTRL_QOS_REQ BIT(5)
-#define NAN_SDEA_CTRL_SECURITY_REQ BIT(6)
-#define NAN_SDEA_CTRL_RANGING_REQ BIT(7)
-#define NAN_SDEA_CTRL_RANGE_LIMIT BIT(8)
-#define NAN_SDEA_CTRL_SRV_UPD_INDIC BIT(9)
-#define NAN_SDEA_CTRL_GTK_REQ BIT(10)
+#define NAN_SDEA_CTRL_QOS_REQ        BIT(5)
+#define NAN_SDEA_CTRL_SECURITY_REQ   BIT(6)
+#define NAN_SDEA_CTRL_RANGING_REQ    BIT(7)
+#define NAN_SDEA_CTRL_RANGE_LIMIT    BIT(8)
+#define NAN_SDEA_CTRL_SRV_UPD_INDIC  BIT(9)
+#define NAN_SDEA_CTRL_GTK_REQ        BIT(10)
 
 enum nan_service_protocol_type {
 	NAN_SRV_PROTO_BONJOUR = 1,
