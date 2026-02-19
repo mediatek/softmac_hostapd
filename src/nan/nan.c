@@ -72,6 +72,18 @@ static void nan_peer_flush_dev_capa(struct nan_peer_info *info)
 }
 
 
+static void nan_peer_flush_elem_container(struct nan_peer_info *info)
+{
+	struct nan_elem_container_entry *cur, *next;
+
+	dl_list_for_each_safe(cur, next, &info->element_container,
+			      struct nan_elem_container_entry, list) {
+		dl_list_del(&cur->list);
+		os_free(cur);
+	}
+}
+
+
 static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 {
 	if (!peer)
@@ -103,6 +115,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	dl_list_del(&peer->list);
 	nan_peer_flush_avail(&peer->info);
 	nan_peer_flush_dev_capa(&peer->info);
+	nan_peer_flush_elem_container(&peer->info);
 	os_free(peer);
 }
 
@@ -869,6 +882,51 @@ static void nan_parse_peer_device_capa(struct nan_data *nan,
 }
 
 
+static void nan_parse_peer_elem_container_attr(
+	struct nan_data *nan, struct nan_peer *peer,
+	const struct nan_attrs_entry *attr)
+{
+	struct nan_elem_container_entry *entry, *next;
+	u8 map_id = *attr->ptr;
+
+	/* Guarantee that there is only a single entry for each map ID */
+	dl_list_for_each_safe(entry, next, &peer->info.element_container,
+			      struct nan_elem_container_entry, list) {
+		if (entry->map_id == map_id) {
+			dl_list_del(&entry->list);
+			os_free(entry);
+			break;
+		}
+	}
+
+	entry = os_zalloc(sizeof(*entry) + attr->len - 1);
+	if (!entry) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Failed to allocate element container entry");
+		return;
+	}
+
+	dl_list_init(&entry->list);
+	dl_list_add(&peer->info.element_container, &entry->list);
+
+	entry->map_id = map_id;
+	entry->len = attr->len - 1;
+	os_memcpy(entry->data, attr->ptr + 1, entry->len);
+}
+
+
+static void nan_parse_peer_elem_container(struct nan_data *nan,
+					  struct nan_peer *peer,
+					  const struct nan_attrs *attrs)
+{
+	const struct nan_attrs_entry *attr;
+
+	dl_list_for_each(attr, &attrs->element_container,
+			 struct nan_attrs_entry, list)
+		nan_parse_peer_elem_container_attr(nan, peer, attr);
+}
+
+
 /*
  * nan_parse_device_attrs - Parse device attributes and build availability info
  *
@@ -903,6 +961,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 
 	nan_merge_peer_info(&peer->info, &info);
 	nan_parse_peer_device_capa(nan, peer, &attrs);
+	nan_parse_peer_elem_container(nan, peer, &attrs);
 
 	nan_peer_dump(nan, peer);
 	ret = 0;
@@ -949,6 +1008,8 @@ static struct nan_peer * nan_alloc_peer(struct nan_data *nan)
 
 	dl_list_init(&peer->info.avail_entries);
 	dl_list_init(&peer->info.dev_capa);
+	dl_list_init(&peer->info.element_container);
+
 	dl_list_add(&nan->peer_list, &peer->list);
 	dl_list_init(&peer->ndps);
 	return peer;
