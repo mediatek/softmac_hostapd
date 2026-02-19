@@ -325,5 +325,7 @@ int nan_ndp_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		     enum nan_subtype subtype);
 int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 			   const u8 *attrs_data, size_t attrs_len);
+int nan_chan_to_chan_idx_map(struct nan_data *nan,
+			     u8 op_class, u8 channel, u16 *chan_idx_map);
 
 #endif /* NAN_I_H */

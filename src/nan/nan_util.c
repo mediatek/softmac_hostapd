@@ -9,6 +9,7 @@
 #include "includes.h"
 #include "common.h"
 #include "common/wpa_common.h"
+#include "common/ieee802_11_common.h"
 #include "nan_i.h"
 
 
@@ -328,4 +329,37 @@ void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf)
 	wpabuf_put_u8(buf, nan->cfg->dev_capa.n_antennas);
 	wpabuf_put_le16(buf, nan->cfg->dev_capa.channel_switch_time);
 	wpabuf_put_u8(buf, nan->cfg->dev_capa.capa);
+}
+
+
+/**
+ * nan_chan_to_chan_idx_map - Convert an op_class and chan to channel bitmap
+ * @nan: NAN module context from nan_init()
+ * @op_class: the operating class
+ * @channel: channel number
+ * @chan_idx_map: On success, would hold the channel index bitmap
+ * Returns: 0 on success, otherwise a negative value
+ */
+int nan_chan_to_chan_idx_map(struct nan_data *nan,
+			     u8 op_class, u8 channel, u16 *chan_idx_map)
+{
+	int ret;
+	const struct oper_class_map *op_c;
+
+	if (!chan_idx_map)
+		return -1;
+
+	op_c = get_oper_class(NULL, op_class);
+	if (!op_c)
+		return -1;
+
+	ret = op_class_chan_to_idx(op_c, channel);
+	if (ret < 0)
+		return ret;
+
+	if ((size_t) ret >= (sizeof(*chan_idx_map) * 8))
+		return -1;
+
+	*chan_idx_map = BIT(ret);
+	return 0;
 }
