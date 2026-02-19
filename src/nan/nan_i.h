@@ -42,6 +42,53 @@ struct nan_ptk {
 	size_t tk_len;
 };
 
+/**
+ * struct nan_ndp_sec - NAN ndp security state
+ * @present: Whether NDP setup exchange includes security
+ * @valid: Whether the security configuration is valid
+ * @replaycnt_ok: Whether replay count ok
+ * @replaycnt: Current replay count
+ * @i_nonce: Initiator nonce
+ * @i_capab: Initiator capabilities
+ * @i_csid: Initiator cipher suite ID
+ * @i_instance_id: Initiator publish instance ID
+ * @i_pmkid: Initiator PMKID
+ * @r_nonce: Responder nonce
+ * @r_capab: Responder capabilities
+ * @r_csid: Responder cipher suite ID
+ * @r_instance_id: Responder instance ID
+ * @r_pmkid: Responder PMKID
+ * @auth_token: Authentication token
+ * @pmk: PMK used for the secure NDP establishment
+ * @ptk: Derived PTK
+ */
+struct nan_ndp_sec {
+	bool present;
+	bool valid;
+
+	bool replaycnt_ok;
+	u8 replaycnt[8];
+
+	/* Initiator data */
+	u8 i_nonce[WPA_NONCE_LEN];
+	u8 i_capab;
+	u8 i_csid;
+	u8 i_instance_id;
+	u8 i_pmkid[PMKID_LEN];
+
+	/* Responder data */
+	u8 r_nonce[WPA_NONCE_LEN];
+	u8 r_capab;
+	u8 r_csid;
+	u8 r_instance_id;
+	u8 r_pmkid[PMKID_LEN];
+
+	u8 auth_token[NAN_AUTH_TOKEN_LEN];
+	u8 pmk[PMK_LEN];
+
+	struct nan_ptk ptk;
+};
+
 /*
  * enum nan_ndp_state - State of NDP establishment
  * @NAN_NDP_STATE_NONE: No NDP establishment in progress
@@ -111,6 +158,7 @@ struct nan_ndp {
  * @ssi: Service specific information
  * @ssi_len: Service specific information length
  * @service_id: Service ID of the service used for NDP setup
+ * @sec: NDP security data
  */
 struct nan_ndp_setup {
 	struct nan_ndp *ndp;
@@ -124,6 +172,7 @@ struct nan_ndp_setup {
 	u16 ssi_len;
 
 	u8 service_id[NAN_SERVICE_ID_LEN];
+	struct nan_ndp_sec sec;
 };
 
 /**
@@ -523,5 +572,8 @@ int nan_crypto_calc_auth_token(enum nan_cipher_suite_id cipher,
 			       const u8 *buf, size_t len, u8 *token);
 int nan_crypto_key_mic(const u8 *buf, size_t len, const u8 *kck,
 		       size_t kck_len, u8 cipher, u8 *mic);
+void nan_sec_reset(struct nan_data *nan, struct nan_ndp_sec *ndp_sec);
+int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
+	       struct nan_msg *msg);
 
 #endif /* NAN_I_H */
