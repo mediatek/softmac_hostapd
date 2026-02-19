@@ -116,6 +116,8 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_peer_flush_avail(&peer->info);
 	nan_peer_flush_dev_capa(&peer->info);
 	nan_peer_flush_elem_container(&peer->info);
+
+	nan_ndl_reset(nan, peer);
 	os_free(peer);
 }
 

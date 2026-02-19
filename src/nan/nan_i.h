@@ -209,6 +209,86 @@ struct nan_peer_info {
 };
 
 /**
+ * enum nan_ndl_state - State of NDL establishment
+ *
+ * @NAN_NDL_STATE_NONE: No NDL with the peer
+ * @NAN_NDL_STATE_START: NDL setup initiated by local device
+ * @NAN_NDL_STATE_REQ_SENT: Sent NDL request
+ * @NAN_NDL_STATE_REQ_RECV: Got NDL request
+ * @NAN_NDL_STATE_RES_SENT: Sent NDL response
+ * @NAN_NDL_STATE_RES_RECV: Got NDL response
+ * @NAN_NDL_STATE_CON_SENT: Sent NDL confirm
+ * @NAN_NDL_STATE_CON_RECV: Got NDL confirm
+ * @NAN_NDL_STATE_DONE: NDL establishment is done (either success or reject).
+ */
+enum nan_ndl_state {
+	NAN_NDL_STATE_NONE,
+	NAN_NDL_STATE_START,
+	NAN_NDL_STATE_REQ_SENT,
+	NAN_NDL_STATE_REQ_RECV,
+	NAN_NDL_STATE_RES_SENT,
+	NAN_NDL_STATE_RES_RECV,
+	NAN_NDL_STATE_CON_SENT,
+	NAN_NDL_STATE_CON_RECV,
+	NAN_NDL_STATE_DONE,
+};
+
+/**
+ * enum nan_ndl_setup_reason - NAN NDL setup reason
+ * @NAN_NDL_SETUP_REASON_NONE: none
+ * @NAN_NDL_SETUP_REASON_NDP: NDL setup request for NDP operation
+ */
+enum nan_ndl_setup_reason {
+	NAN_NDL_SETUP_REASON_NONE,
+	NAN_NDL_SETUP_REASON_NDP,
+};
+
+/**
+ * struct nan_ndl - NAN NDL data
+ *
+ * @state: Current state
+ * @status: Current status
+ * @send_naf_on_error: When set, indicates that in case that the NDL processing
+ *     returned an error, a NAF still needs to be sent to the peer, i.e., the
+ *     error cannot be silently ignored.
+ * @reason: In case of status == NAN_NDL_STATUS_REJECTED, indicates the reason.
+ * @sched: Holds the local schedule.
+ * @dialog_token: The dialog token for the current NDL negotiation.
+ * @max_idle_period: Indicate a period of time in units of 1024 TU during which
+ *     the peer device can refrain from transmitting over the NDL without
+ *     being terminated.
+ * @setup_reason: The reason for the NDL setup
+ * @ndc_id: NDC identifier
+ * @peer_qos: Peer QoS requirements
+ * @local_qos: Local QoS requirements (for the current NDP establishment)
+ * @ndc_sched: The NDC schedule entries. See &struct nan_sched_entry
+ * @ndc_sched_len: The length in octets of ndc_sched.
+ * @immut_sched: The immutable schedule entries. See &enum nan_sched_entry
+ * @immut_sched_len: The length in octets of immut_sched.
+ */
+struct nan_ndl {
+	enum nan_ndl_state state;
+	enum nan_ndl_status status;
+	u8 send_naf_on_error;
+	enum nan_reason reason;
+	struct nan_schedule sched;
+
+	u8 dialog_token;
+	u16 max_idle_period;
+	enum nan_ndl_setup_reason setup_reason;
+
+	u8 ndc_id[ETH_ALEN];
+
+	struct nan_qos peer_qos, local_qos;
+
+	u8 *ndc_sched;
+	u16 ndc_sched_len;
+
+	u8 *immut_sched;
+	u16 immut_sched_len;
+};
+
+/**
  * struct nan_peer - Represents a known NAN peer
  * @list: List node for linking peers
  * @nmi_addr: NMI of the peer
@@ -217,6 +297,7 @@ struct nan_peer_info {
  * @ndps: List of NDPs associated with this peer
  * @ndp_setup: Used to hold an NDP object while NDP establishment is in
  *     progress
+ * @ndl: NDL data associated with this peer
  */
 struct nan_peer {
 	struct dl_list list;
@@ -227,6 +308,8 @@ struct nan_peer {
 	struct dl_list ndps;
 
 	struct nan_ndp_setup ndp_setup;
+
+	struct nan_ndl *ndl;
 };
 
 /**
@@ -325,6 +408,13 @@ int nan_ndp_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		     enum nan_subtype subtype);
 int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 			   const u8 *attrs_data, size_t attrs_len);
+int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
+		  const struct nan_ndp_params *params);
+void nan_ndl_setup_failure(struct nan_data *nan, struct nan_peer *peer,
+			   enum nan_reason reason, bool reset_state);
+void nan_ndl_reset(struct nan_data *nan, struct nan_peer *peer);
+int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
+			    struct nan_msg *msg);
 int nan_chan_to_chan_idx_map(struct nan_data *nan,
 			     u8 op_class, u8 channel, u16 *chan_idx_map);
 

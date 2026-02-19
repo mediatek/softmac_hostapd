@@ -306,6 +306,7 @@ OBJS += src/nan/nan.c
 OBJS += src/common/nan_de.c
 OBJS += src/nan/nan_util.c
 OBJS += src/nan/nan_ndp.c
+OBJS += src/nan/nan_ndl.c
 endif
 
 ifdef CONFIG_OWE
