@@ -394,6 +394,21 @@ static inline u8 nan_get_next_dialog_token(struct nan_data *nan)
 	return nan->next_dialog_token;
 }
 
+
+/**
+ * nan_get_next_ndp_id - Allocate next nonzero NDP identifier
+ *
+ * Wi-Fi Aware Specification v4.0, Table 82: NDP ID range is 1-255,
+ * value zero is reserved.
+ */
+static inline u8 nan_get_next_ndp_id(struct nan_data *nan)
+{
+	if (++nan->ndp_id_counter == 0)
+		nan->ndp_id_counter++;
+	return nan->ndp_id_counter;
+}
+
+
 struct nan_peer * nan_get_peer(struct nan_data *nan, const u8 *addr);
 bool nan_is_naf(const struct ieee80211_mgmt *mgmt, size_t len);
 int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,

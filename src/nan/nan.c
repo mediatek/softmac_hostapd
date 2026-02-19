@@ -8,11 +8,19 @@
 
 #include "includes.h"
 #include "common.h"
+#include "utils/eloop.h"
 #include "nan.h"
 #include "nan_i.h"
 
 #define NAN_MAX_PEERS 32
 #define NAN_MAX_NAF_LEN 1024
+
+#define NAN_NDP_SETUP_TIMEOUT_LONG  30
+#define NAN_NDP_SETUP_TIMEOUT_SHORT 2
+
+static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx);
+static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
+				 enum nan_reason reason);
 
 
 struct nan_data * nan_init(const struct nan_config *cfg)
@@ -70,6 +78,17 @@ static void nan_peer_flush_elem_container(struct nan_peer_info *info)
 }
 
 
+static void nan_ndp_setup_stop(struct nan_data *nan, struct nan_peer *peer)
+{
+	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
+	nan_ndp_setup_reset(nan, peer);
+
+	/* Need to also remove the NDL if no active NDPs */
+	if (dl_list_empty(&peer->ndps))
+		nan_ndl_reset(nan, peer);
+}
+
+
 static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 {
 	if (!peer)
@@ -95,7 +114,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	if (peer->ndp_setup.ndp) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Peer delete while NDP setup is WIP");
-		nan_ndp_setup_reset(nan, peer);
+		nan_ndp_setup_stop(nan, peer);
 	}
 
 	dl_list_del(&peer->list);
@@ -104,6 +123,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_peer_flush_elem_container(&peer->info);
 
 	nan_ndl_reset(nan, peer);
+	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
 	os_free(peer);
 }
 
@@ -1124,6 +1144,32 @@ static bool nan_ndp_supported(struct nan_data *nan)
 }
 
 
+static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx)
+{
+	struct nan_data *nan = eloop_ctx;
+	struct nan_peer *peer = timeout_ctx;
+
+	wpa_printf(MSG_DEBUG, "NAN: Timeout expired: " MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	if (!peer->ndp_setup.ndp)
+		return;
+
+	nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON);
+}
+
+
+static void nan_set_peer_timeout(struct nan_data *nan, struct nan_peer *peer,
+				 unsigned int sec, unsigned int usec)
+{
+	wpa_printf(MSG_DEBUG, "NAN: Set timeout: " MACSTR " %u.%06u sec",
+		   MAC2STR(peer->nmi_addr), sec, usec);
+
+	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
+	eloop_register_timeout(sec, usec, nan_peer_state_timeout, nan, peer);
+}
+
+
 static void nan_ndp_action_notif(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndp_action_notif_params notify;
@@ -1155,6 +1201,7 @@ static void nan_ndp_action_notif(struct nan_data *nan, struct nan_peer *peer)
 
 	if (nan->cfg->ndp_action_notif)
 		nan->cfg->ndp_action_notif(nan->cfg->cb_ctx, &notify);
+	nan_set_peer_timeout(nan, peer, NAN_NDP_SETUP_TIMEOUT_LONG, 0);
 }
 
 
@@ -1189,7 +1236,7 @@ static void nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 	dl_list_add(&peer->ndps, &peer->ndp_setup.ndp->list);
 	peer->ndp_setup.ndp = NULL;
 
-	nan_ndp_setup_reset(nan, peer);
+	nan_ndp_setup_stop(nan, peer);
 }
 
 
@@ -1221,12 +1268,7 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
 					   local_ndi, peer_ndi, reason);
 
-	/* Reset the NDP setup data */
-	nan_ndp_setup_reset(nan, peer);
-
-	/* Need to also remove the NDL if no active peers */
-	if (dl_list_empty(&peer->ndps))
-		nan_ndl_reset(nan, peer);
+	nan_ndp_setup_stop(nan, peer);
 }
 
 
@@ -1257,7 +1299,7 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 
 		ret = nan_ndl_handle_ndl_attr(nan, peer, msg);
 		if (ret || !peer->ndl) {
-			nan_ndp_setup_reset(nan, peer);
+			nan_ndp_setup_stop(nan, peer);
 			return -1;
 		}
 
@@ -1326,6 +1368,8 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 			   "NAN: NAF: Failed to send NAF. Resetting..");
 		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON);
 	}
+
+	nan_set_peer_timeout(nan, peer, NAN_NDP_SETUP_TIMEOUT_SHORT, 0);
 
 	return 0;
 }
@@ -1493,4 +1537,107 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 	}
 
 	return 0;
+}
+
+
+int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
+{
+	struct nan_peer *peer;
+	enum nan_subtype naf_oui = NAN_SUBTYPE_INVALID;
+	unsigned int timeout;
+	int ret;
+
+	if (!nan_ndp_supported(nan))
+		return -1;
+
+	peer = nan_get_peer(nan, params->ndp_id.peer_nmi);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG, "NAN: NDP peer not found");
+		return -1;
+	}
+
+	switch (params->type) {
+	case NAN_NDP_ACTION_REQ:
+		params->ndp_id.id = nan_get_next_ndp_id(nan);
+		ret = nan_ndp_setup_req(nan, peer, params);
+		if (ret)
+			return ret;
+
+		ret = nan_ndl_setup(nan, peer, params);
+		if (ret) {
+			nan_ndp_setup_stop(nan, peer);
+			return ret;
+		}
+
+		naf_oui = NAN_SUBTYPE_DATA_PATH_REQUEST;
+		timeout = NAN_NDP_SETUP_TIMEOUT_LONG;
+		break;
+	case NAN_NDP_ACTION_RESP:
+		/*
+		 * NDL establishment as part of the NDP establishment. It is
+		 * possible that this would use an already existing NDL or start
+		 * a new NDL setup.
+		 */
+		ret = nan_ndp_setup_resp(nan, peer, params);
+		if (ret) {
+			nan_ndp_setup_stop(nan, peer);
+			return ret;
+		}
+
+		if (peer->ndp_setup.status != NAN_NDP_STATUS_REJECTED) {
+			ret = nan_ndl_setup(nan, peer, params);
+			if (ret) {
+				if (peer->ndl && peer->ndl->send_naf_on_error) {
+					nan_ndp_setup_failure(
+						nan, peer,
+						NAN_REASON_NDL_UNACCEPTABLE, 0);
+				} else {
+					nan_ndp_setup_stop(nan, peer);
+					return ret;
+				}
+			}
+		} else if (peer->ndl && dl_list_empty(&peer->ndps)) {
+			peer->ndl->status = NAN_NDL_STATUS_REJECTED;
+		}
+
+		naf_oui = NAN_SUBTYPE_DATA_PATH_RESPONSE;
+		timeout = NAN_NDP_SETUP_TIMEOUT_SHORT;
+		break;
+	case NAN_NDP_ACTION_CONF:
+		ret = nan_ndl_setup(nan, peer, params);
+		if (ret) {
+			if (peer->ndl && peer->ndl->send_naf_on_error) {
+				nan_ndp_setup_failure(
+					nan, peer,
+					NAN_REASON_NDL_UNACCEPTABLE, 0);
+			} else {
+				nan_ndp_setup_stop(nan, peer);
+				return ret;
+			}
+		}
+
+		naf_oui = NAN_SUBTYPE_DATA_PATH_CONFIRM;
+		timeout = NAN_NDP_SETUP_TIMEOUT_SHORT;
+		break;
+
+	case NAN_NDP_ACTION_TERM:
+		wpa_printf(MSG_DEBUG, "TODO: Support terminate");
+		naf_oui = NAN_SUBTYPE_DATA_PATH_TERMINATION;
+		return -1;
+	default:
+		wpa_printf(MSG_DEBUG, "NAN: Unsupported NDP setup type=%u",
+			   params->type);
+		return -1;
+	}
+
+	ret = nan_action_send(nan, peer, naf_oui);
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Failed sending NAF. Resetting: ret=%d", ret);
+		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason);
+		return 0;
+	}
+
+	nan_set_peer_timeout(nan, peer, timeout, 0);
+	return ret;
 }
