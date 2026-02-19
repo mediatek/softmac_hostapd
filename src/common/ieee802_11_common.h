@@ -324,6 +324,10 @@ bool is_same_band(int freq1, int freq2);
 #define IS_2P4GHZ(n) (n >= 2412 && n <= 2484)
 #define IS_5GHZ(n) (n > 4000 && n < 5895)
 
+u8 op_class_idx_to_chan(const struct oper_class_map *op, u8 idx);
+int op_class_chan_to_idx(const struct oper_class_map *op, u8 chan);
+int ieee80211_get_center_freq(int ctrl_freq, u32 bw);
+
 int ieee802_11_parse_candidate_list(const char *pos, u8 *nei_rep,
 				    size_t nei_rep_len);
 
