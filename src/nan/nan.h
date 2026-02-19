@@ -10,6 +10,7 @@
 #define NAN_H
 
 #include "common/nan_defs.h"
+#include "common/wpa_common.h"
 
 struct nan_cluster_config;
 enum nan_reason;
@@ -181,6 +182,16 @@ struct nan_schedule {
 };
 
 /**
+ * struct nan_ndp_sec_params - NAN NDP security parameters
+ * @csid: Cipher suite ID
+ * @pmk: NAN Pairwise Master Key (PMK)
+ */
+struct nan_ndp_sec_params {
+	enum nan_cipher_suite_id csid;
+	u8 pmk[PMK_LEN];
+};
+
+/**
  * struct nan_ndp_params - Holds the NDP parameters for setting up or
  * terminating an NDP.
  *
@@ -190,6 +201,8 @@ struct nan_schedule {
  *     max_latency, max_latency should be set to NAN_QOS_MAX_LATENCY_NO_PREF.
  *     Should be set only with NAN_NDP_ACTION_REQ and NAN_NDP_ACTION_RESP.
  *     Ignored for other types.
+ * @sec: NDP security parameters. Should be set only with NAN_NDP_ACTION_REQ
+ *     and NAN_NDP_ACTION_RESP. Ignored for other types.
  * @ssi: Service specific information. Should be set only with
  *     NAN_NDP_ACTION_REQ and NAN_NDP_ACTION_RESP. Ignored for other types.
  * @ssi_len: Service specific information length
@@ -210,6 +223,7 @@ struct nan_ndp_params {
 
 	struct nan_ndp_id ndp_id;
 	struct nan_qos qos;
+	struct nan_ndp_sec_params sec;
 	const u8 *ssi;
 	u16 ssi_len;
 

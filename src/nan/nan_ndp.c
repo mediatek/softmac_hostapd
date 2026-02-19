@@ -135,6 +135,18 @@ int nan_ndp_setup_req(struct nan_data *nan, struct nan_peer *peer,
 	}
 
 	nan_sec_reset(nan, &peer->ndp_setup.sec);
+
+	if (params->sec.csid) {
+		peer->ndp_setup.sec.i_csid = params->sec.csid;
+		os_memcpy(peer->ndp_setup.sec.pmk, params->sec.pmk, PMK_LEN);
+
+		peer->ndp_setup.sec.present = true;
+		peer->ndp_setup.sec.valid = true;
+
+		peer->ndp_setup.sec.i_instance_id =
+			peer->ndp_setup.publish_inst_id;
+	}
+
 	nan_ndp_set_state(nan, &peer->ndp_setup, NAN_NDP_STATE_START);
 	peer->ndp_setup.status = NAN_NDP_STATUS_CONTINUED;
 	return 0;
@@ -180,14 +192,6 @@ int nan_ndp_setup_resp(struct nan_data *nan, struct nan_peer *peer,
 		return -1;
 	}
 
-	/* Store service specific information */
-	ret = nan_ndp_ssi(nan, &peer->ndp_setup, params->ssi, params->ssi_len);
-	if (ret)
-		return ret;
-
-	/* TODO: In case of security and status accept, need to change to
-	 * continue
-	 */
 	peer->ndp_setup.status = params->u.resp.status;
 	peer->ndp_setup.reason = params->u.resp.reason_code;
 
@@ -197,7 +201,44 @@ int nan_ndp_setup_resp(struct nan_data *nan, struct nan_peer *peer,
 
 		os_memcpy(peer->ndp_setup.ndp->resp_ndi,
 			  params->u.resp.resp_ndi, ETH_ALEN);
+
+		if (!peer->ndp_setup.sec.present && params->sec.csid) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDP: Security not requested by peer");
+			return -1;
+		}
+
+		if (peer->ndp_setup.sec.present) {
+			if (params->sec.csid != peer->ndp_setup.sec.i_csid) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: NDP: Different cipher suite specified.");
+				return -1;
+			}
+
+			peer->ndp_setup.sec.r_csid = params->sec.csid;
+			os_memcpy(peer->ndp_setup.sec.pmk, params->sec.pmk,
+				  PMK_LEN);
+
+			ret = nan_sec_init_resp(nan, peer);
+			if (ret) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: NDP: Failed to init responder security");
+
+				peer->ndp_setup.status =
+					NAN_NDP_STATUS_REJECTED;
+				peer->ndp_setup.reason =
+					NAN_REASON_INVALID_PARAMETERS;
+				return 0;
+			}
+
+			peer->ndp_setup.status = NAN_NDP_STATUS_CONTINUED;
+		}
 	}
+
+	/* Store service specific information */
+	ret = nan_ndp_ssi(nan, &peer->ndp_setup, params->ssi, params->ssi_len);
+	if (ret)
+		return ret;
 
 	return 0;
 }
