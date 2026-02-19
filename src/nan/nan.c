@@ -12,6 +12,7 @@
 #include "nan_i.h"
 
 #define NAN_MAX_PEERS 32
+#define NAN_MAX_NAF_LEN 1024
 
 
 struct nan_data * nan_init(const struct nan_config *cfg)
@@ -1031,6 +1032,382 @@ int nan_add_peer(struct nan_data *nan, const u8 *addr,
 
 	os_get_reltime(&peer->last_seen);
 	return 0;
+}
+
+
+static void nan_action_build_header(struct nan_data *nan, struct wpabuf *buf,
+				    enum nan_subtype subtype)
+{
+	/* TODO: need to also support protected dual */
+	wpabuf_put_u8(buf, WLAN_ACTION_PUBLIC);
+	wpabuf_put_u8(buf, WLAN_PA_VENDOR_SPECIFIC);
+	wpabuf_put_be24(buf, OUI_WFA);
+	wpabuf_put_u8(buf, NAN_NAF_OUI_TYPE);
+	wpabuf_put_u8(buf, subtype);
+}
+
+
+static int nan_action_build(struct nan_data *nan, struct nan_peer *peer,
+			    enum nan_subtype subtype, struct wpabuf *buf)
+{
+	int ret;
+
+	wpa_printf(MSG_DEBUG, "NAN: Build NAF");
+
+	nan_action_build_header(nan, buf, subtype);
+
+	nan_add_dev_capa_attr(nan, buf);
+
+	ret = nan_ndp_add_ndp_attr(nan, peer, buf);
+	if (ret)
+		return ret;
+
+	ret = nan_ndl_add_avail_attrs(nan, peer, buf);
+	if (ret)
+		return ret;
+
+	ret = nan_ndl_add_ndc_attr(nan, peer, buf);
+	if (ret)
+		return ret;
+
+	ret = nan_ndl_add_ndl_attr(nan, peer, buf);
+	if (ret)
+		return ret;
+
+	ret = nan_ndl_add_qos_attr(nan, peer, buf);
+	if (ret)
+		return ret;
+
+	nan_ndl_add_elem_container_attr(nan, peer, buf);
+
+	wpa_printf(MSG_DEBUG, "NAN: Build NAF: Done");
+
+	return 0;
+}
+
+
+static int nan_action_send(struct nan_data *nan, struct nan_peer *peer,
+			   enum nan_subtype subtype)
+{
+	struct wpabuf *buf;
+	int ret;
+
+	buf = wpabuf_alloc(NAN_MAX_NAF_LEN);
+	if (!buf)
+		return -1;
+
+	ret = nan_action_build(nan, peer, subtype, buf);
+	if (ret)
+		goto out;
+
+	if (!nan->cfg->send_naf)
+		goto out;
+	ret = nan->cfg->send_naf(nan->cfg->cb_ctx, peer->nmi_addr, NULL,
+				 nan->cluster_id, buf);
+
+out:
+	wpa_printf(MSG_DEBUG, "NAN: send_naf: ret=%d", ret);
+	wpabuf_free(buf);
+	return ret;
+}
+
+
+static bool nan_ndp_supported(struct nan_data *nan)
+{
+	if (nan->cfg->ndp_action_notif && nan->cfg->ndp_connected &&
+	    nan->cfg->ndp_disconnected &&
+	    nan->cfg->send_naf && nan->cfg->get_chans)
+		return true;
+
+	wpa_printf(MSG_DEBUG, "NAN: NDP operations are not supported");
+	return false;
+}
+
+
+static void nan_ndp_action_notif(struct nan_data *nan, struct nan_peer *peer)
+{
+	struct nan_ndp_action_notif_params notify;
+
+	os_memset(&notify, 0, sizeof(notify));
+
+	os_memcpy(notify.ndp_id.peer_nmi, peer->nmi_addr, ETH_ALEN);
+	os_memcpy(notify.ndp_id.init_ndi, peer->ndp_setup.ndp->init_ndi,
+		  ETH_ALEN);
+	notify.ndp_id.id = peer->ndp_setup.ndp->ndp_id;
+	notify.publish_inst_id = peer->ndp_setup.publish_inst_id;
+
+	notify.is_request = peer->ndp_setup.state == NAN_NDP_STATE_REQ_RECV;
+	notify.ndp_status = peer->ndp_setup.status;
+
+	if (peer->ndl)
+		notify.ndl_status = peer->ndl->status;
+	else
+		notify.ndl_status = NAN_NDL_STATUS_REJECTED;
+
+	notify.ssi = peer->ndp_setup.ssi;
+	notify.ssi_len = peer->ndp_setup.ssi_len;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP action notification peer=" MACSTR
+		   ", ndp_status=%u, ndl_status=%u",
+		   MAC2STR(peer->nmi_addr), notify.ndp_status,
+		   notify.ndl_status);
+
+	if (nan->cfg->ndp_action_notif)
+		nan->cfg->ndp_action_notif(nan->cfg->cb_ctx, &notify);
+}
+
+
+static void nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
+{
+	struct nan_ndp_connection_params params;
+
+	os_memset(&params, 0, sizeof(params));
+
+	wpa_printf(MSG_DEBUG, "NAN: NDP connected notification peer=" MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	os_memcpy(params.ndp_id.peer_nmi, peer->nmi_addr, ETH_ALEN);
+	os_memcpy(params.ndp_id.init_ndi, peer->ndp_setup.ndp->init_ndi,
+		  ETH_ALEN);
+	params.ndp_id.id = peer->ndp_setup.ndp->ndp_id;
+	params.ssi = peer->ndp_setup.ssi;
+	params.ssi_len = peer->ndp_setup.ssi_len;
+
+	if (peer->ndp_setup.ndp->initiator) {
+		params.local_ndi = peer->ndp_setup.ndp->init_ndi;
+		params.peer_ndi = peer->ndp_setup.ndp->resp_ndi;
+	} else {
+		params.local_ndi = peer->ndp_setup.ndp->resp_ndi;
+		params.peer_ndi = peer->ndp_setup.ndp->init_ndi;
+	}
+
+	if (nan->cfg->ndp_connected)
+		nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params);
+
+	/* Move the NDP to the list of tracked NDPs */
+	dl_list_add(&peer->ndps, &peer->ndp_setup.ndp->list);
+	peer->ndp_setup.ndp = NULL;
+
+	nan_ndp_setup_reset(nan, peer);
+}
+
+
+static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
+				 enum nan_reason reason)
+{
+	const u8 *local_ndi, *peer_ndi;
+	struct nan_ndp_id ndp_id;
+
+	os_memset(&ndp_id, 0, sizeof(ndp_id));
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP disconnected notification peer=" MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	os_memcpy(ndp_id.peer_nmi, peer->nmi_addr, ETH_ALEN);
+	os_memcpy(ndp_id.init_ndi, peer->ndp_setup.ndp->init_ndi, ETH_ALEN);
+	ndp_id.id = peer->ndp_setup.ndp->ndp_id;
+
+	if (peer->ndp_setup.ndp->initiator) {
+		local_ndi = peer->ndp_setup.ndp->init_ndi;
+		peer_ndi = peer->ndp_setup.ndp->resp_ndi;
+	} else {
+		local_ndi = peer->ndp_setup.ndp->resp_ndi;
+		peer_ndi = peer->ndp_setup.ndp->init_ndi;
+	}
+
+	if (nan->cfg->ndp_disconnected)
+		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
+					   local_ndi, peer_ndi, reason);
+
+	/* Reset the NDP setup data */
+	nan_ndp_setup_reset(nan, peer);
+
+	/* Need to also remove the NDL if no active peers */
+	if (dl_list_empty(&peer->ndps))
+		nan_ndl_reset(nan, peer);
+}
+
+
+/**
+ * nan_action_rx_ndp - Process a received NAN Data Path Action Frame
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer
+ * @msg: Parsed NAN message
+ * @resp_oui: OUI subtype to use in case a response is needed
+ * Returns: 0 on success; -1 on failure.
+ */
+static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
+			     struct nan_msg *msg, enum nan_subtype resp_oui)
+{
+	int ret;
+
+	ret = nan_ndp_handle_ndp_attr(nan, peer, msg);
+	if (ret)
+		return ret;
+
+	/*
+	 * NDP request: Also process the NDL/NDC/QoS attributes and store the
+	 * data without actually scheduling. Send an indication to the
+	 * encapsulating logic.
+	 */
+	if (peer->ndp_setup.state == NAN_NDP_STATE_REQ_RECV) {
+		wpa_printf(MSG_DEBUG, "NAN: NDP request");
+
+		ret = nan_ndl_handle_ndl_attr(nan, peer, msg);
+		if (ret || !peer->ndl) {
+			nan_ndp_setup_reset(nan, peer);
+			return -1;
+		}
+
+		nan_ndp_action_notif(nan, peer);
+		return 0;
+	}
+
+	/*
+	 * NDP was rejected by the peer. Clear the ongoing setup and send an
+	 * event. There is no need to send an NAF in this case.
+	 */
+	if (peer->ndp_setup.status == NAN_NDP_STATUS_REJECTED) {
+		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP rejected");
+
+		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason);
+		return 0;
+	}
+
+	/*
+	 * NDP state machine is either done or continued, need to trigger NDL
+	 * state machine.
+	 */
+	ret = nan_ndl_handle_ndl_attr(nan, peer, msg);
+	if (ret || !peer->ndl)
+		return ret;
+
+	if (peer->ndl->status == NAN_NDL_STATUS_REJECTED) {
+		enum nan_reason reason = peer->ndl->reason;
+
+		if (reason == NAN_REASON_RESERVED)
+			reason = NAN_REASON_UNSPECIFIED_REASON;
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NAF: NDL rejected(ret=%d, reason=%u)",
+			   ret, reason);
+
+		/* NDL handling failure on local side */
+		if (peer->ndl->send_naf_on_error) {
+			nan_ndp_setup_failure(nan, peer, reason, 0);
+			ret = nan_action_send(nan, peer, resp_oui);
+		}
+
+		nan_ndp_disconnected(nan, peer, reason);
+		return 0;
+	}
+
+	if (peer->ndl->status == NAN_NDL_STATUS_CONTINUED) {
+		wpa_printf(MSG_DEBUG, "NAN: NAF: NDL continues");
+		nan_ndp_action_notif(nan, peer);
+		return 0;
+	}
+
+	/* Both state machines are done */
+	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
+	    peer->ndl->state == NAN_NDL_STATE_DONE) {
+		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP setup done");
+
+		nan_ndp_connected(nan, peer);
+		return 0;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: NAF: NDP setup continues");
+	ret = nan_action_send(nan, peer, resp_oui);
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NAF: Failed to send NAF. Resetting..");
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON);
+	}
+
+	return 0;
+}
+
+
+/*
+ * nan_action_rx - Process a received NAN Action Frame
+ * @nan: NAN module context from nan_init()
+ * @mgmt: Pointer to the IEEE 802.11 Management frame
+ * @len: Length of the Management frame in octets
+ * Return 0 on success; -1 on failure.
+ */
+int nan_action_rx(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
+		  size_t len)
+{
+	struct nan_msg msg;
+	struct nan_peer *peer;
+	enum nan_subtype resp_oui = NAN_SUBTYPE_INVALID;
+	int ret;
+
+	if (!nan_ndp_supported(nan))
+		return -1;
+
+	/* Parse the NAF and validate its general structure */
+	ret = nan_parse_naf(nan, mgmt, len, &msg);
+	if (ret)
+		return ret;
+
+	ret = nan_add_peer(nan, mgmt->sa, mgmt->u.action.u.naf.variable,
+			   len - IEEE80211_MIN_ACTION_LEN(naf));
+	if (ret)
+		wpa_printf(MSG_DEBUG, "NAN: Failed to parse peer from NAF");
+
+	peer = nan_get_peer(nan, mgmt->sa);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Failed to get a peer that was just added");
+		goto done;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: NAF: oui_subtype=%u", msg.oui_subtype);
+
+	ret = nan_parse_device_attrs(nan, peer, mgmt->u.action.u.naf.variable,
+				     len - IEEE80211_MIN_ACTION_LEN(naf));
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NAF: Failed to parse device attributes");
+		goto done;
+	}
+
+	switch (msg.oui_subtype) {
+	case NAN_SUBTYPE_DATA_PATH_REQUEST:
+		resp_oui = NAN_SUBTYPE_DATA_PATH_RESPONSE;
+		break;
+	case NAN_SUBTYPE_DATA_PATH_RESPONSE:
+		resp_oui = NAN_SUBTYPE_DATA_PATH_CONFIRM;
+		break;
+	case NAN_SUBTYPE_DATA_PATH_CONFIRM:
+		resp_oui = NAN_SUBTYPE_DATA_PATH_KEY_INSTALL;
+		break;
+	case NAN_SUBTYPE_DATA_PATH_KEY_INSTALL:
+	case NAN_SUBTYPE_DATA_PATH_TERMINATION:
+		break;
+	case NAN_SUBTYPE_RANGING_REQUEST:
+	case NAN_SUBTYPE_RANGING_RESPONSE:
+	case NAN_SUBTYPE_RANGING_TERMINATION:
+	case NAN_SUBTYPE_RANGING_REPORT:
+	case NAN_SUBTYPE_SCHEDULE_REQUEST:
+	case NAN_SUBTYPE_SCHEDULE_RESPONSE:
+	case NAN_SUBTYPE_SCHEDULE_CONFIRM:
+	case NAN_SUBTYPE_SCHEDULE_UPDATE_NOTIF:
+		ret = 0;
+		goto done;
+	default:
+		ret = -1;
+		goto done;
+	}
+
+	ret = nan_action_rx_ndp(nan, peer, &msg, resp_oui);
+done:
+	nan_attrs_clear(nan, &msg.attrs);
+	return ret;
 }
 
 

@@ -12,6 +12,8 @@
 #include "common/nan_defs.h"
 
 struct nan_cluster_config;
+enum nan_reason;
+struct ieee80211_mgmt;
 
 /*
  * struct nan_device_capabilities - NAN device capabilities
@@ -256,6 +258,45 @@ struct nan_channels {
 	struct nan_channel_info *chans;
 };
 
+/**
+ * struct nan_ndp_connection_params - Parameters for NDP connection
+ * @ndp_id: NDP identifier
+ * @peer_ndi: Peer NDI MAC address
+ * @local_ndi: Local NDI MAC address
+ * @ssi: Service specific information
+ * @ssi_len: Service specific information length
+ */
+struct nan_ndp_connection_params {
+	struct nan_ndp_id ndp_id;
+	const u8 *peer_ndi;
+	const u8 *local_ndi;
+	const u8 *ssi;
+	size_t ssi_len;
+};
+
+/**
+ * struct nan_ndp_action_notif_params - Parameters for NDP action notification
+ * @ndp_id: NDP identifier
+ * @is_request: Whether the data is associated with an NDP request frame (true)
+ *     or with an NDP response (false).
+ * @ndp_status: NDP status
+ * @ndl_status: NDL status
+ * @publish_inst_id: Identifier for the publish instance function
+ * @ssi: Service specific information
+ * @ssi_len: Service specific information length
+ */
+struct nan_ndp_action_notif_params {
+	struct nan_ndp_id ndp_id;
+	bool is_request;
+
+	enum nan_ndp_status ndp_status;
+	enum nan_ndl_status ndl_status;
+
+	u8 publish_inst_id;
+	const u8 *ssi;
+	size_t ssi_len;
+};
+
 struct nan_config {
 	void *cb_ctx;
 
@@ -281,6 +322,41 @@ struct nan_config {
 	 */
 	int (*update_config)(void *ctx,
 			     const struct nan_cluster_config *config);
+
+	/**
+	 * ndp_action_notif - Notify NDP action is required
+	 * @ctx: Callback context from cb_ctx
+	 * @params: NDP action notification parameters
+	 *
+	 * A notification sent when an NDP establishment frame is received, and
+	 * upper layer input is required to continue the flow.
+	 */
+	void (*ndp_action_notif)(void *ctx,
+				 struct nan_ndp_action_notif_params *params);
+
+	/**
+	 * ndp_connected - Notify that NDP was successfully connected
+	 * @ctx: Callback context from cb_ctx
+	 * @params: NDP connection parameters
+	 */
+	void (*ndp_connected)(void *ctx,
+			      struct nan_ndp_connection_params *params);
+
+	/**
+	 * ndp_disconnected - Notify that NDP was disconnected
+	 * @ctx: Callback context from cb_ctx
+	 * @ndp_id: NDP identifier
+	 * @local_ndi: Local NDI MAC address
+	 * @peer_ndi: Peer NDI MAC address
+	 * @reason: Disconnection reason
+	 *
+	 * This callback notifies that an NDP has been disconnected. It can be
+	 * called both during NDP establishment (indicating failure) or after
+	 * successful establishment (indicating termination).
+	 */
+	void (*ndp_disconnected)(void *ctx, struct nan_ndp_id *ndp_id,
+				 const u8 *local_ndi, const u8 *peer_ndi,
+				 enum nan_reason reason);
 
 	/**
 	 * get_chans - Get the prioritized allowed channel information to be
@@ -332,5 +408,7 @@ int nan_add_peer(struct nan_data *nan, const u8 *addr,
 bool nan_publish_instance_id_valid(struct nan_data *nan, u8 instance_id,
 				   u8 *service_id);
 void nan_set_cluster_id(struct nan_data *nan, const u8 *cluster_id);
+int nan_action_rx(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
+		  size_t len);
 
 #endif /* NAN_H */
