@@ -1158,7 +1158,8 @@ static bool nan_ndp_supported(struct nan_data *nan)
 {
 	if (nan->cfg->ndp_action_notif && nan->cfg->ndp_connected &&
 	    nan->cfg->ndp_disconnected &&
-	    nan->cfg->send_naf && nan->cfg->get_chans)
+	    nan->cfg->send_naf && nan->cfg->get_chans &&
+	    nan->cfg->is_valid_publish_id)
 		return true;
 
 	wpa_printf(MSG_DEBUG, "NAN: NDP operations are not supported");
@@ -1501,10 +1502,14 @@ done:
 bool nan_publish_instance_id_valid(struct nan_data *nan, u8 instance_id,
 				   u8 *service_id)
 {
-	/* TODO: Need implement this logic */
-	wpa_printf(MSG_DEBUG,
-		   "NAN: TODO: Publish instance ID validation not implemented");
-	return true;
+	if (!nan->cfg->is_valid_publish_id) {
+		wpa_printf(MSG_INFO,
+			   "NAN: is_valid_publish_id callback not defined");
+		return false;
+	}
+
+	return nan->cfg->is_valid_publish_id(nan->cfg->cb_ctx, instance_id,
+					     service_id);
 }
 
 

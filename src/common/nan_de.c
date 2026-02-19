@@ -2165,3 +2165,25 @@ void nan_de_set_cluster_id(struct nan_de *de, const u8 *cluster_id)
 		de->cluster_id_set = false;
 	}
 }
+
+
+bool nan_de_is_valid_instance_id(struct nan_de *de, int handle,
+				 bool publish, u8 *service_id)
+{
+	struct nan_de_service *srv;
+
+	if (handle < 1 || handle > NAN_DE_MAX_SERVICE)
+		return false;
+
+	srv = de->service[handle - 1];
+	if (!srv)
+		return false;
+
+	if (publish && srv->type != NAN_DE_PUBLISH)
+		return false;
+	if (!publish && srv->type != NAN_DE_SUBSCRIBE)
+		return false;
+
+	os_memcpy(service_id, srv->service_id, NAN_SERVICE_ID_LEN);
+	return true;
+}

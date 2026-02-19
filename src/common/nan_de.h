@@ -209,6 +209,8 @@ int nan_de_transmit(struct nan_de *de, int handle,
 		    const u8 *peer_addr, u8 req_instance_id);
 void nan_de_dw_trigger(struct nan_de *de, int freq);
 void nan_de_set_cluster_id(struct nan_de *de, const u8 *cluster_id);
+bool nan_de_is_valid_instance_id(struct nan_de *de, int handle,
+				 bool publish, u8 *service_id);
 
 int nan_de_stop_listen(struct nan_de *de, int handle);
 

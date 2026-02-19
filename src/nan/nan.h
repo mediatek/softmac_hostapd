@@ -411,6 +411,17 @@ struct nan_config {
 	 */
 	int (*send_naf)(void *ctx, const u8 *dst, const u8 *src,
 			const u8 *cluster_id, struct wpabuf *buf);
+
+	/**
+	 * is_valid_publish_id - Check if a publish instance ID is valid
+	 * @ctx: Callback context from cb_ctx
+	 * @instance_id: The instance ID to check
+	 * @service_id: On return, holds the service ID if the instance ID is
+	 *	valid
+	 * Returns: true if there is a local publish service ID with the given
+	 * instance ID; false otherse
+	 */
+	bool (*is_valid_publish_id)(void *ctx, u8 instance_id, u8 *service_id);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
