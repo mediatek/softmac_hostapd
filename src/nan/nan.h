@@ -304,6 +304,18 @@ struct nan_config {
 	 * for use by the NAN module for the given map.
 	 */
 	int (*get_chans)(void *ctx, u8 map_id, struct nan_channels *chans);
+
+	/**
+	 * send_naf - Transmit a NAN Action frame
+	 * @ctx: Callback context from cb_ctx
+	 * @dst: Destination MAC address
+	 * @src: Source MAC address. Can be NULL.
+	 * @cluster_id: The cluster ID
+	 * @buf: Frame body (starting from the Category field)
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*send_naf)(void *ctx, const u8 *dst, const u8 *src,
+			const u8 *cluster_id, struct wpabuf *buf);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
