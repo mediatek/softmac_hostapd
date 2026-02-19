@@ -101,10 +101,83 @@ struct nan_ndp_setup {
 };
 
 /**
+ * struct nan_band_chan - NAN channel/band entry
+ *
+ * @band_id: Band ID as specified by enum nan_band_entry
+ * @chan: Channel entry as specified by &struct nan_chan_entry
+ */
+struct nan_band_chan {
+	union {
+		u8 band_id;
+		struct nan_chan_entry chan;
+	} u;
+};
+
+/**
+ * enum nan_band_chan_type - NAN band or channel
+ *
+ * @NAN_TYPE_BAND: The entry is a band entry
+ * @NAN_TYPE_CHANNEL: The entry is a channel entry
+ */
+enum nan_band_chan_type {
+	NAN_TYPE_BAND,
+	NAN_TYPE_CHANNEL,
+};
+
+/**
+ * struct nan_avail_entry - NAN availability entry
+ *
+ * @list: Used for linking in the availability entries list
+ * @map_id: Map ID of the availability attribute that this entry belongs to
+ * @type: Availability type. One of NAN_AVAIL_ENTRY_CTRL_TYPE_*.
+ * @preference: Preference of being available in the NAN slots specified by
+ *	the associated time bitmap. The preference is higher when the value is
+ *	set larger. Valid values are 0 - 3.
+ * @utilization: Indicating proportion within the NAN slots specified by the
+ *	associated time bitmap that are already utilized for other purposes,
+ *	quantized to 20%. Valid values are 0 - 5.
+ * @rx_nss: Maximum number of special streams the NAN device can receive during
+ *	the NAN slots specified by the associated time bitmap
+ * @tbm: Time bitmap specifying the NAN slots in which the device will be
+ *	available for NAN operations
+ * @band_chan_type: Type of entries in &band_chan array, as specified by
+ *	enum nan_band_chan_type
+ * @n_band_chan: Number of entries in &band_chan array
+ * @band_chan: Array of bands/channels on which the NAN device will be
+ *	available
+ */
+struct nan_avail_entry {
+	struct dl_list list;
+	u8 map_id;
+	u8 type;
+	u8 preference;
+	u8 utilization;
+	u8 rx_nss;
+	struct nan_time_bitmap tbm;
+	enum nan_band_chan_type band_chan_type;
+	u8 n_band_chan;
+	struct nan_band_chan *band_chan;
+};
+
+/**
+ * struct nan_peer_info - NAN peer information
+ *
+ * @last_seen: Timestamp of the last update of the peer info
+ * @seq_id: Sequence id of the last availability update
+ * @avail_entries: List of availability entries of the peer
+ */
+struct nan_peer_info {
+	struct os_reltime last_seen;
+	u8 seq_id;
+	struct dl_list avail_entries;
+};
+
+/**
  * struct nan_peer - Represents a known NAN peer
  * @list: List node for linking peers
  * @nmi_addr: NMI of the peer
  * @last_seen: Timestamp of the last time this peer was seen
+ * @info: Information about the peer
  * @ndps: List of NDPs associated with this peer
  * @ndp_setup: Used to hold an NDP object while NDP establishment is in
  *     progress
@@ -113,6 +186,8 @@ struct nan_peer {
 	struct dl_list list;
 	u8 nmi_addr[ETH_ALEN];
 	struct os_reltime last_seen;
+	struct nan_peer_info info;
+
 	struct dl_list ndps;
 
 	struct nan_ndp_setup ndp_setup;
@@ -212,5 +287,7 @@ void nan_ndp_setup_failure(struct nan_data *nan, struct nan_peer *peer,
 			   enum nan_reason reason, bool reset_state);
 int nan_ndp_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		     enum nan_subtype subtype);
+int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
+			   const u8 *attrs_data, size_t attrs_len);
 
 #endif /* NAN_I_H */
