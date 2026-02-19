@@ -884,3 +884,193 @@ int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
 		return -1;
 	}
 }
+
+
+/**
+ * nan_ndl_add_ndl_attr - Add NDL attribute to frame
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer for NDL establishment
+ * @buf: Frame buffer to which the attribute would be added
+ * Returns: 0 on success, negative on failure.
+ */
+int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
+			 struct wpabuf *buf)
+{
+	struct nan_ndl *ndl;
+	u16 ndl_ctrl = 0;
+	u8 type;
+
+	if (!peer || !peer->ndl)
+		return -1;
+
+	ndl = peer->ndl;
+
+	wpa_printf(MSG_DEBUG, "NAN: Add NDL attribute. state=%s, status=%u",
+		   nan_ndl_state_str(ndl->state), ndl->status);
+
+	switch (ndl->state) {
+	case NAN_NDL_STATE_NONE:
+	case NAN_NDL_STATE_REQ_SENT:
+	case NAN_NDL_STATE_RES_SENT:
+	case NAN_NDL_STATE_CON_SENT:
+	default:
+		return -1;
+	case NAN_NDL_STATE_START:
+		type = NAN_NDL_TYPE_REQUEST;
+		if (ndl->sched.ndc.len)
+			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
+		break;
+	case NAN_NDL_STATE_REQ_RECV:
+		type = NAN_NDL_TYPE_RESPONSE;
+		if (ndl->sched.ndc.len &&
+		    ndl->status != NAN_NDL_STATUS_REJECTED)
+			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
+		break;
+	case NAN_NDL_STATE_RES_RECV:
+		type = NAN_NDL_TYPE_CONFIRM;
+		if (ndl->sched.ndc.len &&
+		    ndl->status != NAN_NDL_STATUS_REJECTED)
+			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
+		break;
+	case NAN_NDL_STATE_DONE:
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDL: Done. Not adding NDL attribute");
+		return 0;
+	}
+
+	/* QoS attribute is going to be added */
+	if (ndl->local_qos.max_latency != NAN_QOS_MAX_LATENCY_NO_PREF ||
+	    ndl->local_qos.min_slots != NAN_QOS_MIN_SLOTS_NO_PREF)
+		ndl_ctrl |= NAN_NDL_CTRL_NDL_QOS_ATTR_PRESENT;
+
+	wpabuf_put_u8(buf, NAN_ATTR_NDL);
+	wpabuf_put_le16(buf, sizeof(struct ieee80211_ndl));
+
+	wpabuf_put_u8(buf, ndl->dialog_token);
+	wpabuf_put_u8(buf, type | (ndl->status << NAN_NDL_STATUS_POS));
+	wpabuf_put_u8(buf, ndl->reason);
+	wpabuf_put_u8(buf, ndl_ctrl);
+
+	return 0;
+}
+
+
+/**
+ * nan_ndl_add_ndc_attr - Add NDC attribute to frame
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer for NDL establishment
+ * @buf: Frame buffer to which the attribute would be added
+ * Returns: 0 on success, negative on failure.
+ */
+int nan_ndl_add_ndc_attr(struct nan_data *nan, const struct nan_peer *peer,
+			 struct wpabuf *buf)
+{
+	struct nan_ndl *ndl;
+	u8 ndc_ctrl = NAN_NDC_CTRL_SELECTED;
+	u16 sched_entry_ctrl = 0;
+
+	if (!peer || !peer->ndl)
+		return -1;
+
+	ndl = peer->ndl;
+
+	if (ndl->state != NAN_NDL_STATE_START &&
+	    ndl->state != NAN_NDL_STATE_REQ_RECV &&
+	    ndl->state != NAN_NDL_STATE_RES_RECV)
+		return 0;
+
+	wpa_printf(MSG_DEBUG, "NAN: Add NDC attribute. state=%s, status=%u",
+		   nan_ndl_state_str(ndl->state), ndl->status);
+
+	/* NDC attribute is optional in case of reject */
+	if (ndl->status == NAN_NDL_STATUS_REJECTED)
+		return 0;
+
+	/*
+	 * NDC attribute for NDP Request is optional. In all other cases it is
+	 * mandatory
+	 */
+	if (!ndl->sched.ndc.len) {
+		if (ndl->state != NAN_NDL_STATE_START) {
+			wpa_printf(MSG_DEBUG, "NAN: NDL: No NDC to add");
+			return -1;
+		}
+
+		return 0;
+	}
+
+	wpabuf_put_u8(buf, NAN_ATTR_NDC);
+	wpabuf_put_le16(buf, sizeof(struct ieee80211_ndc) +
+			sizeof(struct nan_sched_entry) +
+			ndl->sched.ndc.len);
+
+	wpabuf_put_data(buf, ndl->ndc_id, sizeof(ndl->ndc_id));
+	wpabuf_put_u8(buf, ndc_ctrl);
+
+	/* Add the schedule entry */
+	wpabuf_put_u8(buf, ndl->sched.ndc_map_id);
+
+	sched_entry_ctrl |= ndl->sched.ndc.duration <<
+		NAN_TIME_BM_CTRL_BIT_DURATION_POS;
+	sched_entry_ctrl |= ndl->sched.ndc.period <<
+		NAN_TIME_BM_CTRL_PERIOD_POS;
+	sched_entry_ctrl |= ndl->sched.ndc.offset <<
+		NAN_TIME_BM_CTRL_START_OFFSET_POS;
+
+	wpabuf_put_le16(buf, sched_entry_ctrl);
+
+	/* Add the time bitmap */
+	wpabuf_put_u8(buf, ndl->sched.ndc.len);
+	wpabuf_put_data(buf, ndl->sched.ndc.bitmap, ndl->sched.ndc.len);
+
+	return 0;
+}
+
+
+/**
+ * nan_ndl_add_qos_attr - Add QOS attribute to frame
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer for NDL establishment
+ * @buf: Frame buffer to which the attribute would be added
+ * Returns: 0 on success, negative on failure.
+ */
+int nan_ndl_add_qos_attr(struct nan_data *nan,
+			 const struct nan_peer *peer,
+			 struct wpabuf *buf)
+{
+	struct nan_ndl *ndl;
+
+	if (!peer || !peer->ndl)
+		return -1;
+
+	ndl = peer->ndl;
+
+	wpa_printf(MSG_DEBUG, "NAN: Add QoS attribute. state=%s, status=%u",
+		   nan_ndl_state_str(ndl->state), ndl->status);
+
+	switch (ndl->state) {
+	case NAN_NDL_STATE_START:
+	case NAN_NDL_STATE_REQ_RECV:
+	case NAN_NDL_STATE_RES_RECV:
+		break;
+	case NAN_NDL_STATE_NONE:
+	case NAN_NDL_STATE_REQ_SENT:
+	case NAN_NDL_STATE_RES_SENT:
+	case NAN_NDL_STATE_CON_SENT:
+	case NAN_NDL_STATE_CON_RECV:
+	case NAN_NDL_STATE_DONE:
+	default:
+		return 0;
+	}
+
+	if (ndl->local_qos.max_latency == NAN_QOS_MAX_LATENCY_NO_PREF &&
+	    ndl->local_qos.min_slots == NAN_QOS_MIN_SLOTS_NO_PREF)
+		return 0;
+
+	wpabuf_put_u8(buf, NAN_ATTR_NDL_QOS);
+	wpabuf_put_le16(buf, sizeof(struct ieee80211_nan_qos));
+	wpabuf_put_u8(buf, ndl->local_qos.min_slots);
+	wpabuf_put_le16(buf, ndl->local_qos.max_latency);
+
+	return 0;
+}

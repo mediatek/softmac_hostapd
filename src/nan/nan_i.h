@@ -415,6 +415,12 @@ void nan_ndl_setup_failure(struct nan_data *nan, struct nan_peer *peer,
 void nan_ndl_reset(struct nan_data *nan, struct nan_peer *peer);
 int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
 			    struct nan_msg *msg);
+int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
+			 struct wpabuf *buf);
+int nan_ndl_add_ndc_attr(struct nan_data *nan, const struct nan_peer *peer,
+			 struct wpabuf *buf);
+int nan_ndl_add_qos_attr(struct nan_data *nan, const struct nan_peer *peer,
+			 struct wpabuf *buf);
 int nan_chan_to_chan_idx_map(struct nan_data *nan,
 			     u8 op_class, u8 channel, u16 *chan_idx_map);
 
