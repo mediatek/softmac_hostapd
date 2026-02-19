@@ -437,6 +437,9 @@ int nan_ndl_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		     enum nan_subtype subtype);
 int nan_ndl_add_avail_attrs(struct nan_data *nan, const struct nan_peer *peer,
 			    struct wpabuf *buf);
+void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
+				     const struct nan_peer *peer,
+				     struct wpabuf *buf);
 int nan_get_chan_bm(struct nan_data *nan, struct nan_sched_chan *chan,
 		    u8 *op_class, u16 *chan_bm, u16 *pri_chan_bm);
 int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
