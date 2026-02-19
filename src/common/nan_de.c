@@ -1440,12 +1440,15 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		flen = *sda++;
 		if (end - sda < flen)
 			return;
-		if (flen >= 4 && WPA_GET_BE24(sda) == OUI_WFA) {
-			srv_proto_type = sda[3];
-			ssi = sda + 4;
-			ssi_len = flen - 4;
-			wpa_printf(MSG_DEBUG, "NAN: Service Protocol Type %d",
-				   srv_proto_type);
+
+		if (flen) {
+			/* This case of SSI in SDA does not have an explicit
+			 * indication of a service protocol type unlike the
+			 * SDEA case. For now, leave srv_proto_type to 0 for
+			 * this SDA case since that is a reserved value for the
+			 * SDEA cases. */
+			ssi = sda;
+			ssi_len = flen;
 			wpa_hexdump(MSG_MSGDUMP, "NAN: ssi", ssi, ssi_len);
 		}
 		sda += flen;
