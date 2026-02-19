@@ -80,6 +80,26 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.stop = wpas_nan_stop_cb;
 	nan.update_config = wpas_nan_update_config_cb;
 
+	/*
+	 * TODO: Set the device capabilities based on configuration and driver
+	 * data. For now do not set 'n_antennas', 'channel_switch_time' and
+	 * 'capa', i.e., indicating that the information is not available. This
+	 * information should also be retrieved from the driver.
+	 */
+	nan.dev_capa.cdw_info =
+		((1 << NAN_CDW_INFO_2G_POS) & NAN_CDW_INFO_2G_MASK) |
+		((1 << NAN_CDW_INFO_5G_POS) & NAN_CDW_INFO_5G_MASK);
+
+	nan.dev_capa.supported_bands = NAN_DEV_CAPA_SBAND_2G;
+	if (wpa_s->nan_drv_flags &
+	    WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND)
+		nan.dev_capa.supported_bands |= NAN_DEV_CAPA_SBAND_5G;
+
+	/* TODO: set based on driver capabilities */
+	nan.dev_capa.op_mode = NAN_DEV_CAPA_OP_MODE_PHY_MODE_VHT |
+		NAN_DEV_CAPA_OP_MODE_PHY_MODE_HE |
+		NAN_DEV_CAPA_OP_MODE_HE_VHT_160;
+
 	wpa_s->nan = nan_init(&nan);
 	if (!wpa_s->nan) {
 		wpa_printf(MSG_INFO, "NAN: Failed to init");

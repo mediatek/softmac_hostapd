@@ -308,3 +308,24 @@ int nan_parse_naf(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
 			       len - IEEE80211_MIN_ACTION_LEN(naf),
 			       &msg->attrs);
 }
+
+
+/*
+ * nan_add_dev_capa_attr - Add Device Capability attribute
+ * @nan: NAN module context from nan_init()
+ * @buf: wpabuf to which the attribute would be added
+ */
+void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf)
+{
+	wpabuf_put_u8(buf, NAN_ATTR_DEVICE_CAPABILITY);
+	wpabuf_put_le16(buf, sizeof(struct nan_device_capa));
+
+	/* Device capabilities apply to the device, so set map ID = 0 */
+	wpabuf_put_u8(buf, 0);
+	wpabuf_put_le16(buf, nan->cfg->dev_capa.cdw_info);
+	wpabuf_put_u8(buf, nan->cfg->dev_capa.supported_bands);
+	wpabuf_put_u8(buf, nan->cfg->dev_capa.op_mode);
+	wpabuf_put_u8(buf, nan->cfg->dev_capa.n_antennas);
+	wpabuf_put_le16(buf, nan->cfg->dev_capa.channel_switch_time);
+	wpabuf_put_u8(buf, nan->cfg->dev_capa.capa);
+}

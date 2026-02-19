@@ -11,8 +11,28 @@
 
 struct nan_cluster_config;
 
+/*
+ * struct nan_device_capabilities - NAN device capabilities
+ * @cdw_info: Committed DW information
+ * @supported_bands: Supported bands
+ * @op_mode: Operation mode
+ * @n_antennas: Number of antennas
+ * @channel_switch_time: Maximal channel switch time
+ * @capa: Device capabilities
+ */
+struct nan_device_capabilities {
+	u16 cdw_info;
+	u8 supported_bands;
+	u8 op_mode;
+	u8 n_antennas;
+	u16 channel_switch_time;
+	u8 capa;
+};
+
 struct nan_config {
 	void *cb_ctx;
+
+	struct nan_device_capabilities dev_capa;
 
 	/**
 	 * start - Start NAN
