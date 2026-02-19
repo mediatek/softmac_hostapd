@@ -446,4 +446,66 @@ struct ieee80211_nan_qos {
 #define NAN_QOS_MIN_SLOTS_NO_PREF   0
 #define NAN_QOS_MAX_LATENCY_NO_PREF 0xffff
 
+/* Wi-Fi Aware spec v4.0, Table 121 (Cipher Suite attribute field format) */
+enum nan_cipher_suite_id {
+	NAN_CS_NONE         = 0,
+	NAN_CS_SK_CCM_128   = 1,
+	NAN_CS_SK_GCM_256   = 2,
+	NAN_CS_PK_2WDH_128  = 3,
+	NAN_CS_PK_2WDH_256  = 4,
+	NAN_CS_GTK_CCMP_128 = 5,
+	NAN_CS_GTK_GCMP_256 = 6,
+	NAN_CS_PK_PASN_128  = 7,
+	NAN_CS_PK_PASN_256  = 8,
+};
+
+struct nan_cipher_suite {
+	u8 csid; /* Cipher Suite ID */
+	u8 instance_id; /* Publish ID */
+} STRUCT_PACKED;
+
+/* Wi-Fi Aware spec v4.0, Table 122 (Cipher Suite Information attribute (CSIA)
+ * field format) */
+#define NAN_CS_INFO_CAPA_16_ND_TKSA_REPLAY_COUNTERS BIT(0)
+#define NAN_CS_INFO_CAPA_GTK_SUPP_POS               1
+#define NAN_CS_INFO_CAPA_GTK_SUPP_MASK              (BIT(1) | BIT(2))
+#define NAN_CS_INFO_CAPA_GTK_SUPP_NONE              0
+#define NAN_CS_INFO_CAPA_GTK_SUPP_NO_BIGTK          1
+#define NAN_CS_INFO_CAPA_GTK_SUPP_ALL               2
+#define NAN_CS_INFO_CAPA_16_REPLAY_COUNTERS         BIT(3)
+#define NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256  BIT(4)
+
+struct nan_cipher_suite_info {
+	u8 capab; /* Capabilities */
+	u8 cs[0]; /* Cipher Suite List */
+} STRUCT_PACKED;
+
+/* Wi-Fi Aware spec v4.0, Table 123 (Security Context Identifier (SCID) field
+ * format) */
+enum nan_sec_ctx_type {
+	NAN_SEC_CTX_TYPE_ND_PMKID = 1,
+};
+
+struct nan_sec_ctxt {
+	le16 len; /* Security Context Identifier Type Length */
+	u8 scid; /* Security Context Identifier Type */
+	u8 instance_id; /* Publish ID */
+	u8 ctxt[0]; /* Security Context Identifier */
+} STRUCT_PACKED;
+
+/* Only key descriptor type 2 is supported */
+#define NAN_KEY_DESC 2
+
+/* Wi-Fi Aware spec v4.0, Table 125 (NAN Shared Key Descriptor attribute field
+ * format) */
+struct nan_shared_key {
+	u8 publish_id; /* Publish ID */
+
+	/*
+	 * The format of the key is as defined in the IEEE 802.11 standard,
+	 * starting with the Descriptor Type field. See struct wpa_eapol_key.
+	 */
+	u8 key[0]; /* IEEE 802.11 RSNA Key Descriptor */
+} STRUCT_PACKED;
+
 #endif /* NAN_DEFS_H */
