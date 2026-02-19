@@ -12,11 +12,35 @@
 #include "list.h"
 #include "common/ieee802_11_defs.h"
 #include "common/nan_defs.h"
+#include "common/wpa_common.h"
 #include "nan.h"
 
 struct nan_config;
 
 #define NAN_INVALID_MAP_ID 0xff
+
+#define NAN_KCK_MAX_LEN 24
+#define NAN_KEK_MAX_LEN 32
+#define NAN_TK_MAX_LEN  32
+
+/**
+ * struct nan_ptk - NAN Pairwise Transient Key
+ * @kck: Key Confirmation Key
+ * @kek: Key Encryption Key
+ * @tk: Transient Key
+ * @kck_len: Length of &kck in octets
+ * @kek_len: Length of &kek in octets
+ * @tk_len: Length of &tk in octets
+ */
+struct nan_ptk {
+	u8 kck[NAN_KCK_MAX_LEN];
+	u8 kek[NAN_KEK_MAX_LEN];
+	u8 tk[NAN_TK_MAX_LEN];
+
+	size_t kck_len;
+	size_t kek_len;
+	size_t tk_len;
+};
 
 /*
  * enum nan_ndp_state - State of NDP establishment
@@ -488,5 +512,16 @@ struct bitfield * nan_avail_entries_to_bf(struct nan_data *nan,
 void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 			struct nan_ndp_id *ndp_id, const u8 *local_ndi,
 			const u8 *peer_ndi, enum nan_reason reason);
+int nan_crypto_pmk_to_ptk(const u8 *pmk, const u8 *iaddr, const u8 *raddr,
+			  const u8 *inonce, const u8 *rnonce,
+			  struct nan_ptk *ptk,
+			  enum nan_cipher_suite_id cipher);
+int nan_crypto_calc_pmkid(const u8 *pmk, const u8 *iaddr, const u8 *raddr,
+			  const u8 *serv_id,
+			  enum nan_cipher_suite_id cipher, u8 *pmkid);
+int nan_crypto_calc_auth_token(enum nan_cipher_suite_id cipher,
+			       const u8 *buf, size_t len, u8 *token);
+int nan_crypto_key_mic(const u8 *buf, size_t len, const u8 *kck,
+		       size_t kck_len, u8 cipher, u8 *mic);
 
 #endif /* NAN_I_H */

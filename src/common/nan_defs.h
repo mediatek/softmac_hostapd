@@ -446,6 +446,10 @@ struct ieee80211_nan_qos {
 #define NAN_QOS_MIN_SLOTS_NO_PREF   0
 #define NAN_QOS_MAX_LATENCY_NO_PREF 0xffff
 
+#define NAN_AUTH_TOKEN_LEN 16
+#define NAN_KEY_MIC_LEN    16
+#define NAN_KEY_MIC_24_LEN 24
+
 /* Wi-Fi Aware spec v4.0, Table 121 (Cipher Suite attribute field format) */
 enum nan_cipher_suite_id {
 	NAN_CS_NONE         = 0,
