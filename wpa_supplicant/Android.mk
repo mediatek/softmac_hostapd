@@ -304,6 +304,7 @@ ifdef NEED_NAN
 OBJS += nan_supplicant.c
 OBJS += src/nan/nan.c
 OBJS += src/common/nan_de.c
+OBJS += src/nan/nan_util.c
 endif
 
 ifdef CONFIG_OWE

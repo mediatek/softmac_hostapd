@@ -1218,11 +1218,22 @@ struct ieee80211_mgmt {
 					 * Basic Multi-Link element (optional) */
 					u8 variable[];
 				} STRUCT_PACKED link_reconf_resp;
+				struct {
+					u8 action;
+					u8 oui[3];
+					u8 oui_type;
+					u8 subtype;
+					u8 variable[0];
+				} STRUCT_PACKED naf;
 			} u;
 		} STRUCT_PACKED action;
 	} u;
 } STRUCT_PACKED;
 
+
+#define IEEE80211_MIN_ACTION_LEN(type)	\
+	(offsetof(struct ieee80211_mgmt, u.action.u.type) + \
+	 sizeof(((struct ieee80211_mgmt *) 0)->u.action.u.type))
 
 #define IEEE80211_MAX_MMPDU_SIZE 2304
 

@@ -332,6 +332,7 @@ ifdef NEED_NAN
 OBJS += nan_supplicant.o
 OBJS += ../src/nan/nan.o
 OBJS += ../src/common/nan_de.o
+OBJS += ../src/nan/nan_util.o
 endif
 
 ifdef CONFIG_PR
