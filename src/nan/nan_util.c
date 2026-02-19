@@ -809,3 +809,118 @@ int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 
 	return 0;
 }
+
+
+/**
+ * nan_del_avail_entry - Delete an availability entry
+ * @entry: The availability entry to delete
+ */
+void nan_del_avail_entry(struct nan_avail_entry *entry)
+{
+	if (!entry)
+		return;
+	os_free(entry->band_chan);
+	os_free(entry);
+}
+
+
+/**
+ * nan_flush_avail_entries - Flush a list of availability entries
+ * @avail_entries: List of availability entries
+ */
+void nan_flush_avail_entries(struct dl_list *avail_entries)
+{
+	struct nan_avail_entry *cur, *next;
+
+	dl_list_for_each_safe(cur, next, avail_entries,
+			      struct nan_avail_entry, list) {
+		dl_list_del(&cur->list);
+		nan_del_avail_entry(cur);
+	}
+}
+
+
+/**
+ * nan_sched_entries_to_avail_entries - Convert NAN schedule entries to NAN
+ * availability entries
+ *
+ * @nan: NAN module context from nan_init()
+ * @avail_entries: On successful return would hold a valid list of availability
+ *     entries
+ * @sched_entries: Buffer holding the schedule entries, each of type
+ *     &struct nan_sched_entry
+ * @sched_entries_len: Length of the sched_entries buffer
+ */
+int nan_sched_entries_to_avail_entries(struct nan_data *nan,
+				       struct dl_list *avail_entries,
+				       const u8 *sched_entries,
+				       u16 sched_entries_len)
+{
+	dl_list_init(avail_entries);
+
+	if (!sched_entries || !sched_entries_len)
+		return 0;
+
+	if (sched_entries_len < sizeof(struct nan_sched_entry)) {
+		wpa_printf(MSG_DEBUG, "NAN: Schedule entry too short=%u",
+			   sched_entries_len);
+		return -1;
+	}
+
+	while (sched_entries_len > 0) {
+		const struct nan_sched_entry *sched_entry =
+			(const struct nan_sched_entry *) sched_entries;
+		struct nan_avail_entry *avail_entry;
+		u16 ctrl;
+		size_t elen;
+
+		if (sched_entries_len < sizeof(struct nan_sched_entry))
+			goto fail;
+		elen = sizeof(struct nan_sched_entry) + sched_entry->len;
+		if (sched_entries_len < elen) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Invalid schedule entry len=%u",
+				   sched_entry->len);
+			goto fail;
+		}
+
+		if (sched_entry->len > NAN_TIME_BITMAP_MAX_LEN)
+			goto fail;
+
+		avail_entry = os_zalloc(sizeof(struct nan_avail_entry));
+		if (!avail_entry)
+			goto fail;
+
+		avail_entry->map_id = sched_entry->map_id;
+		ctrl = le_to_host16(sched_entry->control);
+
+		avail_entry->tbm.duration =
+			BITS(ctrl,
+			     NAN_TIME_BM_CTRL_BIT_DURATION_MASK,
+			     NAN_TIME_BM_CTRL_BIT_DURATION_POS);
+		avail_entry->tbm.period =
+			BITS(ctrl,
+			     NAN_TIME_BM_CTRL_PERIOD_MASK,
+			     NAN_TIME_BM_CTRL_PERIOD_POS);
+		avail_entry->tbm.offset =
+			BITS(ctrl,
+			     NAN_TIME_BM_CTRL_START_OFFSET_MASK,
+			     NAN_TIME_BM_CTRL_START_OFFSET_POS);
+
+		avail_entry->tbm.len = sched_entry->len;
+		os_memcpy(avail_entry->tbm.bitmap, sched_entry->bm,
+			  sched_entry->len);
+
+		dl_list_init(&avail_entry->list);
+		dl_list_add(avail_entries, &avail_entry->list);
+
+		sched_entries_len -= elen;
+		sched_entries += elen;
+	}
+
+	return 0;
+
+fail:
+	nan_flush_avail_entries(avail_entries);
+	return -1;
+}

@@ -39,24 +39,9 @@ struct nan_data * nan_init(const struct nan_config *cfg)
 }
 
 
-static void nan_del_avail_entry(struct nan_avail_entry *entry)
-{
-	if (!entry)
-		return;
-	os_free(entry->band_chan);
-	os_free(entry);
-}
-
-
 static void nan_peer_flush_avail(struct nan_peer_info *info)
 {
-	struct nan_avail_entry *cur, *next;
-
-	dl_list_for_each_safe(cur, next, &info->avail_entries,
-			      struct nan_avail_entry, list) {
-		dl_list_del(&cur->list);
-		nan_del_avail_entry(cur);
-	}
+	nan_flush_avail_entries(&info->avail_entries);
 }
 
 
