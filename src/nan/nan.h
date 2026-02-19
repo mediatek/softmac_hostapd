@@ -69,6 +69,113 @@ struct nan_ndp_id {
 	u8 id;
 };
 
+/*
+ * The maximal period of a NAN schedule is 8192 TUs. With time slots of 16 TUs,
+ * need 64 octets to represent a complete schedule bitmap.
+ */
+#define NAN_TIME_BITMAP_MAX_LEN 64
+
+/**
+ * struct nan_time_bitmap - NAN time bitmap
+ *
+ * @duration: Slot duration represented by each bit in the bitmap. Valid values
+ *     are as defined in nan_defs.h and Wi-Fi Aware spec v4.0, Table 97 (Time
+ *     Bitmap Control field format for the NAN Availability attribute).
+ * @period: Indicates the repeat interval of the bitmap.
+ *     When set to zero, the bitmap is not repeated. Valid values are
+ *     as defined in nan_defs.h and Wi-Fi Aware spec v4.0, Table 97 (Time
+ *     Bitmap Control field format for the NAN Availability attribute).
+ * @offset: The time period specified by the %bitmap field starts at
+ *     16 * offset TUs after DW0.
+ * @len: Length of the %bitmap field, in bytes. If this is zero, the NAN device
+ *     is available for 512 NAN slots beginning after the immediate previous
+ *     DW0.
+ * @bitmap: Each bit in the time bitmap corresponds to a time duration indicated
+ *     by the value of the %duration field. When a bit is set to 1, the NAN
+ *     device is available (or conditionally or potentially available)
+ *     for any NAN operations for the time associated with the bit.
+ */
+struct nan_time_bitmap {
+	u8 duration;
+	u16 period;
+	u16 offset;
+	u8 len;
+	u8 bitmap[NAN_TIME_BITMAP_MAX_LEN];
+};
+
+/**
+ * struct nan_sched_chan - NAN scheduled channel
+ *
+ * @freq: Primary channel center frequency of the 20 MHz
+ * @center_freq1: Center frequency of the first segment
+ * @center_freq2: Center frequency of the second segment, if any
+ * @bandwidth: The channel bandwidth in MHz
+ */
+struct nan_sched_chan {
+	int freq;
+	int center_freq1;
+	int center_freq2;
+	int bandwidth;
+};
+
+/**
+ * struct nan_chan_schedule - NAN channel schedule
+ *
+ * @chan: The channel associated with the schedule
+ * @committed: Committed schedule time bitmap
+ * @conditonal: Conditional schedule time bitmap
+ * @map_id: The map_id of the availability attribute where this schedule is
+ *     represented
+ */
+struct nan_chan_schedule {
+	struct nan_sched_chan chan;
+	struct nan_time_bitmap committed;
+	struct nan_time_bitmap conditional;
+	u8 map_id;
+};
+
+/**
+ * struct nan_sched_qos - QoS requirements in units of 16 TUs per 512 TUs
+ *
+ * @required_slots: Number of required slots
+ * @min_slots: Minimum number of CRB slots needed for this NDL. If this amount
+ *     of CRB slots can't be scheduled the NDL should fail.
+ * @max_gap: Maximum allowed latency (in slots) of the CRB schedule
+ */
+struct nan_sched_qos {
+	u8 required_slots;
+	u8 min_slots;
+	u8 max_gap;
+};
+
+#define NAN_SCHEDULE_MAX_CHANNELS 6
+
+/**
+ * struct nan_schedule - NAN schedule
+ *
+ * @map_ids_bitmap: Bitmap of map IDs included in this schedule. Not all map IDs
+ *    are covered by &chans. For map IDs that are not covered, when building
+ *    NAFs, NAN availability attributes would be added with potential
+ *    availability entries.
+ * @n_chans: Number of channels for this schedule.
+ * @chans:  The channels included in the schedule. The channels must be sorted
+ *     such that the map IDs (in struct nan_chan_schedule) are in ascending
+ *     order.
+ * @ndc: NDC bitmap schedule
+ * @ndc_map_id: The NDC map ID
+ * @sequence_id: Schedule sequence ID
+ * @elems: Additional elements to be set in an element container attribute
+ */
+struct nan_schedule {
+	u32 map_ids_bitmap;
+	u8 n_chans;
+	struct nan_chan_schedule chans[NAN_SCHEDULE_MAX_CHANNELS];
+	struct nan_time_bitmap ndc;
+	u8 ndc_map_id;
+	u8 sequence_id;
+	struct wpabuf *elems;
+};
+
 /**
  * struct nan_ndp_params - Holds the NDP parameters for setting up or
  * terminating an NDP.
