@@ -2085,3 +2085,32 @@ int nan_peer_get_pot_avail(struct nan_data *nan, const u8 *addr,
 
 	return 0;
 }
+
+
+/**
+ * nan_convert_sched_to_avail_attrs - Convert NAN schedule to availability attrs
+ * @nan: NAN module context from nan_init()
+ * @map_ids_bitmap: Bitmap of map IDs for which NAN availability attributes
+ * should be added. Not all map IDs are covered by &chans. For map IDs that
+ *    are not covered, NAN availability attributes will be added with
+ *    potential availability entries.
+ * @sequence_id: Sequence ID for the availability attributes
+ * @n_chans: Number of channel entries in chans
+ * @chans: Channel entries
+ * @buf: Buffer to which the availability attributes will be added
+ * Returns: 0 on success; -1 on failure
+ *
+ * Convert the given NAN schedule information to availability attributes and add
+ * them to the given buffer. For each given map ID the get_chans() callback will
+ * be used to get the channel entries for the potential availability entries.
+ */
+int nan_convert_sched_to_avail_attrs(struct nan_data *nan, u8 sequence_id,
+				     u32 map_ids_bitmap,
+				     size_t n_chans,
+				     struct nan_chan_schedule *chans,
+				     struct wpabuf *buf)
+{
+	return nan_add_avail_attrs(nan, sequence_id, map_ids_bitmap,
+				   NAN_AVAIL_ENTRY_CTRL_TYPE_COND,
+				   n_chans, chans, buf);
+}
