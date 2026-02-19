@@ -1624,9 +1624,12 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		break;
 
 	case NAN_NDP_ACTION_TERM:
-		wpa_printf(MSG_DEBUG, "TODO: Support terminate");
 		naf_oui = NAN_SUBTYPE_DATA_PATH_TERMINATION;
-		return -1;
+		timeout = NAN_NDP_SETUP_TIMEOUT_SHORT;
+		ret = nan_ndp_term_req(nan, peer, &params->ndp_id);
+		if (ret)
+			return ret;
+		break;
 	default:
 		wpa_printf(MSG_DEBUG, "NAN: Unsupported NDP setup type=%u",
 			   params->type);

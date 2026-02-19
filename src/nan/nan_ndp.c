@@ -464,6 +464,21 @@ static int nan_ndp_attr_handle_confirm(struct nan_data *nan,
 }
 
 
+static struct nan_ndp * nan_ndp_find_ndp(struct nan_peer *peer,
+					 u8 ndp_id, const u8 *init_ndi)
+{
+	struct nan_ndp *pndp;
+
+	dl_list_for_each(pndp, &peer->ndps, struct nan_ndp, list) {
+		if (pndp->ndp_id == ndp_id &&
+		    ether_addr_equal(pndp->init_ndi, init_ndi))
+			return pndp;
+	}
+
+	return NULL;
+}
+
+
 static int nan_ndp_attr_handle_term(struct nan_data *nan, struct nan_peer *peer,
 				    struct ieee80211_ndp *ndp_attr, u8 status)
 {
@@ -471,7 +486,6 @@ static int nan_ndp_attr_handle_term(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_ndp_id ndp_id;
 	const u8 *local_ndi, *peer_ndi;
 	struct nan_ndp *pndp;
-	bool found;
 
 	wpa_printf(MSG_DEBUG,
 		   "NAN: NDP: Termination peer=" MACSTR " ndp_id=%u, init_ndi="
@@ -497,16 +511,9 @@ static int nan_ndp_attr_handle_term(struct nan_data *nan, struct nan_peer *peer,
 	}
 
 	/* Find the NDP in the list of active NDPs */
-	found = false;
-	dl_list_for_each(pndp, &peer->ndps, struct nan_ndp, list) {
-		if (pndp->ndp_id == ndp_attr->ndp_id &&
-		    ether_addr_equal(pndp->init_ndi, ndp_attr->initiator_ndi)) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
+	pndp = nan_ndp_find_ndp(peer, ndp_attr->ndp_id,
+				ndp_attr->initiator_ndi);
+	if (!pndp) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: NDP: Termination but NDP does not exist");
 		return 1;
@@ -645,10 +652,15 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 		type = NAN_NDP_TYPE_SECURITY_INSTALL;
 		break;
 	case NAN_NDP_STATE_NONE:
+	case NAN_NDP_STATE_DONE:
+		if (ndp_setup->status == NAN_NDP_STATUS_REJECTED)
+			type = NAN_NDP_TYPE_TERMINATE;
+		else
+			return -1;
+		break;
 	case NAN_NDP_STATE_REQ_SENT:
 	case NAN_NDP_STATE_RES_SENT:
 	case NAN_NDP_STATE_CON_SENT:
-	case NAN_NDP_STATE_DONE:
 	default:
 		return 0;
 	}
@@ -792,5 +804,61 @@ int nan_ndp_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		break;
 	}
 
+	return 0;
+}
+
+
+/*
+ * nan_ndp_term_req - Handle local NDP termination request
+ * @nan: NAN module context from nan_init()
+ * @peer: The peer with whom the NDP is being setup
+ * @ndp_id: NDP identifier
+ * Returns: 0 on success, -1 on failure
+ */
+int nan_ndp_term_req(struct nan_data *nan, struct nan_peer *peer,
+		     struct nan_ndp_id *ndp_id)
+{
+	struct nan_ndp_setup *ndp_setup = &peer->ndp_setup;
+	struct nan_ndp *pndp;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP: Terminate request with peer=" MACSTR
+		   " ndp_id=%u, init_ndi=" MACSTR,
+		   MAC2STR(peer->nmi_addr), ndp_id->id,
+		   MAC2STR(ndp_id->init_ndi));
+
+	if (ndp_setup->ndp) {
+		if (ndp_setup->ndp->ndp_id == ndp_id->id &&
+		    ether_addr_equal(ndp_setup->ndp->init_ndi,
+				     ndp_id->init_ndi)) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDP: WIP with peer. Terminate");
+
+			nan_ndp_set_state(nan, &peer->ndp_setup,
+					  NAN_NDP_STATE_DONE);
+			ndp_setup->status = NAN_NDP_STATUS_REJECTED;
+			ndp_setup->reason = NAN_REASON_UNSPECIFIED_REASON;
+			return 0;
+		}
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP: Cannot terminate NDP while NDP establishment is WIP");
+		return -1;
+	}
+
+	/* Find the NDP in the list of active NDPs */
+	pndp = nan_ndp_find_ndp(peer, ndp_id->id, ndp_id->init_ndi);
+	if (!pndp) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP: Termination request for unknown NDP");
+		return -1;
+	}
+
+	/* Remove the NDP from the list and setup data for the termination */
+	dl_list_del(&pndp->list);
+
+	peer->ndp_setup.ndp = pndp;
+	peer->ndp_setup.status = NAN_NDP_STATUS_REJECTED;
+	peer->ndp_setup.reason = NAN_REASON_UNSPECIFIED_REASON;
 	return 0;
 }

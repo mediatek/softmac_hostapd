@@ -433,6 +433,8 @@ int nan_ndp_naf_sent(struct nan_data *nan, struct nan_peer *peer,
 		     enum nan_subtype subtype);
 int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 			   const u8 *attrs_data, size_t attrs_len);
+int nan_ndp_term_req(struct nan_data *nan, struct nan_peer *peer,
+		     struct nan_ndp_id *ndp_id);
 int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
 		  const struct nan_ndp_params *params);
 void nan_ndl_setup_failure(struct nan_data *nan, struct nan_peer *peer,
