@@ -913,6 +913,9 @@ hostapd_chan_width_from_freq_params(struct hostapd_freq_params *freq_params);
 struct hostapd_data *
 hostapd_get_mbssid_bss_by_idx(struct hostapd_data *hapd, size_t idx);
 
+bool hostapd_acceptable_sta_addr(struct hostapd_data *hapd, const u8 *addr,
+				 const u8 *addr_ml, bool mld);
+
 static inline bool
 hostapd_is_ht_enabled(struct hostapd_data *hapd)
 {

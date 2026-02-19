@@ -3273,9 +3273,7 @@ static void handle_auth(struct hostapd_data *hapd,
 	u16 seq_ctrl;
 	struct radius_sta rad_info;
 	const u8 *dst, *sa;
-#ifdef CONFIG_IEEE80211BE
 	bool mld_sta = false;
-#endif /* CONFIG_IEEE80211BE */
 
 	if (len < IEEE80211_HDRLEN + sizeof(mgmt->u.auth)) {
 		wpa_printf(MSG_INFO, "handle_auth - too short payload (len=%lu)",
@@ -3394,24 +3392,12 @@ static void handle_auth(struct hostapd_data *hapd,
 		goto fail;
 	}
 
-	if (ether_addr_equal(mgmt->sa, hapd->own_addr)) {
+	if (!hostapd_acceptable_sta_addr(hapd, mgmt->sa, sa, mld_sta)) {
 		wpa_printf(MSG_INFO, "Station " MACSTR " not allowed to authenticate",
 			   MAC2STR(sa));
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
 		goto fail;
 	}
-
-#ifdef CONFIG_IEEE80211BE
-	if (mld_sta &&
-	    (ether_addr_equal(sa, hapd->own_addr) ||
-	     ether_addr_equal(sa, hapd->mld->mld_addr))) {
-		wpa_printf(MSG_INFO,
-			   "Station " MACSTR " not allowed to authenticate",
-			   MAC2STR(sa));
-		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
-		goto fail;
-	}
-#endif /* CONFIG_IEEE80211BE */
 
 	if (hapd->conf->no_auth_if_seen_on) {
 		struct hostapd_data *other;

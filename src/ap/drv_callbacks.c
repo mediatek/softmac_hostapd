@@ -406,6 +406,11 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 		 * will not remove the STA immediately.
 		 */
 		sta->timeout_next = STA_NULLFUNC;
+	} else if (!hostapd_acceptable_sta_addr(hapd, addr, addr, false)) {
+		wpa_printf(MSG_INFO, "STA " MACSTR " not allowed to connect",
+			   MAC2STR(addr));
+		hostapd_drv_sta_disassoc(hapd, addr, WLAN_REASON_UNSPECIFIED);
+			return -1;
 	} else {
 		sta = ap_sta_add(hapd, addr);
 		if (sta == NULL) {

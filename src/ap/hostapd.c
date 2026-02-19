@@ -5278,3 +5278,69 @@ hostapd_get_mbssid_bss_by_idx(struct hostapd_data *hapd, size_t idx)
 
 	return NULL;
 }
+
+
+static bool hostapd_acceptable_sta_addr_bss(struct hostapd_data *hapd,
+					    const u8 *addr, const u8 *addr_ml,
+					    bool mld)
+{
+	if (ether_addr_equal(addr, hapd->own_addr))
+		return false;
+
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->mld && mld &&
+	    (ether_addr_equal(addr_ml, hapd->own_addr) ||
+	     ether_addr_equal(addr_ml, hapd->mld->mld_addr)))
+		return false;
+	if (hapd->mld && ether_addr_equal(addr, hapd->mld->mld_addr))
+		return false;
+#endif /* CONFIG_IEEE80211BE */
+
+	return true;
+}
+
+
+struct hostapd_acceptable_sta_add_ctx {
+	const u8 *addr;
+	const u8 *addr_ml;
+	bool mld;
+};
+
+
+static int hostapd_acceptable_sta_addr_iface(struct hostapd_iface *iface,
+					     void *_ctx)
+{
+	struct hostapd_acceptable_sta_add_ctx *ctx = _ctx;
+	size_t i;
+
+	for (i = 0; i < iface->num_bss; i++) {
+		struct hostapd_data *hapd = iface->bss[i];
+
+		if (!hostapd_acceptable_sta_addr_bss(hapd, ctx->addr,
+						     ctx->addr_ml, ctx->mld))
+			return -1;
+	}
+
+	return 0;
+}
+
+
+bool hostapd_acceptable_sta_addr(struct hostapd_data *hapd, const u8 *addr,
+				 const u8 *addr_ml, bool mld)
+{
+	struct hostapd_acceptable_sta_add_ctx ctx;
+
+	if (!hostapd_acceptable_sta_addr_bss(hapd, addr, addr_ml, mld))
+		return false;
+
+	ctx.addr = addr;
+	ctx.addr_ml = addr_ml;
+	ctx.mld = mld;
+	if (hapd->iface->interfaces &&
+	    hostapd_for_each_interface(hapd->iface->interfaces,
+				       hostapd_acceptable_sta_addr_iface,
+				       &ctx) < 0)
+		return false;
+
+	return true;
+}
