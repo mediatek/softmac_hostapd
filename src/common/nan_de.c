@@ -1146,7 +1146,7 @@ static bool nan_de_filter_match(struct nan_de_service *srv,
 }
 
 
-static void nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
+static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			      const u8 *peer_addr, const u8 *a3, u8 instance_id,
 			      const u8 *matching_filter,
 			      size_t matching_filter_len,
@@ -1156,7 +1156,7 @@ static void nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			      bool range_limit, int rssi)
 {
 	if (!nan_de_filter_match(srv, matching_filter, matching_filter_len))
-		return;
+		return false;
 
 	/* Skip USD logic */
 	if (srv->sync)
@@ -1168,7 +1168,7 @@ static void nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			wpa_printf(MSG_DEBUG,
 				   "NAN: Discard SDA with RSSI %d below threshold %d",
 				   rssi, de->rssi_threshold);
-			return;
+			return false;
 		}
 	}
 
@@ -1201,10 +1201,12 @@ send_event:
 			peer_addr,
 			sdea_control & NAN_SDEA_CTRL_FSD_REQ,
 			sdea_control & NAN_SDEA_CTRL_FSD_GAS);
+
+	return true;
 }
 
 
-static void nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
+static bool nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
 				const u8 *peer_addr, const u8 *a3,
 				u8 instance_id,
 				const u8 *matching_filter,
@@ -1218,7 +1220,7 @@ static void nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
 	/* Publish function processing of a receive Subscribe message */
 
 	if (!nan_de_filter_match(srv, matching_filter, matching_filter_len))
-		return;
+		return false;
 
 	if ((range_limit || srv->close_proximity) &&
 	    de->rssi_threshold && rssi) {
@@ -1226,19 +1228,19 @@ static void nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
 			wpa_printf(MSG_DEBUG,
 				   "NAN: Discard SDA with RSSI %d below threshold %d",
 				   rssi, de->rssi_threshold);
-			return;
+			return false;
 		}
 	}
 
 	if (!srv->publish.solicited)
-		return;
+		return false;
 
 	if (os_reltime_initialized(&srv->pause_state_end) &&
 	    (!ether_addr_equal(peer_addr, srv->sel_peer_addr) ||
 	     instance_id != srv->sel_peer_id)) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: In pauseState - ignore Subscribe message from another subscriber");
-		return;
+		return false;
 	}
 
 	if (de->offload)
@@ -1267,10 +1269,12 @@ offload:
 	if (!srv->publish.disable_events && de->cb.replied)
 		de->cb.replied(de->cb.ctx, srv->id, peer_addr, instance_id,
 			       srv_proto_type, ssi, ssi_len);
+
+	return true;
 }
 
 
-static void nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
+static bool nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 				const u8 *peer_addr, const u8 *a3,
 				u8 instance_id, const u8 *ssi, size_t ssi_len)
 {
@@ -1284,7 +1288,7 @@ static void nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 	     !ssi)) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: In pauseState - ignore Follow-up message from another subscriber or without ssi");
-		return;
+		return false;
 	}
 
 	if (srv->type == NAN_DE_PUBLISH && !ssi && !srv->sync)
@@ -1296,6 +1300,8 @@ static void nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 	if (de->cb.receive)
 		de->cb.receive(de->cb.ctx, srv->id, instance_id, ssi, ssi_len,
 			       peer_addr);
+
+	return true;
 }
 
 
@@ -1355,7 +1361,7 @@ static bool nan_srf_match(struct nan_de *de, const u8 *srf, size_t srf_len)
 }
 
 
-static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
+static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 			  unsigned int freq, const u8 *buf, size_t len,
 			  const u8 *sda, size_t sda_len, int rssi)
 {
@@ -1371,9 +1377,10 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 	const u8 *end;
 	const u8 *matching_filter = NULL;
 	size_t matching_filter_len = 0;
+	bool ret = false;
 
 	if (sda_len < NAN_SERVICE_ID_LEN + 1 + 1 + 1)
-		return;
+		return false;
 	end = sda + sda_len;
 
 	service_id = sda;
@@ -1392,12 +1399,12 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Discard SDF with unknown Service Control Type %u",
 			   type);
-		return;
+		return false;
 	}
 
 	if (ctrl & NAN_SRV_CTRL_BINDING_BITMAP) {
 		if (end - sda < 2)
-			return;
+			return false;
 		sda += 2;
 	}
 
@@ -1405,10 +1412,10 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		u8 flen;
 
 		if (end - sda < 1)
-			return;
+			return false;
 		flen = *sda++;
 		if (end - sda < flen)
-			return;
+			return false;
 		matching_filter = sda;
 		matching_filter_len = flen;
 		sda += flen;
@@ -1418,15 +1425,15 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		u8 flen;
 
 		if (end - sda < 1)
-			return;
+			return false;
 		flen = *sda++;
 		if (end - sda < flen)
-			return;
+			return false;
 
 		if (!nan_srf_match(de, sda, flen)) {
 			wpa_printf(MSG_DEBUG,
 				   "NAN: Discard SDA with non-matching SRF");
-			return;
+			return false;
 		}
 
 		sda += flen;
@@ -1436,10 +1443,10 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		u8 flen;
 
 		if (end - sda < 1)
-			return;
+			return false;
 		flen = *sda++;
 		if (end - sda < flen)
-			return;
+			return false;
 
 		if (flen) {
 			/* This case of SSI in SDA does not have an explicit
@@ -1493,44 +1500,43 @@ static void nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 
 		switch (type) {
 		case NAN_SRV_CTRL_PUBLISH:
-			nan_de_rx_publish(de, srv, peer_addr, a3, instance_id,
-					  matching_filter,
-					  matching_filter_len,
-					  req_instance_id,
-					  sdea_control, srv_proto_type,
-					  ssi, ssi_len,
-					  ctrl &
-					  NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
-					  rssi);
+			ret |= nan_de_rx_publish(
+				de, srv, peer_addr, a3, instance_id,
+				matching_filter, matching_filter_len,
+				req_instance_id, sdea_control, srv_proto_type,
+				ssi, ssi_len,
+				ctrl & NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
+				rssi);
 			break;
 		case NAN_SRV_CTRL_SUBSCRIBE:
-			nan_de_rx_subscribe(de, srv, peer_addr, a3, instance_id,
-					    matching_filter,
-					    matching_filter_len,
-					    srv_proto_type,
-					    ssi, ssi_len,
-					    ctrl &
-					    NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
-					    rssi);
+			ret |= nan_de_rx_subscribe(
+				de, srv, peer_addr, a3, instance_id,
+				matching_filter, matching_filter_len,
+				srv_proto_type, ssi, ssi_len,
+				ctrl & NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
+				rssi);
 			break;
 		case NAN_SRV_CTRL_FOLLOW_UP:
-			nan_de_rx_follow_up(de, srv, peer_addr, a3, instance_id,
-					    ssi, ssi_len);
+			ret |= nan_de_rx_follow_up(de, srv, peer_addr, a3,
+						   instance_id, ssi, ssi_len);
 			break;
 		}
 	}
+
+	return ret;
 }
 
 
-void nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
+bool nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		   unsigned int freq, const u8 *buf, size_t len, int rssi)
 {
 	const u8 *sda;
 	u16 sda_len;
 	unsigned int skip;
+	bool ret = false;
 
 	if (!de->num_service)
-		return;
+		return false;
 
 	wpa_printf(MSG_DEBUG, "NAN: RX SDF from " MACSTR
 		   " freq=%u len=%zu rssi=%d",
@@ -1546,9 +1552,11 @@ void nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 		sda++;
 		sda_len = WPA_GET_LE16(sda);
 		sda += 2;
-		nan_de_rx_sda(de, peer_addr, a3, freq, buf, len, sda, sda_len,
-			      rssi);
+		ret |= nan_de_rx_sda(de, peer_addr, a3, freq, buf, len,
+				     sda, sda_len, rssi);
 	}
+
+	return ret;
 }
 
 
