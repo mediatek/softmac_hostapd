@@ -89,6 +89,18 @@ static void nan_ndp_setup_stop(struct nan_data *nan, struct nan_peer *peer)
 }
 
 
+static void nan_peer_flush_sec(struct nan_peer_info *info)
+{
+	struct nan_peer_sec_info_entry *cur, *next;
+
+	dl_list_for_each_safe(cur, next, &info->sec,
+			      struct nan_peer_sec_info_entry, list) {
+		dl_list_del(&cur->list);
+		os_free(cur);
+	}
+}
+
+
 static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 {
 	if (!peer)
@@ -123,6 +135,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_peer_flush_elem_container(&peer->info);
 
 	nan_ndl_reset(nan, peer);
+	nan_peer_flush_sec(&peer->info);
 	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
 	os_free(peer);
 }
@@ -1017,6 +1030,7 @@ static struct nan_peer * nan_alloc_peer(struct nan_data *nan)
 	dl_list_init(&peer->info.avail_entries);
 	dl_list_init(&peer->info.dev_capa);
 	dl_list_init(&peer->info.element_container);
+	dl_list_init(&peer->info.sec);
 
 	dl_list_add(&nan->peer_list, &peer->list);
 	dl_list_init(&peer->ndps);
@@ -1228,6 +1242,8 @@ static void nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 		params.local_ndi = peer->ndp_setup.ndp->resp_ndi;
 		params.peer_ndi = peer->ndp_setup.ndp->init_ndi;
 	}
+
+	nan_sec_ndp_store_keys(nan, peer, params.peer_ndi, params.local_ndi);
 
 	if (nan->cfg->ndp_connected)
 		nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params);

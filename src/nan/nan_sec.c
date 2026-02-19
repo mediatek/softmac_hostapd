@@ -1130,3 +1130,72 @@ int nan_sec_pre_tx(struct nan_data *nan, struct nan_peer *peer,
 
 	return ret;
 }
+
+
+/*
+ * nan_sec_ndp_store_keys - Store the NDP keys after successful NDP
+ * establishment
+ *
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer for which the NDP was established
+ * @peer_ndi: NDI address of the peer for the NDP that was just established
+ * @local_ndi: Local NDI address for the NDP that was just established
+ *
+ * Returns: true if keys were stored, false otherwise
+ */
+bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
+			    const u8 *peer_ndi, const u8 *local_ndi)
+{
+	struct nan_ndp *ndp = peer->ndp_setup.ndp;
+	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
+	struct nan_peer_sec_info_entry *cur, *next;
+
+	if (!ndp || !ndp_sec->valid || !ndp_sec->i_csid ||
+	    peer->ndp_setup.state != NAN_NDP_STATE_DONE)
+		return false;
+
+	if (ndp_sec->i_csid != NAN_CS_SK_CCM_128 &&
+	    ndp_sec->i_csid != NAN_CS_SK_GCM_256)
+		return false;
+
+	dl_list_for_each_safe(cur, next, &peer->info.sec,
+			      struct nan_peer_sec_info_entry, list) {
+		if (!ether_addr_equal(peer_ndi, cur->peer_ndi) ||
+		    !ether_addr_equal(local_ndi, cur->local_ndi))
+			continue;
+
+		/*
+		 * The security configuration should be updated if it is
+		 * stronger than the existing one or equal in strength. Since
+		 * GCM-256 is considered stronger than CCM-128, always update if
+		 * it is the current one. Otherwise, update only if the previous
+		 * one was CCMP-128.
+		 */
+		if (ndp_sec->i_csid == NAN_CS_SK_GCM_256 ||
+		    cur->csid == NAN_CS_SK_CCM_128)
+			goto store;
+
+		return false;
+	}
+
+	cur = os_zalloc(sizeof(*cur));
+	if (!cur) {
+		wpa_printf(MSG_INFO,
+			   "NAN: SEC: Failed memory allocation for security info");
+		return false;
+	}
+
+	dl_list_add(&peer->info.sec, &cur->list);
+	os_memcpy(cur->peer_ndi, peer_ndi, ETH_ALEN);
+	os_memcpy(cur->local_ndi, local_ndi, ETH_ALEN);
+
+store:
+	wpa_printf(MSG_DEBUG, "NAN: SEC: Store security information");
+
+	cur->csid = ndp_sec->i_csid;
+	os_memcpy(cur->pmkid, ndp_sec->i_pmkid, PMKID_LEN);
+	os_memcpy(cur->pmk, ndp_sec->pmk, PMK_LEN);
+	os_memcpy(&cur->ptk, &ndp_sec->ptk, sizeof(cur->ptk));
+
+	return true;
+}
