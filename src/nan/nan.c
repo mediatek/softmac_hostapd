@@ -11,6 +11,8 @@
 #include "nan.h"
 #include "nan_i.h"
 
+#define NAN_MAX_PEERS 32
+
 
 struct nan_data * nan_init(const struct nan_config *cfg)
 {
@@ -29,15 +31,41 @@ struct nan_data * nan_init(const struct nan_config *cfg)
 		return NULL;
 	}
 
+	dl_list_init(&nan->peer_list);
+
 	wpa_printf(MSG_DEBUG, "NAN: Initialized");
 
 	return nan;
 }
 
 
+static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
+{
+	if (!peer)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Removing peer: " MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	dl_list_del(&peer->list);
+	os_free(peer);
+}
+
+
+static void nan_peer_clear_all(struct nan_data *nan)
+{
+	struct nan_peer *peer, *n_peer;
+
+	dl_list_for_each_safe(peer, n_peer, &nan->peer_list,
+			      struct nan_peer, list)
+		nan_del_peer(nan, peer);
+}
+
+
 void nan_deinit(struct nan_data *nan)
 {
 	wpa_printf(MSG_DEBUG, "NAN: Deinit");
+	nan_peer_clear_all(nan);
 	os_free(nan->cfg);
 	os_free(nan);
 }
@@ -96,6 +124,7 @@ void nan_flush(struct nan_data *nan)
 	}
 
 	nan->nan_started = 0;
+	nan_peer_clear_all(nan);
 }
 
 
@@ -110,4 +139,77 @@ void nan_stop(struct nan_data *nan)
 
 	nan_flush(nan);
 	nan->cfg->stop(nan->cfg->cb_ctx);
+}
+
+
+struct nan_peer * nan_get_peer(struct nan_data *nan, const u8 *addr)
+{
+	struct nan_peer *peer;
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		if (ether_addr_equal(peer->nmi_addr, addr))
+			return peer;
+	}
+
+	return NULL;
+}
+
+
+static struct nan_peer * nan_alloc_peer(struct nan_data *nan)
+{
+	struct nan_peer *peer, *oldest = NULL;
+	size_t count = 0;
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		count++;
+		if (!oldest ||
+		    os_reltime_before(&peer->last_seen, &oldest->last_seen))
+			oldest = peer;
+	}
+
+	if (count >= NAN_MAX_PEERS && oldest) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Remove peer=" MACSTR " to make room",
+			   MAC2STR(oldest->nmi_addr));
+
+		nan_del_peer(nan, oldest);
+	}
+
+	peer = os_zalloc(sizeof(*peer));
+	if (!peer)
+		return NULL;
+
+	dl_list_add(&nan->peer_list, &peer->list);
+	return peer;
+}
+
+
+int nan_add_peer(struct nan_data *nan, const u8 *addr,
+		 const u8 *device_attrs, size_t device_attrs_len)
+{
+	struct nan_peer *peer;
+
+	/* Allow adding peer devices even if NAN was not started, to support
+	 * discovery during USD, etc. */
+	if (!nan)
+		return -1;
+
+	/* TODO: parse the device attributes to update the peer information */
+	if (!device_attrs || !device_attrs_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Ignore add_peer with no device attributes");
+		return -1;
+	}
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer) {
+		peer = nan_alloc_peer(nan);
+		if (!peer)
+			return -1;
+
+		os_memcpy(peer->nmi_addr, addr, ETH_ALEN);
+	}
+
+	os_get_reltime(&peer->last_seen);
+	return 0;
 }

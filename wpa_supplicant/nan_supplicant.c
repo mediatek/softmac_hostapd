@@ -681,9 +681,18 @@ void wpas_nan_de_rx_sdf(struct wpa_supplicant *wpa_s, const u8 *src,
 			const u8 *a3, unsigned int freq,
 			const u8 *buf, size_t len, int rssi)
 {
+	bool store_peer;
+
 	if (!wpa_s->nan_de)
 		return;
-	nan_de_rx_sdf(wpa_s->nan_de, src, a3, freq, buf, len, rssi);
+
+	store_peer = nan_de_rx_sdf(wpa_s->nan_de, src, a3, freq, buf,
+				   len, rssi);
+
+	if (!wpas_nan_ready(wpa_s) || !store_peer)
+		return;
+
+	nan_add_peer(wpa_s->nan, src, buf, len);
 }
 
 

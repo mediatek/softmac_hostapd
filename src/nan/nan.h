@@ -45,4 +45,7 @@ int nan_update_config(struct nan_data *nan,
 void nan_stop(struct nan_data *nan);
 void nan_flush(struct nan_data *nan);
 
+int nan_add_peer(struct nan_data *nan, const u8 *addr,
+		 const u8 *device_attrs, size_t device_attrs_len);
+
 #endif /* NAN_H */
