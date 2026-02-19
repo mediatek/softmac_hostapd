@@ -1199,3 +1199,25 @@ store:
 
 	return true;
 }
+
+
+int nan_sec_get_tk(struct nan_data *nan, struct nan_peer *peer,
+		     const u8 *peer_ndi, const u8 *local_ndi,
+		     u8 *tk, size_t *tk_len, enum nan_cipher_suite_id *csid)
+{
+	struct nan_peer_sec_info_entry *cur;
+
+	dl_list_for_each(cur, &peer->info.sec,
+			 struct nan_peer_sec_info_entry, list) {
+		if (!ether_addr_equal(peer_ndi, cur->peer_ndi) ||
+		    !ether_addr_equal(local_ndi, cur->local_ndi))
+			continue;
+
+		os_memcpy(tk, &cur->ptk.tk, cur->ptk.tk_len);
+		*tk_len = cur->ptk.tk_len;
+		*csid = cur->csid;
+		return 0;
+	}
+
+	return -1;
+}

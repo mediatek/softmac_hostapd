@@ -613,5 +613,8 @@ int nan_sec_pre_tx(struct nan_data *nan, struct nan_peer *peer,
 		   struct wpabuf *buf);
 bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
 			    const u8 *peer_ndi, const u8 *local_ndi);
+int nan_sec_get_tk(struct nan_data *nan, struct nan_peer *peer,
+		   const u8 *peer_ndi, const u8 *local_ndi,
+		   u8 *tk, size_t *tk_len, enum nan_cipher_suite_id *csid);
 
 #endif /* NAN_I_H */

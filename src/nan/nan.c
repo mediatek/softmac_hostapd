@@ -1719,3 +1719,20 @@ nan_peer_get_device_capabilities(struct nan_data *nan, const u8 *addr,
 
 	return NULL;
 }
+
+
+int nan_peer_get_tk(struct nan_data *nan, const u8 *addr,
+		    const u8 *peer_ndi, const u8 *local_ndi,
+		    u8 *tk, size_t *tk_len, enum nan_cipher_suite_id *csid)
+{
+	struct nan_peer *peer;
+
+	if (!nan || !tk || !tk_len || !csid)
+		return -1;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return -1;
+
+	return nan_sec_get_tk(nan, peer, peer_ndi, local_ndi, tk, tk_len, csid);
+}
