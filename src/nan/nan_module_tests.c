@@ -380,6 +380,10 @@ static int nan_ndp_notify_action(struct nan_device *dev, void *ctx)
 			dev->conf->schedule_cb(&params->sched);
 			params->sched.elems = dev->global->elems;
 			params->sched_valid = 1;
+
+			params->sec.csid =
+				dev->conf->ndp_confs[dev->n_ndps].csid;
+			os_memcpy(params->sec.pmk, dev->conf->pmk, PMK_LEN);
 		} else {
 			wpa_printf(MSG_INFO, "%s: Rejecting request",
 				   dev->name);
@@ -433,6 +437,9 @@ static int nan_ndp_notify_action(struct nan_device *dev, void *ctx)
 			params->sched.elems = dev->global->elems;
 			params->sched_valid = 1;
 
+			params->sec.csid =
+				dev->conf->ndp_confs[dev->n_ndps].csid;
+			os_memcpy(params->sec.pmk, dev->conf->pmk, PMK_LEN);
 		} else {
 			wpa_printf(MSG_INFO, "%s: Rejecting response",
 				   dev->name);
@@ -598,6 +605,21 @@ static void nan_test_ndp_connected_cb(void *ctx,
 
 	nan_peer_get_schedule_info(dev->nan, params->ndp_id.peer_nmi, &sched);
 	nan_peer_get_pot_avail(dev->nan, params->ndp_id.peer_nmi, &pot);
+
+	if (nan_peer_get_tk(dev->nan, params->ndp_id.peer_nmi,
+			    params->peer_ndi, params->local_ndi,
+			    dev->tk, &dev->tk_len, &dev->csid) == 0) {
+		wpa_hexdump(MSG_DEBUG, "NAN Test: TK", dev->tk, dev->tk_len);
+
+		if (dev->csid !=
+		    dev->conf->ndp_confs[dev->n_ndps].expected_csid) {
+			wpa_printf(MSG_ERROR,
+				   "%s: Unexpected CSID: got %u expected %u",
+				   dev->name, dev->csid,
+				   dev->conf->ndp_confs[dev->n_ndps].
+				   expected_csid);
+		}
+	}
 
 	nan_test_ndp_action(dev, NAN_TEST_NDP_NOTIFY_CONNECTED, &params->ndp_id,
 			    0, params->ssi, params->ssi_len, NAN_CS_NONE, NULL);
@@ -835,6 +857,7 @@ static int nan_test_dev_init(struct nan_device *dev)
 	struct nan_config nan;
 
 	os_memset(&nan, 0, sizeof(nan));
+	os_memcpy(nan.nmi_addr, dev->nmi, ETH_ALEN);
 	nan.cb_ctx = dev;
 
 	nan.start = nan_test_start_cb;
@@ -994,6 +1017,8 @@ static int nan_test_ndp_request(struct nan_device *sub)
 	params->ndp_id.id = ++sub->counter;
 	params->qos.min_slots = NAN_TEST_MIN_SLOTS;
 	params->qos.max_latency = NAN_TEST_MAX_LATENCY;
+	params->sec.csid = sub->conf->ndp_confs[sub->n_ndps].csid;
+	os_memcpy(params->sec.pmk, sub->conf->pmk, PMK_LEN);
 
 	/* Use the device specific schedule callback */
 	sub->conf->schedule_cb(&params->sched);
@@ -1070,7 +1095,12 @@ static int nan_test_verify_expected_result(struct nan_device *dev)
 static int nan_test_iteration_done(struct nan_test_global *global)
 {
 	struct nan_device *dev;
+	u8 tk[NAN_TK_MAX_LEN];
+	size_t tk_len = 0;
+	enum nan_cipher_suite_id csid;
 	int ret;
+
+	os_memset(tk, 0, sizeof(tk));
 
 	dl_list_for_each(dev, &global->devs, struct nan_device, list) {
 		ret = nan_test_verify_expected_result(dev);
@@ -1078,8 +1108,30 @@ static int nan_test_iteration_done(struct nan_test_global *global)
 		if (ret)
 			return ret;
 
+		if (tk_len == 0 && dev->tk_len > 0) {
+			os_memcpy(tk, dev->tk, dev->tk_len);
+			tk_len = dev->tk_len;
+			csid = dev->csid;
+		} else if (dev->tk_len > 0) {
+			if (tk_len != dev->tk_len ||
+			    csid != dev->csid ||
+			    os_memcmp(tk, dev->tk, tk_len) != 0) {
+				wpa_printf(MSG_ERROR,
+					   "%s: TK mismatch with other device",
+					   dev->name);
+				return -1;
+			}
+
+			wpa_printf(MSG_INFO, "%s: TK matches with other device",
+				   dev->name);
+		}
+
 		dev->connected_notify_received = false;
 		dev->disconnected_notify_received = false;
+
+		os_memset(dev->tk, 0, sizeof(dev->tk));
+		dev->tk_len = 0;
+
 		dev->n_ndps++;
 	}
 

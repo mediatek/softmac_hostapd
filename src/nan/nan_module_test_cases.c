@@ -382,6 +382,156 @@ static struct nan_test_case three_way_ndp_two_way_ndl_reject = {
 };
 
 
+static struct nan_test_case four_way_ndp_two_way_ndl_chan_149_ccm_128 = {
+	.name = "Four way NDP and two way NDL channel 149 with CCMP 128",
+	.pub_conf = {
+		.schedule_cb = nan_test_schedule_cb_all_ndc,
+		.get_chans_cb = nan_test_get_chans_default,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_CONNECTED,
+				.csid = NAN_CS_SK_CCM_128,
+				.expected_csid = NAN_CS_SK_CCM_128,
+			},
+		},
+		.pot_avail = {
+			0x12, 0x0a, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00,
+			0xba, 0x02, 0x20, 0x02, 0x04
+		},
+		.pot_avail_len = 13,
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+		},
+	},
+	.sub_conf = {
+		.schedule_cb = nan_test_schedule_cb_all_no_ndc,
+		.get_chans_cb = nan_test_get_chans_default,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_CONNECTED,
+				.csid = NAN_CS_SK_CCM_128,
+				.expected_csid = NAN_CS_SK_CCM_128,
+				.term_once_connected = 1,
+			},
+		},
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+		},
+	}
+};
+
+static struct nan_test_case four_way_ndp_two_way_ndl_chan_149_gcm_256 = {
+	.name = "Four way NDP and three way NDL with GCMP 256",
+	.pub_conf = {
+		.schedule_cb = nan_test_schedule_cb_all_ndc,
+		.get_chans_cb = nan_test_get_chans_default,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_CONNECTED,
+				.csid = NAN_CS_SK_GCM_256,
+				.expected_csid = NAN_CS_SK_GCM_256,
+			},
+		},
+		.pot_avail = {
+			0x12, 0x0a, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00,
+			0xba, 0x02, 0x20, 0x02, 0x04
+		},
+		.pot_avail_len = 13,
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+		},
+	},
+	.sub_conf = {
+		.schedule_cb = nan_test_schedule_cb_2ghz_no_ndc,
+		.schedule_conf_cb = nan_test_schedule_cb_all_ndc,
+		.get_chans_cb = nan_test_get_chans_default_reverse,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_CONNECTED,
+				.csid = NAN_CS_SK_GCM_256,
+				.expected_csid = NAN_CS_SK_GCM_256,
+				.term_once_connected = 1,
+			},
+		},
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+		},
+	}
+};
+
+
+static struct nan_test_case pmk_mismatch = {
+	.name = "PMK mismatch test case",
+	.pub_conf = {
+		.schedule_cb = nan_test_schedule_cb_all_ndc,
+		.get_chans_cb = nan_test_get_chans_default,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_DISCONNECTED,
+				.csid = NAN_CS_SK_GCM_256,
+			},
+		},
+		.pot_avail = {
+			0x12, 0x0a, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00,
+			0xba, 0x02, 0x20, 0x02, 0x04
+		},
+		.pot_avail_len = 13,
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+		},
+	},
+	.sub_conf = {
+		.schedule_cb = nan_test_schedule_cb_all_no_ndc,
+		.get_chans_cb = nan_test_get_chans_default,
+		.n_ndps = 1,
+		.ndp_confs = {
+			{
+				.accept_request = 1,
+				.expected_result =
+					NAN_TEST_NDP_NOTIFY_DISCONNECTED,
+				.csid = NAN_CS_SK_GCM_256,
+			},
+		},
+		.pmk = {
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x0,
+		},
+	}
+};
+
+
 static const struct nan_test_case *g_nan_test_cases[] = {
 	&three_way_ndp_two_way_ndl_chan_149,
 	&three_way_ndp_two_way_ndl_diff_period,
@@ -389,6 +539,9 @@ static const struct nan_test_case *g_nan_test_cases[] = {
 	&three_way_ndp_two_way_ndl_chan_mis,
 	&three_way_ndp_two_way_ndl_reject,
 	&three_way_ndp_three_way_ndl,
+	&four_way_ndp_two_way_ndl_chan_149_ccm_128,
+	&four_way_ndp_two_way_ndl_chan_149_gcm_256,
+	&pmk_mismatch,
 	NULL
 };
 

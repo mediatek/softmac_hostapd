@@ -49,6 +49,9 @@ enum nan_test_ndp_notify_type {
  * @term_once_connected: Terminate once connected.
  * @expected_result: Expected NDP establishment result
  * @reason: For publisher device, indicates the reject reason
+ * @csid: Cipher suite ID
+ * @expected_csid: Expected Cipher suite ID in case of a successful connection
+ * @pmk: Pairwise Master Key
  */
 struct nan_test_dev_conf {
 	int (*schedule_cb)(struct nan_schedule *sched);
@@ -64,7 +67,11 @@ struct nan_test_dev_conf {
 		bool term_once_connected;
 		enum nan_test_ndp_notify_type expected_result;
 		u8 reason;
+		enum nan_cipher_suite_id csid;
+		enum nan_cipher_suite_id expected_csid;
 	} ndp_confs[NAN_MAX_NUM_NDPS];
+
+	u8 pmk[PMK_LEN];
 };
 
 /**
@@ -83,6 +90,9 @@ struct nan_test_dev_conf {
  *     was received
  * @disconnected_notify_received: Indicates whether a disconnected notification
  *     was received
+ * @tk: NAN TK
+ * @tk_len: Length of the NAN TK
+ * @csid: Cipher suite ID
  */
 struct nan_device {
 	struct dl_list list;
@@ -102,6 +112,10 @@ struct nan_device {
 
 	bool connected_notify_received;
 	bool disconnected_notify_received;
+
+	u8 tk[NAN_TK_MAX_LEN];
+	size_t tk_len;
+	enum nan_cipher_suite_id csid;
 };
 
 /**
