@@ -1957,6 +1957,10 @@ OBJS += ../src/crypto/crypto_module_tests.o
 ifdef CONFIG_WPS
 OBJS += ../src/wps/wps_module_tests.o
 endif
+ifdef CONFIG_NAN
+OBJS += ../src/nan/nan_module_tests.o
+OBJS += ../src/nan/nan_module_test_cases.o
+endif
 endif
 
 OBJS += ../src/drivers/driver_common.o
