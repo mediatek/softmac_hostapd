@@ -531,6 +531,11 @@ static void nl80211_deliver_pending_events(void *eloop_ctx, void *data)
 
 	wpa_printf(MSG_DEBUG, "nl80211: Delivering pending events");
 
+	if (dl_list_empty(&global->pending_events))
+		return;
+
+	dl_list_init(&pending_events);
+
 	global->pending_events.next->prev = &pending_events;
 	global->pending_events.prev->next = &pending_events;
 	pending_events.next = global->pending_events.next;
