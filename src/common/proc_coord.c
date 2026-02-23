@@ -573,6 +573,8 @@ static void proc_coord_update_peers_from_dir(struct proc_coord *pc)
 		proc_coord_send_request(pc, pid, PROC_COORD_CMD_PING, NULL,
 					10000, proc_coord_cb_ping, pc);
 	}
+
+	closedir(dir);
 }
 
 
