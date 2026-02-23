@@ -4628,6 +4628,19 @@ static int ctrl_iface_get_capability_auth_alg(struct wpa_supplicant *wpa_s,
 
 #endif /* CONFIG_PASN */
 
+#if defined(CONFIG_ENC_ASSOC) && defined(CONFIG_PASN) && defined(CONFIG_SAE)
+	if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_SAE) &&
+	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
+	    (wpa_s->drv_flags2 &
+	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION)) {
+		ret = os_snprintf(pos, end - pos, "%sEPPKE",
+				  pos == buf ? "" : " ");
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+#endif /* CONFIG_ENC_ASSOC && CONFIG_PASN && CONFIG_SAE */
+
 	return pos - buf;
 }
 
