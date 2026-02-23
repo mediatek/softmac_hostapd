@@ -3579,6 +3579,8 @@ static void wpas_parse_connection_info(struct wpa_supplicant *wpa_s,
 }
 
 
+#ifdef CONFIG_P2P
+
 static bool is_assisted_dfs_p2p_allowed_cc(const char *country)
 {
 	return country[0] == 'U' && country[1] == 'S';
@@ -3633,6 +3635,8 @@ static bool is_dfs_owner_ap(struct wpa_supplicant *wpa_s, struct wpa_bss *bss)
 
 	return true;
 }
+
+#endif /* CONFIG_P2P */
 
 
 static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
