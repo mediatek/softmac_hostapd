@@ -6593,7 +6593,7 @@ DBusMessage * wpas_dbus_handler_nan_publish(DBusMessage *message,
 			reply = wpas_dbus_error_invalid_args(message,
 							     entry.key);
 			wpa_dbus_dict_entry_clear(&entry);
-			goto fail;
+			goto out;
 		}
 	}
 
@@ -6862,7 +6862,7 @@ DBusMessage * wpas_dbus_handler_nan_subscribe(DBusMessage *message,
 			reply = wpas_dbus_error_invalid_args(message,
 							     entry.key);
 			wpa_dbus_dict_entry_clear(&entry);
-			goto fail;
+			goto out;
 		}
 	}
 
@@ -7027,7 +7027,7 @@ DBusMessage * wpas_dbus_handler_nan_transmit(DBusMessage *message,
 			reply = wpas_dbus_error_invalid_args(message,
 							     entry.key);
 			wpa_dbus_dict_entry_clear(&entry);
-			goto fail;
+			goto out;
 		}
 	}
 
