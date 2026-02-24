@@ -6869,7 +6869,7 @@ static int handle_action(struct hostapd_data *hapd,
 		    WPA_GET_BE24(mgmt->u.action.u.vs_public_action.oui) ==
 		    OUI_WFA &&
 		    mgmt->u.action.u.vs_public_action.variable[0] ==
-		    NAN_OUI_TYPE) {
+		    NAN_SDF_OUI_TYPE) {
 			const u8 *pos, *end;
 
 			pos = mgmt->u.action.u.vs_public_action.variable;
