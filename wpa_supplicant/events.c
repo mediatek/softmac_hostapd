@@ -1899,7 +1899,7 @@ static int wpa_supplicant_connect_ml_missing(struct wpa_supplicant *wpa_s,
 	      (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)))
 		return 0;
 
-	usable_links = wpa_bss_get_usable_links(wpa_s, selected, ssid,
+	usable_links = wpa_bss_get_usable_links(wpa_s, selected, NULL,
 						&missing_links);
 	if (!usable_links || !missing_links)
 		return 0;
