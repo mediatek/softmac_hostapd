@@ -70,10 +70,6 @@ static void wpa_group_get(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
 static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
-#ifdef CONFIG_IEEE80211BE
-static void wpa_group_put_vlan(struct wpa_authenticator *wpa_auth,
-			       int vlan_id);
-#endif /* CONFIG_IEEE80211BE */
 static int ieee80211w_kde_len(struct wpa_state_machine *sm);
 static u8 * ieee80211w_kde_add(struct wpa_state_machine *sm, u8 *pos);
 static int wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
@@ -151,7 +147,7 @@ void wpa_release_link_auth_ref(struct wpa_state_machine *sm, u8 link_id,
 		wpa_auth = link->wpa_auth;
 		if (wpa_auth) {
 			link->wpa_auth = NULL;
-			wpa_group_put_vlan(wpa_auth, sm->group->vlan_id);
+			wpa_group_put(wpa_auth, wpa_auth->group);
 		}
 	}
 }
@@ -1171,7 +1167,7 @@ static void wpa_free_sta_sm(struct wpa_state_machine *sm)
 		wpa_auth = sm->mld_links[link_id].wpa_auth;
 		sm->mld_links[link_id].wpa_auth = NULL;
 		sm->mld_links[link_id].valid = false;
-		wpa_group_put_vlan(wpa_auth, sm->group->vlan_id);
+		wpa_group_put(wpa_auth, wpa_auth->group);
 	}
 #endif /* CONFIG_IEEE80211BE */
 	wpa_group_put(sm->wpa_auth, sm->group);
@@ -4388,8 +4384,8 @@ void wpa_auth_ml_get_key_info(struct wpa_authenticator *a,
 	u8 rsc[WPA_KEY_RSC_LEN];
 
 	wpa_printf(MSG_DEBUG,
-		   "MLD: Get group key info: link_id=%u, IGTK=%u, BIGTK=%u VLAN ID:%d",
-		   info->link_id, mgmt_frame_prot, beacon_prot, vlan_id);
+		   "MLD: Get group key info: link_id=%u, IGTK=%u, BIGTK=%u",
+		   info->link_id, mgmt_frame_prot, beacon_prot);
 
 	if (vlan_id)
 		gsm = wpa_select_vlan_wpa_group(gsm, vlan_id);
@@ -7102,18 +7098,6 @@ static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 }
 
 
-#ifdef CONFIG_IEEE80211BE
-static void wpa_group_put_vlan(struct wpa_authenticator *wpa_auth,
-			       int vlan_id)
-{
-	struct wpa_group *vlan_group =
-		wpa_select_vlan_wpa_group(wpa_auth->group, vlan_id);
-
-	wpa_group_put(wpa_auth, vlan_group);
-}
-#endif /* CONFIG_IEEE80211BE */
-
-
 /*
  * Add a group that has its references counter set to zero. Caller needs to
  * call wpa_group_get() on the return value to mark the entry in use.
@@ -7231,15 +7215,14 @@ int wpa_auth_release_group(struct wpa_authenticator *wpa_auth, int vlan_id)
 }
 
 
-int wpa_auth_sta_set_vlan(struct wpa_state_machine *sm,
-			  struct wpa_authenticator *wpa_auth, int vlan_id)
+int wpa_auth_sta_set_vlan(struct wpa_state_machine *sm, int vlan_id)
 {
 	struct wpa_group *group;
 
 	if (!sm || !sm->wpa_auth)
 		return 0;
 
-	group = wpa_auth->group;
+	group = sm->wpa_auth->group;
 	while (group) {
 		if (group->vlan_id == vlan_id)
 			break;
@@ -7247,18 +7230,10 @@ int wpa_auth_sta_set_vlan(struct wpa_state_machine *sm,
 	}
 
 	if (!group) {
-		group = wpa_auth_add_group(wpa_auth, vlan_id);
+		group = wpa_auth_add_group(sm->wpa_auth, vlan_id);
 		if (!group)
 			return -1;
 	}
-
-#ifdef CONFIG_IEEE80211BE
-	if (sm->mld_assoc_link_id >= 0 &&
-	    (sm->mld_assoc_link_id != wpa_auth->link_id)) {
-		wpa_group_get(wpa_auth, group);
-		return 0;
-	}
-#endif /* CONFIG_IEEE80211BE */
 
 	if (sm->group == group)
 		return 0;
