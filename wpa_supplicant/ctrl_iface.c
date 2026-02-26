@@ -13176,6 +13176,22 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "dp_required=", 12) == 0) {
+			params.data_path = !!atoi(token + 12);
+			continue;
+		}
+
+		if (os_strncmp(token, "dp_type=", 8) == 0) {
+			params.dp_type = !!atoi(token + 8);
+			continue;
+		}
+
+		if (os_strncmp(token, "security_required=", 18) == 0) {
+			params.security_required = !!atoi(token + 18);
+			security_required_set = true;
+			continue;
+		}
+
 		if (os_strncmp(token, "nd_pmk=", 7) == 0) {
 			if (params.nd_pmk) {
 				wpa_printf(MSG_INFO,
@@ -13210,12 +13226,6 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 				goto fail;
 			}
 			params.forced_addr = forced_addr;
-			continue;
-		}
-
-		if (os_strcmp(token, "security_required=0") == 0) {
-			params.security_required = false;
-			security_required_set = true;
 			continue;
 		}
 
@@ -13493,6 +13503,21 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 
 		if (os_strncmp(token, "randomized_service_id=", 22) == 0) {
 			params.randomize_service_id = !!atoi(token + 22);
+			continue;
+		}
+
+		if (os_strncmp(token, "dp_required=", 12) == 0) {
+			params.dp_required = !!atoi(token + 12);
+			continue;
+		}
+
+		if (os_strncmp(token, "dp_type=", 8) == 0) {
+			params.dp_type = !!atoi(token + 8);
+			continue;
+		}
+
+		if (os_strncmp(token, "security_required=", 18) == 0) {
+			params.security_required = !!atoi(token + 18);
 			continue;
 		}
 

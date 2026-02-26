@@ -184,6 +184,9 @@ struct nan_publish_params {
 	/* Randomize service ID for NAN services */
 	bool randomize_service_id;
 
+	/* Data Path Type flag (0=unicast, 1=multicast) */
+	bool dp_type;
+
 	/*
 	 * Pairing Bootstrapping Methods as defined in Wi-Fi Aware spec v4.0,
 	 * Table 128
@@ -309,6 +312,15 @@ struct nan_subscribe_params {
 
 	/* Randomize service ID for NAN services */
 	bool randomize_service_id;
+
+	/* Data Path Required flag */
+	bool dp_required;
+
+	/* Data Path Type flag */
+	bool dp_type;
+
+	/* Security Required flag */
+	bool security_required;
 
 	/*
 	 * GTK protection required for group-addressed Data frames transmitted

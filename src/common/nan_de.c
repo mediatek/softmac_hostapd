@@ -680,6 +680,19 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 			sdea_ctrl |= NAN_SDEA_CTRL_FSD_REQ;
 		if (srv->publish.fsd_gas)
 			sdea_ctrl |= NAN_SDEA_CTRL_FSD_GAS;
+		if (srv->publish.dp_type)
+			sdea_ctrl |= NAN_SDEA_CTRL_DATA_PATH_TYPE;
+		if (srv->publish.security_required)
+			sdea_ctrl |= NAN_SDEA_CTRL_SECURITY_REQ;
+	}
+
+	if (srv->type == NAN_DE_SUBSCRIBE) {
+		if (srv->subscribe.dp_required)
+			sdea_ctrl |= NAN_SDEA_CTRL_DATA_PATH_REQ;
+		if (srv->subscribe.dp_type)
+			sdea_ctrl |= NAN_SDEA_CTRL_DATA_PATH_TYPE;
+		if (srv->subscribe.security_required)
+			sdea_ctrl |= NAN_SDEA_CTRL_SECURITY_REQ;
 	}
 	if (ssi || sdea_ctrl)
 		len += NAN_ATTR_HDR_LEN + sdea_len;
