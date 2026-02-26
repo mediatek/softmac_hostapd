@@ -1531,7 +1531,7 @@ static void mlme_event_mgmt(struct i802_bss *bss,
 
 static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 				      struct nlattr *cookie, const u8 *frame,
-				      size_t len, struct nlattr *ack)
+				      size_t len, struct nlattr *ack, int link_id)
 {
 	union wpa_event_data event;
 	const struct ieee80211_hdr *hdr = (const struct ieee80211_hdr *) frame;
@@ -1543,11 +1543,11 @@ static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 		cookie_val = nla_get_u64(cookie);
 	wpa_printf(MSG_DEBUG,
 		   "nl80211: Frame TX status event A1=" MACSTR
-		   " %sstype=%d cookie=0x%llx%s ack=%d",
+		   " %sstype=%d cookie=0x%llx%s ack=%d, link_id=%d",
 		   MAC2STR(hdr->addr1),
 		   WLAN_FC_GET_TYPE(fc) != WLAN_FC_TYPE_MGMT ? "not-mgmt " : "",
 		   WLAN_FC_GET_STYPE(fc), (long long unsigned int) cookie_val,
-		   cookie ? "" : "(N/A)", ack != NULL);
+		   cookie ? "" : "(N/A)", ack != NULL, link_id);
 
 	if (cookie_val && cookie_val == drv->eapol_tx_cookie &&
 	    len >= ETH_HLEN &&
@@ -1588,8 +1588,12 @@ static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 	event.tx_status.data = frame;
 	event.tx_status.data_len = len;
 	event.tx_status.ack = ack != NULL;
-	event.tx_status.link_id = cookie_val == drv->send_frame_cookie ?
-		drv->send_frame_link_id : NL80211_DRV_LINK_ID_NA;
+
+	if (link_id == -1)
+		link_id = cookie_val == drv->send_frame_cookie ?
+			drv->send_frame_link_id : NL80211_DRV_LINK_ID_NA;
+	event.tx_status.link_id = link_id;
+
 	wpa_supplicant_event(bss->ctx, EVENT_TX_STATUS, &event);
 }
 
@@ -1971,7 +1975,7 @@ static void mlme_event(struct i802_bss *bss,
 		break;
 	case NL80211_CMD_FRAME_TX_STATUS:
 		mlme_event_mgmt_tx_status(bss, cookie, nla_data(frame),
-					  nla_len(frame), ack);
+					  nla_len(frame), ack, link_id);
 		break;
 	case NL80211_CMD_UNPROT_DEAUTHENTICATE:
 		mlme_event_unprot_disconnect(drv, EVENT_UNPROT_DEAUTH,
