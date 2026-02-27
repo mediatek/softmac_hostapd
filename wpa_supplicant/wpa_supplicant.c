@@ -2291,7 +2291,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	}
 
 #ifdef CONFIG_ENC_ASSOC
-	if (ssid->ssid_protection && proto == WPA_PROTO_RSN &&
+	if (proto == WPA_PROTO_RSN &&
 	    (wpa_s->drv_flags2 &
 	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION)) {
 		bool assoc_enc;
