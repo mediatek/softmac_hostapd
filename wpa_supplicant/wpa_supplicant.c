@@ -9520,7 +9520,9 @@ void wpas_request_connection(struct wpa_supplicant *wpa_s)
 	wpa_s->disconnected = 0;
 	wpa_s->reassociate = 1;
 	wpa_s->last_owe_group = 0;
+#ifdef CONFIG_PASN
 	wpa_pasn_reset(&wpa_s->pasn);
+#endif /* CONFIG_PASN */
 
 	if (wpa_supplicant_fast_associate(wpa_s) != 1)
 		wpa_supplicant_req_scan(wpa_s, 0, 0);
