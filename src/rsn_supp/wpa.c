@@ -1325,9 +1325,11 @@ static int wpa_supplicant_install_ptk(struct wpa_sm *sm,
 	if (key_flag & KEY_FLAG_NEXT) {
 		sm->ptk.installed_rx = true;
 	} else {
+#ifndef CONFIG_TESTING_OPTIONS
 		/* TK is not needed anymore in supplicant */
 		os_memset(sm->ptk.tk, 0, WPA_TK_MAX_LEN);
 		sm->ptk.tk_len = 0;
+#endif /* CONFIG_TESTING_OPTIONS */
 		sm->ptk.installed = 1;
 		sm->tk_set = true;
 	}
@@ -6063,6 +6065,16 @@ void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm, enum rsn_hash_alg hash,
 
 #ifdef CONFIG_TESTING_OPTIONS
 
+void wpa_sm_set_ptk_tk(struct wpa_sm *sm, const u8 *ptk_tk, size_t ptk_tk_len)
+{
+	if (ptk_tk && ptk_tk_len <= WPA_TK_MAX_LEN) {
+		os_memcpy(sm->ptk.tk, ptk_tk, ptk_tk_len);
+		sm->ptk.tk_len = ptk_tk_len;
+		wpa_printf(MSG_DEBUG, "Updated PTK TK");
+	}
+}
+
+
 void wpa_sm_set_test_assoc_ie(struct wpa_sm *sm, struct wpabuf *buf)
 {
 	wpabuf_free(sm->test_assoc_ie);
@@ -7833,3 +7845,28 @@ const u8 * wpa_sm_get_pmk(struct wpa_sm *sm, const u8 *addr, const u8 *pmkid,
 }
 
 #endif /* CONFIG_IEEE8021X_AUTH */
+
+
+#ifdef CONFIG_TESTING_OPTIONS
+/**
+ * wpa_sm_get_cached_tk - Get cached TK for testing purposes
+ * @sm: Pointer to WPA state machine data from wpa_sm_init()
+ * @tk: Buffer to store the TK
+ * @tk_len: Pointer to store the TK length
+ * Returns: 0 on success, -1 if TK is not available
+ *
+ * This function retrieves the cached TK from wpa_sm. The TK is only available
+ * if PTK is set and TK is not null.
+ */
+int wpa_sm_get_cached_tk(struct wpa_sm *sm, u8 *tk, size_t *tk_len)
+{
+	if (!sm || !sm->ptk_set ||
+	    sm->ptk.tk_len == 0 || sm->ptk.tk_len > WPA_TK_MAX_LEN)
+		return -1;
+
+	os_memcpy(tk, sm->ptk.tk, sm->ptk.tk_len);
+	*tk_len = sm->ptk.tk_len;
+
+	return 0;
+}
+#endif /* CONFIG_TESTING_OPTIONS */

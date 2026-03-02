@@ -3686,6 +3686,10 @@ static int wpas_rx_enc_assoc_resp(struct wpa_supplicant *wpa_s, const u8 *aa,
 			       entry->ptk.kck, entry->ptk.kck_len,
 			       entry->ptk.kek, entry->ptk.kek_len);
 
+#ifdef CONFIG_TESTING_OPTIONS
+	wpa_sm_set_ptk_tk(wpa_s->wpa, entry->ptk.tk, entry->ptk.tk_len);
+#endif /* CONFIG_TESTING_OPTIONS */
+
 	return process_encrypted_assoc_resp(wpa_s->wpa,
 					    ((wpa_s->drv_flags2 &
 					      WPA_DRIVER_FLAGS2_MLO) &&
