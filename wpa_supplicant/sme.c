@@ -23,6 +23,7 @@
 #include "common/dpp.h"
 #include "rsn_supp/wpa.h"
 #include "rsn_supp/pmksa_cache.h"
+#include "rsn_supp/wpa_ie.h"
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "driver_i.h"
@@ -638,6 +639,9 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 	u32 capab = 0;
 	int group;
 	bool derive_kdk;
+	u8 rsne[80];
+	size_t rsne_len = sizeof(rsne);
+	int len;
 
 	pasn = &wpa_s->pasn;
 
@@ -788,6 +792,15 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 		wpa_printf(MSG_INFO, "EPPKE: Failed to init ECDH");
 		return;
 	}
+
+	len = wpa_gen_wpa_ie(wpa_s->wpa, rsne, rsne_len);
+	if (len < 0) {
+		wpa_printf(MSG_INFO, "EPPKE: Failed to generate RSNE");
+		return;
+	}
+	pasn_set_rsne(pasn, rsne);
+	wpa_hexdump(MSG_DEBUG, "EPPKE: Set own RSNE default",
+		    pasn->rsn_ie, pasn->rsn_ie_len);
 	pasn->akmp = wpa_s->key_mgmt;
 	pasn->cipher = wpa_s->pairwise_cipher;
 	pasn->group = group;

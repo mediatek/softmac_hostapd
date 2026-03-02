@@ -132,7 +132,7 @@ struct pasn_data {
 	int disable_pmksa_caching;
 	int *pasn_groups;
 	int use_anti_clogging;
-	const u8 *rsn_ie;
+	u8 *rsn_ie;
 	size_t rsn_ie_len;
 
 	u8 *comeback_key;
@@ -261,6 +261,7 @@ void pasn_set_noauth(struct pasn_data *pasn, bool noauth);
 void pasn_set_password(struct pasn_data *pasn, const char *password);
 void pasn_set_wpa_key_mgmt(struct pasn_data *pasn, int key_mgmt);
 void pasn_set_rsn_pairwise(struct pasn_data *pasn, int rsn_pairwise);
+void pasn_set_rsne(struct pasn_data *pasn, const u8 *rsne);
 void pasn_set_rsnxe_caps(struct pasn_data *pasn, u32 rsnxe_capab);
 void pasn_set_rsnxe_ie(struct pasn_data *pasn, const u8 *rsnxe_ie);
 void pasn_set_custom_pmkid(struct pasn_data *pasn, const u8 *pmkid);

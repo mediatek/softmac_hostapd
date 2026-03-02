@@ -678,7 +678,9 @@ struct wpabuf * wpas_pasn_build_auth_1(struct pasn_data *pasn,
 			wrapped_data_buf = wpas_pasn_get_wrapped_data(pasn);
 	}
 
-	if (wpa_pasn_add_rsne(buf, pmkid, pasn->akmp, pasn->cipher) < 0)
+	if (pasn->rsn_ie && pasn->rsn_ie_len)
+		wpabuf_put_data(buf, pasn->rsn_ie, pasn->rsn_ie_len);
+	else if (wpa_pasn_add_rsne(buf, pmkid, pasn->akmp, pasn->cipher) < 0)
 		goto fail;
 
 	if (!wrapped_data_buf)
@@ -906,6 +908,7 @@ void wpa_pasn_reset(struct pasn_data *pasn)
 #endif /* CONFIG_TESTING_OPTIONS */
 	pasn->network_id = 0;
 	pasn->derive_kdk = false;
+	os_free(pasn->rsn_ie);
 	pasn->rsn_ie = NULL;
 	pasn->rsn_ie_len = 0;
 	os_free(pasn->rsnxe_ie);

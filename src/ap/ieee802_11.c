@@ -3042,7 +3042,8 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 	pasn->use_anti_clogging = use_anti_clogging(hapd);
 	pasn_set_password(pasn, sae_get_password(hapd, sta, NULL, 0, NULL,
 						 &pasn->pt, NULL));
-	pasn->rsn_ie = wpa_auth_get_wpa_ie(hapd->wpa_auth, &pasn->rsn_ie_len);
+	pasn_set_rsne(pasn, wpa_auth_get_wpa_ie(hapd->wpa_auth,
+						&pasn->rsn_ie_len));
 	pasn_set_rsnxe_ie(pasn, hostapd_wpa_ie(hapd, WLAN_EID_RSNX));
 	pasn->disable_pmksa_caching = hapd->conf->disable_pmksa_caching;
 #ifdef CONFIG_ENC_ASSOC

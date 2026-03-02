@@ -33,6 +33,7 @@ void pasn_data_deinit(struct pasn_data *pasn)
 	if (!pasn)
 		return;
 	os_free(pasn->rsnxe_ie);
+	os_free(pasn->rsn_ie);
 	wpabuf_free(pasn->frame);
 	os_free(pasn->pasn_groups);
 	wpabuf_free(pasn->auth1);
@@ -183,6 +184,16 @@ void pasn_set_rsnxe_ie(struct pasn_data *pasn, const u8 *rsnxe_ie)
 	if (!pasn || !rsnxe_ie)
 		return;
 	pasn->rsnxe_ie = os_memdup(rsnxe_ie, 2 + rsnxe_ie[1]);
+}
+
+
+void pasn_set_rsne(struct pasn_data *pasn, const u8 *rsne)
+{
+	if (!pasn || !rsne)
+		return;
+	os_free(pasn->rsn_ie);
+	pasn->rsn_ie = os_memdup(rsne, 2 + rsne[1]);
+	pasn->rsn_ie_len = pasn->rsn_ie ? 2 + rsne[1] : 0;
 }
 
 
