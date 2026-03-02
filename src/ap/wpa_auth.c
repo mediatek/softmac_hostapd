@@ -72,8 +72,8 @@ static void wpa_group_put(struct wpa_authenticator *wpa_auth,
 			  struct wpa_group *group);
 static int ieee80211w_kde_len(struct wpa_state_machine *sm);
 static u8 * ieee80211w_kde_add(struct wpa_state_machine *sm, u8 *pos);
-static int wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
-				struct wpa_group *group);
+static void wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
+				 struct wpa_group *group);
 
 
 static const u32 eapol_key_timeout_first = 100; /* ms */
@@ -2696,7 +2696,7 @@ static void wpa_group_ensure_init(struct wpa_authenticator *wpa_auth,
 	}
 
 	if (wpa_group_init_gmk_and_counter(wpa_auth, group) < 0 ||
-	    wpa_group_update_gtk(wpa_auth, group) < 0 ||
+	    wpa_gtk_update(wpa_auth, group) < 0 ||
 	    wpa_group_config_group_keys(wpa_auth, group) < 0) {
 		wpa_printf(MSG_INFO, "WPA: GMK/GTK setup failed");
 		group->first_sta_seen = false;
@@ -6162,8 +6162,8 @@ int wpa_wnmsleep_bigtk_subelem(struct wpa_state_machine *sm, u8 *pos)
 #endif /* CONFIG_WNM_AP */
 
 
-static int wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
-				struct wpa_group *group)
+static void wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
+				 struct wpa_group *group)
 {
 	int tmp;
 
@@ -6179,7 +6179,7 @@ static int wpa_group_update_gtk(struct wpa_authenticator *wpa_auth,
 	/* "GKeyDoneStations = GNoStations" is done in more robust way by
 	 * counting the STAs that are marked with GUpdateStationKeys instead of
 	 * including all STAs that could be in not-yet-completed state. */
-	return wpa_gtk_update(wpa_auth, group);
+	wpa_gtk_update(wpa_auth, group);
 }
 
 
