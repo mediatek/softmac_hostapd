@@ -776,31 +776,29 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	}
 
 	/* Service Descriptor Extension attribute */
-	if (srv->type == NAN_DE_PUBLISH || ssi) {
-		if (srv->type == NAN_DE_PUBLISH) {
-			if (srv->gtk_required)
-				sdea_ctrl |= NAN_SDEA_CTRL_GTK_REQ;
-			if (srv->data_path) {
-				sdea_ctrl |= NAN_SDEA_CTRL_DATA_PATH_REQ;
-				if (srv->cipher_suites_list &&
-				    srv->security_required)
-					sdea_ctrl |= NAN_SDEA_CTRL_SECURITY_REQ;
-			}
+	if (srv->type == NAN_DE_PUBLISH) {
+		if (srv->gtk_required)
+			sdea_ctrl |= NAN_SDEA_CTRL_GTK_REQ;
+		if (srv->data_path) {
+			sdea_ctrl |= NAN_SDEA_CTRL_DATA_PATH_REQ;
+			if (srv->cipher_suites_list &&
+			    srv->security_required)
+				sdea_ctrl |= NAN_SDEA_CTRL_SECURITY_REQ;
 		}
+	}
 
-		if (sdea_ctrl || ssi) {
-			wpabuf_put_u8(buf, NAN_ATTR_SDEA);
-			wpabuf_put_le16(buf, sdea_len);
-			/* Instance ID */
-			wpabuf_put_u8(buf, srv->publish.orig_id ?
-				      srv->publish.orig_id : srv->id);
-			wpabuf_put_le16(buf, sdea_ctrl);
-			if (ssi) {
-				wpabuf_put_le16(buf, 4 + wpabuf_len(ssi));
-				wpabuf_put_be24(buf, OUI_WFA);
-				wpabuf_put_u8(buf, srv->srv_proto_type);
-				wpabuf_put_buf(buf, ssi);
-			}
+	if (sdea_ctrl || ssi) {
+		wpabuf_put_u8(buf, NAN_ATTR_SDEA);
+		wpabuf_put_le16(buf, sdea_len);
+		/* Instance ID */
+		wpabuf_put_u8(buf, srv->publish.orig_id ?
+			      srv->publish.orig_id : srv->id);
+		wpabuf_put_le16(buf, sdea_ctrl);
+		if (ssi) {
+			wpabuf_put_le16(buf, 4 + wpabuf_len(ssi));
+			wpabuf_put_be24(buf, OUI_WFA);
+			wpabuf_put_u8(buf, srv->srv_proto_type);
+			wpabuf_put_buf(buf, ssi);
 		}
 	}
 
