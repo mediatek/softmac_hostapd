@@ -115,6 +115,10 @@ enum qca_radiotap_vendor_ids {
  * @QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ: The number of chains to be
  * used for receiving the data in the 5/6 GHz band.
  *
+ * To effectively clear or reset the chain configuration, user-space can set
+ * the attribute to 0xFF or 255, allowing the driver to apply the default chain
+ * configuration.
+ *
  * Global chain-mask configuration - Applies to 2.4 GHz or 5/6 GHz band
  * The following band specific attributes are used to dynamically configure the
  * global chain masks (e.g., 0x1 for Chain 0, 0x2 for Chain 1, 0x4 for Chain 2)
