@@ -546,6 +546,7 @@ sme_build_802_1x_for_ptk(struct wpa_supplicant *wpa_s, bool external)
 	/* Generate RSNE */
 	if (external)
 		rsne_len = wpa_external_auth_add_rsne(
+			wpa_s->wpa,
 			wpa_s->auth_1x->rsne, sizeof(wpa_s->auth_1x->rsne),
 			wpa_s->sme.ext_auth_key_mgmt,
 			wpa_s->sme.ext_pairwise_cipher,

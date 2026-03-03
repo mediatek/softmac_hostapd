@@ -825,7 +825,8 @@ static int wpas_eppke_set_rsne(struct wpa_supplicant *wpa_s,
 	u8 rsne[257];
 	int rsne_len;
 
-	rsne_len = wpa_external_auth_add_rsne(rsne, sizeof(rsne),
+	rsne_len = wpa_external_auth_add_rsne(wpa_s->wpa,
+					      rsne, sizeof(rsne),
 					      awork->akmp, awork->cipher,
 					      awork->group_cipher,
 					      awork->group_mgmt_cipher,

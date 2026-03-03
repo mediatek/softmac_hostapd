@@ -226,6 +226,11 @@ struct wpa_sm {
 	unsigned int eapol_2_key_info_set_mask;
 	bool encrypt_eapol_m2;
 	bool encrypt_eapol_m4;
+	/*
+	 * Number of random PMKIDs to inject into the RSNE when no valid
+	 * PMKSA is available.
+	 */
+	unsigned int test_random_pmkid_count;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 #ifdef CONFIG_FILS
@@ -283,6 +288,16 @@ struct wpa_sm {
 	const struct security_profile_entry *security_profile;
 };
 
+
+static inline unsigned int
+wpa_sm_test_random_pmkid_count(const struct wpa_sm *sm)
+{
+#ifdef CONFIG_TESTING_OPTIONS
+	return sm ? sm->test_random_pmkid_count : 0;
+#else /* CONFIG_TESTING_OPTIONS */
+	return 0;
+#endif /* CONFIG_TESTING_OPTIONS */
+}
 
 static inline void wpa_sm_set_state(struct wpa_sm *sm, enum wpa_states state)
 {

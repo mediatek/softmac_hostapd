@@ -16,6 +16,7 @@
 #include "crypto/sha512.h"
 #include "crypto/aes_wrap.h"
 #include "crypto/crypto.h"
+#include "crypto/random.h"
 #include "ieee802_11_defs.h"
 #include "ieee802_11_common.h"
 #include "defs.h"
@@ -4280,14 +4281,41 @@ void wpa_pasn_build_auth_header(struct wpabuf *buf, const u8 *bssid,
 }
 
 
+#ifdef CONFIG_TESTING_OPTIONS
+int wpa_rsne_inject_random_pmkids(u8 **pos, unsigned int count)
+{
+	unsigned int i;
+
+	wpa_printf(MSG_INFO, "TESTING: Inject %u random PMKID(s) into RSNE",
+		   count);
+	WPA_PUT_LE16(*pos, count);
+	*pos += 2;
+	for (i = 0; i < count; i++) {
+		if (random_get_bytes(*pos, PMKID_LEN) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "TESTING: Failed to generate random PMKID");
+			return -1;
+		}
+		wpa_hexdump(MSG_DEBUG, "TESTING: Random PMKID",
+			    *pos, PMKID_LEN);
+		*pos += PMKID_LEN;
+	}
+	return 0;
+}
+#endif /* CONFIG_TESTING_OPTIONS */
+
+
 /*
  * wpa_pasn_add_rsne - Add an RSNE for PASN authentication
  * @buf: Buffer in which the IE will be added
  * @pmkid: Optional PMKID. Can be NULL.
  * @akmp: Authentication and key management protocol
  * @cipher: The cipher suite
+ * @random_pmkid_count: Number of random PMKIDs to add; only for testing
+ * purposes
  */
-int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid, int akmp, int cipher)
+int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid, int akmp, int cipher,
+		      unsigned int random_pmkid_count)
 {
 	struct rsn_ie_hdr *hdr;
 	u32 suite;
@@ -4300,6 +4328,8 @@ int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid, int akmp, int cipher)
 	rsne_len = sizeof(*hdr) + RSN_SELECTOR_LEN +
 		2 + RSN_SELECTOR_LEN + 2 + RSN_SELECTOR_LEN +
 		2 + RSN_SELECTOR_LEN + 2 + (pmkid ? PMKID_LEN : 0);
+	if (!pmkid && random_pmkid_count > 0)
+		rsne_len += 2 + random_pmkid_count * PMKID_LEN;
 
 	if (wpabuf_tailroom(buf) < rsne_len)
 		return -1;
@@ -4373,6 +4403,12 @@ int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid, int akmp, int cipher)
 	WPA_PUT_LE16(pos, capab);
 	pos += 2;
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!pmkid && random_pmkid_count > 0) {
+		if (wpa_rsne_inject_random_pmkids(&pos, random_pmkid_count) < 0)
+			return -1;
+	} else
+#endif /* CONFIG_TESTING_OPTIONS */
 	if (pmkid) {
 		wpa_printf(MSG_DEBUG, "PASN: Adding PMKID");
 

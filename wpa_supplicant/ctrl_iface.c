@@ -9214,6 +9214,8 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	wpa_s->dpp_discard_public_action = 0;
 	dpp_test = DPP_TEST_DISABLED;
 #endif /* CONFIG_DPP */
+	wpa_sm_set_test_random_pmkid_count(wpa_s->wpa, 0);
+	wpa_s->pasn.test_random_pmkid_count = 0;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	wpa_s->disconnected = 0;
@@ -14343,6 +14345,18 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "TEST_ASSOC_IE ", 14) == 0) {
 		if (wpas_ctrl_test_assoc_ie(wpa_s, buf + 14) < 0)
 			reply_len = -1;
+	} else if (os_strncmp(buf, "TEST_RANDOM_PMKID_COUNT ", 24) == 0) {
+		int count = atoi(buf + 24);
+
+		if (count < 0 || count > 10) {
+			wpa_printf(MSG_INFO,
+				   "TESTING: Invalid random PMKID count %d (valid range: 0-10)",
+				   count);
+			reply_len = -1;
+		} else {
+			wpa_sm_set_test_random_pmkid_count(wpa_s->wpa, count);
+			wpa_s->pasn.test_random_pmkid_count = count;
+		}
 	} else if (os_strncmp(buf, "TEST_EAPOL_M2_ELEMS ", 20) == 0) {
 		if (wpas_ctrl_test_eapol_m2_elems(wpa_s, buf + 20) < 0)
 			reply_len = -1;

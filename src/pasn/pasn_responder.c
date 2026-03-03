@@ -362,7 +362,7 @@ static struct wpabuf * pasn_get_fils_wd(struct pasn_data *pasn)
 	wpabuf_put_le16(buf, WLAN_STATUS_SUCCESS);
 
 	/* Own RSNE */
-	wpa_pasn_add_rsne(buf, NULL, pasn->akmp, pasn->cipher);
+	wpa_pasn_add_rsne(buf, NULL, pasn->akmp, pasn->cipher, 0);
 
 	/* FILS Nonce */
 	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
@@ -648,7 +648,7 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 #endif /* CONFIG_ENC_ASSOC */
 	} else {
 		if (wpa_pasn_add_rsne(buf, pmkid,
-				      pasn->akmp, pasn->cipher) < 0)
+				      pasn->akmp, pasn->cipher, 0) < 0)
 			goto fail;
 	}
 	/* No need to derive PMK if PMKSA is given */
@@ -729,7 +729,7 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 			goto fail;
 
 		if (wpa_pasn_add_rsne(rsn_buf, pmkid,
-				      pasn->akmp, pasn->cipher) < 0)
+				      pasn->akmp, pasn->cipher, 0) < 0)
 			goto fail;
 
 		rsn_ie = wpabuf_head_u8(rsn_buf);

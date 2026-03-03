@@ -138,10 +138,17 @@ int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
 	u8 *pos;
 	struct rsn_ie_hdr *hdr;
 	u32 suite;
+	size_t len;
 
-	if (rsn_ie_len < sizeof(*hdr) + RSN_SELECTOR_LEN +
-	    2 + RSN_SELECTOR_LEN + 2 + RSN_SELECTOR_LEN + 2 +
-	    (sm->cur_pmksa ? 2 + PMKID_LEN : 0)) {
+	len = sizeof(*hdr) + RSN_SELECTOR_LEN +
+		2 + RSN_SELECTOR_LEN + 2 + RSN_SELECTOR_LEN + 2;
+	if (sm->cur_pmksa)
+		len += 2 + PMKID_LEN;
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!sm->cur_pmksa && wpa_sm_test_random_pmkid_count(sm) > 0)
+		len += 2 + wpa_sm_test_random_pmkid_count(sm) * PMKID_LEN;
+#endif /* CONFIG_TESTING_OPTIONS */
+	if (rsn_ie_len < len) {
 		wpa_printf(MSG_DEBUG, "RSN: Too short IE buffer (%lu bytes)",
 			   (unsigned long) rsn_ie_len);
 		return -1;
@@ -249,6 +256,13 @@ int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
 	WPA_PUT_LE16(pos, rsn_supp_capab(sm));
 	pos += 2;
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!sm->cur_pmksa && wpa_sm_test_random_pmkid_count(sm) > 0 &&
+	    wpa_rsne_inject_random_pmkids(
+		    &pos, wpa_sm_test_random_pmkid_count(sm)) < 0)
+		return -1;
+#endif /* CONFIG_TESTING_OPTIONS */
+
 	if (sm->cur_pmksa) {
 		/* PMKID Count (2 octets, little endian) */
 		*pos++ = 1;
@@ -259,7 +273,7 @@ int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
 	}
 
 	if (wpa_cipher_valid_mgmt_group(mgmt_group_cipher)) {
-		if (!sm->cur_pmksa) {
+		if (!sm->cur_pmksa && !wpa_sm_test_random_pmkid_count(sm)) {
 			/* PMKID Count */
 			WPA_PUT_LE16(pos, 0);
 			pos += 2;
@@ -304,6 +318,7 @@ int wpa_gen_wpa_ie(struct wpa_sm *sm, u8 *wpa_ie, size_t wpa_ie_len)
 
 /*
  * wpa_external_auth_add_rsne - Build an RSNE for external authentication
+ * @sm: Pointer to WPA state machine data from wpa_sm_init()
  * @rsne: Buffer in which the RSNE will be written
  * @rsne_len: Length of the RSNE buffer
  * @akmp: Authentication and key management protocol
@@ -314,22 +329,32 @@ int wpa_gen_wpa_ie(struct wpa_sm *sm, u8 *wpa_ie, size_t wpa_ie_len)
  * @pmkid: PMKID to include in the RSNE, or %NULL if no PMKID
  * Returns: Length of the RSNE or -1 on failure
  */
-int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
-			       int pairwise_cipher, int group_cipher,
+int wpa_external_auth_add_rsne(struct wpa_sm *sm, u8 *rsne, size_t rsne_len,
+			       int akmp, int pairwise_cipher, int group_cipher,
 			       int group_mgmt_cipher, u16 rsn_capab,
 			       const u8 *pmkid)
 {
 	struct rsn_ie_hdr *hdr;
 	u32 suite;
 	u8 *pos;
+	size_t len;
 
 	wpa_printf(MSG_DEBUG, "RSN: Ext-Auth: Build RSNE");
 
-	if (rsne_len < sizeof(*hdr) + RSN_SELECTOR_LEN +
-	    2 + RSN_SELECTOR_LEN + 2 + RSN_SELECTOR_LEN + 2 +
-	    (pmkid ? 2 + PMKID_LEN : 0) +
-	    (wpa_cipher_valid_mgmt_group(group_mgmt_cipher) ?
-	    (RSN_SELECTOR_LEN + (!pmkid ? 2 : 0)) : 0)) {
+	len = sizeof(*hdr) + RSN_SELECTOR_LEN +
+		2 + RSN_SELECTOR_LEN + 2 + RSN_SELECTOR_LEN + 2;
+	if (pmkid)
+		len += 2 + PMKID_LEN;
+	if (wpa_cipher_valid_mgmt_group(group_mgmt_cipher)) {
+		len += RSN_SELECTOR_LEN;
+		if (!pmkid && !wpa_sm_test_random_pmkid_count(sm))
+			len += 2;
+	}
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!pmkid && wpa_sm_test_random_pmkid_count(sm) > 0)
+		len += 2 + wpa_sm_test_random_pmkid_count(sm) * PMKID_LEN;
+#endif /* CONFIG_TESTING_OPTIONS */
+	if (rsne_len < len) {
 		wpa_printf(MSG_DEBUG, "Ext-Auth: Too short RSNE buffer (%lu bytes)",
 			   (unsigned long) rsne_len);
 		return -1;
@@ -381,6 +406,13 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
 	WPA_PUT_LE16(pos, rsn_capab);
 	pos += 2;
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (!pmkid && wpa_sm_test_random_pmkid_count(sm) > 0 &&
+	    wpa_rsne_inject_random_pmkids(
+		    &pos, wpa_sm_test_random_pmkid_count(sm)) < 0)
+		return -1;
+#endif /* CONFIG_TESTING_OPTIONS */
+
 	if (pmkid) {
 		wpa_printf(MSG_DEBUG, "RSN: Ext-Auth: Adding PMKID");
 		/* PMKID Count (2 octets, little endian) */
@@ -393,7 +425,7 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
 
 	/* Group Management Cipher Suite */
 	if (wpa_cipher_valid_mgmt_group(group_mgmt_cipher)) {
-		if (!pmkid) {
+		if (!pmkid && !wpa_sm_test_random_pmkid_count(sm)) {
 			/* PMKID Count */
 			WPA_PUT_LE16(pos, 0);
 			pos += 2;

@@ -148,6 +148,12 @@ struct pasn_data {
 	 * frame for group negotiation testing.
 	 */
 	const int *pasn_test_groups;
+
+	/*
+	 * Number of random PMKIDs to inject into the RSNE when no valid
+	 * PMKSA is available.
+	 */
+	unsigned int test_random_pmkid_count;
 #endif /* CONFIG_TESTING_OPTIONS */
 	int network_id;
 	void *network_ctx;
@@ -367,6 +373,15 @@ int pasn_add_encrypted_data(struct pasn_data *pasn, struct wpabuf *buf,
 			    const u8 *data, size_t data_len);
 int pasn_parse_encrypted_data(struct pasn_data *pasn, const u8 *data,
 			      size_t len);
+
+static inline unsigned int pasn_get_test_random_pmkid(struct pasn_data *pasn)
+{
+#ifdef CONFIG_TESTING_OPTIONS
+	return pasn ? pasn->test_random_pmkid_count : 0;
+#else /* CONFIG_TESTING_OPTIONS */
+	return 0;
+#endif /* CONFIG_TESTING_OPTIONS */
+}
 
 #ifdef __cplusplus
 }

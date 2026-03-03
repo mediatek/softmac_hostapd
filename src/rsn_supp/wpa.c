@@ -6241,6 +6241,16 @@ const u8 * wpa_sm_get_anonce(struct wpa_sm *sm)
 	return sm->anonce;
 }
 
+
+void wpa_sm_set_test_random_pmkid_count(struct wpa_sm *sm, unsigned int count)
+{
+	if (!sm)
+		return;
+	wpa_printf(MSG_DEBUG,
+		   "TESTING: Set random PMKID injection count to %u", count);
+	sm->test_random_pmkid_count = count;
+}
+
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
