@@ -16,6 +16,7 @@
 #include "common/ieee802_11_common.h"
 #include "common/ocv.h"
 #include "common/ptksa_cache.h"
+#include "crypto/crypto.h"
 #include "eapol_supp/eapol_supp_sm.h"
 #include "common/wpa_common.h"
 #include "common/sae.h"
