@@ -2847,6 +2847,11 @@ static int __ieee802_11_set_beacon(struct hostapd_data *hapd)
 	}
 #endif /* CONFIG_IEEE80211AX */
 
+	if (iface->cac_started) {
+		wpa_printf(MSG_DEBUG, "Ignore set beacons during CAC period");
+		return 0;
+	}
+
 	hapd->beacon_set_done = 1;
 
 	if (ieee802_11_build_ap_params(hapd, &params) < 0)

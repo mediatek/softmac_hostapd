@@ -1132,6 +1132,8 @@ int hostapd_parse_freq_params(const char *pos,
 			      struct hostapd_freq_params *params,
 			      unsigned int freq)
 {
+	int ret;
+
 	os_memset(params, 0, sizeof(*params));
 
 	if (freq)
@@ -1139,7 +1141,8 @@ int hostapd_parse_freq_params(const char *pos,
 	else
 		params->freq = atoi(pos);
 
-	if (params->freq == 0) {
+	ret = ieee80211_freq_to_chan(params->freq, (u8 *)&params->channel);
+	if (ret == NUM_HOSTAPD_MODES) {
 		wpa_printf(MSG_ERROR, "freq_params: invalid freq provided");
 		return -1;
 	}

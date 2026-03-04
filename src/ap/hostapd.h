@@ -696,6 +696,10 @@ struct hostapd_iface {
 		unsigned int expand_ch:1;
 		int new_chwidth;
 		bool max_bw80;
+		/* backup the original primary channel when background radar
+		 * requires a two step CAC for 160 MHz
+		 */
+		int primary_backup;
 	} radar_background;
 
 	u16 hw_flags;
@@ -900,8 +904,6 @@ void hostapd_chan_switch_config(struct hostapd_data *hapd,
 				struct hostapd_freq_params *freq_params);
 int hostapd_switch_channel(struct hostapd_data *hapd,
 			   struct csa_settings *settings);
-int hostapd_force_channel_switch(struct hostapd_iface *iface,
-				 struct csa_settings *settings);
 int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count);
 void
 hostapd_switch_channel_fallback(struct hostapd_iface *iface,
