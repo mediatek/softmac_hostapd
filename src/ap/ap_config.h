@@ -995,6 +995,7 @@ struct hostapd_bss_config {
 
 	bool epcs_disabled;
 	bool robust_av_scs_disabled;
+	bool eht_rtwt_disabled;
 #ifdef CONFIG_TESTING_OPTIONS
 	/*
 	 * If set indicate the AP as disabled in the RNR element included in the
@@ -1003,6 +1004,9 @@ struct hostapd_bss_config {
 	bool mld_indicate_disabled;
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
+#ifdef CONFIG_IEEE80211AX
+	bool he_btwt_disabled;
+#endif
 	int mbssid_index;
 
 	bool spp_amsdu;

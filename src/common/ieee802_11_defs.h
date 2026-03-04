@@ -2629,6 +2629,8 @@ struct ieee80211_spatial_reuse {
 /* HE Capabilities Information defines */
 
 #define HE_MACCAP_TWT_RESPONDER			((u8) BIT(2))
+#define HE_MACCAP_BROADCAST_TWT_SUPPORT_IDX	2
+#define HE_MACCAP_BROADCAST_TWT_SUPPORT		((u8) BIT(4))
 
 #define HE_PHYCAP_CHANNEL_WIDTH_SET_IDX		0
 #define HE_PHYCAP_CHANNEL_WIDTH_MASK		((u8) (BIT(1) | BIT(2) | \

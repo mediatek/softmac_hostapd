@@ -631,6 +631,8 @@ struct hostapd_mld {
 
 	bool epcs_disabled;
 	bool robust_av_scs_disabled;
+	bool he_btwt_disabled;
+	bool eht_rtwt_disabled;
 };
 
 #define HOSTAPD_MLD_MAX_REF_COUNT      0xFF

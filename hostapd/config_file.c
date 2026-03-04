@@ -4045,6 +4045,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		conf->mu_onoff = val;
+	} else if (os_strcmp(buf, "he_btwt_disabled") == 0) {
+		bss->he_btwt_disabled = !!atoi(pos);
 #endif /* CONFIG_IEEE80211AX */
 	} else if (os_strcmp(buf, "max_listen_interval") == 0) {
 		bss->max_listen_interval = atoi(pos);
@@ -5274,6 +5276,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		conf->neg_ttlm_support_mode = atoi(pos);
 	} else if (os_strcmp(buf, "robust_av_scs_disabled") == 0) {
 		bss->robust_av_scs_disabled = !!atoi(pos);
+	} else if (os_strcmp(buf, "eht_rtwt_disabled") == 0) {
+		bss->eht_rtwt_disabled = !!atoi(pos);
 #ifdef CONFIG_TESTING_OPTIONS
 	} else if (os_strcmp(buf, "eht_oper_puncturing_override") == 0) {
 		if (get_u16(pos, line, &bss->eht_oper_puncturing_override))
