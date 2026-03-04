@@ -948,6 +948,9 @@ endif
 endif
 
 ifdef CONFIG_SAE
+ifdef CONFIG_IEEE80211BE
+NEED_SHA384=y
+endif
 ifdef NEED_SHA384
 # Need to add HMAC-SHA384 KDF as well, if SHA384 was enabled.
 NEED_HMAC_SHA384_KDF=y
