@@ -462,8 +462,10 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	control = MULTI_LINK_CONTROL_TYPE_BASIC |
 		BASIC_MULTI_LINK_CTRL_PRES_LINK_ID |
 		BASIC_MULTI_LINK_CTRL_PRES_BSS_PARAM_CH_COUNT |
-		BASIC_MULTI_LINK_CTRL_PRES_EML_CAPA |
 		BASIC_MULTI_LINK_CTRL_PRES_MLD_CAPA;
+
+	if (!hapd->mld->eml_disable)
+		control |= BASIC_MULTI_LINK_CTRL_PRES_EML_CAPA;
 
 	/*
 	 * Set the basic Multi-Link common information. Hard code the common
@@ -473,6 +475,9 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	 * MLD Capabilities and Operations (2)
 	 */
 	common_info_len = EHT_ML_COMMON_INFO_LEN;
+
+	if (hapd->mld->eml_disable)
+		common_info_len -= 2; /* EML Capabilities (2) */
 
 	if (include_mld_id) {
 		/* AP MLD ID */
@@ -502,12 +507,14 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	 * per IEEE Std 802.11be-2024, 9.4.2.322.2.3 (Common Info field of the
 	 * Basic Multi-Link element).
 	 */
-	mld_eml_capa = hapd->iface->mld_eml_capa &
-		~(EHT_ML_EML_CAPA_EMLSR_TRANS_DELAY_MASK |
-		  EHT_ML_EML_CAPA_EMLSR_PADDING_DELAY_MASK);
+	if (!hapd->mld->eml_disable) {
+		mld_eml_capa = hapd->iface->mld_eml_capa &
+					~(EHT_ML_EML_CAPA_EMLSR_TRANS_DELAY_MASK |
+					  EHT_ML_EML_CAPA_EMLSR_PADDING_DELAY_MASK);
 
-	wpa_printf(MSG_DEBUG, "MLD: EML Capabilities=0x%x", mld_eml_capa);
-	wpabuf_put_le16(buf, mld_eml_capa);
+		wpa_printf(MSG_DEBUG, "MLD: EML Capabilities=0x%x", mld_eml_capa);
+		wpabuf_put_le16(buf, mld_eml_capa);
+	}
 
 	mld_cap = hapd->iface->mld_mld_capa;
 	max_simul_links = mld_cap & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
@@ -863,6 +870,9 @@ static size_t hostapd_eid_eht_ml_len(struct hostapd_data *hapd,
 	size_t len = 0;
 	size_t eht_ml_len = 2 + EHT_ML_COMMON_INFO_LEN;
 	u8 link_id;
+
+	if (hapd->mld->eml_disable)
+		eht_ml_len -= 2; /* EML Capabilities (2) */
 
 	if (include_mld_id)
 		eht_ml_len++;
@@ -2851,12 +2861,17 @@ void ieee802_11_rx_protected_eht_action(struct hostapd_data *hapd,
 {
 	const u8 *payload;
 	u8 action;
+	size_t plen;
 
 	if (!hapd->conf->mld_ap)
 		return;
 
+	if (len < IEEE80211_HDRLEN + 2)
+		return;
+
 	payload = ((const u8 *) mgmt) + IEEE80211_HDRLEN + 1;
 	action = *payload++;
+	plen = len - IEEE80211_HDRLEN - 2;
 
 	switch (action) {
 	case WLAN_PROT_EHT_LINK_RECONFIG_REQUEST:
