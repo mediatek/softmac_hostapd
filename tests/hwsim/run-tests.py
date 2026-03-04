@@ -11,6 +11,7 @@ import re
 import gc
 import sys
 import time
+import glob
 from datetime import datetime
 import argparse
 import subprocess
@@ -159,6 +160,36 @@ class DataCollector(object):
             self._trace_cmd.stdin.write(b'DONE\n')
             self._trace_cmd.stdin.flush()
             self._trace_cmd.wait()
+
+        pcap = os.path.join(self._logdir, f'{self._testname}.hwsim0.pcapng')
+        if os.path.exists(pcap):
+            found_key = False
+            pmks_name = os.path.join(self._logdir, f'{self._testname}.pmks')
+            ptks_name = os.path.join(self._logdir, f'{self._testname}.ptks')
+            with open(pmks_name, 'wb') as pmks, \
+                 open(ptks_name, 'wb') as ptks:
+                logs = os.path.join(self._logdir, f'{self._testname}.*')
+                for f in glob.glob(logs):
+                    if f.endswith('.pcapng'): continue
+                    with open(f, 'rb') as logfile:
+                        for line in logfile:
+                            if b'PTK - hexdump' in line:
+                                ptks.write(line.split(b':')[-1].replace(b' ', b''))
+                                found_key = True
+                            if b'PMK - hexdump' in line:
+                                pmks.write(line.split(b':')[-1].replace(b' ', b''))
+                                found_key = True
+
+            if found_key:
+                out_pcap = os.path.join(self._logdir, f'{self._testname}.hwsim0.dec.pcapng')
+                if os.path.isfile('../../wlantest/wlantest'):
+                    wlantest_bin = '../../wlantest/wlantest'
+                else:
+                    wlantest_bin = 'wlantest'
+                with open(os.path.join(self._logdir, f'{self._testname}.dec.log'), 'w') as dec_log:
+                    subprocess.run([wlantest_bin, '-r', pcap, '-f', pmks_name,
+                                    '-T', ptks_name, '-n', out_pcap],
+                                   stdout=dec_log)
 
         if self._kmemleak:
             output = os.path.join(self._logdir, '%s.kmemleak' % (self._testname, ))
