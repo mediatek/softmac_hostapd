@@ -602,6 +602,10 @@ int add_common_radius_attr(struct hostapd_data *hapd,
 	struct hostapd_radius_attr *attr;
 	int len;
 
+	if (hapd->conf->dynamic_own_ip_addr)
+		radius_client_get_local_addr(hapd->radius,
+					     &hapd->conf->own_ip_addr);
+
 	if (!hostapd_config_get_radius_attr(req_attr,
 					    RADIUS_ATTR_NAS_IP_ADDRESS) &&
 	    hapd->conf->own_ip_addr.af == AF_INET &&
@@ -2001,6 +2005,25 @@ static int ieee802_1x_update_vlan(struct radius_msg *msg,
 }
 #endif /* CONFIG_NO_VLAN */
 
+static int ieee802_1x_update_wispr(struct hostapd_data *hapd,
+				   struct sta_info *sta,
+				   struct radius_msg *msg)
+{
+	memset(sta->bandwidth, 0, sizeof(sta->bandwidth));
+
+	if (radius_msg_get_wispr(msg, sta->bandwidth))
+		return 0;
+
+	if (!sta->bandwidth[0] && !sta->bandwidth[1])
+		return 0;
+
+	hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
+		       HOSTAPD_LEVEL_INFO,
+		       "received wispr bandwidth from RADIUS server %d/%d",
+		       sta->bandwidth[0], sta->bandwidth[1]);
+
+	return 0;
+}
 
 /**
  * ieee802_1x_receive_auth - Process RADIUS frames from Authentication Server
@@ -2117,6 +2140,7 @@ ieee802_1x_receive_auth(struct radius_msg *msg, struct radius_msg *req,
 		ieee802_1x_check_hs20(hapd, sta, msg,
 				      session_timeout_set ?
 				      (int) session_timeout : -1);
+		ieee802_1x_update_wispr(hapd, sta, msg);
 		break;
 	case RADIUS_CODE_ACCESS_REJECT:
 		sm->eap_if->aaaFail = true;
@@ -2836,6 +2860,7 @@ static const char * bool_txt(bool val)
 	return val ? "TRUE" : "FALSE";
 }
 
+#ifdef CONFIG_CTRL_IFACE_MIB
 
 int ieee802_1x_get_mib(struct hostapd_data *hapd, char *buf, size_t buflen)
 {
@@ -3022,6 +3047,7 @@ int ieee802_1x_get_mib_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	return len;
 }
 
+#endif
 
 #ifdef CONFIG_HS20
 static void ieee802_1x_wnm_notif_send(void *eloop_ctx, void *timeout_ctx)

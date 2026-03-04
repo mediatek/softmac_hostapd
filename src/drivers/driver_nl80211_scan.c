@@ -235,7 +235,7 @@ nl80211_scan_common(struct i802_bss *bss, u8 cmd,
 		wpa_printf(MSG_DEBUG, "nl80211: Passive scan requested");
 	}
 
-	if (params->extra_ies) {
+	if (params->extra_ies && drv->capa.max_scan_ie_len >= params->extra_ies_len) {
 		wpa_hexdump(MSG_MSGDUMP, "nl80211: Scan extra IEs",
 			    params->extra_ies, params->extra_ies_len);
 		if (params->extra_ies_len > drv->capa.max_probe_req_ie_len)
@@ -426,6 +426,7 @@ int wpa_driver_nl80211_scan(struct i802_bss *bss,
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "nl80211: Scan trigger failed: ret=%d "
 			   "(%s)", ret, strerror(-ret));
+
 		if (ret == -EOPNOTSUPP &&
 		    drv->hostapd && is_ap_interface(drv->nlmode)) {
 			/*

@@ -95,6 +95,7 @@ struct i802_bss {
 	u64 wdev_id;
 	char ifname[IFNAMSIZ + 1];
 	char brname[IFNAMSIZ];
+	u32 radio_mask;
 	unsigned int added_if_into_bridge:1;
 	unsigned int already_in_bridge:1;
 	unsigned int added_bridge:1;
@@ -346,7 +347,7 @@ send_and_recv_resp(struct wpa_driver_nl80211_data *drv,
 
 int nl80211_create_iface(struct wpa_driver_nl80211_data *drv,
 			 const char *ifname, enum nl80211_iftype iftype,
-			 const u8 *addr, int wds,
+			 const u8 *addr, int wds, u32 radio_mask,
 			 int (*handler)(struct nl_msg *, void *),
 			 void *arg, int use_existing);
 void nl80211_remove_iface(struct wpa_driver_nl80211_data *drv, int ifidx);
@@ -391,8 +392,6 @@ struct i802_link * nl80211_get_link(struct i802_bss *bss, s8 link_id);
 u8 nl80211_get_link_id_from_link(struct i802_bss *bss, struct i802_link *link);
 int nl80211_remove_link(struct i802_bss *bss, int link_id);
 void nl80211_update_active_links(struct i802_bss *bss, int link_id);
-int nl80211_has_ifidx(struct wpa_driver_nl80211_data *drv, int ifidx,
-		      int ifidx_reason);
 
 static inline bool nl80211_link_valid(u16 links, s8 link_id)
 {

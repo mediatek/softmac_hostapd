@@ -1377,6 +1377,35 @@ radius_msg_get_cisco_keys(struct radius_msg *msg, struct radius_msg *sent_msg,
 	return keys;
 }
 
+#define RADIUS_VENDOR_ID_WISPR	14122
+#define RADIUS_WISPR_AV_BW_UP	7
+#define RADIUS_WISPR_AV_BW_DOWN	8
+
+int
+radius_msg_get_wispr(struct radius_msg *msg, u32 *bandwidth)
+{
+	int i;
+
+	if (msg == NULL || bandwidth == NULL)
+		return 1;
+
+	for (i = 0; i < 2; i++) {
+		size_t keylen;
+		u8 *key;
+
+		key = radius_msg_get_vendor_attr(msg, RADIUS_VENDOR_ID_WISPR,
+						 RADIUS_WISPR_AV_BW_UP + i, &keylen);
+		if (!key)
+			continue;
+
+		if (keylen == 4)
+			bandwidth[i] = ntohl(*((u32 *)key));
+		os_free(key);
+	}
+
+	return 0;
+}
+
 
 int radius_msg_add_mppe_keys(struct radius_msg *msg,
 			     const u8 *req_authenticator,

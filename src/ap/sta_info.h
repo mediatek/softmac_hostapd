@@ -50,10 +50,6 @@
 #define WLAN_STA_PENDING_DEAUTH_CB BIT(30)
 #define WLAN_STA_NONERP BIT(31)
 
-/* Maximum number of supported rates (from both Supported Rates and Extended
- * Supported Rates IEs). */
-#define WLAN_SUPP_RATES_MAX 32
-
 struct hostapd_data;
 
 struct mbo_non_pref_chan_info {
@@ -102,6 +98,7 @@ struct sta_info {
 #ifdef CONFIG_ENC_ASSOC
 	bool epp_sta; /* Indicates if the station is an EPP peer */
 #endif /* CONFIG_ENC_ASSOC */
+	u32 bandwidth[2];
 
 #ifdef CONFIG_MESH
 	enum mesh_plink_state plink_state;
@@ -187,6 +184,9 @@ struct sta_info {
 	int vlan_id_bound; /* updated by ap_sta_bind_vlan() */
 	 /* PSKs from RADIUS authentication server */
 	struct hostapd_sta_wpa_psk_short *psk;
+	struct sae_pt *sae_pt;
+	int use_sta_psk;
+	int psk_idx;
 
 	char *identity; /* User-Name from RADIUS */
 	char *radius_cui; /* Chargeable-User-Identity from RADIUS */
@@ -309,6 +309,7 @@ struct sta_info {
 #endif /* CONFIG_TESTING_OPTIONS */
 #ifdef CONFIG_AIRTIME_POLICY
 	unsigned int airtime_weight;
+	unsigned int dyn_airtime_weight;
 	struct os_reltime backlogged_until;
 #endif /* CONFIG_AIRTIME_POLICY */
 
@@ -421,23 +422,8 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta);
 
 void ap_free_sta_pasn(struct hostapd_data *hapd, struct sta_info *sta);
 
-static inline bool ap_sta_is_mld(struct hostapd_data *hapd,
-				 struct sta_info *sta)
-{
-#ifdef CONFIG_IEEE80211BE
-	return hapd->conf->mld_ap && sta && sta->mld_info.mld_sta;
-#else /* CONFIG_IEEE80211BE */
-	return false;
-#endif /* CONFIG_IEEE80211BE */
-}
-
-static inline void ap_sta_set_mld(struct sta_info *sta, bool mld)
-{
-#ifdef CONFIG_IEEE80211BE
-	if (sta)
-		sta->mld_info.mld_sta = mld;
-#endif /* CONFIG_IEEE80211BE */
-}
+bool ap_sta_is_mld(struct hostapd_data *hapd, struct sta_info *sta);
+void ap_sta_set_mld(struct sta_info *sta, bool mld);
 
 void ap_sta_free_sta_profile(struct mld_info *info);
 

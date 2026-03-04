@@ -28,6 +28,7 @@
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "ctrl_iface.h"
+#include "ucode.h"
 
 /* Per-interface ctrl_iface */
 
@@ -436,6 +437,7 @@ static void wpa_supplicant_ctrl_iface_msg_cb(void *ctx, int level,
 	if (wpa_s == NULL)
 		return;
 
+	wpas_ucode_ctrl_event(wpa_s, txt, len);
 	gpriv = wpa_s->global->ctrl_iface;
 
 	if (type != WPA_MSG_NO_GLOBAL && gpriv &&

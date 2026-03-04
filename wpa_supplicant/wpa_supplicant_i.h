@@ -15,12 +15,14 @@
 #include "common/sae.h"
 #include "common/wpa_ctrl.h"
 #include "common/dpp.h"
+#include "common/ieee802_11_common.h"
 #include "crypto/sha384.h"
 #include "eapol_supp/eapol_supp_sm.h"
 #include "wps/wps_defs.h"
 #include "config_ssid.h"
 #include "wmm_ac.h"
 #include "pasn/pasn_common.h"
+#include "ucode.h"
 
 extern const char *const wpa_supplicant_version;
 extern const char *const wpa_supplicant_license;
@@ -719,6 +721,7 @@ struct wpa_supplicant {
 	unsigned char perm_addr[ETH_ALEN];
 	char ifname[100];
 	u8 hw_dfs_domain;
+	struct wpas_ucode_bss ucode;
 #ifdef CONFIG_MATCH_IFACE
 	int matched;
 #endif /* CONFIG_MATCH_IFACE */
@@ -1595,6 +1598,8 @@ struct wpa_supplicant {
 	unsigned int enabled_4addr_mode:1;
 	unsigned int multi_bss_support:1;
 	unsigned int drv_authorized_port:1;
+
+	struct multi_ap_params multi_ap;
 	unsigned int multi_ap_ie:1;
 	unsigned int multi_ap_backhaul:1;
 	unsigned int multi_ap_fronthaul:1;

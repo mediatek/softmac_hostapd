@@ -332,6 +332,10 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 #endif /* CONFIG_OWE */
 	bool updated = false;
 	bool driver_acl;
+	struct hostapd_ubus_request req = {
+		.type = HOSTAPD_UBUS_ASSOC_REQ,
+		.addr = addr,
+	};
 
 #ifdef CONFIG_P2P
 	if (hapd->p2p_group && (!hapd->started || hapd->disabled)) {
@@ -526,6 +530,12 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 		}
 	}
 #endif /* CONFIG_IEEE80211BE */
+
+	if (hostapd_ubus_handle_event(hapd, &req)) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR " assoc rejected by ubus handler.\n",
+			   MAC2STR(req.addr));
+		goto fail;
+	}
 
 #ifdef CONFIG_P2P
 	if (elems.p2p) {
@@ -1424,6 +1434,7 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 
 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED
 			"freq=%d dfs=%d", freq, is_dfs);
+		hostapd_ubus_notify_csa(hapd, freq);
 	} else if (hapd->iface->drv_flags & WPA_DRIVER_FLAGS_DFS_OFFLOAD) {
 		/* Complete AP configuration for the first bring up. */
 		if (is_dfs0 > 0 &&
@@ -2580,8 +2591,8 @@ static void hostapd_mld_iface_disable(struct hostapd_data *hapd)
 #endif /* CONFIG_IEEE80211BE */
 
 
-void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
-			  union wpa_event_data *data)
+void hostapd_wpa_event(void *ctx, enum wpa_event_type event,
+		       union wpa_event_data *data)
 {
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta;
@@ -2943,7 +2954,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 }
 
 
-void wpa_supplicant_event_global(void *ctx, enum wpa_event_type event,
+void hostapd_wpa_event_global(void *ctx, enum wpa_event_type event,
 				 union wpa_event_data *data)
 {
 	struct hapd_interfaces *interfaces = ctx;

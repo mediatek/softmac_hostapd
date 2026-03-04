@@ -1,6 +1,7 @@
 ALL=hostapd hostapd_cli
 CONFIG_FILE = .config
 
+-include $(if $(MULTICALL), ../wpa_supplicant/.config)
 include ../src/build.rules
 
 ifdef LIBS
@@ -61,6 +62,10 @@ endif
 
 OBJS += main.o
 OBJS += config_file.o
+
+ifdef CONFIG_RADIUS_SERVER
+OBJS += radius.o
+endif
 
 OBJS += ../src/ap/hostapd.o
 OBJS += ../src/ap/wpa_auth_glue.o
@@ -166,6 +171,24 @@ OBJS += ../src/common/hw_features_common.o
 
 OBJS += ../src/eapol_auth/eapol_auth_sm.o
 
+ifdef CONFIG_UBUS
+CFLAGS += -DUBUS_SUPPORT
+OBJS += ../src/ap/ubus.o
+LIBS += -lubus
+NEED_ULOOP:=y
+endif
+
+ifdef CONFIG_UCODE
+CFLAGS += -DUCODE_SUPPORT
+OBJS += ../src/utils/ucode.o
+OBJS += ../src/ap/ucode.o
+NEED_ULOOP:=y
+endif
+
+ifdef NEED_ULOOP
+OBJS += ../src/utils/uloop.o
+LIBS += -lubox
+endif
 
 ifdef CONFIG_CODE_COVERAGE
 CFLAGS += -O0 -fprofile-arcs -ftest-coverage -U_FORTIFY_SOURCE
@@ -200,7 +223,8 @@ endif
 
 ifdef CONFIG_NO_VLAN
 CFLAGS += -DCONFIG_NO_VLAN
-else
+endif
+ifneq ($(findstring CONFIG_NO_VLAN,$(CFLAGS)), CONFIG_NO_VLAN)
 OBJS += ../src/ap/vlan_init.o
 OBJS += ../src/ap/vlan_ifconfig.o
 OBJS += ../src/ap/vlan.o
@@ -220,6 +244,9 @@ endif
 ifdef CONFIG_NO_CTRL_IFACE
 CFLAGS += -DCONFIG_NO_CTRL_IFACE
 else
+ifdef CONFIG_CTRL_IFACE_MIB
+CFLAGS += -DCONFIG_CTRL_IFACE_MIB
+endif
 ifeq ($(CONFIG_CTRL_IFACE), udp)
 CFLAGS += -DCONFIG_CTRL_IFACE_UDP
 else
@@ -360,10 +387,14 @@ CFLAGS += -DCONFIG_MBO
 OBJS += ../src/ap/mbo_ap.o
 endif
 
+ifndef MULTICALL
+CFLAGS += -DNO_SUPPLICANT
+endif
+
 include ../src/drivers/drivers.mak
-OBJS += $(DRV_AP_OBJS)
-CFLAGS += $(DRV_AP_CFLAGS)
-LDFLAGS += $(DRV_AP_LDFLAGS)
+OBJS += $(sort $(DRV_AP_OBJS) $(if $(MULTICALL),$(DRV_WPA_OBJS)))
+CFLAGS += $(DRV_AP_CFLAGS) $(if $(MULTICALL),$(DRV_WPA_CFLAGS))
+LDFLAGS += $(DRV_AP_LDFLAGS) $(if $(MULTICALL),$(DRV_WPA_LDFLAGS))
 LIBS += $(DRV_AP_LIBS)
 
 ifdef CONFIG_L2_PACKET
@@ -714,6 +745,7 @@ CFLAGS += -DCONFIG_TLSV12
 endif
 
 ifeq ($(CONFIG_TLS), wolfssl)
+CFLAGS += -DCONFIG_TLS_WOLFSSL
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
 CONFIG_CRYPTO=wolfssl
 ifdef TLS_FUNCS
@@ -735,6 +767,7 @@ endif
 endif
 
 ifeq ($(CONFIG_TLS), openssl)
+CFLAGS += -DCONFIG_TLS_OPENSSL
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
 CONFIG_CRYPTO=openssl
 ifdef TLS_FUNCS
@@ -764,7 +797,39 @@ endif
 CFLAGS += -DTLS_DEFAULT_CIPHERS=\"$(CONFIG_TLS_DEFAULT_CIPHERS)\"
 endif
 
+ifeq ($(CONFIG_TLS), mbedtls)
+CFLAGS += -DCONFIG_TLS_MBEDTLS
+ifndef CONFIG_CRYPTO
+CONFIG_CRYPTO=mbedtls
+endif
+ifdef TLS_FUNCS
+OBJS += ../src/crypto/tls_mbedtls.o
+LIBS += -lmbedtls
+ifndef CONFIG_DPP
+LIBS += -lmbedx509
+endif
+endif
+OBJS += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
+HOBJS += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
+SOBJS += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
+ifeq ($(CONFIG_CRYPTO), mbedtls)
+ifdef CONFIG_DPP
+LIBS += -lmbedx509
+LIBS_h += -lmbedx509
+LIBS_n += -lmbedx509
+LIBS_s += -lmbedx509
+endif
+LIBS += -lmbedcrypto
+LIBS_h += -lmbedcrypto
+LIBS_n += -lmbedcrypto
+LIBS_s += -lmbedcrypto
+# XXX: create a config option?
+CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
+endif
+endif
+
 ifeq ($(CONFIG_TLS), gnutls)
+CFLAGS += -DCONFIG_TLS_GNUTLS
 ifndef CONFIG_CRYPTO
 # default to libgcrypt
 CONFIG_CRYPTO=gnutls
@@ -795,6 +860,7 @@ endif
 endif
 
 ifeq ($(CONFIG_TLS), internal)
+CFLAGS += -DCONFIG_TLS_INTERNAL
 ifndef CONFIG_CRYPTO
 CONFIG_CRYPTO=internal
 endif
@@ -873,6 +939,7 @@ endif
 endif
 
 ifeq ($(CONFIG_TLS), linux)
+CFLAGS += -DCONFIG_TLS_INTERNAL
 OBJS += ../src/crypto/crypto_linux.o
 ifdef TLS_FUNCS
 OBJS += ../src/crypto/crypto_internal-rsa.o
@@ -943,7 +1010,9 @@ endif
 
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 AESOBJS += ../src/crypto/aes-wrap.o
+endif
 endif
 endif
 ifdef NEED_AES_EAX
@@ -955,15 +1024,21 @@ AESOBJS += ../src/crypto/aes-siv.o
 NEED_AES_CTR=y
 endif
 ifdef NEED_AES_CTR
+ifneq ($(CONFIG_TLS), mbedtls)
 AESOBJS += ../src/crypto/aes-ctr.o
 endif
+endif
 ifdef NEED_AES_ENCBLOCK
+ifneq ($(CONFIG_TLS), mbedtls)
 AESOBJS += ../src/crypto/aes-encblock.o
+endif
 endif
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 AESOBJS += ../src/crypto/aes-omac1.o
+endif
 endif
 endif
 endif
@@ -971,8 +1046,10 @@ ifdef NEED_AES_UNWRAP
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 NEED_AES_DEC=y
 AESOBJS += ../src/crypto/aes-unwrap.o
+endif
 endif
 endif
 endif
@@ -982,7 +1059,9 @@ NEED_AES_DEC=y
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 AESOBJS += ../src/crypto/aes-cbc.o
+endif
 endif
 endif
 endif
@@ -1001,12 +1080,16 @@ ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), gnutls)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 SHA1OBJS += ../src/crypto/sha1.o
 endif
 endif
 endif
 endif
+endif
+ifneq ($(CONFIG_TLS), mbedtls)
 SHA1OBJS += ../src/crypto/sha1-prf.o
+endif
 ifdef CONFIG_INTERNAL_SHA1
 SHA1OBJS += ../src/crypto/sha1-internal.o
 ifdef NEED_FIPS186_2_PRF
@@ -1015,14 +1098,20 @@ endif
 endif
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 SHA1OBJS += ../src/crypto/sha1-pbkdf2.o
 endif
 endif
+endif
 ifdef NEED_T_PRF
+ifneq ($(CONFIG_TLS), mbedtls)
 SHA1OBJS += ../src/crypto/sha1-tprf.o
 endif
+endif
 ifdef NEED_TLS_PRF
+ifneq ($(CONFIG_TLS), mbedtls)
 SHA1OBJS += ../src/crypto/sha1-tlsprf.o
+endif
 endif
 endif
 
@@ -1034,7 +1123,9 @@ ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), gnutls)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/md5.o
+endif
 endif
 endif
 endif
@@ -1088,29 +1179,46 @@ ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), gnutls)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha256.o
 endif
 endif
 endif
 endif
+endif
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha256-prf.o
+endif
 ifdef CONFIG_INTERNAL_SHA256
 OBJS += ../src/crypto/sha256-internal.o
 endif
 ifdef NEED_TLS_PRF_SHA256
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha256-tlsprf.o
 endif
+endif
 ifdef NEED_TLS_PRF_SHA384
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha384-tlsprf.o
 endif
+endif
 ifdef NEED_HMAC_SHA256_KDF
+CFLAGS += -DCONFIG_HMAC_SHA256_KDF
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha256-kdf.o
 endif
+endif
 ifdef NEED_HMAC_SHA384_KDF
+CFLAGS += -DCONFIG_HMAC_SHA384_KDF
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha384-kdf.o
 endif
+endif
 ifdef NEED_HMAC_SHA512_KDF
+CFLAGS += -DCONFIG_HMAC_SHA512_KDF
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha512-kdf.o
+endif
 endif
 ifdef NEED_SHA384
 CFLAGS += -DCONFIG_SHA384
@@ -1118,12 +1226,16 @@ ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), gnutls)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha384.o
 endif
 endif
 endif
 endif
+endif
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha384-prf.o
+endif
 endif
 ifdef NEED_SHA512
 CFLAGS += -DCONFIG_SHA512
@@ -1131,12 +1243,16 @@ ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), gnutls)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha512.o
 endif
 endif
 endif
 endif
+endif
+ifneq ($(CONFIG_TLS), mbedtls)
 OBJS += ../src/crypto/sha512-prf.o
+endif
 endif
 
 ifdef CONFIG_INTERNAL_SHA384
@@ -1182,7 +1298,9 @@ HOBJS += $(SHA1OBJS)
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
 ifneq ($(CONFIG_TLS), wolfssl)
+ifneq ($(CONFIG_TLS), mbedtls)
 HOBJS += ../src/crypto/md5.o
+endif
 endif
 endif
 endif
@@ -1321,6 +1439,11 @@ CFLAGS += -DCONFIG_PROCESS_COORDINATION
 OBJS += ../src/common/proc_coord.o
 endif
 
+ifdef CONFIG_APUP
+CFLAGS += -DCONFIG_APUP
+OBJS += ../src/ap/apup.o
+endif
+
 $(DESTDIR)$(BINDIR)/%: %
 	install -D $(<) $(@)
 
@@ -1329,8 +1452,14 @@ install: $(addprefix $(DESTDIR)$(BINDIR)/,$(ALL))
 _OBJS_VAR := OBJS
 include ../src/objs.mk
 
+hostapd_multi.a: $(BCHECK) $(OBJS)
+	$(Q)$(CC) -c -o hostapd_multi.o -Dmain=hostapd_main $(CFLAGS) main.c
+	@$(E) "  CC " $<
+	@rm -f $@
+	@$(AR) cr $@ hostapd_multi.o $(OBJS)
+
 hostapd: $(OBJS)
-	$(Q)$(CC) $(LDFLAGS) -o hostapd $(OBJS) $(LIBS)
+	+$(Q)$(CC) $(LDFLAGS) -o hostapd $(OBJS) $(LIBS)
 	@$(E) "  LD " $@
 
 ifdef CONFIG_WPA_TRACE
@@ -1341,7 +1470,7 @@ _OBJS_VAR := OBJS_c
 include ../src/objs.mk
 
 hostapd_cli: $(OBJS_c)
-	$(Q)$(CC) $(LDFLAGS) -o hostapd_cli $(OBJS_c) $(LIBS_c)
+	+$(Q)$(CC) $(LDFLAGS) -o hostapd_cli $(OBJS_c) $(LIBS_c)
 	@$(E) "  LD " $@
 
 NOBJS = nt_password_hash.o ../src/crypto/ms_funcs.o $(SHA1OBJS)
@@ -1365,7 +1494,9 @@ NOBJS += ../src/utils/trace.o
 endif
 
 HOBJS += hlr_auc_gw.o ../src/utils/common.o ../src/utils/wpa_debug.o ../src/utils/os_$(CONFIG_OS).o ../src/utils/wpabuf.o ../src/crypto/milenage.o
+ifneq ($(CONFIG_TLS), mbedtls)
 HOBJS += ../src/crypto/aes-encblock.o
+endif
 ifdef CONFIG_INTERNAL_AES
 HOBJS += ../src/crypto/aes-internal.o
 HOBJS += ../src/crypto/aes-internal-enc.o
@@ -1388,18 +1519,24 @@ SOBJS += ../src/common/sae.o
 SOBJS += ../src/common/sae_pk.o
 SOBJS += ../src/common/dragonfly.o
 SOBJS += $(AESOBJS)
+ifneq ($(CONFIG_TLS), mbedtls)
 SOBJS += ../src/crypto/sha384.o
 SOBJS += ../src/crypto/sha512.o
 SOBJS += ../src/crypto/sha256-prf.o
 SOBJS += ../src/crypto/sha384-prf.o
 SOBJS += ../src/crypto/sha512-prf.o
+endif
 SOBJS += ../src/crypto/dh_groups.o
+ifneq ($(CONFIG_TLS), mbedtls)
 SOBJS += ../src/crypto/sha256-kdf.o
 SOBJS += ../src/crypto/sha384-kdf.o
 SOBJS += ../src/crypto/sha512-kdf.o
+endif
 SOBJS += ../src/common/wpa_common.o
 SOBJS += ../src/crypto/random.o
+ifneq ($(CONFIG_TLS), mbedtls)
 SOBJS += ../src/crypto/sha1-prf.o
+endif
 SOBJS += ../src/utils/eloop.o
 
 _OBJS_VAR := NOBJS
@@ -1408,6 +1545,12 @@ _OBJS_VAR := HOBJS
 include ../src/objs.mk
 _OBJS_VAR := SOBJS
 include ../src/objs.mk
+
+dump_cflags:
+	@printf "%s " "$(CFLAGS)"
+
+dump_ldflags:
+	@printf "%s " "$(LDFLAGS) $(LIBS) $(EXTRALIBS)"
 
 nt_password_hash: $(NOBJS)
 	$(Q)$(CC) $(LDFLAGS) -o nt_password_hash $(NOBJS) $(LIBS_n)

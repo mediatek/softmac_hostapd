@@ -35,6 +35,9 @@ int hostapd_set_drv_ieee8021x(struct hostapd_data *hapd, const char *ifname,
 			      int enabled);
 int hostapd_vlan_if_add(struct hostapd_data *hapd, const char *ifname);
 int hostapd_vlan_if_remove(struct hostapd_data *hapd, const char *ifname);
+
+/** @param val as per nl80211 driver implementation, 1 means add 0 means remove
+ */
 int hostapd_set_wds_sta(struct hostapd_data *hapd, char *ifname_wds,
 			const u8 *addr, int aid, int val);
 int hostapd_sta_add(struct hostapd_data *hapd,
@@ -366,12 +369,12 @@ static inline int hostapd_drv_br_port_set_attr(struct hostapd_data *hapd,
 
 static inline int hostapd_drv_br_set_net_param(struct hostapd_data *hapd,
 					       enum drv_br_net_param param,
-					       unsigned int val)
+					       const char *ifname, unsigned int val)
 {
 	if (hapd->driver == NULL || hapd->drv_priv == NULL ||
 	    hapd->driver->br_set_net_param == NULL)
 		return -1;
-	return hapd->driver->br_set_net_param(hapd->drv_priv, param, val);
+	return hapd->driver->br_set_net_param(hapd->drv_priv, param, ifname, val);
 }
 
 static inline int hostapd_drv_vendor_cmd(struct hostapd_data *hapd,
@@ -403,6 +406,23 @@ static inline int hostapd_drv_stop_ap(struct hostapd_data *hapd)
 
 	hapd->beacon_set_done = 0;
 	return 0;
+}
+
+static inline int hostapd_drv_if_rename(struct hostapd_data *hapd,
+					enum wpa_driver_if_type type,
+					const char *ifname,
+					const char *new_name)
+{
+	if (!hapd->driver || !hapd->driver->if_rename || !hapd->drv_priv)
+		return -1;
+	return hapd->driver->if_rename(hapd->drv_priv, type, ifname, new_name);
+}
+
+static inline int hostapd_drv_set_first_bss(struct hostapd_data *hapd)
+{
+	if (!hapd->driver || !hapd->driver->set_first_bss || !hapd->drv_priv)
+		return 0;
+	return hapd->driver->set_first_bss(hapd->drv_priv);
 }
 
 static inline int hostapd_drv_channel_info(struct hostapd_data *hapd,

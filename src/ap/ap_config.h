@@ -120,6 +120,7 @@ struct hostapd_ssid {
 #define DYNAMIC_VLAN_OPTIONAL 1
 #define DYNAMIC_VLAN_REQUIRED 2
 	int dynamic_vlan;
+	int vlan_no_bridge;
 #define DYNAMIC_VLAN_NAMING_WITHOUT_DEVICE 0
 #define DYNAMIC_VLAN_NAMING_WITH_DEVICE 1
 #define DYNAMIC_VLAN_NAMING_END 2
@@ -284,6 +285,8 @@ struct airtime_sta_weight {
 struct hostapd_bss_config {
 	char iface[IFNAMSIZ + 1];
 	char bridge[IFNAMSIZ + 1];
+	char ft_iface[IFNAMSIZ + 1];
+	char snoop_iface[IFNAMSIZ + 1];
 	char vlan_bridge[IFNAMSIZ + 1];
 	char wds_bridge[IFNAMSIZ + 1];
 	int bridge_hairpin; /* hairpin_mode on bridge members */
@@ -312,6 +315,7 @@ struct hostapd_bss_config {
 	unsigned int eap_sim_db_timeout;
 	int eap_server_erp; /* Whether ERP is enabled on internal EAP server */
 	struct hostapd_ip_addr own_ip_addr;
+	int dynamic_own_ip_addr;
 	char *nas_identifier;
 	struct hostapd_radius_servers *radius;
 	int radius_require_message_authenticator;
@@ -979,6 +983,8 @@ struct hostapd_bss_config {
 	/* The AP's MLD MAC address within the AP MLD */
 	u8 mld_addr[ETH_ALEN];
 
+	s8 mld_link_id;
+
 #ifdef CONFIG_TESTING_OPTIONS
 	/*
 	 * If set indicate the AP as disabled in the RNR element included in the
@@ -995,6 +1001,35 @@ struct hostapd_bss_config {
 	unsigned int pmksa_caching_privacy:1;
 	unsigned int eap_using_authentication_frames:1;
 #endif /* CONFIG_ENC_ASSOC  */
+
+#ifdef CONFIG_APUP
+	/**
+	 * Access Point Micro Peering
+	 * A simpler and more useful successor to Ad Hoc,
+	 * Wireless Distribution System, 802.11s mesh mode, Multi-AP and EasyMesh.
+	 *
+	 * Almost plain APs communicate between them via 4-address mode, like in WDS
+	 * but all of them are AP, so they can eventually communicate also with
+	 * plain stations and more AP nodes in sight.
+	 * Low hardware requirements, just AP mode support + 4-address mode, and no
+	 * more unnecessary complications, like hardcoded bridging or routing
+	 * algorithm in WiFi stack.
+	 * For each AP in sight an interface is created, and then it can be used as
+	 * convenient in each case, bridging, routing etc.
+	 */
+	bool apup;
+
+	/**
+	 * In 4-address mode each peer AP in sight is associated to its own
+	 * interface so we have more flexibility in "user-space".
+	 * Those interfaces could be simply bridged in a trivial topology (which
+	 * happens automatically if wds_bridge is not an empty string), or feeded to
+	 * a routing daemon.
+	 *
+	 * If not defined interface names are generated following the WDS convention.
+	 */
+	char apup_peer_ifname_prefix[IFNAMSIZ + 1];
+#endif /* CONFIG_APUP */
 };
 
 /**
@@ -1080,6 +1115,8 @@ struct hostapd_config {
 	unsigned int track_sta_max_num;
 	unsigned int track_sta_max_age;
 
+	int max_num_sta;
+
 	char country[3]; /* first two octets: country code as described in
 			  * ISO/IEC 3166-1. Third octet:
 			  * ' ' (ascii 32): all environments
@@ -1117,6 +1154,8 @@ struct hostapd_config {
 
 	int ht_op_mode_fixed;
 	u16 ht_capab;
+	int noscan;
+	int no_ht_coex;
 	int ieee80211n;
 	int secondary_channel;
 	int no_pri_sec_switch;

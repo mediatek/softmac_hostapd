@@ -410,6 +410,7 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	mgmt->u.action.u.bss_tm_req.validity_interval = 1;
 	pos = mgmt->u.action.u.bss_tm_req.variable;
 
+	hapd->openwrt_stats.wnm.bss_transition_request_tx++;
 	wpa_printf(MSG_DEBUG, "WNM: Send BSS Transition Management Request to "
 		   MACSTR " dialog_token=%u req_mode=0x%x disassoc_timer=%u "
 		   "validity_interval=%u",
@@ -478,7 +479,8 @@ static void ieee802_11_rx_bss_trans_mgmt_query(struct hostapd_data *hapd,
 		MAC2STR(addr), reason, hex ? " neighbor=" : "", hex);
 	os_free(hex);
 
-	ieee802_11_send_bss_trans_mgmt_request(hapd, addr, dialog_token);
+	if (!hostapd_ubus_notify_bss_transition_query(hapd, addr, dialog_token, reason, pos, end - pos))
+		ieee802_11_send_bss_trans_mgmt_request(hapd, addr, dialog_token);
 }
 
 
@@ -500,7 +502,7 @@ static void ieee802_11_rx_bss_trans_mgmt_resp(struct hostapd_data *hapd,
 					      size_t len)
 {
 	u8 dialog_token, status_code, bss_termination_delay;
-	const u8 *pos, *end;
+	const u8 *pos, *end, *target_bssid = NULL;
 	int enabled = hapd->conf->bss_transition;
 	struct sta_info *sta;
 
@@ -547,6 +549,7 @@ static void ieee802_11_rx_bss_trans_mgmt_resp(struct hostapd_data *hapd,
 			wpa_printf(MSG_DEBUG, "WNM: not enough room for Target BSSID field");
 			return;
 		}
+		target_bssid = pos;
 		sta->agreed_to_steer = 1;
 		eloop_cancel_timeout(ap_sta_reset_steer_flag_timer, hapd, sta);
 		eloop_register_timeout(2, 0, ap_sta_reset_steer_flag_timer,
@@ -565,6 +568,10 @@ static void ieee802_11_rx_bss_trans_mgmt_resp(struct hostapd_data *hapd,
 			" status_code=%u bss_termination_delay=%u",
 			MAC2STR(addr), status_code, bss_termination_delay);
 	}
+
+	hostapd_ubus_notify_bss_transition_response(hapd, sta->addr, dialog_token,
+						    status_code, bss_termination_delay,
+						    target_bssid, pos, end - pos);
 
 	wpa_hexdump(MSG_DEBUG, "WNM: BSS Transition Candidate List Entries",
 		    pos, end - pos);
@@ -814,10 +821,12 @@ int ieee802_11_rx_wnm_action_ap(struct hostapd_data *hapd,
 					       plen);
 		return 0;
 	case WNM_BSS_TRANS_MGMT_QUERY:
+		hapd->openwrt_stats.wnm.bss_transition_query_rx++;
 		ieee802_11_rx_bss_trans_mgmt_query(hapd, mgmt->sa, payload,
 						   plen);
 		return 0;
 	case WNM_BSS_TRANS_MGMT_RESP:
+		hapd->openwrt_stats.wnm.bss_transition_response_rx++;
 		ieee802_11_rx_bss_trans_mgmt_resp(hapd, mgmt->sa, payload,
 						  plen);
 		return 0;
@@ -865,6 +874,7 @@ int wnm_send_disassoc_imminent(struct hostapd_data *hapd,
 
 	pos = mgmt->u.action.u.bss_tm_req.variable;
 
+	hapd->openwrt_stats.wnm.bss_transition_request_tx++;
 	wpa_printf(MSG_DEBUG, "WNM: Send BSS Transition Management Request frame to indicate imminent disassociation (disassoc_timer=%d) to "
 		   MACSTR, disassoc_timer, MAC2STR(sta->addr));
 	if (hostapd_drv_send_mlme(hapd, buf, pos - buf, 0, NULL, 0, 0) < 0) {
@@ -947,6 +957,7 @@ int wnm_send_ess_disassoc_imminent(struct hostapd_data *hapd,
 		return -1;
 	}
 
+	hapd->openwrt_stats.wnm.bss_transition_request_tx++;
 	if (disassoc_timer) {
 		/* send disassociation frame after time-out */
 		set_disassoc_timer(hapd, sta, disassoc_timer);
@@ -1028,6 +1039,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 	os_free(buf);
 
+	hapd->openwrt_stats.wnm.bss_transition_request_tx++;
 	if (disassoc_timer) {
 #ifdef CONFIG_IEEE80211BE
 		/* Link removal is scheduled only when the Link Removal Imminent

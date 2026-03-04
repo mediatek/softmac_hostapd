@@ -92,6 +92,7 @@ struct netlink_data * netlink_init(struct netlink_config *cfg)
 {
 	struct netlink_data *netlink;
 	struct sockaddr_nl local;
+	int size = 262144;
 
 	netlink = os_zalloc(sizeof(*netlink));
 	if (netlink == NULL)
@@ -104,6 +105,9 @@ struct netlink_data * netlink_init(struct netlink_config *cfg)
 		netlink_deinit(netlink);
 		return NULL;
 	}
+
+	setsockopt(netlink->sock, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
+	setsockopt(netlink->sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
 
 	os_memset(&local, 0, sizeof(local));
 	local.nl_family = AF_NETLINK;

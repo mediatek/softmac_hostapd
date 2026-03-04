@@ -232,6 +232,10 @@ enum {
 	RADIUS_VENDOR_ATTR_WFA_HS20_T_C_URL = 10,
 };
 
+#define RADIUS_VENDOR_ID_WISPR	14122
+#define RADIUS_WISPR_AV_BW_UP	7
+#define RADIUS_WISPR_AV_BW_DOWN	8
+
 #ifdef _MSC_VER
 #pragma pack(pop)
 #endif /* _MSC_VER */
@@ -304,6 +308,7 @@ radius_msg_get_ms_keys(struct radius_msg *msg, struct radius_msg *sent_msg,
 struct radius_ms_mppe_keys *
 radius_msg_get_cisco_keys(struct radius_msg *msg, struct radius_msg *sent_msg,
 			  const u8 *secret, size_t secret_len);
+int radius_msg_get_wispr(struct radius_msg *msg, u32 *bandwidth);
 int radius_msg_add_mppe_keys(struct radius_msg *msg,
 			     const u8 *req_authenticator,
 			     const u8 *secret, size_t secret_len,

@@ -412,6 +412,7 @@ static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 	struct hostapd_data *hapd = ctx;
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
 		MAC2STR(addr));
+	hostapd_ubus_notify(hapd, "key-mismatch", addr);
 }
 
 
@@ -483,6 +484,7 @@ static const u8 * hostapd_wpa_auth_get_psk(void *ctx, const u8 *addr,
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 	const u8 *psk;
 
+	sta->psk_idx = 0;
 	if (vlan_id)
 		*vlan_id = 0;
 	if (psk_len)
@@ -533,13 +535,18 @@ static const u8 * hostapd_wpa_auth_get_psk(void *ctx, const u8 *addr,
 	 * returned psk which should not be returned again.
 	 * logic list (all hostapd_get_psk; all sta->psk)
 	 */
+	if (sta && sta->use_sta_psk)
+		psk = NULL;
 	if (sta && sta->psk && !psk) {
 		struct hostapd_sta_wpa_psk_short *pos;
+		int psk_idx = 1;
 
 		if (vlan_id)
 			*vlan_id = 0;
 		psk = sta->psk->psk;
-		for (pos = sta->psk; pos; pos = pos->next) {
+		if (vlan_id)
+			sta->psk_idx = psk_idx;
+		for (pos = sta->psk; pos; pos = pos->next, psk_idx++) {
 			if (pos->is_passphrase) {
 				if (pbkdf2_sha1(pos->passphrase,
 						hapd->conf->ssid.ssid,
@@ -553,9 +560,13 @@ static const u8 * hostapd_wpa_auth_get_psk(void *ctx, const u8 *addr,
 			}
 			if (pos->psk == prev_psk) {
 				psk = pos->next ? pos->next->psk : NULL;
+				if (vlan_id)
+					sta->psk_idx = psk_idx + 1;
 				break;
 			}
 		}
+		if (vlan_id && !psk)
+			sta->psk_idx = 0;
 	}
 	return psk;
 }
@@ -1888,8 +1899,12 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 	    wpa_key_mgmt_ft(hapd->conf->wpa_key_mgmt)) {
 		const char *ft_iface;
 
-		ft_iface = hapd->conf->bridge[0] ? hapd->conf->bridge :
-			   hapd->conf->iface;
+		if (hapd->conf->ft_iface[0])
+			ft_iface = hapd->conf->ft_iface;
+		else if (hapd->conf->bridge[0])
+			ft_iface = hapd->conf->bridge;
+		else
+			ft_iface = hapd->conf->iface;
 		hapd->l2 = l2_packet_init(ft_iface, NULL, ETH_P_RRB,
 					  hostapd_rrb_receive, hapd, 1);
 		if (!hapd->l2) {

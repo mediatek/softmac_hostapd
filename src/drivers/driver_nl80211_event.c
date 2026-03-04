@@ -1260,6 +1260,7 @@ static void mlme_event_ch_switch(struct wpa_driver_nl80211_data *drv,
 				 struct nlattr *bw, struct nlattr *cf1,
 				 struct nlattr *cf2,
 				 struct nlattr *punct_bitmap,
+				 struct nlattr *count,
 				 int finished)
 {
 	struct i802_bss *bss;
@@ -1325,6 +1326,8 @@ static void mlme_event_ch_switch(struct wpa_driver_nl80211_data *drv,
 		data.ch_switch.cf1 = nla_get_u32(cf1);
 	if (cf2)
 		data.ch_switch.cf2 = nla_get_u32(cf2);
+	if (count)
+		data.ch_switch.count = nla_get_u32(count);
 
 	if (link) {
 		data.ch_switch.link_id = nla_get_u8(link);
@@ -2798,7 +2801,7 @@ static void nl80211_spurious_frame(struct i802_bss *bss, struct nlattr **tb,
 	event.rx_from_unknown.link_id = tb[NL80211_ATTR_MLO_LINK_ID] ?
 		nla_get_u8(tb[NL80211_ATTR_MLO_LINK_ID]) : -1;
 
-	wpa_supplicant_event(drv->ctx, EVENT_RX_FROM_UNKNOWN, &event);
+	wpa_supplicant_event(bss->ctx, EVENT_RX_FROM_UNKNOWN, &event);
 }
 
 
@@ -4331,6 +4334,7 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				     tb[NL80211_ATTR_CENTER_FREQ1],
 				     tb[NL80211_ATTR_CENTER_FREQ2],
 				     tb[NL80211_ATTR_PUNCT_BITMAP],
+				     tb[NL80211_ATTR_CH_SWITCH_COUNT],
 				     0);
 		break;
 	case NL80211_CMD_CH_SWITCH_NOTIFY:
@@ -4343,6 +4347,7 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 				     tb[NL80211_ATTR_CENTER_FREQ1],
 				     tb[NL80211_ATTR_CENTER_FREQ2],
 				     tb[NL80211_ATTR_PUNCT_BITMAP],
+				     NULL,
 				     1);
 		break;
 	case NL80211_CMD_DISCONNECT:
@@ -4565,8 +4570,6 @@ int process_global_event(struct nl_msg *msg, void *arg)
 			if (wiphy_idx_set)
 				wiphy_idx = nl80211_get_wiphy_index(bss);
 			if ((ifidx == -1 && !wiphy_idx_set && !wdev_id_set) ||
-			    (bss->br_ifindex > 0 &&
-			     nl80211_has_ifidx(drv, bss->br_ifindex, ifidx)) ||
 			    (wiphy_idx_set && wiphy_idx == wiphy_idx_rx) ||
 			    (wdev_id_set && bss->wdev_id_set &&
 			     wdev_id == bss->wdev_id)) {

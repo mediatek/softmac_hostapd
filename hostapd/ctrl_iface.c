@@ -3977,6 +3977,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 						      reply_size);
 	} else if (os_strcmp(buf, "STATUS-DRIVER") == 0) {
 		reply_len = hostapd_drv_status(hapd, reply, reply_size);
+#ifdef CONFIG_CTRL_IFACE_MIB
 	} else if (os_strcmp(buf, "MIB") == 0) {
 		reply_len = ieee802_11_get_mib(hapd, reply, reply_size);
 		if (reply_len >= 0) {
@@ -4018,6 +4019,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "STA-NEXT ", 9) == 0) {
 		reply_len = hostapd_ctrl_iface_sta_next(hapd, buf + 9, reply,
 							reply_size);
+#endif
 	} else if (os_strcmp(buf, "ATTACH") == 0) {
 		if (hostapd_ctrl_iface_attach(hapd, from, fromlen, NULL))
 			reply_len = -1;
@@ -5948,6 +5950,7 @@ try_again:
 		return -1;
 	}
 
+	interface->ctrl_iface_recv = hostapd_ctrl_iface_receive_process;
 	wpa_msg_register_cb(hostapd_ctrl_iface_msg_cb);
 
 	return 0;
@@ -6049,6 +6052,7 @@ fail:
 	os_free(fname);
 
 	interface->global_ctrl_sock = s;
+	interface->ctrl_iface_recv = hostapd_ctrl_iface_receive_process;
 	eloop_register_read_sock(s, hostapd_global_ctrl_iface_receive,
 				 interface, NULL);
 

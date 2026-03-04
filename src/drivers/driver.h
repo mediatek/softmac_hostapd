@@ -1022,6 +1022,9 @@ struct wpa_driver_associate_params {
 	 * responsible for selecting with which BSS to associate. */
 	const u8 *bssid;
 
+	unsigned char rates[WLAN_SUPP_RATES_MAX];
+	int mcast_rate;
+
 	/**
 	 * bssid_hint - BSSID of a proposed AP
 	 *
@@ -1965,6 +1968,7 @@ struct wpa_driver_mesh_join_params {
 #define WPA_DRIVER_MESH_FLAG_AMPE	0x00000008
 	unsigned int flags;
 	bool handle_dfs;
+	int mcast_rate;
 };
 
 struct wpa_driver_set_key_params {
@@ -2465,6 +2469,9 @@ struct wpa_driver_capa {
 
 	/** Maximum number of iterations in a single scan plan */
 	u32 max_sched_scan_plan_iterations;
+
+	/** Maximum number of extra IE bytes for scans */
+	u16 max_scan_ie_len;
 
 	/** Whether sched_scan (offloaded scanning) is supported */
 	int sched_scan_supported;
@@ -4166,6 +4173,25 @@ struct wpa_driver_ops {
 			 const char *ifname);
 
 	/**
+	 * if_rename - Rename a virtual interface
+	 * @priv: Private driver interface data
+	 * @type: Interface type
+	 * @ifname: Interface name of the virtual interface to be renamed
+	 *	    (NULL when renaming the AP BSS interface)
+	 * @new_name: New interface name of the virtual interface
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*if_rename)(void *priv, enum wpa_driver_if_type type,
+			 const char *ifname, const char *new_name);
+
+	/**
+	 * set_first_bss - Make a virtual interface the first (primary) bss
+	 * @priv: Private driver interface data
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*set_first_bss)(void *priv);
+
+	/**
 	 * set_sta_vlan - Bind a station into a specific interface (AP only)
 	 * @priv: Private driver interface data
 	 * @ifname: Interface (main or virtual BSS or VLAN)
@@ -4255,7 +4281,7 @@ struct wpa_driver_ops {
 	 * Returns: 0 on success, -1 on failure
 	 */
 	int (*set_wds_sta)(void *priv, const u8 *addr, int aid, int val,
-			   const char *bridge_ifname, char *ifname_wds);
+			   const char *bridge_ifname, const char *ifname_wds);
 
 	/**
 	 * send_action - Transmit an Action frame
@@ -4561,7 +4587,7 @@ struct wpa_driver_ops {
 	 * Returns: 0 on success, negative (<0) on failure
 	 */
 	int (*br_set_net_param)(void *priv, enum drv_br_net_param param,
-				unsigned int val);
+				const char *ifname, unsigned int val);
 
 	/**
 	 * get_wowlan - Get wake-on-wireless status
@@ -7009,6 +7035,7 @@ union wpa_event_data {
 
 	/**
 	 * struct ch_switch
+	 * @count: Count until channel switch activates
 	 * @freq: Frequency of new channel in MHz
 	 * @ht_enabled: Whether this is an HT channel
 	 * @ch_offset: Secondary channel offset
@@ -7019,6 +7046,7 @@ union wpa_event_data {
 	 * @punct_bitmap: Puncturing bitmap
 	 */
 	struct ch_switch {
+		int count;
 		int freq;
 		int ht_enabled;
 		int ch_offset;
@@ -7287,8 +7315,8 @@ union wpa_event_data {
  * Driver wrapper code should call this function whenever an event is received
  * from the driver.
  */
-void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
-			  union wpa_event_data *data);
+extern void (*wpa_supplicant_event)(void *ctx, enum wpa_event_type event,
+				    union wpa_event_data *data);
 
 /**
  * wpa_supplicant_event_global - Report a driver event for wpa_supplicant
@@ -7300,7 +7328,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
  * Same as wpa_supplicant_event(), but we search for the interface in
  * wpa_global.
  */
-void wpa_supplicant_event_global(void *ctx, enum wpa_event_type event,
+extern void (*wpa_supplicant_event_global)(void *ctx, enum wpa_event_type event,
 				 union wpa_event_data *data);
 
 /*

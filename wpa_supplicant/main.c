@@ -12,6 +12,7 @@
 #endif /* __linux__ */
 
 #include "common.h"
+#include "build_features.h"
 #include "crypto/crypto.h"
 #include "fst/fst.h"
 #include "wpa_supplicant_i.h"
@@ -213,7 +214,7 @@ int main(int argc, char *argv[])
 
 	for (;;) {
 		c = getopt(argc, argv,
-			   "b:Bc:C:D:de:f:g:G:hi:I:KLMm:No:O:p:P:qsTtuvWyz:");
+			   "b:Bc:C:D:de:f:g:G:hi:I:KLMm:nNo:O:p:P:qsTtuv::Wyz:");
 		if (c < 0)
 			break;
 		switch (c) {
@@ -278,6 +279,9 @@ int main(int argc, char *argv[])
 			params.conf_p2p_dev = optarg;
 			break;
 #endif /* CONFIG_P2P */
+		case 'n':
+			iface_count = 0;
+			break;
 		case 'o':
 			params.override_driver = optarg;
 			break;
@@ -313,8 +317,12 @@ int main(int argc, char *argv[])
 			break;
 #endif /* CONFIG_CTRL_IFACE_DBUS_NEW */
 		case 'v':
-			printf("%s\n", wpa_supplicant_version);
-			exitcode = 0;
+			if (optarg) {
+				exitcode = !has_feature(optarg);
+			} else {
+				printf("%s\n", wpa_supplicant_version);
+				exitcode = 0;
+			}
 			goto out;
 		case 'W':
 			params.wait_for_monitor++;

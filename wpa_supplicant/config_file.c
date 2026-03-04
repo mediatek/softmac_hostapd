@@ -391,8 +391,13 @@ struct wpa_config * wpa_config_read(const char *name, struct wpa_config *cfgp,
 	while (identity_tail && identity_tail->next)
 		identity_tail = identity_tail->next;
 
+	if (!strncmp(name, "data:", 5)) {
+		f = fmemopen((void *)(name + 5), strlen(name + 5), "r");
+		name = "<inline>";
+	} else {
+		f = fopen(name, "r");
+	}
 	wpa_printf(MSG_DEBUG, "Reading configuration file '%s'", name);
-	f = fopen(name, "r");
 	if (f == NULL) {
 		if (show_details)
 			wpa_printf(MSG_ERROR,
@@ -885,6 +890,7 @@ static void wpa_config_write_network(FILE *f, struct wpa_ssid *ssid,
 	INT(mode);
 #ifdef CONFIG_MESH
 	INT(no_auto_peer);
+	INT(noscan);
 	INT_DEF(mesh_fwding, DEFAULT_MESH_FWDING);
 #endif /* CONFIG_MESH */
 	INT(frequency);

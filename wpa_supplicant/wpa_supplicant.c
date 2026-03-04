@@ -1268,6 +1268,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		sme_sched_obss_scan(wpa_s, 0);
 	}
 	wpa_s->wpa_state = state;
+	wpas_ucode_update_state(wpa_s);
 
 #ifndef CONFIG_NO_ROBUST_AV
 	if (state == WPA_COMPLETED && dl_list_len(&wpa_s->active_scs_ids) &&
@@ -3045,7 +3046,7 @@ static int drv_supports_vht(struct wpa_supplicant *wpa_s,
 }
 
 
-static bool ibss_mesh_is_80mhz_avail(int channel, struct hostapd_hw_modes *mode)
+static bool ibss_mesh_is_80mhz_avail(int channel, struct hostapd_hw_modes *mode, bool dfs_enabled)
 {
 	int i;
 
@@ -3054,7 +3055,10 @@ static bool ibss_mesh_is_80mhz_avail(int channel, struct hostapd_hw_modes *mode)
 
 		chan = hw_get_channel_chan(mode, i, NULL);
 		if (!chan ||
-		    chan->flag & (HOSTAPD_CHAN_DISABLED | HOSTAPD_CHAN_NO_IR))
+		    chan->flag & HOSTAPD_CHAN_DISABLED)
+			return false;
+		
+		if (!dfs_enabled && chan->flag & (HOSTAPD_CHAN_RADAR | HOSTAPD_CHAN_NO_IR))
 			return false;
 	}
 
@@ -3114,7 +3118,7 @@ static bool ibss_mesh_can_use_vht(struct wpa_supplicant *wpa_s,
 				  const struct wpa_ssid *ssid,
 				  struct hostapd_hw_modes *mode)
 {
-	if (mode->mode != HOSTAPD_MODE_IEEE80211A)
+	if (mode->mode != HOSTAPD_MODE_IEEE80211A && !(ssid->noscan))
 		return false;
 
 	if (!drv_supports_vht(wpa_s, ssid))
@@ -3181,14 +3185,14 @@ static void ibss_mesh_select_40mhz(struct wpa_supplicant *wpa_s,
 				   const struct wpa_ssid *ssid,
 				   struct hostapd_hw_modes *mode,
 				   struct hostapd_freq_params *freq,
-				   int obss_scan, bool is_6ghz)
+				   int obss_scan, bool is_6ghz, bool dfs_enabled)
 {
 	int chan_idx;
 	struct hostapd_channel_data *pri_chan = NULL, *sec_chan = NULL;
 	int i, res;
 	unsigned int j;
 	static const int ht40plus_5ghz[] = {
-		36, 44, 52, 60, 100, 108, 116, 124, 132, 140,
+		1, 2, 3, 4, 5, 6, 7, 36, 44, 52, 60, 100, 108, 116, 124, 132, 140,
 		149, 157, 165, 173, 184, 192
 	};
 	static const int ht40plus_6ghz[] = {
@@ -3212,8 +3216,11 @@ static void ibss_mesh_select_40mhz(struct wpa_supplicant *wpa_s,
 		return;
 
 	/* Check primary channel flags */
-	if (pri_chan->flag & (HOSTAPD_CHAN_DISABLED | HOSTAPD_CHAN_NO_IR))
-		return;
+	if (pri_chan->flag & HOSTAPD_CHAN_DISABLED)
+ 		return;
+	if (pri_chan->flag & (HOSTAPD_CHAN_RADAR | HOSTAPD_CHAN_NO_IR))
+		if (!dfs_enabled)
+			return;
 
 #ifdef CONFIG_HT_OVERRIDES
 	if (ssid->disable_ht40)
@@ -3248,8 +3255,11 @@ static void ibss_mesh_select_40mhz(struct wpa_supplicant *wpa_s,
 		return;
 
 	/* Check secondary channel flags */
-	if (sec_chan->flag & (HOSTAPD_CHAN_DISABLED | HOSTAPD_CHAN_NO_IR))
-		return;
+	if (sec_chan->flag & HOSTAPD_CHAN_DISABLED)
+ 		return;
+	if (sec_chan->flag & (HOSTAPD_CHAN_RADAR | HOSTAPD_CHAN_NO_IR))
+		if (!dfs_enabled)
+			return;
 
 	if (freq->ht_enabled) {
 		if (ht40 == -1) {
@@ -3327,7 +3337,7 @@ static bool ibss_mesh_select_80_160mhz(struct wpa_supplicant *wpa_s,
 				       const struct wpa_ssid *ssid,
 				       struct hostapd_hw_modes *mode,
 				       struct hostapd_freq_params *freq,
-				       int ieee80211_mode, bool is_6ghz) {
+				       int ieee80211_mode, bool is_6ghz, bool dfs_enabled) {
 	static const int bw80[] = {
 		5180, 5260, 5500, 5580, 5660, 5745, 5825,
 		5955, 6035, 6115, 6195, 6275, 6355, 6435,
@@ -3380,7 +3390,7 @@ static bool ibss_mesh_select_80_160mhz(struct wpa_supplicant *wpa_s,
 		goto skip_80mhz;
 
 	/* Use 40 MHz if channel not usable */
-	if (!ibss_mesh_is_80mhz_avail(channel, mode))
+	if (!ibss_mesh_is_80mhz_avail(channel, mode, dfs_enabled))
 		goto skip_80mhz;
 
 	chwidth = CONF_OPER_CHWIDTH_80MHZ;
@@ -3422,7 +3432,7 @@ static bool ibss_mesh_select_80_160mhz(struct wpa_supplicant *wpa_s,
 	     HE_PHYCAP_CHANNEL_WIDTH_SET_160MHZ_IN_5G) &&
 	    (ssid->max_oper_chwidth == CONF_OPER_CHWIDTH_160MHZ ||
 	     ssid->max_oper_chwidth == CONF_OPER_CHWIDTH_320MHZ) &&
-	    ibss_mesh_is_80mhz_avail(channel + 16 * offset_in_160, mode)) {
+	    ibss_mesh_is_80mhz_avail(channel + 16 * offset_in_160, mode, dfs_enabled)) {
 		for (j = 0; j < ARRAY_SIZE(bw160); j++) {
 			u8 start_chan;
 
@@ -3445,11 +3455,11 @@ static bool ibss_mesh_select_80_160mhz(struct wpa_supplicant *wpa_s,
 	     EHT_PHYCAP_320MHZ_IN_6GHZ_SUPPORT_MASK) && is_6ghz &&
 	    ssid->max_oper_chwidth == CONF_OPER_CHWIDTH_320MHZ &&
 	    ibss_mesh_is_80mhz_avail(channel + 16 -
-				     64 * ((offset_in_320 + 1) / 4), mode) &&
+				     64 * ((offset_in_320 + 1) / 4), mode, dfs_enabled) &&
 	    ibss_mesh_is_80mhz_avail(channel + 32 -
-				     64 * ((offset_in_320 + 2) / 4), mode) &&
+				     64 * ((offset_in_320 + 2) / 4), mode, dfs_enabled) &&
 	    ibss_mesh_is_80mhz_avail(channel + 48 -
-				     64 * ((offset_in_320 + 3) / 4), mode)) {
+				     64 * ((offset_in_320 + 3) / 4), mode, dfs_enabled)) {
 		for (j = 0; j < ARRAY_SIZE(bw320); j += 2) {
 			if (freq->freq >= bw320[j] &&
 			    freq->freq <= bw320[j + 1]) {
@@ -3478,10 +3488,12 @@ static bool ibss_mesh_select_80_160mhz(struct wpa_supplicant *wpa_s,
 				if (!chan)
 					continue;
 
-				if (chan->flag & (HOSTAPD_CHAN_DISABLED |
-						  HOSTAPD_CHAN_NO_IR |
-						  HOSTAPD_CHAN_RADAR))
-					continue;
+				if (chan->flag & HOSTAPD_CHAN_DISABLED)
+ 					continue;
+				if (chan->flag & (HOSTAPD_CHAN_RADAR |
+						  HOSTAPD_CHAN_NO_IR))
+					if (!dfs_enabled)
+						continue;
 
 				/* Found a suitable second segment for 80+80 */
 				chwidth = CONF_OPER_CHWIDTH_80P80MHZ;
@@ -3533,11 +3545,16 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 	int ieee80211_mode = wpas_mode_to_ieee80211_mode(ssid->mode);
 	enum hostapd_hw_mode hw_mode;
 	struct hostapd_hw_modes *mode = NULL;
-	int obss_scan = 1;
+	int obss_scan = !(ssid->noscan);
 	u8 channel;
 	bool is_6ghz, is_24ghz;
+	bool dfs_enabled = wpa_s->conf->country[0] && (wpa_s->drv_flags & WPA_DRIVER_FLAGS_RADAR);
 
 	freq->freq = ssid->frequency;
+
+	if (ssid->fixed_freq) {
+		obss_scan = 0;
+	}
 
 	if (ssid->mode == WPAS_MODE_IBSS && !ssid->fixed_freq) {
 		struct wpa_bss *bss = ibss_find_existing_bss(wpa_s, ssid);
@@ -3576,12 +3593,14 @@ void ibss_mesh_setup_freq(struct wpa_supplicant *wpa_s,
 		freq->he_enabled = ibss_mesh_can_use_he(wpa_s, ssid, mode,
 							ieee80211_mode);
 	freq->channel = channel;
+	if (mode->mode == HOSTAPD_MODE_IEEE80211G && ssid->noscan)
+		ibss_mesh_select_40mhz(wpa_s, ssid, mode, freq, obss_scan, is_6ghz, dfs_enabled);
 	/* Setup higher BW only for 5 and 6 GHz */
 	if (mode->mode == HOSTAPD_MODE_IEEE80211A) {
 		ibss_mesh_select_40mhz(wpa_s, ssid, mode, freq, obss_scan,
-				       is_6ghz);
+				       is_6ghz, dfs_enabled);
 		if (!ibss_mesh_select_80_160mhz(wpa_s, ssid, mode, freq,
-						ieee80211_mode, is_6ghz))
+						ieee80211_mode, is_6ghz, dfs_enabled))
 			freq->he_enabled = freq->vht_enabled = false;
 	}
 
@@ -4742,6 +4761,12 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 			params.beacon_int = ssid->beacon_int;
 		else
 			params.beacon_int = wpa_s->conf->beacon_int;
+		int i = 0;
+		while (i < WLAN_SUPP_RATES_MAX) {
+			params.rates[i] = ssid->rates[i];
+			i++;
+		}
+		params.mcast_rate = ssid->mcast_rate;
 	}
 
 	if (bss && ssid->enable_edmg)
@@ -6466,7 +6491,7 @@ wpa_supplicant_alloc(struct wpa_supplicant *parent)
 	if (wpa_s == NULL)
 		return NULL;
 	wpa_s->scan_req = INITIAL_SCAN_REQ;
-	wpa_s->scan_interval = 5;
+	wpa_s->scan_interval = 1;
 	wpa_s->new_connection = 1;
 	wpa_s->parent = parent ? parent : wpa_s;
 	wpa_s->p2pdev = wpa_s->parent;
@@ -8250,7 +8275,6 @@ struct wpa_interface * wpa_supplicant_match_iface(struct wpa_global *global,
 	return NULL;
 }
 
-
 /**
  * wpa_supplicant_match_existing - Match existing interfaces
  * @global: Pointer to global data from wpa_supplicant_init()
@@ -8285,6 +8309,11 @@ static int wpa_supplicant_match_existing(struct wpa_global *global)
 
 #endif /* CONFIG_MATCH_IFACE */
 
+extern void supplicant_event(void *ctx, enum wpa_event_type event,
+			     union wpa_event_data *data);
+
+extern void supplicant_event_global(void *ctx, enum wpa_event_type event,
+ 				 union wpa_event_data *data);
 
 /**
  * wpa_supplicant_add_iface - Add a new network interface
@@ -8367,6 +8396,8 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 	}
 #endif /* CONFIG_P2P */
 
+	wpas_ucode_add_bss(wpa_s);
+
 	return wpa_s;
 }
 
@@ -8392,6 +8423,8 @@ int wpa_supplicant_remove_iface(struct wpa_global *global,
 	char *ifname = NULL;
 	struct wpa_supplicant *parent = wpa_s->parent;
 #endif /* CONFIG_MESH */
+
+	wpas_ucode_free_bss(wpa_s);
 
 	/* Remove interface from the global list of interfaces */
 	prev = global->ifaces;
@@ -8541,6 +8574,8 @@ struct wpa_global * wpa_supplicant_init(struct wpa_params *params)
 #ifndef CONFIG_NO_WPA_MSG
 	wpa_msg_register_ifname_cb(wpa_supplicant_msg_ifname_cb);
 #endif /* CONFIG_NO_WPA_MSG */
+	wpa_supplicant_event = supplicant_event;
+	wpa_supplicant_event_global = supplicant_event_global;
 
 	if (params->wpa_debug_file_path)
 		wpa_debug_open_file(params->wpa_debug_file_path);
@@ -8710,6 +8745,7 @@ struct wpa_global * wpa_supplicant_init(struct wpa_params *params)
 
 	eloop_register_timeout(WPA_SUPPLICANT_CLEANUP_INTERVAL, 0,
 			       wpas_periodic, global, NULL);
+	wpas_ucode_init(global);
 
 	return global;
 }
@@ -8781,6 +8817,8 @@ void wpa_supplicant_deinit(struct wpa_global *global)
 		wpa_supplicant_global_ctrl_iface_deinit(global->ctrl_iface);
 
 	wpas_notify_supplicant_deinitialized(global);
+
+	wpas_ucode_free();
 
 	eap_peer_unregister_methods();
 #ifdef CONFIG_AP
