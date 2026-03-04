@@ -118,6 +118,11 @@ u8 * hostapd_eid_he_capab(struct hostapd_data *hapd, u8 *eid,
 
 	os_memcpy(cap->he_mac_capab_info, he_capab->mac_cap,
 		  HE_MAX_MAC_CAPAB_SIZE);
+
+	if (hostapd_is_he_btwt_disabled(hapd))
+		cap->he_mac_capab_info[HE_MACCAP_BROADCAST_TWT_SUPPORT_IDX] &=
+			~HE_MACCAP_BROADCAST_TWT_SUPPORT;
+
 	os_memcpy(cap->he_phy_capab_info, he_capab->phy_cap,
 		  HE_MAX_PHY_CAPAB_SIZE);
 	epos = (u8 *) &cap->he_basic_supported_mcs_set;

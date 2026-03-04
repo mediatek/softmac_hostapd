@@ -1558,6 +1558,19 @@ u8 * hostapd_eid_wfa_capab(struct hostapd_data *hapd, struct sta_info *sta,
 }
 
 
+#ifdef CONFIG_IEEE80211AX
+bool hostapd_is_he_btwt_disabled(struct hostapd_data *hapd)
+{
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd))
+		return hapd->mld && hapd->mld->he_btwt_disabled;
+#endif
+
+	return hapd->conf->he_btwt_disabled;
+}
+#endif /* CONFIG_IEEE80211AX */
+
+
 #ifdef CONFIG_IEEE80211BE
 bool hostapd_is_robust_av_scs_disabled(struct hostapd_data *hapd)
 {
@@ -1566,4 +1579,12 @@ bool hostapd_is_robust_av_scs_disabled(struct hostapd_data *hapd)
 
 	return hapd->conf->robust_av_scs_disabled;
 }
-#endif
+
+bool hostapd_is_eht_rtwt_disabled(struct hostapd_data *hapd)
+{
+	if (hostapd_is_mld_ap(hapd))
+		return hapd->mld && hapd->mld->eht_rtwt_disabled;
+
+	return hapd->conf->eht_rtwt_disabled;
+}
+#endif /* CONFIG_IEEE80211BE */

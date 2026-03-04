@@ -147,6 +147,9 @@ u8 * hostapd_eid_eht_capab(struct hostapd_data *hapd, u8 *eid,
 	if (hostapd_is_robust_av_scs_disabled(hapd))
 		cap->mac_cap &= ~host_to_le16(EHT_MACCAP_SCS_TRAFFIC_DESC);
 
+	if (hostapd_is_eht_rtwt_disabled(hapd))
+		cap->mac_cap &= ~host_to_le16(EHT_MACCAP_RESTRICTED_TWT);
+
 	os_memcpy(cap->phy_cap, eht_cap->phy_cap, EHT_PHY_CAPAB_LEN);
 
 	if (!is_6ghz_op_class(hapd->iconf->op_class))
