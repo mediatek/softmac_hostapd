@@ -19,6 +19,7 @@
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
 #include "driver_nl80211.h"
+#include "common/mtk_vendor.h"
 
 
 static void
@@ -3608,6 +3609,78 @@ static void nl80211_vendor_event_brcm(struct wpa_driver_nl80211_data *drv,
 
 #endif /* CONFIG_DRIVER_NL80211_BRCM */
 
+static void mtk_nl80211_pp_bitmap_update(struct i802_bss *bss,
+					 int freq, const u8 *data, size_t len)
+{
+	struct nlattr *tb[MTK_VENDOR_ATTR_PP_CTRL_MAX + 1];
+	union wpa_event_data event;
+
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: MTK pp bitmap update vendor event received");
+
+	if (nla_parse(tb, MTK_VENDOR_ATTR_PP_CTRL_MAX,
+		      (struct nlattr *) data, len, NULL) ||
+	    !tb[MTK_VENDOR_ATTR_PP_BITMAP])
+		return;
+
+	os_memset(&event, 0, sizeof(event));
+	event.ch_switch.freq = freq;
+
+	event.ch_switch.link_id =
+		nl80211_get_link_id_by_freq(bss, event.ch_switch.freq);
+	event.ch_switch.punct_bitmap =
+		nla_get_u16(tb[MTK_VENDOR_ATTR_PP_BITMAP]);
+
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: puncture bitmap: 0x%04x, link_id: %d",
+		   event.ch_switch.punct_bitmap, event.ch_switch.link_id);
+	wpa_supplicant_event(bss->ctx, EVENT_PP_BITMAP_UPDATE, &event);
+}
+
+static void nl80211_vendor_event_mtk(struct wpa_driver_nl80211_data *drv,
+				      u32 subcmd, u8 *data, size_t len)
+{
+	struct nlattr *tb[NL80211_ATTR_MAX + 1];
+	struct i802_bss *bss_iter;
+	int freq;
+	u8 *vendor_data;
+	size_t vendor_len;
+
+	wpa_printf(MSG_DEBUG, "nl80211: Got MTK vendor event %u", subcmd);
+
+	if (nla_parse(tb, NL80211_ATTR_MAX, (struct nlattr *) data, len, NULL) ||
+	    !tb[NL80211_ATTR_VENDOR_DATA] || !tb[NL80211_ATTR_WIPHY_FREQ])
+		return;
+
+	/* Find a matched link based on the frequency. */
+	freq = nla_get_u32(tb[NL80211_ATTR_WIPHY_FREQ]);
+	for (bss_iter = drv->first_bss; bss_iter; bss_iter = bss_iter->next) {
+		s8 link_id;
+
+		link_id = nl80211_get_link_id_by_freq(bss_iter, freq);
+		if (link_id != NL80211_DRV_LINK_ID_NA)
+			break;
+		if (!bss_iter->valid_links && bss_iter->links[0].freq == freq)
+			break;
+	}
+	if (!bss_iter) {
+		wpa_printf(MSG_DEBUG, "nl80211: No link or bss found on frequency %d", freq);
+		return;
+	}
+
+	vendor_data = nla_data(tb[NL80211_ATTR_VENDOR_DATA]);
+	vendor_len = nla_len(tb[NL80211_ATTR_VENDOR_DATA]);
+	switch (subcmd) {
+	case MTK_NL80211_VENDOR_EVENT_PP_BMP_UPDATE:
+		mtk_nl80211_pp_bitmap_update(bss_iter, freq, vendor_data, vendor_len);
+		break;
+	default:
+		wpa_printf(MSG_DEBUG,
+			   "%s: Ignore unsupported MTK vendor event %u",
+			   __func__, subcmd);
+		break;
+	}
+}
 
 static void nl80211_vendor_event(struct i802_bss *bss, struct nlattr **tb)
 {
@@ -3664,6 +3737,9 @@ static void nl80211_vendor_event(struct i802_bss *bss, struct nlattr **tb)
 		nl80211_vendor_event_brcm(drv, subcmd, data, len);
 		break;
 #endif /* CONFIG_DRIVER_NL80211_BRCM */
+	case OUI_MTK:
+		nl80211_vendor_event_mtk(drv, subcmd, data, len);
+		break;
 	default:
 		wpa_printf(MSG_DEBUG, "nl80211: Ignore unsupported vendor event");
 		break;
