@@ -1031,7 +1031,10 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 			       &pasn_params, wrapped_data, secret);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed to derive keys");
-		status = WLAN_STATUS_PASN_BASE_AKMP_FAILED;
+		if (rsn_data.num_pmkid && !wrapped_data && !cached_pmk)
+			status = WLAN_STATUS_INVALID_PMKID;
+		else
+			status = WLAN_STATUS_PASN_BASE_AKMP_FAILED;
 		goto send_resp;
 	}
 
