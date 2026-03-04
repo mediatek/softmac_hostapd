@@ -458,8 +458,10 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	control = MULTI_LINK_CONTROL_TYPE_BASIC |
 		BASIC_MULTI_LINK_CTRL_PRES_LINK_ID |
 		BASIC_MULTI_LINK_CTRL_PRES_BSS_PARAM_CH_COUNT |
-		BASIC_MULTI_LINK_CTRL_PRES_EML_CAPA |
 		BASIC_MULTI_LINK_CTRL_PRES_MLD_CAPA;
+
+	if (!hapd->mld->eml_disable)
+		control |= BASIC_MULTI_LINK_CTRL_PRES_EML_CAPA;
 
 	/*
 	 * Set the basic Multi-Link common information. Hard code the common
@@ -469,6 +471,9 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	 * MLD Capabilities and Operations (2)
 	 */
 	common_info_len = EHT_ML_COMMON_INFO_LEN;
+
+	if (hapd->mld->eml_disable)
+		common_info_len -= 2; /* EML Capabilities (2) */
 
 	if (include_mld_id) {
 		/* AP MLD ID */
@@ -489,9 +494,11 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 	/* Currently hard code the BSS Parameters Change Count to 0x1 */
 	wpabuf_put_u8(buf, hapd->eht_mld_bss_param_change);
 
-	wpa_printf(MSG_DEBUG, "MLD: EML Capabilities=0x%x",
-		   hapd->iface->mld_eml_capa);
-	wpabuf_put_le16(buf, hapd->iface->mld_eml_capa);
+	if (!hapd->mld->eml_disable) {
+		wpa_printf(MSG_DEBUG, "MLD: EML Capabilities=0x%x",
+			   hapd->iface->mld_eml_capa);
+		wpabuf_put_le16(buf, hapd->iface->mld_eml_capa);
+	}
 
 	mld_cap = hapd->iface->mld_mld_capa;
 	max_simul_links = mld_cap & EHT_ML_MLD_CAPA_MAX_NUM_SIM_LINKS_MASK;
@@ -812,11 +819,15 @@ static u8 * hostapd_eid_eht_reconf_ml(struct hostapd_data *hapd, u8 *eid)
 
 
 static size_t hostapd_eid_eht_ml_len(struct mld_info *info,
-				     bool include_mld_id, bool include_bpcc)
+				     bool include_mld_id, bool include_bpcc,
+				     u8 eml_disable)
 {
 	size_t len = 0;
 	size_t eht_ml_len = 2 + EHT_ML_COMMON_INFO_LEN;
 	u8 link_id;
+
+	if (eml_disable)
+		eht_ml_len -= 2; /* EML Capabilities (2) */
 
 	if (include_mld_id)
 		eht_ml_len++;
@@ -885,7 +896,8 @@ size_t hostapd_eid_eht_ml_beacon_len(struct hostapd_data *hapd,
 				     struct mld_info *info,
 				     bool include_mld_id)
 {
-	return hostapd_eid_eht_ml_len(info, include_mld_id, false);
+	return hostapd_eid_eht_ml_len(info, include_mld_id, false,
+				      hapd->mld->eml_disable);
 }
 
 
@@ -1916,7 +1928,7 @@ hostapd_send_link_reconf_resp(struct hostapd_data *hapd,
 		 * once mac80211 is fixed to match the standard (or this comment
 		 * be removed if the standard is modified to match
 		 * implementation). */
-		mle_len = hostapd_eid_eht_ml_len(&mld, false, true);
+		mle_len = hostapd_eid_eht_ml_len(&mld, false, true, hapd->mld->eml_disable);
 		len += mle_len;
 	}
 
@@ -2733,12 +2745,17 @@ void ieee802_11_rx_protected_eht_action(struct hostapd_data *hapd,
 {
 	const u8 *payload;
 	u8 action;
+	size_t plen;
 
 	if (!hapd->conf->mld_ap)
 		return;
 
+	if (len < IEEE80211_HDRLEN + 2)
+		return;
+
 	payload = ((const u8 *) mgmt) + IEEE80211_HDRLEN + 1;
 	action = *payload++;
+	plen = len - IEEE80211_HDRLEN - 2;
 
 	switch (action) {
 	case WLAN_PROT_EHT_LINK_RECONFIG_REQUEST:

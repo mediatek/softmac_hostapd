@@ -990,6 +990,8 @@ struct hostapd_bss_config {
 
 	s8 mld_link_id;
 
+	u8 eml_disable;
+
 #ifdef CONFIG_TESTING_OPTIONS
 	/*
 	 * If set indicate the AP as disabled in the RNR element included in the

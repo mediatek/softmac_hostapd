@@ -3190,8 +3190,8 @@ static int nl80211_action_subscribe_ap(struct i802_bss *bss)
 		ret = -1;
 #endif /* CONFIG_FST */
 #ifdef CONFIG_IEEE80211BE
-	/* Protected EHT - Link Reconfiguration Request */
-	if (nl80211_register_action_frame(bss, (u8 *) "\x25\x0b", 2) < 0)
+	/* Protected EHT */
+	if (nl80211_register_action_frame(bss, (u8 *) "\x25", 1) < 0)
 		ret = -1;
 #endif /* CONFIG_IEEE80211BE */
 	/* Vendor-specific Protected */
@@ -6484,6 +6484,14 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 			goto fail;
 	}
 #endif /* CONFIG_ENC_ASSOC */
+
+	if (params->eml_cap) {
+		wpa_printf(MSG_DEBUG, "  * eml_capa=%u",
+			   params->eml_cap);
+		if (nla_put_u16(msg, NL80211_ATTR_EML_CAPABILITY,
+				params->eml_cap))
+			goto fail;
+	}
 
 	ret = send_and_recv_cmd(drv, msg);
 	msg = NULL;
