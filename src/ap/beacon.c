@@ -496,6 +496,39 @@ static u8 * hostapd_eid_csa(struct hostapd_data *hapd, u8 *eid)
 }
 
 
+static u8 * hostapd_eid_sec_chan_offs(struct hostapd_data *hapd, u8 *eid)
+{
+#define SEC_CHAN_OFFS_BELOW	0x3
+	int sec;
+
+	if (!hapd->iconf->ieee80211n || hapd->conf->disable_11n ||
+	    is_6ghz_op_class(hapd->iconf->op_class) ||
+	    !hapd->cs_freq_params.channel)
+		return eid;
+
+	sec = hapd->cs_freq_params.sec_channel_offset;
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->cs_freq_params.punct_bitmap && sec) {
+		u32 start_freq;
+		u16 pri_ch_pos;
+		u16 sec_ch_bit_pos;
+
+		start_freq = hapd->cs_freq_params.center_freq1 -
+			(hapd->cs_freq_params.bandwidth / 2);
+		pri_ch_pos = (hapd->cs_freq_params.freq - start_freq) / 20;
+		sec_ch_bit_pos = BIT(pri_ch_pos + sec);
+		if (hapd->cs_freq_params.punct_bitmap & sec_ch_bit_pos)
+			sec = 0;
+	}
+#endif /* CONFIG_IEEE80211BE */
+	*eid++ = WLAN_EID_SECONDARY_CHANNEL_OFFSET;
+	*eid++ = 1;
+	*eid++ = sec < 0 ? SEC_CHAN_OFFS_BELOW : sec;
+
+	return eid;
+}
+
+
 static u8 * hostapd_eid_ecsa(struct hostapd_data *hapd, u8 *eid)
 {
 	if (!hapd->cs_freq_params.channel || !hapd->iface->cs_oper_class)
@@ -855,6 +888,9 @@ static u8 * hostapd_probe_resp_fill_elems(struct hostapd_data *hapd,
 	else
 		params->csa_pos = NULL;
 	pos = csa_pos;
+
+	/* Secondary channel offset IE */
+	pos = hostapd_eid_sec_chan_offs(hapd, pos);
 
 	/* ERP Information element */
 	pos = hostapd_eid_erp_info(hapd, pos);
@@ -2275,6 +2311,9 @@ static void hostapd_fill_bcn_sta_profile(struct hostapd_data *hapd,
 			link->sta_prof_csa_offset = csa_pos - 1 - buf;
 		epos = csa_pos;
 
+		/* Secondary channel offset IE */
+		epos = hostapd_eid_sec_chan_offs(h, epos);
+
 		/* eCSA IE */
 		csa_pos = hostapd_eid_ecsa(h, epos);
 		if (csa_pos != epos)
@@ -2449,6 +2488,9 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 	if (csa_pos != tailpos)
 		hapd->cs_c_off_beacon = csa_pos - tail - 1;
 	tailpos = csa_pos;
+
+	/* Secondary channel offset IE */
+	tailpos = hostapd_eid_sec_chan_offs(hapd, tailpos);
 
 	/* ERP Information element */
 	tailpos = hostapd_eid_erp_info(hapd, tailpos);
