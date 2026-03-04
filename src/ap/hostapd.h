@@ -48,6 +48,15 @@ struct mesh_conf;
 struct hostapd_iface;
 struct hostapd_mld;
 
+#define EPCS_MAX_WMM_PARAMS	4
+#define EPCS_MAX_AUTH_STAS	64
+
+struct epcs_entry {
+	u8 addr[ETH_ALEN];
+	u16 wmm_idx[MAX_NUM_MLD_LINKS];
+	struct dl_list list;
+};
+
 struct hapd_interfaces {
 	int (*reload_config)(struct hostapd_iface *iface);
 	struct hostapd_config * (*config_read_cb)(const char *config_fname);
@@ -110,6 +119,11 @@ struct hapd_interfaces {
 #ifdef CONFIG_PROCESS_COORDINATION
 	struct proc_coord *pc;
 #endif /* CONFIG_PROCESS_COORDINATION */
+
+	struct {
+		struct dl_list list;
+		struct hostapd_wmm_ac_params wmm_tbl[EPCS_MAX_WMM_PARAMS][WMM_AC_NUM];
+	} epcs;
 };
 
 enum hostapd_chan_status {
@@ -598,6 +612,8 @@ struct hostapd_mld {
 	int ctrl_sock;
 	struct dl_list ctrl_dst;
 	char *ctrl_interface; /* Directory for UNIX domain sockets */
+
+	bool epcs_disabled;
 };
 
 #define HOSTAPD_MLD_MAX_REF_COUNT      0xFF
@@ -1092,6 +1108,8 @@ static inline bool hostapd_mld_is_first_bss(struct hostapd_data *hapd)
 #endif /* CONFIG_IEEE80211BE */
 
 u16 hostapd_get_punct_bitmap(struct hostapd_data *hapd);
+struct epcs_entry *
+hostapd_epcs_get_entry(struct hapd_interfaces *ifaces, const u8 *addr);
 
 static inline bool ap_pmf_enabled(struct hostapd_bss_config *conf)
 {

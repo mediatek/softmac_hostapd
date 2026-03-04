@@ -5961,3 +5961,17 @@ bool hostapd_acceptable_sta_addr(struct hostapd_data *hapd, const u8 *addr,
 
 	return true;
 }
+
+
+struct epcs_entry *
+hostapd_epcs_get_entry(struct hapd_interfaces *ifaces, const u8 *addr)
+{
+	struct epcs_entry *entry;
+
+	dl_list_for_each(entry, &ifaces->epcs.list, struct epcs_entry, list) {
+		if (ether_addr_equal(addr, entry->addr))
+			return entry;
+	}
+
+	return NULL;
+}
