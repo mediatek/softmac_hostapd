@@ -2972,6 +2972,8 @@ struct hostapd_sta_add_params {
 	 */
 	const u8 *nmi_addr;
 #endif /* CONFIG_NAN */
+
+	bool mtk_sta;
 };
 
 struct mac_address {

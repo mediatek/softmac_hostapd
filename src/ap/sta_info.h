@@ -372,6 +372,8 @@ struct sta_info {
 	u8 unsolicited_dialog_token;
 	struct dscp_policy_state dscp_state;
 #endif /* CONFIG_ROBUST_AV */
+
+	bool mtk_sta;
 };
 
 

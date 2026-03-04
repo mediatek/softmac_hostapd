@@ -137,6 +137,7 @@ struct ieee802_11_elems {
 	const u8 *security_profile;
 
 	const u8 *mscs_desc;
+	const u8 *vendor_mtk;
 
 	u8 ssid_len;
 	u8 supp_rates_len;
@@ -218,6 +219,7 @@ struct ieee802_11_elems {
 	u8 security_profile_len;
 
 	size_t mscs_desc_len;
+	size_t vendor_mtk_len;
 
 	struct mb_ies_info mb_ies;
 
