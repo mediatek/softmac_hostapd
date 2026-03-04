@@ -8147,3 +8147,16 @@ bool wpa_auth_get_first_sta_seen(struct wpa_authenticator *wpa_auth,
 	group = wpa_select_vlan_wpa_group(wpa_auth->group, vlan_id);
 	return group->first_sta_seen;
 }
+
+
+void wpa_assign_wpa_auth_group(struct wpa_state_machine *sm,
+				  struct wpa_authenticator *wpa_auth)
+{
+	if (!sm || !sm->group || !wpa_auth || !wpa_auth->group)
+		return;
+
+	wpa_group_put(sm->wpa_auth, sm->group);
+	sm->wpa_auth = wpa_auth;
+	sm->group = wpa_auth->group;
+	wpa_group_get(sm->wpa_auth, sm->group);
+}

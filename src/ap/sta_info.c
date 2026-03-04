@@ -249,7 +249,10 @@ void set_wpa_sm_for_each_partner_link(struct hostapd_data *hapd,
 	struct sta_info *lsta;
 	struct hostapd_data *lhapd;
 
-	if (!ap_sta_is_mld(hapd, psta))
+	if (!hapd->conf->mld_ap)
+		return;
+
+	if (!ap_sta_is_mld(hapd, psta) && !psta->ft_over_ds)
 		return;
 
 	for_each_mld_link(lhapd, hapd) {
