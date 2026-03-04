@@ -529,9 +529,40 @@ static int hostapd_ctrl_iface_sta_mib(struct hostapd_data *hapd,
 }
 
 
+#ifdef CONFIG_IEEE80211BE
+static struct sta_info *hostapd_ml_get_next_primary_sta(struct sta_info *sta)
+{
+	while (sta) {
+		if (!sta->mld_info.mld_sta || sta == sta->mld_assoc_sta)
+			return sta;
+
+		sta = sta->next;
+	}
+
+	return NULL;
+}
+#endif /* CONFIG_IEEE80211BE */
+
+
 int hostapd_ctrl_iface_sta_first(struct hostapd_data *hapd,
 				 char *buf, size_t buflen)
 {
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd)) {
+		struct hostapd_data *h;
+		struct sta_info *sta;
+
+		for_each_mld_link(h, hapd) {
+			sta = hostapd_ml_get_next_primary_sta(h->sta_list);
+			if (!sta)
+				continue;
+
+			return hostapd_ctrl_iface_sta_mib(h, sta, buf, buflen);
+		}
+
+		return 0;
+	}
+#endif /* CONFIG_IEEE80211BE */
 	return hostapd_ctrl_iface_sta_mib(hapd, hapd->sta_list, buf, buflen);
 }
 
@@ -582,11 +613,64 @@ int hostapd_ctrl_iface_sta_next(struct hostapd_data *hapd, const char *txtaddr,
 				char *buf, size_t buflen)
 {
 	u8 addr[ETH_ALEN];
-	struct sta_info *sta;
+	struct sta_info *sta = NULL;
 	int ret;
 
-	if (hwaddr_aton(txtaddr, addr) ||
-	    (sta = ap_get_sta(hapd, addr)) == NULL) {
+	if (hwaddr_aton(txtaddr, addr)) {
+		ret = os_snprintf(buf, buflen, "FAIL\n");
+		if (os_snprintf_error(buflen, ret))
+			return 0;
+		return ret;
+	}
+
+#ifdef CONFIG_IEEE80211BE
+	if (hostapd_is_mld_ap(hapd)) {
+		struct hostapd_data *h, *tmp_hapd = NULL;
+		struct sta_info *tmp_sta;
+
+		/* Find the target sta_info with input address.
+		 * If it's a STA MLD, sta_info on the setup link is needed.
+		 */
+		for_each_mld_link(h, hapd) {
+			tmp_sta = ap_get_sta(h, addr);
+			if (tmp_sta && (!tmp_sta->mld_info.mld_sta ||
+			    tmp_sta->mld_assoc_link_id == h->mld_link_id)) {
+				sta = tmp_sta;
+				tmp_hapd = h;
+				break;
+			}
+		}
+
+		if (!sta)
+			goto skip_mld;
+
+		for_each_mld_link(h, hapd) {
+			if (sta) {
+				/* Start from the associated one */
+				if (h != tmp_hapd)
+					continue;
+
+				sta = sta->next;
+			} else {
+				/* change to next link's STA list */
+				sta = h->sta_list;
+			}
+
+			sta = hostapd_ml_get_next_primary_sta(sta);
+			if (!sta)
+				continue;
+
+			return hostapd_ctrl_iface_sta_mib(h, sta, buf, buflen);
+		}
+
+		return 0;
+	}
+
+skip_mld:
+#endif /* CONFIG_IEEE80211BE */
+
+	sta = ap_get_sta(hapd, addr);
+	if (!sta) {
 		ret = os_snprintf(buf, buflen, "FAIL\n");
 		if (os_snprintf_error(buflen, ret))
 			return 0;
