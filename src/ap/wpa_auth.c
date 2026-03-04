@@ -7994,8 +7994,10 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 	ptr = buf;
 	kde = buf;
 	if (is_ml) {
+#ifdef CONFIG_IEEE80211BE
 		kde = wpa_auth_ml_group_kdes(sm, kde, KDE_ALL_LINKS);
 		kde_len = wpa_auth_ml_group_kdes_len(sm, KDE_ALL_LINKS);
+#endif /* CONFIG_IEEE80211BE */
 	} else {
 		gtk = gsm->GTK[gsm->GN - 1];
 		gtk_len = gsm->GTK_len;
