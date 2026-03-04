@@ -15,6 +15,7 @@
 #include "qca-vendor.h"
 #include "ieee802_11_defs.h"
 #include "ieee802_11_common.h"
+#include "mtk_vendor.h"
 
 
 static int ieee802_11_parse_vendor_specific(const u8 *pos, size_t elen,
@@ -212,6 +213,22 @@ static int ieee802_11_parse_vendor_specific(const u8 *pos, size_t elen,
 		default:
 			wpa_printf(MSG_EXCESSIVE,
 				   "Unknown QCA information element ignored (type=%d len=%lu)",
+				   pos[3], (unsigned long) elen);
+			return -1;
+		}
+		break;
+
+	case OUI_MTK:
+		switch (pos[3]) {
+		case MTK_VENDOR_ELEM_DEFAULT:
+		case MTK_VENDOR_ELEM_256QAM:
+			elems->vendor_mtk = pos;
+			elems->vendor_mtk_len = elen;
+			break;
+		default:
+			wpa_printf(MSG_EXCESSIVE, "Unknown Mediatek "
+				   "information element ignored "
+				   "(type=%d len=%lu)",
 				   pos[3], (unsigned long) elen);
 			return -1;
 		}

@@ -6369,6 +6369,13 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 				goto fail;
 		}
 
+		if (params->mtk_sta) {
+			wpa_printf(MSG_DEBUG, "  * mtk_sta =%u",
+				   params->mtk_sta);
+			if (nla_put_flag(msg, NL80211_ATTR_VENDOR_MTK_STA))
+				goto fail;
+		}
+
 		if (is_ap_interface(drv->nlmode) &&
 		    nla_put_u8(msg, NL80211_ATTR_STA_SUPPORT_P2P_PS,
 			       params->support_p2p_ps ?

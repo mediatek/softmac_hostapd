@@ -345,6 +345,8 @@ struct sta_info {
 
 	struct wpabuf *sae_pw_id;
 	unsigned int sae_pw_id_counter;
+
+	bool mtk_sta;
 };
 
 

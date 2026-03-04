@@ -4091,6 +4091,15 @@ static void check_mscs_desc_elem(struct hostapd_data *hapd, struct sta_info *sta
 	sta->mscs_assoc_included = 1;
 }
 
+static void check_mtk_vendor_elem(struct hostapd_data *hapd, struct sta_info *sta,
+				  struct ieee802_11_elems *elems)
+{
+	if (!sta || !elems->vendor_mtk)
+		return;
+
+	sta->mtk_sta = 1;
+}
+
 static u16 check_multi_ap(struct hostapd_data *hapd, struct sta_info *sta,
 			  const u8 *multi_ap_ie, size_t multi_ap_len)
 {
@@ -4716,6 +4725,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 		}
 	}
 #endif /* CONFIG_IEEE80211BE */
+	check_mtk_vendor_elem(hapd, sta, elems);
 
 #ifdef CONFIG_P2P
 	if (elems->p2p && ies && ies_len) {
@@ -5668,7 +5678,7 @@ static int add_associated_sta(struct hostapd_data *hapd,
 			    sta->flags | WLAN_STA_ASSOC, sta->qosinfo,
 			    sta->vht_opmode, sta->p2p_ie ? 1 : 0,
 			    set, mld_link_addr, mld_link_sta, eml_cap,
-			    epp_sta)) {
+			    epp_sta, sta->mtk_sta)) {
 		hostapd_logger(hapd, sta->addr,
 			       HOSTAPD_MODULE_IEEE80211, HOSTAPD_LEVEL_NOTICE,
 			       "Could not %s STA to kernel driver",
@@ -6391,7 +6401,7 @@ static void handle_assoc(struct hostapd_data *hapd,
 					    sta->flags, 0, 0, 0, 0,
 					    sta->setup_link_addr, false,
 					    sta->mld_info.common_info.eml_capa,
-					    false)) {
+					    false, sta->mtk_sta)) {
 				resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
 				goto fail;
 			}

@@ -25,6 +25,11 @@ enum mtk_nl80211_vendor_subcmds {
 	MTK_NL80211_VENDOR_SUBCMD_DFS_TX_CTRL = 0xd5,
 };
 
+enum mtk_vendor_element_id {
+	MTK_VENDOR_ELEM_DEFAULT = 0,
+	MTK_VENDOR_ELEM_256QAM = 8,
+};
+
 enum mtk_nl80211_vendor_subevents {
 	MTK_NL80211_VENDOR_EVENT_PP_BMP_UPDATE = 0x5,
 };
