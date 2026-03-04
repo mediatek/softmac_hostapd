@@ -632,7 +632,7 @@ char * get_param(const char *cmd, const char *param);
 /* Iterate all links, or, if no link is defined, iterate given index */
 #define for_each_link_default(_links, _i, _def_idx)	\
 	for ((_i) = (_links) ? 0 : (_def_idx);		\
-	     (_i) < MAX_NUM_MLD_LINKS ||		\
+	     ((_links) && (_i) < MAX_NUM_MLD_LINKS) ||	\
 		     (!(_links) && (_i) == (_def_idx));	\
 	     (_i)++)					\
 		if (!(_links) || (_links) & BIT(_i))
