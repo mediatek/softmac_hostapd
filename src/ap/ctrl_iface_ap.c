@@ -1220,8 +1220,9 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 					  u16 punct_bitmap)
 {
 	u32 start_freq;
+	bool is_6g = is_6ghz_freq(params->freq);
 
-	if (is_6ghz_freq(params->freq)) {
+	if (is_6g) {
 		const int bw_idx[] = { 20, 40, 80, 160, 320 };
 		int idx, bw;
 
@@ -1273,7 +1274,8 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 			return -1;
 		break;
 	case 40:
-		if (params->center_freq2 || !params->sec_channel_offset)
+		if (params->center_freq2 ||
+		    (!is_6g && !params->sec_channel_offset))
 			return -1;
 
 		if (punct_bitmap)
@@ -1290,12 +1292,17 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 			if (params->freq - 10 != params->center_freq1)
 				return -1;
 			break;
+		case 0:
+			if (!is_6g)
+				return -1;
+			break;
 		default:
 			return -1;
 		}
 		break;
 	case 80:
-		if (!params->center_freq1 || !params->sec_channel_offset)
+		if (!params->center_freq1 ||
+		    (!is_6g && !params->sec_channel_offset))
 			return 1;
 
 		switch (params->sec_channel_offset) {
@@ -1307,6 +1314,10 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 		case -1:
 			if (params->freq + 10 != params->center_freq1 &&
 			    params->freq - 30 != params->center_freq1)
+				return -1;
+			break;
+		case 0:
+			if (!is_6g)
 				return -1;
 			break;
 		default:
@@ -1324,7 +1335,7 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 		break;
 	case 160:
 		if (!params->center_freq1 || params->center_freq2 ||
-		    !params->sec_channel_offset)
+		    (!is_6g && !params->sec_channel_offset))
 			return -1;
 
 		switch (params->sec_channel_offset) {
@@ -1342,13 +1353,16 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 			    params->freq - 70 != params->center_freq1)
 				return -1;
 			break;
+		case 0:
+			if (!is_6g)
+				return -1;
+			break;
 		default:
 			return -1;
 		}
 		break;
 	case 320:
-		if (!params->center_freq1 || params->center_freq2 ||
-		    !params->sec_channel_offset)
+		if (!params->center_freq1 || params->center_freq2)
 			return -1;
 
 		switch (params->sec_channel_offset) {
@@ -1374,6 +1388,10 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 			    params->freq - 150 != params->center_freq1)
 				return -1;
 			break;
+		case 0:
+			break;
+		default:
+			return -1;
 		}
 		break;
 	default:
