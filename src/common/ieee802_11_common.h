@@ -38,6 +38,11 @@ struct multi_ap_params {
 
 /* Parsed Information Elements */
 struct ieee802_11_elems {
+	/* Control of parsing operations */
+	bool show_errors;
+	bool stop_at_mic; /* Whether to stop parsing after MIC element */
+
+	/* Parsed data */
 	const u8 *ssid;
 	const u8 *supp_rates;
 	const u8 *ds_params;
@@ -210,6 +215,8 @@ typedef enum { ParseOK = 0, ParseUnknown = 1, ParseFailed = -1 } ParseRes;
 ParseRes ieee802_11_parse_elems(const u8 *start, size_t len,
 				struct ieee802_11_elems *elems,
 				int show_errors);
+ParseRes ieee802_11_parse_elems_ctrl(const u8 *start, size_t len,
+				     struct ieee802_11_elems *elems);
 void ieee802_11_elems_clear_ids(struct ieee802_11_elems *elems,
 				const u8 *ids, size_t num);
 void ieee802_11_elems_clear_ext_ids(struct ieee802_11_elems *elems,
