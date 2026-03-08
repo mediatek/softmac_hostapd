@@ -2464,6 +2464,13 @@ int wpa_auth_sm_event(struct wpa_state_machine *sm, enum wpa_event event)
 		break;
 	case WPA_REAUTH:
 	case WPA_REAUTH_EAPOL:
+		if (event == WPA_REAUTH && sm->auth_alg == WLAN_AUTH_EPPKE &&
+		    !sm->started) {
+			wpa_printf(MSG_DEBUG,
+				   "EPPKE: Do not start state machine for a STA that has used EPPKE and reassociates");
+			break;
+		}
+
 		if (!sm->started) {
 			/*
 			 * When using WPS, we may end up here if the STA
