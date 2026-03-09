@@ -5853,9 +5853,11 @@ struct wpa_driver_ops {
 	* @lpi_bcn_enhance: 1 to enable beacon duplicate enhancement in 6G lpi mode, 0 to disable enhancement
 	* @sku_idx: index used to indicate which sku table should be used
 	* @link_id: MLD link id. -1 if this is an non-MLD AP
+	* @power_table: power table generated from AFC response
+	* @lpi_mode: specify the current mode is whether lpi
 	*/
-	int (*txpower_ctrl)(void *priv, u8 lpi_psd, u8 sku_idx, u8 lpi_bcn_enhance,
-			    u8 link_id);
+	int (*txpower_ctrl)(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance,
+			    s8 link_id, s8 *power_table, u8 lpi_mode);
 };
 
 /**

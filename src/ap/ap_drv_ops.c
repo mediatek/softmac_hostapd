@@ -1611,7 +1611,9 @@ int hostapd_drv_get_aval_bss_color_bmp(struct hostapd_data *hapd, u64 *aval_colo
 
 int hostapd_drv_txpower_ctrl(struct hostapd_data *hapd)
 {
-	s8 link_id = -1;
+	s8 link_id = -1, sku_idx = hapd->iconf->sku_idx, ret = 0, i;
+	s8 *afc_power_table = NULL;
+	bool lpi_mode = false;
 
 	if (!hapd->driver || !hapd->driver->txpower_ctrl)
 		return 0;
@@ -1619,10 +1621,32 @@ int hostapd_drv_txpower_ctrl(struct hostapd_data *hapd)
 	if (hapd->conf->mld_ap)
 		link_id = hapd->mld_link_id;
 
-	return hapd->driver->txpower_ctrl(hapd->drv_priv, hapd->iconf->lpi_psd,
-					  hapd->iconf->sku_idx,
-					  hapd->iconf->lpi_bcn_enhance,
-					  link_id);
+#ifdef CONFIG_AFC
+	lpi_mode = hapd->iface->afc.lpi_mode;
+	if (hapd->iface->current_mode->is_6ghz &&
+	    he_reg_is_sp(hapd->iface->conf->he_6ghz_reg_pwr_type) &&
+	    hapd->iface->afc.data_valid) {
+		afc_power_table = os_zalloc(MAX_CHANNEL_NUM_6G * afc_power_table_num * sizeof(s8));
+		ret = hostapd_afc_translate_table(hapd->iface, afc_power_table);
+		if (ret)
+			goto out;
+	}
+
+	if (hapd->iface->afc.lpi_mode == true)
+		sku_idx = hapd->iconf->lpi_sku_idx;
+#endif /* CONFIG_AFC */
+
+	ret = hapd->driver->txpower_ctrl(hapd->drv_priv, hapd->iconf->lpi_psd,
+					 sku_idx,
+					 hapd->iconf->lpi_bcn_enhance,
+					 link_id,
+					 afc_power_table,
+					 lpi_mode);
+out:
+#ifdef CONFIG_AFC
+	os_free(afc_power_table);
+#endif /* CONFIG_AFC */
+	return ret;
 }
 
 int hostapd_drv_ap_wireless(struct hostapd_data *hapd, u8 sub_vendor_id, int value)

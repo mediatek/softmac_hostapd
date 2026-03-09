@@ -5356,6 +5356,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		conf->lpi_psd = !!en;
 	} else if (os_strcmp(buf, "sku_idx") == 0) {
 		conf->sku_idx = strtol(pos, NULL, 10);
+	} else if (os_strcmp(buf, "lpi_sku_idx") == 0) {
+		conf->lpi_sku_idx = strtol(pos, NULL, 10);
 	} else if (os_strcmp(buf, "lpi_bcn_enhance") == 0) {
 		u8 en = strtol(pos, NULL, 10);
 		conf->lpi_bcn_enhance = !!en;
