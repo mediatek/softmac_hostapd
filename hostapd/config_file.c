@@ -1283,6 +1283,198 @@ static int hostapd_parse_he_srg_bitmap(u8 *bitmap, char *val)
 	return 0;
 }
 
+
+#ifdef CONFIG_AFC
+static int hostapd_afc_parse_cert_ids(struct hostapd_config *conf, char *pos)
+{
+	struct cert_id *c = NULL, *tmp;
+	int i, count = 0;
+
+	while (pos && pos[0]) {
+		char *p;
+
+		tmp = os_realloc_array(c, count + 1, sizeof(*c));
+		if (!tmp)
+			goto error;
+		c = tmp;
+
+		i = count;
+		count++;
+		os_memset(&c[i], 0, sizeof(struct cert_id));
+
+		p = os_strchr(pos, ':');
+		if (!p)
+			goto error;
+
+		*p++ = '\0';
+		if (!p || !p[0])
+			goto error;
+
+		c[i].rulset = os_strdup(pos);
+		if (!c[i].rulset)
+			goto error;
+
+		pos = p;
+		p = os_strchr(pos, ',');
+		if (p)
+			*p++ = '\0';
+
+		c[i].id = os_strdup(pos);
+		if (!c[i].id)
+			goto error;
+
+		pos = p;
+	}
+
+	for (i = 0; i < conf->afc.n_cert_ids; i++) {
+		os_free(conf->afc.cert_ids[i].rulset);
+		os_free(conf->afc.cert_ids[i].id);
+	}
+	os_free(conf->afc.cert_ids);
+
+	conf->afc.n_cert_ids = count;
+	conf->afc.cert_ids = c;
+
+	return 0;
+
+error:
+	for (i = 0; i < count; i++) {
+		os_free(c[i].rulset);
+		os_free(c[i].id);
+	}
+	os_free(c);
+
+	return -ENOMEM;
+}
+
+
+static int hostapd_afc_parse_position_data(struct afc_linear_polygon **data,
+					   unsigned int *n_linear_polygon_data,
+					   char *pos)
+{
+	struct afc_linear_polygon *d = NULL, *tmp;
+	int count = 0;
+
+	while (pos && pos[0]) {
+		char *p, *end;
+
+		tmp = os_realloc_array(d, count + 1, sizeof(*d));
+		if (!tmp)
+			goto error;
+		d = tmp;
+
+		p = os_strchr(pos, ':');
+		if (!p)
+			goto error;
+
+		*p++ = '\0';
+		if (!p || !p[0])
+			goto error;
+
+		d[count].longitude = strtod(pos, &end);
+		if (*end)
+			goto error;
+
+		pos = p;
+		p = os_strchr(pos, ',');
+		if (p)
+			*p++ = '\0';
+
+		d[count].latitude = strtod(pos, &end);
+		if (*end)
+			goto error;
+
+		pos = p;
+		count++;
+	}
+
+	os_free(*data);
+	*n_linear_polygon_data = count;
+	*data = d;
+
+	return 0;
+
+error:
+	os_free(d);
+	return -ENOMEM;
+}
+
+
+static int hostapd_afc_parse_freq_range(struct hostapd_config *conf, char *pos)
+{
+	struct afc_freq_range *f = NULL, *tmp;
+	int count = 0;
+
+	while (pos && pos[0]) {
+		char *p;
+
+		tmp = os_realloc_array(f, count + 1, sizeof(*f));
+		if (!tmp)
+			goto error;
+		f = tmp;
+
+		p = os_strchr(pos, ':');
+		if (!p)
+			goto error;
+
+		*p++ = '\0';
+		if (!p || !p[0])
+			goto error;
+
+		f[count].low_freq = atoi(pos);
+		pos = p;
+		p = os_strchr(pos, ',');
+		if (p)
+			*p++ = '\0';
+
+		f[count].high_freq = atoi(pos);
+		pos = p;
+		count++;
+	}
+
+	os_free(conf->afc.freq_range);
+	conf->afc.n_freq_range = count;
+	conf->afc.freq_range = f;
+
+	return 0;
+
+error:
+	os_free(f);
+	return -ENOMEM;
+}
+
+
+static int hostapd_afc_parse_op_class(struct hostapd_config *conf, char *pos)
+{
+	unsigned int *oc = NULL, *tmp;
+	int count = 0;
+
+	while (pos && pos[0]) {
+		char *p;
+
+		tmp = os_realloc_array(oc, count + 1, sizeof(*oc));
+		if (!tmp) {
+			os_free(oc);
+			return -ENOMEM;
+		}
+		oc = tmp;
+
+		p = os_strchr(pos, ',');
+		if (p)
+			*p++ = '\0';
+
+		oc[count] = atoi(pos);
+		pos = p;
+		count++;
+	}
+
+	os_free(conf->afc.op_class);
+	conf->afc.n_op_class = count;
+	conf->afc.op_class = oc;
+
+	return 0;
+}
+#endif /* CONFIG_AFC */
 #endif /* CONFIG_IEEE80211AX */
 
 
@@ -3764,6 +3956,64 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 			return 1;
 		}
 		bss->unsol_bcast_probe_resp_interval = val;
+#ifdef CONFIG_AFC
+	} else if (os_strcmp(buf, "afcd_sock") == 0) {
+		os_free(conf->afc.socket);
+		conf->afc.socket = os_strdup(pos);
+	} else if (os_strcmp(buf, "afc_request_version") == 0) {
+		os_free(conf->afc.request.version);
+		conf->afc.request.version = os_strdup((pos));
+	} else if (os_strcmp(buf, "afc_serial_number") == 0) {
+		os_free(conf->afc.request.sn);
+		conf->afc.request.sn = os_strdup((pos));
+	} else if (os_strcmp(buf, "afc_cert_ids") == 0) {
+		if (hostapd_afc_parse_cert_ids(conf, pos))
+			return 1;
+	} else if (os_strcmp(buf, "afc_location_type") == 0) {
+		conf->afc.location.type = atoi(pos);
+		if (conf->afc.location.type != ELLIPSE &&
+		    conf->afc.location.type != LINEAR_POLYGON &&
+		    conf->afc.location.type != RADIAL_POLYGON)
+			return 1;
+	} else if (os_strcmp(buf, "afc_linear_polygon") == 0) {
+		if (hostapd_afc_parse_position_data(
+			&conf->afc.location.linear_polygon_data,
+			&conf->afc.location.n_linear_polygon_data,
+			pos))
+			return 1;
+	} else if (os_strcmp(buf, "afc_radial_polygon") == 0) {
+		if (hostapd_afc_parse_position_data(
+			(struct afc_linear_polygon **)
+			&conf->afc.location.radial_polygon_data,
+			&conf->afc.location.n_radial_polygon_data,
+			pos))
+			return 1;
+	} else if (os_strcmp(buf, "afc_major_axis") == 0) {
+		conf->afc.location.major_axis = atoi(pos);
+	} else if (os_strcmp(buf, "afc_minor_axis") == 0) {
+		conf->afc.location.minor_axis = atoi(pos);
+	} else if (os_strcmp(buf, "afc_orientation") == 0) {
+		conf->afc.location.orientation = atoi(pos);
+	} else if (os_strcmp(buf, "afc_height") == 0) {
+		char *end;
+
+		conf->afc.location.height = strtod(pos, &end);
+		if (*end)
+			return 1;
+	} else if (os_strcmp(buf, "afc_height_type") == 0) {
+		os_free(conf->afc.location.height_type);
+		conf->afc.location.height_type = os_strdup(pos);
+	} else if (os_strcmp(buf, "afc_vertical_tolerance") == 0) {
+		conf->afc.location.vertical_tolerance = atoi(pos);
+	} else if (os_strcmp(buf, "afc_min_power") == 0) {
+		conf->afc.min_power = atoi(pos);
+	} else if (os_strcmp(buf, "afc_freq_range") == 0) {
+		if (hostapd_afc_parse_freq_range(conf, pos))
+			return 1;
+	} else if (os_strcmp(buf, "afc_op_class") == 0) {
+		if (hostapd_afc_parse_op_class(conf, pos))
+			return 1;
+#endif /* CONFIG_AFC */
 	} else if (os_strcmp(buf, "mbssid") == 0) {
 		int mbssid = atoi(pos);
 		if (mbssid < 0 || mbssid > ENHANCED_MBSSID_ENABLED) {

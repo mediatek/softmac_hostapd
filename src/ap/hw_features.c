@@ -157,6 +157,8 @@ int hostapd_get_hw_features(struct hostapd_iface *iface)
 		iface->current_mode = NULL;
 	}
 
+	hostap_afc_disable_channels(iface);
+
 	for (i = 0; i < num_modes; i++) {
 		struct hostapd_hw_modes *feature = &modes[i];
 		int dfs_enabled = hapd->iconf->ieee80211h &&
