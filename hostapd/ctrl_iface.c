@@ -2557,7 +2557,6 @@ static int hostapd_ctrl_iface_color_change(struct hostapd_iface *iface,
 {
 #ifdef NEED_AP_MLME
 	struct cca_settings settings;
-	struct hostapd_data *hapd = iface->bss[0];
 	int ret, color;
 	unsigned int i;
 	char *end;
@@ -2603,7 +2602,7 @@ static int hostapd_ctrl_iface_color_change(struct hostapd_iface *iface,
 		return 0;
 	}
 
-	if (hapd->cca_in_progress) {
+	if (hostapd_is_cca_in_progress(iface)) {
 		wpa_printf(MSG_ERROR,
 			   "color_change: CCA is already in progress");
 		return -1;
@@ -2626,6 +2625,8 @@ static int hostapd_ctrl_iface_color_change(struct hostapd_iface *iface,
 			hostapd_cleanup_cca_params(bss);
 			continue;
 		}
+		eloop_cancel_timeout(hostapd_switch_color_timeout_handler,
+				     bss, NULL);
 
 		wpa_printf(MSG_DEBUG, "Setting user selected color: %d", color);
 		ret = hostapd_drv_switch_color(bss, &settings);
