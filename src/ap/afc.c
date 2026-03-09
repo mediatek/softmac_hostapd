@@ -18,6 +18,7 @@
 #include "hostapd.h"
 #include "acs.h"
 #include "hw_features.h"
+#include "ap_drv_ops.h"
 
 #define HOSTAPD_AFC_RETRY_TIMEOUT	180
 #define HOSTAPD_AFC_TIMEOUT		86400 /* 24h */
@@ -511,7 +512,8 @@ static int hostad_afc_update_chan_info(struct afc_chan_info_elem **chan_list,
 			c = tmp;
 
 			c[count].chan = channel;
-			os_memset(c[count].power, 0, sizeof(c[count].power));
+			for (int j = 0; j < 5; j++)
+				c[count].power[j] = AFC_INVALID_POWER;
 			count++;
 		}
 		c[i].power[op_class_pwr_index] = power;
@@ -911,7 +913,19 @@ static bool hostapd_afc_has_usable_chans(struct hostapd_iface *iface)
 int hostapd_afc_handle_request(struct hostapd_iface *iface)
 {
 	struct hostapd_config *iconf = iface->conf;
+	bool lpi_mode;
 	int ret;
+	int afc_status = AFC_CONTINUE;
+
+	lpi_mode = he_reg_is_indoor(iconf->he_6ghz_reg_pwr_type);
+	if (lpi_mode && !he_reg_is_sp(iconf->he_6ghz_reg_pwr_type)) {
+		iface->afc.lpi_mode = true;
+		return 1;
+	}
+
+	if (strncmp(iconf->country, "US", 2) != 0 &&
+	    strncmp(iconf->country, "CA", 2) != 0)
+		return 1;
 
 	/* AFC is required just for standard power AP */
 	if (!he_reg_is_sp(iconf->he_6ghz_reg_pwr_type))
@@ -926,34 +940,55 @@ int hostapd_afc_handle_request(struct hostapd_iface *iface)
 	iface->afc.request_id = os_random();
 	ret = hostapd_afc_send_receive(iface);
 	if (ret < 0) {
-		/*
-		 * If the connection to the AFCD failed, reschedule for a
-		 * future attempt.
-		 */
-		wpa_printf(MSG_ERROR, "AFC: Connection failed: %d", ret);
-		if (ret == -EIO)
-			ret = 0;
+		afc_status = lpi_mode ? AFC_LPI : AFC_DISABLE;
 		goto resched;
 	}
 
 	hostap_afc_disable_channels(iface);
-	if (!hostapd_afc_has_usable_chans(iface))
+	if (!hostapd_afc_has_usable_chans(iface)) {
+		afc_status = lpi_mode ? AFC_LPI : AFC_DISABLE;
 		goto resched;
+	}
 
 	ret = hostapd_is_usable_chans(iface);
 	if (ret != 1) {
 		/* Trigger an ACS freq scan */
+		afc_status = AFC_RESTART_IFACE;
 		iconf->channel = 0;
 		iface->freq = 0;
 		hostapd_set_and_check_bw320_offset(iface->conf, 0);
 
 		if (!ret && acs_init(iface) != HOSTAPD_CHAN_ACS) {
 			wpa_printf(MSG_ERROR, "AFC: Could not start ACS");
+			afc_status = AFC_DISABLE;
 			ret = -EINVAL;
 		}
-	}
+	} else
+		ret = 1;
 
 resched:
+	switch(afc_status) {
+	case AFC_LPI:
+		ret = hostapd_afc_reset_channels(iface);
+		if (ret) {
+			ret = 0;
+			break;
+		}
+		iface->afc.lpi_mode = true;
+		ret = 1;
+		break;
+	/* Disable and restart iface would be finished in hostapd setup flow. */
+	case AFC_DISABLE:
+		if (ret == -EIO)
+			ret = 0;
+		break;
+	case AFC_RESTART_IFACE:
+	case AFC_CONTINUE:
+		break;
+	default:
+		break;
+	}
+
 	eloop_cancel_timeout(hostapd_afc_timeout_handler, iface, NULL);
 	eloop_register_timeout(iface->afc.timeout, 0,
 			       hostapd_afc_timeout_handler, iface, NULL);
@@ -985,40 +1020,67 @@ static void hostapd_afc_delete_data_from_server(struct hostapd_iface *iface)
 static void hostapd_afc_timeout_handler(void *eloop_ctx, void *timeout_ctx)
 {
 	struct hostapd_iface *iface = eloop_ctx;
-	bool restart_iface = true;
+	bool lpi_mode;
+	int afc_status = AFC_CONTINUE, ret;
+
+	lpi_mode = he_reg_is_indoor(iface->conf->he_6ghz_reg_pwr_type);
+	iface->afc.lpi_mode = false;
 
 	hostapd_afc_delete_data_from_server(iface);
 	if (iface->state != HAPD_IFACE_ENABLED) {
+		afc_status = AFC_RESTART_IFACE;
 		/* hostapd is not fully enabled yet, toggle the interface */
-		goto restart_interface;
+		goto resched;
 	}
+
 
 	if (hostapd_afc_send_receive(iface) < 0 ||
 	    hostapd_afc_reset_channels(iface)) {
-		restart_iface = false;
-		goto restart_interface;
+		afc_status = lpi_mode ? AFC_LPI : AFC_DISABLE;
+		goto resched;
 	}
 
+	hostap_afc_disable_channels(iface);
 	if (hostapd_is_usable_chans(iface) > 0) {
 		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_COMPLETE);
 		goto resched;
 	}
 
-	restart_iface = hostapd_afc_has_usable_chans(iface);
-	if (restart_iface) {
+	ret = hostapd_afc_has_usable_chans(iface);
+	if (ret) {
 		/* Trigger an ACS freq scan */
+		afc_status = AFC_RESTART_IFACE;
 		iface->conf->channel = 0;
 		iface->freq = 0;
 		hostapd_set_and_check_bw320_offset(iface->conf, 0);
 	} else {
+		afc_status = lpi_mode ? AFC_LPI : AFC_DISABLE;
 		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_COMPLETE);
 	}
 
-restart_interface:
-	hostapd_disable_iface(iface);
-	if (restart_iface)
-		hostapd_enable_iface(iface);
 resched:
+	switch(afc_status) {
+	case AFC_DISABLE:
+		hostapd_drv_txpower_ctrl(iface->bss[0]);
+		hostapd_disable_iface(iface);
+		break;
+	case AFC_RESTART_IFACE:
+		hostapd_disable_iface(iface);
+		hostapd_enable_iface(iface);
+		break;
+	case AFC_LPI:
+		if (hostapd_afc_reset_channels(iface)) {
+			hostapd_disable_iface(iface);
+			break;
+		}
+		iface->afc.lpi_mode = true;
+		fallthrough;
+	case AFC_CONTINUE:
+		hostapd_drv_txpower_ctrl(iface->bss[0]);
+		break;
+	default:
+		break;
+	}
 	eloop_register_timeout(iface->afc.timeout, 0,
 			       hostapd_afc_timeout_handler, iface, NULL);
 }
@@ -1115,13 +1177,256 @@ int hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
 				unsigned int j;
 
 				*power = 0;
-				for (j = 0; j < ARRAY_SIZE(c->power); j++)
+				for (j = 0; j < 5; j++) {
+					if ((int)c->power[j] == AFC_INVALID_POWER)
+						continue;
 					*power = MAX(*power,
-						     (int) (2 * c->power[j]));
+						     (int)(2 * c->power[j]));
+				}
+
 				return 0;
 			}
 		}
 	}
 
 	return -EINVAL;
+}
+
+static void hostapd_afc_init_power_table(s8 *power_table)
+{
+	int table_idx, bw;
+	s8 *chan_power_list;
+
+	/* init power table */
+	for (table_idx = 0; table_idx < MAX_CHANNEL_NUM_6G; table_idx++) {
+		chan_power_list = &power_table[table_idx * afc_power_table_num];
+		for (bw = 0; bw < afc_power_table_num; bw++)
+			chan_power_list[bw] = AFC_INVALID_POWER;
+	}
+}
+
+static void hostapd_afc_parse_bw320(int table_idx, s8 *power_list)
+{
+	if (table_idx > 7)
+		power_list[afc_power_bw320_2] =
+			power_list[afc_power_bw320_1];
+	if (table_idx > 47)
+		power_list[afc_power_bw320_1] = AFC_INVALID_POWER;
+}
+
+static int hostapd_afc_parse_psd_to_dbm(struct hostapd_iface *iface, s8 *power_table)
+{
+	int i, freq, channel, bw, table_idx, target_power;
+	s8 *chan_power_list;
+
+	for (i = 0; i < iface->afc.num_freq_range; i++) {
+		struct afc_freq_range_elem *freq_range = &iface->afc.freq_range[i];
+
+		freq = freq_range->low_freq + 10;
+		channel = hostapd_hw_get_channel(iface->bss[0], freq);
+		if (channel == 0)
+			continue;
+
+		table_idx = channel / 4;
+
+		if (table_idx >= MAX_CHANNEL_NUM_6G)
+			return -EINVAL;
+
+		chan_power_list = &power_table[table_idx * afc_power_table_num];
+		for (bw = afc_power_bw20; bw < afc_power_bw320_2; bw++) {
+			target_power = (s8)(freq_range->max_psd * 2 +
+				PSD_TO_DBM_OFFSET + bw * DOUBLE_BW_POWER);
+			target_power = MIN(AFC_MAXIMUM_POWER, target_power);
+			chan_power_list[bw] = MIN(chan_power_list[bw],
+						  target_power);
+		}
+		hostapd_afc_parse_bw320(table_idx, chan_power_list);
+	}
+	return 0;
+}
+
+static int hostapd_afc_parse_eirp_to_dbm(struct hostapd_iface *iface, s8 *power_table)
+{
+	int i, bw, table_idx, target_power;
+	s8 *chan_power_list;
+
+	for (i = 0; i < iface->afc.num_chan_info; i++) {
+		struct afc_chan_info_elem *chan_info = &iface->afc.chan_info_list[i];
+
+		table_idx = chan_info->chan / 4;
+
+		if (table_idx >= MAX_CHANNEL_NUM_6G)
+			return -EINVAL;
+
+		chan_power_list = &power_table[table_idx * afc_power_table_num];
+		for (bw = afc_power_bw20; bw <= afc_power_bw320_1; bw++) {
+			if ((s8)chan_info->power[bw] == AFC_INVALID_POWER)
+				continue;
+			target_power = MIN(AFC_MAXIMUM_POWER,
+					   (s8)(chan_info->power[bw] * 2));
+			chan_power_list[bw] = MIN(chan_power_list[bw], target_power);
+		}
+		hostapd_afc_parse_bw320(table_idx, chan_power_list);
+	}
+	return 0;
+}
+
+static int afc_get_ru_be_offset(int bw, int *target_bw, int *offset)
+{
+	switch (bw) {
+	case afc_power_ru26:
+		*target_bw = afc_power_bw20;
+		*offset = RU26_OFFSET_20MHZ;
+		break;
+	case afc_power_ru52:
+		*target_bw = afc_power_bw20;
+		*offset = RU52_OFFSET_20MHZ;
+		break;
+	case afc_power_ru78:
+		*target_bw = afc_power_bw20;
+		*offset = RU78_OFFSET_20MHZ;
+		break;
+	case afc_power_ru106:
+		*target_bw = afc_power_bw20;
+		*offset = RU106_OFFSET_20MHZ;
+		break;
+	case afc_power_ru132:
+		*target_bw = afc_power_bw20;
+		*offset = RU132_OFFSET_20MHZ;
+		break;
+	case afc_power_ru726:
+		*target_bw = afc_power_bw80;
+		*offset = RU726_OFFSET_80MHZ;
+		break;
+	case afc_power_ru1480:
+		*target_bw = afc_power_bw160;
+		*offset = RU1480_OFFSET_160MHZ;
+		break;
+	case afc_power_ru1772:
+		*target_bw = afc_power_bw160;
+		*offset = RU1772_OFFSET_160MHZ;
+		break;
+	case afc_power_ru2476:
+		*target_bw = afc_power_bw320_1;
+		*offset = RU2476_OFFSET_320MHZ;
+		break;
+	case afc_power_ru2988:
+		*target_bw = afc_power_bw320_1;
+		*offset = RU2988_OFFSET_320MHZ;
+		break;
+	case afc_power_ru3472:
+		*target_bw = afc_power_bw320_1;
+		*offset = RU3472_OFFSET_320MHZ;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int hostapd_afc_fill_wide_bandwidth_power(s8 *power_table)
+{
+	int table_idx, bw;
+	s8 *chan_power_list;
+
+	for (table_idx = 0; table_idx < MAX_CHANNEL_NUM_6G; table_idx++) {
+		int target_power, ru26_power, ch_offset;
+
+		ch_offset = table_idx * afc_power_table_num;
+		if (power_table[ch_offset + afc_power_bw20] == AFC_INVALID_POWER)
+			continue;
+
+		chan_power_list = &power_table[ch_offset];
+
+		/* Check wide bandwidth power minimum or valid. */
+		for (bw = afc_power_bw40; bw <= afc_power_bw320_2; bw++) {
+			int bw_ch_num, first_ch, last_ch;
+
+			target_power = AFC_INVALID_POWER;
+			switch (bw) {
+			case afc_power_bw40:
+				bw_ch_num = 2;
+				break;
+			case afc_power_bw80:
+				bw_ch_num = 4;
+				break;
+			case afc_power_bw160:
+				bw_ch_num = 8;
+				break;
+			case afc_power_bw320_1:
+			case afc_power_bw320_2:
+				bw_ch_num = 16;
+				break;
+			default:
+				continue;
+			}
+			if ((bw == afc_power_bw320_1 && table_idx > 47) ||
+			    (bw == afc_power_bw320_2 && table_idx < 8))
+				continue;
+
+			if (bw == afc_power_bw320_2)
+				first_ch = table_idx - (table_idx + 8) % bw_ch_num;
+			else
+				first_ch = table_idx - table_idx % bw_ch_num;
+			last_ch = first_ch + bw_ch_num;
+			for (int ch = first_ch; ch < last_ch; ch++) {
+				int ch_offset2 = ch * afc_power_table_num;
+
+				if (power_table[ch_offset2 + bw] == AFC_INVALID_POWER) {
+					target_power = AFC_INVALID_POWER;
+					break;
+				}
+				target_power = MIN(power_table[ch_offset2 + bw], target_power);
+			}
+			chan_power_list[bw] = target_power;
+		}
+
+		/* Update remain ru */
+		for (bw = afc_power_ru26; bw < afc_power_table_num; bw++) {
+			int target_bw, offset;
+
+			if (afc_get_ru_be_offset(bw, &target_bw, &offset))
+				return -EINVAL;
+
+			if (target_bw == afc_power_bw320_1 &&
+			    chan_power_list[target_bw] == AFC_INVALID_POWER)
+			    target_bw++;
+
+			if (chan_power_list[target_bw] == AFC_INVALID_POWER) {
+				chan_power_list[bw] = AFC_INVALID_POWER;
+				continue;
+			}
+
+			target_power = chan_power_list[target_bw] - offset;
+			chan_power_list[bw] = target_power;
+		}
+	}
+	return 0;
+}
+
+
+int hostapd_afc_translate_table(struct hostapd_iface *iface,
+				s8 *power_table)
+{
+	int ret;
+
+	if (!iface->afc.data_valid || !power_table)
+		return -EINVAL;
+
+	hostapd_afc_init_power_table(power_table);
+
+	ret = hostapd_afc_parse_psd_to_dbm(iface, power_table);
+	if (ret)
+		goto out;
+
+	ret = hostapd_afc_parse_eirp_to_dbm(iface, power_table);
+	if (ret)
+		goto out;
+
+	ret = hostapd_afc_fill_wide_bandwidth_power(power_table);
+	if (ret)
+		goto out;
+
+out:
+	return ret;
 }
