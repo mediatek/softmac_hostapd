@@ -843,6 +843,8 @@ struct hostapd_iface {
 	bool assisted_dfs;
 
 #ifdef CONFIG_AFC
+	struct wpabuf *afc_request;
+	char *afc_response;
 	struct {
 		unsigned int request_id;
 		int timeout;
@@ -927,6 +929,7 @@ enum afc_table_info {
 int hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
 				       int *power);
 int hostapd_afc_handle_request(struct hostapd_iface *iface);
+void hostapd_afc_send_request(struct hostapd_iface *iface);
 void hostapd_afc_stop(struct hostapd_iface *iface);
 void hostap_afc_disable_channels(struct hostapd_iface *iface);
 int hostapd_afc_translate_table(struct hostapd_iface *iface,
@@ -942,6 +945,10 @@ hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
 static inline int hostapd_afc_handle_request(struct hostapd_iface *iface)
 {
 	return 1;
+}
+
+static inline void hostapd_afc_send_request(struct hostapd_iface *iface)
+{
 }
 
 static inline void hostapd_afc_stop(struct hostapd_iface *iface)

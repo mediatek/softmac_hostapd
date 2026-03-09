@@ -593,6 +593,13 @@ hostapd_afc_parse_reply(struct hostapd_iface *iface, char *reply, size_t len)
 		   "Received AFC reply: %s, len: %lu, os_strlen: %lu",
 		   reply, len, os_strlen(reply));
 
+	iface->afc_response = os_strdup(reply);
+	if (!iface->afc_response) {
+		wpa_printf(MSG_ERROR,
+			   "Failed to alloc memory for storing AFC reply");
+		return -ENOMEM;
+	}
+
 	root = json_parse((const char *) reply, os_strlen(reply));
 	if (!root) {
 		wpa_printf(MSG_ERROR, "Failed to parse AFC reply payload");
@@ -808,7 +815,7 @@ static int hostapd_afc_send_receive(struct hostapd_iface *iface)
 		wpa_printf(MSG_ERROR, "Failed parsing AFC reply: %d", ret);
 close_sock:
 	os_free(buf);
-	json_object_put(request_obj);
+	iface->afc_request = request_obj;
 	close(sockfd);
 
 	return ret;
@@ -955,6 +962,11 @@ resched:
 
 static void hostapd_afc_delete_data_from_server(struct hostapd_iface *iface)
 {
+	wpabuf_free(iface->afc_request);
+	iface->afc_request = NULL;
+	os_free(iface->afc_response);
+	iface->afc_response = NULL;
+
 	os_free(iface->afc.chan_info_list);
 	os_free(iface->afc.freq_range);
 
@@ -1030,6 +1042,13 @@ resched:
 	}
 	eloop_register_timeout(iface->afc.timeout, 0,
 			       hostapd_afc_timeout_handler, iface, NULL);
+}
+
+
+void hostapd_afc_send_request(struct hostapd_iface *iface)
+{
+	eloop_cancel_timeout(hostapd_afc_timeout_handler, iface, NULL);
+	eloop_register_timeout(0, 0, hostapd_afc_timeout_handler, iface, NULL);
 }
 
 

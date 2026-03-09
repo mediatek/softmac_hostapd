@@ -6567,6 +6567,39 @@ fail:
 }
 #endif /* CONFIG_IEEE80211BE */
 
+
+#ifdef CONFIG_AFC
+static int
+hostapd_cli_cmd_afc_get_request(struct hostapd_data *hapd, char *cmd,
+				char *buf, size_t buflen)
+{
+	if (!hapd->iface->afc_request)
+		return os_snprintf(buf, buflen, "request data is NA!\n");
+
+	return os_snprintf(buf, buflen, "%s\n",
+			   (const char *) wpabuf_head(hapd->iface->afc_request));
+}
+
+static int
+hostapd_cli_cmd_afc_get_response(struct hostapd_data *hapd, char *cmd,
+				 char *buf, size_t buflen)
+{
+	if (!hapd->iface->afc_response)
+		return os_snprintf(buf, buflen, "response data is NA!\n");
+
+	return os_snprintf(buf, buflen, "%s\n", hapd->iface->afc_response);
+}
+
+static int
+hostapd_cli_cmd_afc_send_request(struct hostapd_data *hapd, char *cmd,
+				 char *buf, size_t buflen)
+{
+	hostapd_afc_send_request(hapd->iface);
+	return os_snprintf(buf, buflen, "OK\n");
+}
+#endif /* CONFIG_AFC */
+
+
 static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      char *buf, char *reply,
 					      int reply_size,
@@ -7309,6 +7342,17 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strncmp(buf, "DEL_MSCS ", 9) == 0) {
 		reply_len = hostapd_ctrl_iface_del_mscs(hapd, buf + 9, reply, reply_size);
 #endif /* CONFIG_IEEE80211BE */
+#ifdef CONFIG_AFC
+	}  else if (os_strncmp(buf, "AFC_GET_REQUEST", 15) == 0) {
+		reply_len = hostapd_cli_cmd_afc_get_request(hapd, buf + 15,
+							    reply, reply_size);
+	}  else if (os_strncmp(buf, "AFC_GET_RESPONSE", 16) == 0) {
+		reply_len = hostapd_cli_cmd_afc_get_response(hapd, buf + 16,
+							     reply, reply_size);
+	}  else if (os_strncmp(buf, "AFC_SEND_REQUEST", 16) == 0) {
+		reply_len = hostapd_cli_cmd_afc_send_request(hapd, buf + 16,
+							     reply, reply_size);
+#endif /* CONFIG_AFC */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
