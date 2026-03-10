@@ -2710,6 +2710,10 @@ static int sme_validate_8021x_auth_elems(struct wpa_supplicant *wpa_s,
 				return -1;
 			}
 			wpa_s->auth_1x->pmkid_found = true;
+		} else if (!pdu) {
+			wpa_msg(wpa_s, MSG_INFO,
+				"IEEE 802.1X: Missing EAPOL PDU for fallback (no PMKID)");
+			return -1;
 		}
 	}
 
@@ -2843,6 +2847,16 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 				validation_failed = true;
 				goto cleanup;
 			}
+
+			/* Fall back to EAP handshake if PMKSA entry for caching
+			 * was not identified */
+			if (wpa_s->auth_1x->pmksa_caching &&
+			    !wpa_s->auth_1x->pmkid_found) {
+				eapol_sm_set_eap_over_auth_frame(wpa_s->eapol,
+								 true);
+				eapol_sm_notify_portEnabled(wpa_s->eapol, true);
+				wpa_s->auth_1x->pmksa_caching = false;
+			}
 		} else if (!elems.akm_suite_selector ||
 			   elems.akm_suite_selector_len != 4 ||
 			   WPA_GET_BE32(elems.akm_suite_selector) !=
@@ -2856,29 +2870,42 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 		}
 	}
 
-	if (!pdu) {
-		wpa_msg(wpa_s, MSG_INFO, "IEEE 802.1X: Missing EAPOL PDU");
-		goto fail;
-	}
-
-	eapol_sm_rx_eapol(wpa_s->eapol, wpa_s->pending_bssid,
-			  wpabuf_head(pdu), wpabuf_len(pdu),
-			  FRAME_ENCRYPTION_UNKNOWN);
-
-	if (eapol_sm_get_failure(wpa_s->eapol)) {
+	if (wpa_s->auth_1x->pmksa_caching &&
+	    data->auth.status_code != WLAN_STATUS_SUCCESS) {
 		wpa_msg(wpa_s, MSG_INFO,
-			"IEEE 802.1X: EAP authentication failed");
+			"IEEE 802.1X: PMKSA caching failed (status=%u)",
+			data->auth.status_code);
 		goto fail;
 	}
 
-	if (eapol_sm_get_success(wpa_s->eapol) &&
-	    data->auth.status_code != WLAN_STATUS_802_1_X_AUTH_SUCCESS) {
-		wpa_msg(wpa_s, MSG_INFO,
-			"IEEE 802.1X: Invalid status code in EAP-Success Authentication frame");
-		goto fail;
+	if (!wpa_s->auth_1x->pmkid_found) {
+		if (!pdu) {
+			wpa_msg(wpa_s, MSG_INFO,
+				"IEEE 802.1X: Missing EAPOL PDU");
+			goto fail;
+		}
+
+		eapol_sm_rx_eapol(wpa_s->eapol, wpa_s->pending_bssid,
+				  wpabuf_head(pdu), wpabuf_len(pdu),
+				  FRAME_ENCRYPTION_UNKNOWN);
+
+		if (eapol_sm_get_failure(wpa_s->eapol)) {
+			wpa_msg(wpa_s, MSG_INFO,
+				"IEEE 802.1X: EAP authentication failed");
+			goto fail;
+		}
+
+		if (eapol_sm_get_success(wpa_s->eapol) &&
+		    data->auth.status_code !=
+		    WLAN_STATUS_802_1_X_AUTH_SUCCESS) {
+			wpa_msg(wpa_s, MSG_INFO,
+				"IEEE 802.1X: Invalid status code in EAP-Success authentication frame");
+			goto fail;
+		}
 	}
 
-	if (data->auth.status_code == WLAN_STATUS_802_1_X_AUTH_SUCCESS) {
+	if (data->auth.status_code == WLAN_STATUS_802_1_X_AUTH_SUCCESS ||
+	    wpa_s->auth_1x->pmkid_found) {
 		wpa_msg(wpa_s, MSG_INFO,
 			"IEEE 802.1X: Authentication successful");
 
