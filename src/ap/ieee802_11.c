@@ -362,18 +362,36 @@ static int send_auth_reply(struct hostapd_data *hapd, struct sta_info *sta,
 	int reply_res = WLAN_STATUS_UNSPECIFIED_FAILURE;
 	const u8 *sa = hapd->own_addr;
 	struct wpabuf *ml_resp = NULL;
+	size_t ml_resp_len = 0;
+#ifdef CONFIG_IEEE8021X_AUTH
+	size_t mic_len = 0;
+#endif /* CONFIG_IEEE8021X_AUTH */
 
 #ifdef CONFIG_IEEE80211BE
 	if (ap_sta_is_mld(hapd, sta)) {
 		ml_resp = hostapd_ml_auth_resp(hapd);
 		if (!ml_resp)
 			return -1;
+		ml_resp_len = wpabuf_len(ml_resp);
 	}
 #endif /* CONFIG_IEEE80211BE */
 
-	rlen = IEEE80211_HDRLEN + sizeof(reply->u.auth) + ies_len;
-	if (ml_resp)
-		rlen += wpabuf_len(ml_resp);
+	rlen = IEEE80211_HDRLEN + sizeof(reply->u.auth) + ies_len + ml_resp_len;
+#ifdef CONFIG_IEEE8021X_AUTH
+	/* Add MIC element for an Authentication frame carrying an EAP-Success
+	 * message and for an Authentication frame with transaction sequence
+	 * frame 2, if PMKSA caching was used.
+	 */
+	if (auth_alg == WLAN_AUTH_802_1X &&
+	    (resp == WLAN_STATUS_802_1_X_AUTH_SUCCESS ||
+	     sta->eap_auth_data.add_mic)) {
+		mic_len = wpa_mic_len(sta->eap_auth_data.akm,
+				      sta->eap_auth_data.pmk_len,
+				      RSN_HASH_NOT_SPECIFIED);
+		rlen += 2 + mic_len;
+	}
+#endif /* CONFIG_IEEE8021X_AUTH */
+
 	buf = os_zalloc(rlen);
 	if (!buf) {
 		wpabuf_free(ml_resp);
@@ -438,6 +456,59 @@ static int send_auth_reply(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 #endif /* CONFIG_SAE */
 #endif /* CONFIG_TESTING_OPTIONS */
+
+#ifdef CONFIG_IEEE8021X_AUTH
+	if (auth_alg == WLAN_AUTH_802_1X &&
+	    (resp == WLAN_STATUS_802_1_X_AUTH_SUCCESS ||
+	     sta->eap_auth_data.add_mic)) {
+		const u8 *frame, *data, *rsne, *rsnxe;
+		u8 data_buf[500], mic[WPA_1X_MAX_MIC_LEN];
+		size_t frame_len, data_len;
+		const u8 *aa = sa;
+		u8 *ptr = reply->u.auth.variable + ies_len + ml_resp_len;
+
+#ifdef CONFIG_IEEE80211BE
+		if (ap_sta_is_mld(hapd, sta))
+			aa = hapd->mld->mld_addr;
+#endif /* CONFIG_IEEE80211BE */
+
+		rsne = hostapd_wpa_ie(hapd, WLAN_EID_RSN);
+		if (!rsne) {
+			wpa_printf(MSG_INFO, "No AP RSNE");
+			return -1;
+		}
+		os_memcpy(data_buf, rsne, 2 + rsne[1]);
+		data_len = 2 + rsne[1];
+
+		rsnxe = hostapd_wpa_ie(hapd, WLAN_EID_RSNX);
+		if (rsnxe) {
+			wpa_printf(MSG_DEBUG, "Found AP RSNXE");
+			os_memcpy(&data_buf[data_len], rsnxe, 2 + rsnxe[1]);
+			data_len += 2 + rsnxe[1];
+		} else {
+			wpa_printf(MSG_DEBUG, "No AP RSNXE");
+		}
+		data = data_buf;
+
+		/* MIC element */
+		ptr[0] = WLAN_EID_MIC;
+		ptr[1] = mic_len;
+		os_memset(ptr + 2, 0, mic_len);
+
+		frame = (const u8 *) &reply->u.auth.auth_alg;
+		frame_len =  rlen - IEEE80211_HDRLEN;
+		if (wpa_auth_8021x_mic(sta->eap_auth_data.akm,
+				       sta->eap_auth_data.ptk.kck,
+				       sta->eap_auth_data.ptk.kck_len,
+				       aa, sta->addr, data, data_len,
+				       frame, frame_len, mic)) {
+			wpa_printf(MSG_INFO, "Failed to derive MIC");
+			return -1;
+		}
+		os_memcpy(ptr + 2, mic, mic_len);
+	}
+#endif /* CONFIF_IEEE8021X_AUTH */
+
 	if (hostapd_drv_send_mlme(hapd, reply, rlen, 0, NULL, 0, 0) < 0)
 		wpa_printf(MSG_INFO, "send_auth_reply: send failed");
 	else
@@ -2739,6 +2810,7 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 			}
 
 			sta->flags |= WLAN_STA_AUTH;
+			sta->eap_auth_data.add_mic = true;
 			send_8021x_auth_reply(hapd, sta, auth_transaction + 1,
 					      WLAN_STATUS_SUCCESS, reply);
 			/* Delete DHss after successful PTK derivation */
