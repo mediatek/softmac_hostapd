@@ -1377,7 +1377,14 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	wpa_s->current_ssid = ssid;
 	wpa_supplicant_rsn_supp_set_config(wpa_s, wpa_s->current_ssid);
 	wpa_sm_set_ssid(wpa_s->wpa, bss->ssid, bss->ssid_len);
-	wpa_supplicant_initiate_eapol(wpa_s);
+
+	/*
+	 * Skip EAPOL SM re-init for IEEE 802.1X Authentication algorithm on
+	 * subsequent Authentication frames since it was already configured
+	 * for the first Authentication frame (start=1).
+	 */
+	if (params.auth_alg != WPA_AUTH_ALG_802_1X || start)
+		wpa_supplicant_initiate_eapol(wpa_s);
 
 #ifdef CONFIG_FILS
 	/* TODO: FILS operations can in some cases be done between different
