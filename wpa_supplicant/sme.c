@@ -977,6 +977,41 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_WEP */
 
+#ifdef CONFIG_IEEE8021X_AUTH
+	if (ssid->eap_over_auth_frame &&
+	    wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt &
+				       ~WPA_KEY_MGMT_IEEE8021X)) {
+		const u8 *rsne, *rsnxe;
+		struct wpa_ie_data ied;
+
+		rsne = wpa_bss_get_rsne(wpa_s, bss, ssid, false);
+		if (!rsne) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"IEEE 802.1X enabled, but target BSS does not advertise RSNE");
+		} else if (rsne[1] &&
+			   wpa_parse_wpa_ie(rsne, 2 + rsne[1], &ied) == 0 &&
+			   wpa_key_mgmt_wpa_ieee8021x(
+				   ied.key_mgmt & ~WPA_KEY_MGMT_IEEE8021X)) {
+			rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
+			if (ieee802_11_rsnx_capab(
+				    rsnxe,
+				    WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES) &&
+			    (wpa_s->drv_flags2 &
+			     WPA_DRIVER_FLAGS2_802_1X_AUTH)) {
+				wpa_dbg(wpa_s, MSG_DEBUG,
+					"Using IEEE 802.1X authentication using Authentication frames");
+				params.auth_alg = WPA_AUTH_ALG_802_1X;
+			} else {
+				wpa_dbg(wpa_s, MSG_DEBUG,
+					"IEEE 802.1X in Authentication frames enabled, but AP doesn't support it");
+			}
+		} else {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"IEEE 802.1X in Authentication frames enabled, but the target BSS does not advertise a suitable AKMP for it");
+		}
+	}
+#endif /* CONFIG_IEEE8021X_AUTH */
+
 	if ((wpa_bss_get_vendor_ie(bss, WPA_IE_VENDOR_TYPE) ||
 	     wpa_bss_get_rsne(wpa_s, bss, ssid, false)) &&
 	    wpa_key_mgmt_wpa(ssid->key_mgmt)) {
