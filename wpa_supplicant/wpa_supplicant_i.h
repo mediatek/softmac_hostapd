@@ -701,10 +701,13 @@ struct last_scan_ssid {
  * @status: Status code
  * @derive_ptk: Whether to derive a PTK for association
  * @pmksa_caching: Whether PMKSA caching is being used
+ * @pmkid_found: Whether PMKID is identified by AP
  * @pmkid: PMKID for PMKSA caching
  * @snonce: SNonce
+ * @anonce: ANonce
  * @dh_group: DH group for key exchange
  * @ecdh: ECDH context
+ * @dhss: DH shared secret
  * @rsne: RSNE
  * @rsne_len: Length of RSNE
  * @rsnxe: RSNXE
@@ -715,10 +718,13 @@ struct auth_802_1x_data {
 	u16 status;
 	bool derive_ptk;
 	bool pmksa_caching;
+	bool pmkid_found;
 	u8 pmkid[PMKID_LEN];
 	u8 snonce[WPA_NONCE_LEN];
+	u8 anonce[WPA_NONCE_LEN];
 	u16 dh_group;
 	struct crypto_ecdh *ecdh;
+	struct wpabuf *dhss;
 	u8 rsne[257];
 	size_t rsne_len;
 	u8 rsnxe[257];

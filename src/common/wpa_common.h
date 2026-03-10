@@ -575,6 +575,8 @@ u32 wpa_akm_to_suite(int akm);
 int wpa_compare_rsn_ie(int ft_initial_assoc,
 		       const u8 *ie1, size_t ie1len,
 		       const u8 *ie2, size_t ie2len);
+int wpa_compare_rsne_params(const u8 *rsne1, size_t rsne1_len,
+			    const u8 *rsne2, size_t rsne2_len);
 int wpa_insert_pmkid(u8 *ies, size_t *ies_len, const u8 *pmkid, bool replace);
 
 struct wpa_ft_ies {

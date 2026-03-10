@@ -355,6 +355,9 @@ static void sme_802_1x_auth_data_free(struct wpa_supplicant *wpa_s)
 		wpa_s->auth_1x->ecdh = NULL;
 	}
 
+	wpabuf_clear_free(wpa_s->auth_1x->dhss);
+	wpa_s->auth_1x->dhss = NULL;
+
 	os_free(wpa_s->auth_1x);
 	wpa_s->auth_1x = NULL;
 
@@ -2655,6 +2658,92 @@ static int sme_validate_basic_mle(const struct ieee802_11_elems *elems,
 
 #ifdef CONFIG_IEEE8021X_AUTH
 
+static int sme_validate_8021x_auth_elems(struct wpa_supplicant *wpa_s,
+					 const struct ieee802_11_elems *elems,
+					 struct wpabuf *pdu)
+{
+	struct wpa_ie_data ie;
+	u16 group;
+
+	if (!elems->rsn_ie || !elems->owe_dh || !elems->nonce ||
+	    elems->nonce_len != WPA_NONCE_LEN) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"IEEE 802.1X: Missing required encryption elements (RSNE=%p, DH=%p, Nonce=%p)",
+			elems->rsn_ie, elems->owe_dh, elems->nonce);
+		return -1;
+	}
+
+	if (wpa_parse_wpa_ie(elems->rsn_ie - 2, elems->rsn_ie_len + 2, &ie) < 0)
+	{
+		wpa_msg(wpa_s, MSG_INFO,
+			"IEEE 802.1X: Failed to parse received RSNE");
+		return -1;
+	}
+
+	if (wpa_compare_rsne_params(wpa_s->auth_1x->rsne,
+				    wpa_s->auth_1x->rsne_len,
+				    elems->rsn_ie - 2,
+				    elems->rsn_ie_len + 2) != 0) {
+		wpa_msg(wpa_s, MSG_INFO, "IEEE 802.1X: RSNE mismatch");
+		return -1;
+	}
+
+	if (wpa_s->auth_1x->pmksa_caching) {
+		if (ie.num_pmkid) {
+			if (pdu) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IEEE 802.1X: Unexpected EAPOL PDU with PMKID indicating PMKSA caching");
+				return -1;
+			}
+
+			if (ie.num_pmkid != 1) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IEEE 802.1X: Expected only one PMKID, got %u",
+					(unsigned int) ie.num_pmkid);
+				return -1;
+			}
+
+			if (os_memcmp(ie.pmkid, wpa_s->auth_1x->pmkid,
+				      PMKID_LEN) != 0) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IEEE 802.1X: PMKID mismatch");
+				return -1;
+			}
+			wpa_s->auth_1x->pmkid_found = true;
+		}
+	}
+
+	if (elems->owe_dh_len < 2) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"IEEE 802.1X: DH parameter too short (%u)",
+			(unsigned int) elems->owe_dh_len);
+		return -1;
+	}
+
+	group = WPA_GET_LE16(elems->owe_dh);
+	if (group != wpa_s->auth_1x->dh_group) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"IEEE 802.1X: DH group mismatch (AP=%u, local=%u)",
+			group, wpa_s->auth_1x->dh_group);
+		return -1;
+	}
+
+	wpa_s->auth_1x->dhss =
+		crypto_ecdh_set_peerkey(wpa_s->auth_1x->ecdh, 1,
+					elems->owe_dh + 2,
+					elems->owe_dh_len - 2);
+	if (!wpa_s->auth_1x->dhss) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"IEEE 802.1X: Failed to compute DH shared secret");
+		return -1;
+	}
+
+	os_memcpy(wpa_s->auth_1x->anonce, elems->nonce, WPA_NONCE_LEN);
+
+	return 0;
+}
+
+
 static int sme_parse_802_1x_auth_frame(struct wpa_supplicant *wpa_s,
 				       const u8 *ies, size_t ies_len,
 				       struct ieee802_11_elems *elems,
@@ -2748,10 +2837,16 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 	}
 
 	if (data->auth.auth_transaction == 2) {
-		if (!elems.akm_suite_selector ||
-		    elems.akm_suite_selector_len != 4 ||
-		    WPA_GET_BE32(elems.akm_suite_selector) !=
-		    wpa_akm_to_suite(wpa_s->key_mgmt)) {
+		if (wpa_s->auth_1x->derive_ptk) {
+			if (sme_validate_8021x_auth_elems(wpa_s, &elems, pdu) <
+			    0) {
+				validation_failed = true;
+				goto cleanup;
+			}
+		} else if (!elems.akm_suite_selector ||
+			   elems.akm_suite_selector_len != 4 ||
+			   WPA_GET_BE32(elems.akm_suite_selector) !=
+			   wpa_akm_to_suite(wpa_s->key_mgmt)) {
 			wpa_msg(wpa_s, MSG_INFO,
 				"IEEE 802.1X: Invalid/missing AKM Suite Selector");
 			wpa_s->auth_1x->status = WLAN_STATUS_AKMP_NOT_VALID;
