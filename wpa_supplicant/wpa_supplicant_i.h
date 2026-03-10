@@ -702,6 +702,13 @@ struct last_scan_ssid {
  * @derive_ptk: Whether to derive a PTK for association
  * @pmksa_caching: Whether PMKSA caching is being used
  * @pmkid: PMKID for PMKSA caching
+ * @snonce: SNonce
+ * @dh_group: DH group for key exchange
+ * @ecdh: ECDH context
+ * @rsne: RSNE
+ * @rsne_len: Length of RSNE
+ * @rsnxe: RSNXE
+ * @rsnxe_len: Length of RSNXE
  */
 struct auth_802_1x_data {
 	u16 auth_trans;
@@ -709,6 +716,13 @@ struct auth_802_1x_data {
 	bool derive_ptk;
 	bool pmksa_caching;
 	u8 pmkid[PMKID_LEN];
+	u8 snonce[WPA_NONCE_LEN];
+	u16 dh_group;
+	struct crypto_ecdh *ecdh;
+	u8 rsne[257];
+	size_t rsne_len;
+	u8 rsnxe[257];
+	size_t rsnxe_len;
 };
 #endif /* CONFIG_IEEE8021X_AUTH */
 

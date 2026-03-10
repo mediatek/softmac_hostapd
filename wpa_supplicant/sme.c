@@ -21,6 +21,7 @@
 #include "common/wpa_common.h"
 #include "common/sae.h"
 #include "common/dpp.h"
+#include "crypto/random.h"
 #include "rsn_supp/wpa.h"
 #include "rsn_supp/pmksa_cache.h"
 #include "rsn_supp/wpa_ie.h"
@@ -349,11 +350,101 @@ static void sme_802_1x_auth_data_free(struct wpa_supplicant *wpa_s)
 	if (!wpa_s || !wpa_s->auth_1x)
 		return;
 
+	if (wpa_s->auth_1x->ecdh) {
+		crypto_ecdh_deinit(wpa_s->auth_1x->ecdh);
+		wpa_s->auth_1x->ecdh = NULL;
+	}
+
 	os_free(wpa_s->auth_1x);
 	wpa_s->auth_1x = NULL;
 
 	if (wpa_s->eapol)
 		eapol_sm_set_eap_over_auth_frame(wpa_s->eapol, false);
+}
+
+
+static struct wpabuf *
+sme_build_802_1x_for_ptk(struct wpa_supplicant *wpa_s)
+{
+	struct wpabuf *pubkey_buf = NULL;
+	struct wpabuf *buf = NULL;
+	int rsne_len, rsnxe_len;
+	size_t total_len = 0;
+
+	/* Generate SNonce */
+	if (random_get_bytes(wpa_s->auth_1x->snonce, WPA_NONCE_LEN) < 0) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to generate SNonce");
+		goto fail;
+	}
+
+	/* Initialize ECDH for Diffie-Hellman Parameter element */
+	/* TODO: Add support for other groups */
+	wpa_s->auth_1x->dh_group = 19;
+	wpa_s->auth_1x->ecdh = crypto_ecdh_init(wpa_s->auth_1x->dh_group);
+	if (!wpa_s->auth_1x->ecdh) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to init ECDH group %d",
+			wpa_s->auth_1x->dh_group);
+		goto fail;
+	}
+
+	pubkey_buf = crypto_ecdh_get_pubkey(wpa_s->auth_1x->ecdh, 0);
+	if (!pubkey_buf) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to get ECDH pubkey");
+		goto fail;
+	}
+
+	/* Generate RSNE */
+	rsne_len = wpa_gen_wpa_ie_rsn(wpa_s->auth_1x->rsne,
+				      sizeof(wpa_s->auth_1x->rsne),
+				      wpa_s->pairwise_cipher,
+				      wpa_s->group_cipher, wpa_s->key_mgmt,
+				      wpa_s->mgmt_group_cipher, wpa_s->wpa);
+	if (rsne_len < 0) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to generate RSNE");
+		goto fail;
+	}
+	wpa_s->auth_1x->rsne_len = rsne_len;
+
+	/* Generate RSNXE */
+	rsnxe_len = wpa_gen_rsnxe(wpa_s->wpa, wpa_s->auth_1x->rsnxe,
+				  sizeof(wpa_s->auth_1x->rsnxe));
+	if (rsnxe_len < 0) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to generate RSNXE");
+		goto fail;
+	}
+	wpa_s->auth_1x->rsnxe_len = rsnxe_len;
+
+	total_len = 3 + WPA_NONCE_LEN + rsne_len + rsnxe_len +
+		3 + 2 + wpabuf_len(pubkey_buf);
+
+	buf = wpabuf_alloc(total_len);
+	if (!buf) {
+		wpa_dbg(wpa_s, MSG_INFO, "Failed to allocate buf");
+		goto fail;
+	}
+
+	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+	wpabuf_put_u8(buf, 1 + WPA_NONCE_LEN);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_NONCE);
+	wpabuf_put_data(buf, wpa_s->auth_1x->snonce, WPA_NONCE_LEN);
+
+	wpabuf_put_data(buf, wpa_s->auth_1x->rsne, rsne_len);
+	wpabuf_put_data(buf, wpa_s->auth_1x->rsnxe, rsnxe_len);
+
+	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+	wpabuf_put_u8(buf, 1 + 2 + wpabuf_len(pubkey_buf));
+	wpabuf_put_u8(buf, WLAN_EID_EXT_OWE_DH_PARAM);
+	wpabuf_put_le16(buf, wpa_s->auth_1x->dh_group);
+	wpabuf_put_buf(buf, pubkey_buf);
+
+	wpabuf_free(pubkey_buf);
+
+	return buf;
+
+fail:
+	wpabuf_free(pubkey_buf);
+	sme_802_1x_auth_data_free(wpa_s);
+	return NULL;
 }
 
 
@@ -363,6 +454,7 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 	struct wpabuf *buf, *eapol_pdu;
 	size_t buf_len;
 	u32 suite = 0;
+	struct wpabuf *buf_for_ptk = NULL;
 
 	if (wpa_key_mgmt_wpa_ieee8021x(wpa_s->key_mgmt &
 				       ~WPA_KEY_MGMT_IEEE8021X))
@@ -378,11 +470,23 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 	if (!eapol_pdu)
 		return NULL;
 
-	buf_len = 2 + 2 + 2 + wpabuf_len(eapol_pdu) + 7;
+	buf_len = 2 + 2 + 2 + wpabuf_len(eapol_pdu);
+
+	if (wpa_s->auth_1x->derive_ptk) {
+		buf_for_ptk = sme_build_802_1x_for_ptk(wpa_s);
+		if (!buf_for_ptk) {
+			wpabuf_free(eapol_pdu);
+			return NULL;
+		}
+		buf_len += wpabuf_len(buf_for_ptk);
+	} else {
+		buf_len += 7; /* AKM Suite Selector element */
+	}
 
 	buf = wpabuf_alloc(buf_len);
 	if (!buf) {
 		wpabuf_free(eapol_pdu);
+		wpabuf_free(buf_for_ptk);
 		return NULL;
 	}
 
@@ -391,10 +495,15 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 	wpabuf_put_le16(buf, wpabuf_len(eapol_pdu));
 	wpabuf_put_buf(buf, eapol_pdu);
 
-	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
-	wpabuf_put_u8(buf, 1 + 4);
-	wpabuf_put_u8(buf, WLAN_EID_EXT_AKM_SUITE_SELECTOR);
-	wpabuf_put_be32(buf, suite);
+	if (wpa_s->auth_1x->derive_ptk) {
+		wpabuf_put_buf(buf, buf_for_ptk);
+		wpabuf_free(buf_for_ptk);
+	} else {
+		wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+		wpabuf_put_u8(buf, 1 + 4);
+		wpabuf_put_u8(buf, WLAN_EID_EXT_AKM_SUITE_SELECTOR);
+		wpabuf_put_be32(buf, suite);
+	}
 
 	wpabuf_free(eapol_pdu);
 	return buf;

@@ -130,10 +130,10 @@ u16 rsn_supp_capab(struct wpa_sm *sm)
 }
 
 
-static int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
-			      int pairwise_cipher, int group_cipher,
-			      int key_mgmt, int mgmt_group_cipher,
-			      struct wpa_sm *sm)
+int wpa_gen_wpa_ie_rsn(u8 *rsn_ie, size_t rsn_ie_len,
+		       int pairwise_cipher, int group_cipher,
+		       int key_mgmt, int mgmt_group_cipher,
+		       struct wpa_sm *sm)
 {
 	u8 *pos;
 	struct rsn_ie_hdr *hdr;
