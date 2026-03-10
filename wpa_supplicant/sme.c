@@ -3086,6 +3086,12 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 				goto fail;
 			}
 
+			ptksa_cache_add(wpa_s->ptksa, wpa_s->own_addr,
+					peer_addr, wpa_s->pairwise_cipher,
+					dot11RSNAConfigPMKLifetime, &ptk, NULL,
+					NULL, wpa_s->key_mgmt,
+					WLAN_AUTH_802_1X);
+
 			forced_memzero(&ptk, sizeof(ptk));
 		}
 
