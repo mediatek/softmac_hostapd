@@ -2384,4 +2384,20 @@ struct wpabuf * eapol_sm_get_eapol_pdu(struct eapol_sm *sm, u8 type)
 	return out;
 }
 
+
+bool eapol_sm_get_success(struct eapol_sm *sm)
+{
+	if (!sm)
+		return false;
+	return sm->eapSuccess;
+}
+
+
+bool eapol_sm_get_failure(struct eapol_sm *sm)
+{
+	if (!sm)
+		return false;
+	return sm->eapFail;
+}
+
 #endif /* CONFIG_IEEE8021X_AUTH */
