@@ -2851,6 +2851,73 @@ static int sme_validate_8021x_auth_elems(struct wpa_supplicant *wpa_s,
 }
 
 
+static int sme_add_802_1x_mic_in_assoc(struct wpa_supplicant *wpa_s,
+				       const u8 *aa)
+{
+	struct ptksa_cache_entry *ptk_entry;
+	const u8 *rsne, *rsnxe;
+	size_t rsne_len = 0, rsnxe_len = 0;
+	u8 mic[SHA384_MAC_LEN];
+	size_t mic_len = 0;
+	const u8 *spa = wpa_s->own_addr;
+	struct wpabuf *buf = NULL;
+	int ret = -1;
+	u8 *pos;
+
+	ptk_entry = ptksa_cache_get(wpa_s->ptksa, aa, wpa_s->pairwise_cipher);
+	if (!ptk_entry || !ptk_entry->ptk.kck_len)
+		return -1;
+
+	rsne = get_ie(wpa_s->sme.assoc_req_ie, wpa_s->sme.assoc_req_ie_len,
+		      WLAN_EID_RSN);
+	rsnxe = get_ie(wpa_s->sme.assoc_req_ie, wpa_s->sme.assoc_req_ie_len,
+		       WLAN_EID_RSNX);
+	if (!rsne || !rsnxe || rsne[1] == 0 || rsnxe[1] == 0)
+		return -1;
+
+	rsne_len = 2 + rsne[1];
+	rsnxe_len = 2 + rsnxe[1];
+
+	buf = wpabuf_alloc(2 * ETH_ALEN + rsne_len + rsnxe_len);
+	if (!buf)
+		return -1;
+
+	/* Data to MAC: AA || SPA || RSNE || RSNXE */
+	wpabuf_put_data(buf, aa, ETH_ALEN);
+	wpabuf_put_data(buf, spa, ETH_ALEN);
+	wpabuf_put_data(buf, rsne, rsne_len);
+	wpabuf_put_data(buf, rsnxe, rsnxe_len);
+
+	if (wpa_key_mgmt_sha384(wpa_s->key_mgmt)) {
+		mic_len = SHA384_MAC_LEN / 2;
+		if (hmac_sha384(ptk_entry->ptk.kck, ptk_entry->ptk.kck_len,
+				wpabuf_head(buf), wpabuf_len(buf), mic) < 0)
+			goto out;
+	} else {
+		mic_len = SHA256_MAC_LEN / 2;
+		if (hmac_sha256(ptk_entry->ptk.kck, ptk_entry->ptk.kck_len,
+				wpabuf_head(buf), wpabuf_len(buf), mic) < 0)
+			goto out;
+	}
+
+	/* Append MIC element to assoc_req_ie */
+	if (wpa_s->sme.assoc_req_ie_len + 2 + mic_len >
+	    sizeof(wpa_s->sme.assoc_req_ie))
+		goto out;
+
+	pos = wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len;
+	*pos++ = WLAN_EID_MIC;
+	*pos++ = mic_len;
+	os_memcpy(pos, mic, mic_len);
+	wpa_s->sme.assoc_req_ie_len += 2 + mic_len;
+	ret = 0;
+
+out:
+	wpabuf_free(buf);
+	return ret;
+}
+
+
 static int sme_parse_802_1x_auth_frame(struct wpa_supplicant *wpa_s,
 				       const u8 *ies, size_t ies_len,
 				       struct ieee802_11_elems *elems,
@@ -3770,6 +3837,17 @@ mscs_fail:
 		wpa_s->pmkid_snonce_set = true;
 	}
 #endif /* CONFIG_PMKSA_PRIVACY */
+
+#ifdef CONFIG_IEEE8021X_AUTH
+	/*
+	 * Append MIC element to (Re)Association Request frame when using
+	 * IEEE 802.1X Authentication algorithm.
+	 */
+	if (auth_type == WLAN_AUTH_802_1X && wpa_s->auth_1x &&
+	    wpa_s->auth_1x->derive_ptk)
+		sme_add_802_1x_mic_in_assoc(wpa_s, wpa_s->valid_links ?
+					    wpa_s->ap_mld_addr : bssid);
+#endif /* CONFIG_IEEE8021X_AUTH */
 
 	params.bssid = bssid;
 	params.ssid = wpa_s->sme.ssid;
