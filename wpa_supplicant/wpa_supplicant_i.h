@@ -699,10 +699,16 @@ struct last_scan_ssid {
  * struct auth_802_1x_data - Data for IEEE 802.1X Authentication algorithm
  * @auth_trans: Authentication transaction sequence number
  * @status: Status code
+ * @derive_ptk: Whether to derive a PTK for association
+ * @pmksa_caching: Whether PMKSA caching is being used
+ * @pmkid: PMKID for PMKSA caching
  */
 struct auth_802_1x_data {
 	u16 auth_trans;
 	u16 status;
+	bool derive_ptk;
+	bool pmksa_caching;
+	u8 pmkid[PMKID_LEN];
 };
 #endif /* CONFIG_IEEE8021X_AUTH */
 

@@ -439,8 +439,43 @@ sme_build_802_1x_auth_continue(struct wpa_supplicant *wpa_s)
 }
 
 
+static void sme_check_802_1x_pmksa_caching(struct wpa_supplicant *wpa_s,
+					   struct wpa_bss *bss,
+					   struct wpa_ssid *ssid)
+{
+	struct rsn_pmksa_cache_entry *pmksa;
+	const u8 *rsnxe, *peer_addr;
+
+	peer_addr = wpa_s->valid_links ?
+		wpa_s->ap_mld_addr : wpa_s->pending_bssid;
+
+	rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
+	if (ssid->eap_over_auth_frame &&
+	    ieee802_11_rsnx_capab(rsnxe,
+				  WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) &&
+	    (wpa_s->drv_flags2 &
+	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION))
+		wpa_s->auth_1x->derive_ptk = true;
+
+	if (wpa_s->auth_1x->derive_ptk &&
+	    pmksa_cache_set_current(wpa_s->wpa, NULL, peer_addr, ssid, 0, NULL,
+				    wpa_s->key_mgmt, false) == 0) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"IEEE 802.1X: PMKSA cache entry found, using PMKSA caching");
+		wpa_sm_set_pmk_from_pmksa(wpa_s->wpa);
+		wpa_s->auth_1x->pmksa_caching = true;
+
+		pmksa = pmksa_cache_get_current(wpa_s->wpa);
+		if (pmksa)
+			os_memcpy(wpa_s->auth_1x->pmkid, pmksa->pmkid,
+				  PMKID_LEN);
+	}
+}
+
+
 static struct wpabuf *
 sme_build_802_1x_auth_request(struct wpa_supplicant *wpa_s,
+			      struct wpa_bss *bss,
 			      struct wpa_ssid *ssid, bool start)
 {
 	if (start) {
@@ -449,8 +484,12 @@ sme_build_802_1x_auth_request(struct wpa_supplicant *wpa_s,
 		if (!wpa_s->auth_1x)
 			return NULL;
 
-		eapol_sm_set_eap_over_auth_frame(wpa_s->eapol, true);
-		eapol_sm_notify_portEnabled(wpa_s->eapol, true);
+		sme_check_802_1x_pmksa_caching(wpa_s, bss, ssid);
+
+		if (!wpa_s->auth_1x->pmksa_caching) {
+			eapol_sm_set_eap_over_auth_frame(wpa_s->eapol, true);
+			eapol_sm_notify_portEnabled(wpa_s->eapol, true);
+		}
 
 		wpa_s->auth_1x->auth_trans = 1;
 		return sme_build_802_1x_auth_start(wpa_s, ssid);
@@ -1497,7 +1536,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 
 #ifdef CONFIG_IEEE8021X_AUTH
 	if (!skip_auth && params.auth_alg == WPA_AUTH_ALG_802_1X) {
-		resp = sme_build_802_1x_auth_request(wpa_s, ssid, start);
+		resp = sme_build_802_1x_auth_request(wpa_s, bss, ssid, start);
 		if (!resp) {
 			wpas_connection_failed(wpa_s, bss->bssid, NULL);
 			return;
