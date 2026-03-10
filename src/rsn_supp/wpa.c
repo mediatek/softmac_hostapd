@@ -7688,6 +7688,7 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 	}
 
 	sm->eppke_completed = 0;
+	sm->eap_over_auth_frame_completed = 0;
 	wpa_hexdump_key(MSG_DEBUG, "ENC_ASSOC: (Re)Association Response frame",
 			ies, ies_len);
 
@@ -7700,7 +7701,8 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 		return -1;
 	}
 
-	if (wpa_compare_rsn_ie(wpa_key_mgmt_sae(sm->key_mgmt),
+	if (wpa_compare_rsn_ie(wpa_key_mgmt_sae(sm->key_mgmt) ||
+			       wpa_key_mgmt_wpa_ieee8021x(sm->key_mgmt),
 			       sm->ap_rsn_ie, sm->ap_rsn_ie_len,
 			       elems.rsn_ie - 2, elems.rsn_ie_len + 2)) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
@@ -7763,6 +7765,7 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 
 	wpa_printf(MSG_DEBUG, "ENC_ASSOC: Association completed successfully");
 	sm->eppke_completed = 1;
+	sm->eap_over_auth_frame_completed = 1;
 
 	ret = 0;
 fail:

@@ -229,6 +229,7 @@ struct wpa_sm {
 #endif /* CONFIG_FILS */
 #ifdef CONFIG_ENC_ASSOC
 	unsigned int eppke_completed:1;
+	unsigned int eap_over_auth_frame_completed:1;
 #endif /* CONFIG_ENC_ASSOC */
 
 #ifdef CONFIG_OWE
