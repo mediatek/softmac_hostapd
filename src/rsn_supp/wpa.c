@@ -7782,9 +7782,23 @@ bool wpa_sm_pmksa_privacy_supported(struct wpa_sm *sm)
 
 
 #ifdef CONFIG_IEEE8021X_AUTH
+
 void wpa_sm_set_802_1x_auth_caps(struct wpa_sm *sm, u64 flags2)
 {
 	sm->eap_over_auth_frame =
 		!!(flags2 & WPA_DRIVER_FLAGS2_802_1X_AUTH);
 }
+
+
+const u8 * wpa_sm_get_pmk(struct wpa_sm *sm, const u8 *addr, const u8 *pmkid,
+			  size_t *pmk_len)
+{
+	if (wpa_supplicant_get_pmk(sm, addr, pmkid) < 0 ||
+	    sm->pmk_len == 0)
+		return NULL;
+
+	*pmk_len = sm->pmk_len;
+	return sm->pmk;
+}
+
 #endif /* CONFIG_IEEE8021X_AUTH */

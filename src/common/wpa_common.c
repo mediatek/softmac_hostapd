@@ -487,6 +487,8 @@ int wpa_eapol_key_mic(const u8 *key, size_t key_len, int akmp,
  * @ptk: Buffer for pairwise transient key
  * @akmp: Negotiated AKM
  * @cipher: Negotiated pairwise cipher
+ * @z: Additional context data
+ * @z_len: Length of additional context data
  * @kdk_len: The length in octets that should be derived for KDK
  * Returns: 0 on success, -1 on failure
  *
@@ -497,7 +499,9 @@ int wpa_eapol_key_mic(const u8 *key, size_t key_len, int akmp,
  *             [ || Z.x ])
  *
  * The optional Z.x component is used only with DPP and that part is not defined
- * in IEEE 802.11.
+ * in IEEE 802.11. The additional context data is also used to carry the DHss
+ * (Diffie-Hellman shared secret) when IEEE 802.1X authentication in
+ * Authentication frames is  used.
  */
 int wpa_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const char *label,
 		   const u8 *addr1, const u8 *addr2,

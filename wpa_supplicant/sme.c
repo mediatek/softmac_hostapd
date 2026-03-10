@@ -2796,6 +2796,23 @@ static int sme_parse_802_1x_auth_frame(struct wpa_supplicant *wpa_s,
 }
 
 
+static size_t wpas_get_kdk_len(struct wpa_supplicant *wpa_s)
+{
+	const u8 *rsnxe;
+
+	if (!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SEC_LTF_STA) ||
+	    !wpa_s->current_bss)
+		return 0;
+
+	rsnxe = wpa_bss_get_ie(wpa_s->current_bss, WLAN_EID_RSNX);
+
+	if (rsnxe && ieee802_11_rsnx_capab(rsnxe, WLAN_RSNX_CAPAB_SECURE_LTF))
+		return WPA_KDK_MAX_LEN;
+
+	return 0;
+}
+
+
 static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 					     union wpa_event_data *data)
 {
@@ -2906,6 +2923,47 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 
 	if (data->auth.status_code == WLAN_STATUS_802_1_X_AUTH_SUCCESS ||
 	    wpa_s->auth_1x->pmkid_found) {
+		if (wpa_s->auth_1x->derive_ptk) {
+			const u8 *peer_addr = wpa_s->valid_links ?
+				wpa_s->ap_mld_addr : wpa_s->pending_bssid;
+			struct wpa_ptk ptk;
+			const u8 *pmk;
+			size_t pmk_len;
+			size_t kdk_len;
+
+			pmk = wpa_sm_get_pmk(wpa_s->wpa, peer_addr,
+					     wpa_s->auth_1x->pmkid_found ?
+					     wpa_s->auth_1x->pmkid :
+					     NULL, &pmk_len);
+			if (!pmk) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IEEE 802.1X: Failed to get PMK");
+				goto fail;
+			}
+
+			kdk_len = wpas_get_kdk_len(wpa_s);
+
+			if (!wpa_s->auth_1x->dhss ||
+			    wpa_auth_802_1x_pmk_to_ptk(
+				    pmk, pmk_len, wpa_s->own_addr, peer_addr,
+				    wpa_s->auth_1x->snonce,
+				    wpa_s->auth_1x->anonce,
+				    wpa_s->key_mgmt, wpa_s->pairwise_cipher,
+				    wpabuf_head(wpa_s->auth_1x->dhss),
+				    wpabuf_len(wpa_s->auth_1x->dhss),
+				    &ptk, kdk_len) < 0) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"SME: PTK derivation failed");
+				goto fail;
+			}
+
+			/* Clear DHss after successful PTK derivation */
+			wpabuf_clear_free(wpa_s->auth_1x->dhss);
+			wpa_s->auth_1x->dhss = NULL;
+
+			forced_memzero(&ptk, sizeof(ptk));
+		}
+
 		wpa_msg(wpa_s, MSG_INFO,
 			"IEEE 802.1X: Authentication successful");
 
