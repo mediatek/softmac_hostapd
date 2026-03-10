@@ -2498,6 +2498,42 @@ void sme_external_auth_mgmt_rx(struct wpa_supplicant *wpa_s,
 
 #ifdef CONFIG_IEEE8021X_AUTH
 
+static int sme_validate_basic_mle(const struct ieee802_11_elems *elems,
+				  const u8 *addr)
+{
+	const u8 *mld_addr;
+
+	if (!addr) {
+		wpa_printf(MSG_DEBUG, "MLD: No peer address to check against");
+		return -1;
+	}
+
+	if (!elems->basic_mle || !elems->basic_mle_len) {
+		wpa_printf(MSG_DEBUG, "MLD: No MLE in authentication");
+		return -1;
+	}
+
+	mld_addr = get_basic_mle_mld_addr(elems->basic_mle,
+					  elems->basic_mle_len);
+	if (!mld_addr) {
+		wpa_printf(MSG_DEBUG, "MLD: No MLD address in MLE");
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG, "MLD: MLD MAC address=" MACSTR,
+		   MAC2STR(mld_addr));
+
+	if (!ether_addr_equal(addr, mld_addr)) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: Unexpected MLD MAC address (expected " MACSTR
+			   ")", MAC2STR(addr));
+		return -1;
+	}
+
+	return 0;
+}
+
+
 static int sme_parse_802_1x_auth_frame(struct wpa_supplicant *wpa_s,
 				       const u8 *ies, size_t ies_len,
 				       struct ieee802_11_elems *elems,
@@ -2582,6 +2618,12 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 		wpa_msg(wpa_s, MSG_INFO,
 			"IEEE 802.1X: Failed to parse Authentication frame");
 		return;
+	}
+
+	if (wpa_s->valid_links &&
+	    sme_validate_basic_mle(&elems, wpa_s->ap_mld_addr) < 0) {
+		validation_failed = true;
+		goto cleanup;
 	}
 
 	if (data->auth.auth_transaction == 2) {
