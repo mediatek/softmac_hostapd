@@ -6702,6 +6702,8 @@ union wpa_event_data {
 		u16 status_code;
 		const u8 *ies;
 		size_t ies_len;
+		const u8 *frame_body;
+		size_t frame_body_len;
 	} auth;
 
 	/**
