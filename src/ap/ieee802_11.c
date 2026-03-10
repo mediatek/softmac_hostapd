@@ -6512,7 +6512,10 @@ rsnxe_done:
 #endif /* CONFIG_OWE */
 
 #ifdef CONFIG_ENC_ASSOC
-	if (sta && sta->auth_alg == WLAN_AUTH_EPPKE &&
+	if (sta &&
+	    (sta->auth_alg == WLAN_AUTH_EPPKE ||
+	     sta->auth_alg == WLAN_AUTH_802_1X) &&
+	    wpa_auth_ap_sta_support_assoc_enc(sta->wpa_sm) &&
 	    status_code == WLAN_STATUS_SUCCESS) {
 		reply->frame_control |= WLAN_FC_PROTECTED;
 

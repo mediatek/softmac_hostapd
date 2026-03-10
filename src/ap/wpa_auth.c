@@ -8096,6 +8096,17 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 }
 
 
+bool wpa_auth_ap_sta_support_assoc_enc(struct wpa_state_machine *sm)
+{
+	if (!sm)
+		return false;
+
+	return sm->wpa_auth->conf.assoc_frame_encryption &&
+		ieee802_11_rsnx_capab(sm->rsnxe,
+				      WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION);
+}
+
+
 u8 * wpa_auth_write_assoc_resp_eppke(struct wpa_state_machine *sm,
 				     u8 *pos, size_t max_len, bool is_ml)
 {
