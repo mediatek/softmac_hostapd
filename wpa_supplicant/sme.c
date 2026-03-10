@@ -3033,6 +3033,8 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 			const u8 *pmk;
 			size_t pmk_len;
 			size_t kdk_len;
+			static const u8 zero[6] = { 0 };
+			enum wpa_alg alg;
 
 			pmk = wpa_sm_get_pmk(wpa_s->wpa, peer_addr,
 					     wpa_s->auth_1x->pmkid_found ?
@@ -3069,6 +3071,17 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 				    data->auth.frame_body_len, &ptk) < 0) {
 				wpa_msg(wpa_s, MSG_INFO,
 					"IEEE 802.1X: MIC validation failed");
+				forced_memzero(&ptk, sizeof(ptk));
+				goto fail;
+			}
+
+			alg = wpa_cipher_to_alg(wpa_s->pairwise_cipher);
+			if (wpa_drv_set_key(wpa_s, -1, alg, peer_addr, 0, 1,
+					    zero, sizeof(zero),
+					    ptk.tk, ptk.tk_len,
+					    KEY_FLAG_PAIRWISE_RX_TX) < 0) {
+				wpa_msg(wpa_s, MSG_INFO,
+					"IEEE 802.1X: TK configuration failed");
 				forced_memzero(&ptk, sizeof(ptk));
 				goto fail;
 			}
