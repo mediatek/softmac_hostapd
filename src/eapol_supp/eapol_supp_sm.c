@@ -2322,3 +2322,66 @@ int eapol_sm_get_erp_info(struct eapol_sm *sm, struct eap_peer_config *config,
 	return -1;
 #endif /* CONFIG_ERP */
 }
+
+
+#ifdef CONFIG_IEEE8021X_AUTH
+
+void eapol_sm_set_eap_over_auth_frame(struct eapol_sm *sm, bool active)
+{
+	if (!sm)
+		return;
+
+	sm->eap_over_auth_frame = active;
+	if (!active) {
+		wpabuf_free(sm->eapRespData);
+		sm->eapRespData = NULL;
+	}
+}
+
+
+struct wpabuf * eapol_sm_get_eapol_pdu(struct eapol_sm *sm, u8 type)
+{
+	struct wpabuf *buf = NULL, *out = NULL;
+	struct ieee802_1x_hdr *hdr;
+
+	if (!sm)
+		return NULL;
+
+	switch (type) {
+	case IEEE802_1X_TYPE_EAP_PACKET:
+		if (!sm->eapRespData) {
+			wpa_printf(MSG_INFO,
+				   "EAPOL: EAP-Packet requested but no response data");
+			return NULL;
+		}
+
+		buf = sm->eapRespData;
+		sm->eapRespData = NULL;
+		break;
+	case IEEE802_1X_TYPE_EAPOL_START:
+		buf = wpabuf_alloc(0);
+		if (!buf)
+			return NULL;
+		break;
+	default:
+		return NULL;
+	}
+
+	out = wpabuf_alloc(sizeof(*hdr) + wpabuf_len(buf));
+	if (!out) {
+		wpabuf_free(buf);
+		return NULL;
+	}
+
+	hdr = (struct ieee802_1x_hdr *) wpabuf_put(out, sizeof(*hdr));
+	hdr->version = EAPOL_VERSION;
+	hdr->type = type;
+	hdr->length = host_to_be16(wpabuf_len(buf));
+
+	wpabuf_put_buf(out, buf);
+	wpabuf_free(buf);
+
+	return out;
+}
+
+#endif /* CONFIG_IEEE8021X_AUTH */
