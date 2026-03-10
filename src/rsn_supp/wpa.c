@@ -3167,7 +3167,8 @@ static void wpa_supplicant_process_mlo_1_of_2(struct wpa_sm *sm,
 	struct wpa_eapol_ie_parse ie;
 
 	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm) &&
-	    !wpa_eppke_is_completed(sm)) {
+	    !wpa_eppke_is_completed(sm) &&
+	    !wpa_eap_over_auth_frame_is_completed(sm)) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
 			"MLO RSN: Group Key Handshake started prior to completion of 4-way handshake");
 		goto failed;
@@ -3404,7 +3405,8 @@ static void wpa_supplicant_process_1_of_2(struct wpa_sm *sm,
 	u16 gtk_len;
 
 	if (!sm->msg_3_of_4_ok && !wpa_fils_is_completed(sm) &&
-	    !wpa_eppke_is_completed(sm)) {
+	    !wpa_eppke_is_completed(sm) &&
+	    !wpa_eap_over_auth_frame_is_completed(sm)) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
 			"RSN: Group Key Handshake started prior to completion of 4-way handshake");
 		goto failed;
@@ -4584,7 +4586,7 @@ void wpa_sm_notify_assoc(struct wpa_sm *sm, const u8 *bssid)
 	}
 #endif /* CONFIG_FILS */
 #ifdef CONFIG_ENC_ASSOC
-	if (sm->eppke_completed) {
+	if (sm->eppke_completed || sm->eap_over_auth_frame_completed) {
 		/*
 		 * Clear portValid to kick EAPOL state machine to re-enter
 		 * AUTHENTICATED state to get the EAPOL port Authorized.
@@ -4643,6 +4645,7 @@ void wpa_sm_notify_disassoc(struct wpa_sm *sm)
 #endif /* CONFIG_IEEE80211R */
 #ifdef CONFIG_ENC_ASSOC
 	sm->eppke_completed = 0;
+	sm->eap_over_auth_frame_completed = 0;
 #endif /* CONFIG_ENC_ASSOC */
 
 	/* Keys are not needed in the WPA state machine anymore */
@@ -7780,6 +7783,16 @@ bool wpa_eppke_is_completed(struct wpa_sm *sm)
 {
 #ifdef CONFIG_ENC_ASSOC
 	return sm && sm->eppke_completed;
+#else /* CONFIG_ENC_ASSOC */
+	return false;
+#endif /* CONFIG_ENC_ASSOC */
+}
+
+
+bool wpa_eap_over_auth_frame_is_completed(struct wpa_sm *sm)
+{
+#ifdef CONFIG_ENC_ASSOC
+	return sm && sm->eap_over_auth_frame_completed;
 #else /* CONFIG_ENC_ASSOC */
 	return false;
 #endif /* CONFIG_ENC_ASSOC */

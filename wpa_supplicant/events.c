@@ -4681,6 +4681,9 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	if (!ft_completed)
 		ft_completed = wpa_eppke_is_completed(wpa_s->wpa);
 
+	if (!ft_completed)
+		ft_completed = wpa_eap_over_auth_frame_is_completed(wpa_s->wpa);
+
 	wpa_supplicant_set_state(wpa_s, WPA_ASSOCIATED);
 	if (!ether_addr_equal(bssid, wpa_s->bssid)) {
 		if (os_reltime_initialized(&wpa_s->session_start)) {
