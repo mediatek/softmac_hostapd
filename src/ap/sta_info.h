@@ -86,6 +86,8 @@ struct eap_over_auth_data {
 	struct crypto_ecdh *ecdh;
 	struct wpabuf *dhss;
 	bool add_mic;
+	u8 epp_pmkid_cur[PMKID_LEN];
+	u8 epp_pmkid_next[PMKID_LEN];
 };
 
 #define EHT_ML_MAX_STA_PROF_LEN 1024

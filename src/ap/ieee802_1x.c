@@ -1376,6 +1376,19 @@ void ieee802_1x_new_station(struct hostapd_data *hapd, struct sta_info *sta)
 		return;
 	}
 
+#ifdef CONFIG_IEEE8021X_AUTH
+	if (sta->auth_alg == WLAN_AUTH_802_1X) {
+		wpa_printf(MSG_DEBUG,
+			   "IEEE 802.1X: Ignore STA - EAP in Authentication frames");
+		/*
+		 * Clear any possible EAPOL authenticator state to support
+		 * reassociation change from WPA-EAP to PSK.
+		 */
+		ieee802_1x_free_station(hapd, sta);
+		return;
+	}
+#endif /* CONFIG_IEEE8021X_AUTH */
+
 	key_mgmt = wpa_auth_sta_key_mgmt(sta->wpa_sm);
 	if (key_mgmt != -1 &&
 	    (wpa_key_mgmt_wpa_psk(key_mgmt) || key_mgmt == WPA_KEY_MGMT_OWE ||

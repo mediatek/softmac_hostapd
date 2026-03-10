@@ -2586,6 +2586,7 @@ void ieee80211_send_eap_req(struct hostapd_data *hapd, struct sta_info *sta,
 		const u8 *aa = hapd->own_addr;
 		struct rsn_pmksa_cache *pmksa =
 			wpa_auth_get_pmksa_cache(hapd->wpa_auth, is_ml);
+		struct rsn_pmksa_cache_entry *entry;
 
 #ifdef CONFIG_IEEE80211BE
 		if (is_ml)
@@ -2655,11 +2656,18 @@ void ieee80211_send_eap_req(struct hostapd_data *hapd, struct sta_info *sta,
 		/* TODO: Fill session_timeout? */
 		wpa_hexdump_key(MSG_DEBUG, "IEEE802.1X: Cache PMK",
 				msk, pmk_len);
-		pmksa_cache_auth_add(pmksa, msk, pmk_len, NULL,
-				     sta->eap_auth_data.ptk.kck,
-				     sta->eap_auth_data.ptk.kck_len,
-				     aa, sta->addr, 0,
-				     sta->eapol_sm, sta->eap_auth_data.akm);
+
+		entry = pmksa_cache_auth_add(pmksa, msk, pmk_len, NULL,
+					     sta->eap_auth_data.ptk.kck,
+					     sta->eap_auth_data.ptk.kck_len,
+					     aa, sta->addr, 0, sta->eapol_sm,
+					     sta->eap_auth_data.akm);
+		if (!entry) {
+			wpa_printf(MSG_INFO, "Failed to add PMKSA entry");
+			return;
+		}
+		os_memcpy(sta->eap_auth_data.epp_pmkid_cur, entry->pmkid,
+			  PMKID_LEN);
 	}
 
 	reply = prepare_802_1x_auth_resp(hapd, sta, auth_transaction, status,
@@ -2717,7 +2725,7 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 		struct ieee802_11_elems elems;
 		struct rsn_pmksa_cache_entry *cached_pmk = NULL;
 		bool is_ml = ap_sta_is_mld(hapd, sta);
-		bool enc_assoc;
+		bool enc_assoc, pmkid_privacy;
 		size_t i;
 
 		if (ieee802_11_parse_elems(pos, end - pos, &elems, 1) ==
@@ -2733,6 +2741,11 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 
 		enc_assoc = ap_sta_support_enc_assoc(hapd, elems.rsnxe,
 						     elems.rsnxe_len);
+
+		pmkid_privacy = hapd->conf->pmksa_caching_privacy &&
+			ieee802_11_rsnx_capab_len(
+				elems.rsnxe, elems.rsnxe_len,
+				WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
 
 		os_memset(&data, 0, sizeof(data));
 		if (enc_assoc &&
@@ -2752,8 +2765,8 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 				    &data.pmkid[i * PMKID_LEN], PMKID_LEN);
 
 			cached_pmk = pmksa_cache_search(
-				hapd, sta->addr, &data.pmkid[i * PMKID_LEN],
-				is_ml);
+				hapd, pmkid_privacy ? NULL : sta->addr,
+				&data.pmkid[i * PMKID_LEN], is_ml);
 			if (!cached_pmk)
 				continue;
 
@@ -2767,6 +2780,8 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 #endif /* CONFIG_IEEE80211BE */
 			wpa_printf(MSG_DEBUG,
 				   "Found a matching PMKSA cache entry");
+			os_memcpy(sta->eap_auth_data.epp_pmkid_cur,
+				  cached_pmk->pmkid, PMKID_LEN);
 			reply = prepare_802_1x_auth_resp(
 				hapd, sta, auth_transaction + 1,
 				WLAN_STATUS_SUCCESS, cached_pmk, NULL, 0);
@@ -2811,6 +2826,7 @@ static void handle_auth_802_1x(struct hostapd_data *hapd, struct sta_info *sta,
 			}
 
 			sta->flags |= WLAN_STA_AUTH;
+			sta->auth_alg = WLAN_AUTH_802_1X;
 			sta->eap_auth_data.add_mic = true;
 			send_8021x_auth_reply(hapd, sta, auth_transaction + 1,
 					      WLAN_STATUS_SUCCESS, reply);
@@ -5635,6 +5651,12 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 			pmk_len = sta->pasn->pmk_len;
 			pmkid_next = sta->epp_pmkid_next;
 			break;
+#ifdef CONFIG_IEEE8021X_AUTH
+		case WLAN_AUTH_802_1X:
+			pmk_len = sta->eap_auth_data.pmk_len;
+			pmkid_next = sta->eap_auth_data.epp_pmkid_next;
+			break;
+#endif /* CONFIG_IEEE8021X_AUTH */
 		default:
 			wpa_printf(MSG_INFO,
 				   "EPP: Unsupported auth alg %u for PMKID privacy",
@@ -6665,6 +6687,9 @@ rsnxe_done:
 		if (wpa_auth_ap_sta_support_pmkid_privacy(sta->wpa_sm)) {
 			switch (sta->auth_alg) {
 			case WLAN_AUTH_EPPKE:
+#ifdef CONFIG_IEEE8021X_AUTH
+			case WLAN_AUTH_802_1X:
+#endif /* CONFIG_IEEE8021X_AUTH */
 				break;
 			default:
 				wpa_printf(MSG_INFO,
@@ -8343,6 +8368,12 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 			pmkid_cur = sta->pasn->epp_pmkid_cur;
 			pmkid_next = sta->epp_pmkid_next;
 			break;
+#ifdef CONFIG_IEEE8021X_AUTH
+		case WLAN_AUTH_802_1X:
+			pmkid_cur = sta->eap_auth_data.epp_pmkid_cur;
+			pmkid_next = sta->eap_auth_data.epp_pmkid_next;
+			break;
+#endif /* CONFIG_IEEE8021X_AUTH */
 		default:
 			wpa_printf(MSG_INFO,
 				   "EPP: Unsupported auth alg %u for PMKID privacy support",
