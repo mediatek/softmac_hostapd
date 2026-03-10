@@ -340,6 +340,126 @@ static struct wpabuf * sme_auth_build_sae_confirm(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_SAE */
 
 
+#ifdef CONFIG_IEEE8021X_AUTH
+
+static void sme_802_1x_auth_data_free(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s || !wpa_s->auth_1x)
+		return;
+
+	os_free(wpa_s->auth_1x);
+	wpa_s->auth_1x = NULL;
+
+	if (wpa_s->eapol)
+		eapol_sm_set_eap_over_auth_frame(wpa_s->eapol, false);
+}
+
+
+static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
+						   struct wpa_ssid *ssid)
+{
+	struct wpabuf *buf, *eapol_pdu;
+	size_t buf_len;
+	u32 suite = 0;
+
+	if (wpa_key_mgmt_wpa_ieee8021x(wpa_s->key_mgmt &
+				       ~WPA_KEY_MGMT_IEEE8021X))
+		suite = wpa_akm_to_suite(wpa_s->key_mgmt);
+
+	if (suite == 0) {
+		wpa_dbg(wpa_s, MSG_DEBUG, "No matching IEEE 802.1X AKM found");
+		return NULL;
+	}
+
+	eapol_pdu = eapol_sm_get_eapol_pdu(wpa_s->eapol,
+					   IEEE802_1X_TYPE_EAPOL_START);
+	if (!eapol_pdu)
+		return NULL;
+
+	buf_len = 2 + 2 + 2 + wpabuf_len(eapol_pdu) + 7;
+
+	buf = wpabuf_alloc(buf_len);
+	if (!buf) {
+		wpabuf_free(eapol_pdu);
+		return NULL;
+	}
+
+	wpabuf_put_le16(buf, wpa_s->auth_1x->auth_trans);
+	wpabuf_put_le16(buf, WLAN_STATUS_SUCCESS);
+	wpabuf_put_le16(buf, wpabuf_len(eapol_pdu));
+	wpabuf_put_buf(buf, eapol_pdu);
+
+	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+	wpabuf_put_u8(buf, 1 + 4);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_AKM_SUITE_SELECTOR);
+	wpabuf_put_be32(buf, suite);
+
+	wpabuf_free(eapol_pdu);
+	return buf;
+}
+
+
+static struct wpabuf *
+sme_build_802_1x_auth_continue(struct wpa_supplicant *wpa_s)
+{
+	struct wpabuf *buf, *eapol_pdu;
+
+	if (wpa_s->auth_1x->status != WLAN_STATUS_SUCCESS) {
+		buf = wpabuf_alloc(2 + 2 + 2);
+		if (!buf)
+			return NULL;
+
+		wpabuf_put_le16(buf, wpa_s->auth_1x->auth_trans);
+		wpabuf_put_le16(buf, wpa_s->auth_1x->status);
+		wpabuf_put_le16(buf, 0);
+		return buf;
+	}
+
+	eapol_pdu = eapol_sm_get_eapol_pdu(wpa_s->eapol,
+					   IEEE802_1X_TYPE_EAP_PACKET);
+	if (!eapol_pdu)
+		return NULL;
+
+	buf = wpabuf_alloc(2 + 2 + 2 + wpabuf_len(eapol_pdu));
+	if (!buf) {
+		wpabuf_free(eapol_pdu);
+		return NULL;
+	}
+
+	wpa_s->auth_1x->auth_trans++;
+	wpabuf_put_le16(buf, wpa_s->auth_1x->auth_trans);
+	wpabuf_put_le16(buf, wpa_s->auth_1x->status);
+	wpabuf_put_le16(buf, wpabuf_len(eapol_pdu));
+	wpabuf_put_buf(buf, eapol_pdu);
+	wpabuf_free(eapol_pdu);
+
+	return buf;
+}
+
+
+static struct wpabuf *
+sme_build_802_1x_auth_request(struct wpa_supplicant *wpa_s,
+			      struct wpa_ssid *ssid, bool start)
+{
+	if (start) {
+		sme_802_1x_auth_data_free(wpa_s);
+		wpa_s->auth_1x = os_zalloc(sizeof(struct auth_802_1x_data));
+		if (!wpa_s->auth_1x)
+			return NULL;
+
+		eapol_sm_set_eap_over_auth_frame(wpa_s->eapol, true);
+		eapol_sm_notify_portEnabled(wpa_s->eapol, true);
+
+		wpa_s->auth_1x->auth_trans = 1;
+		return sme_build_802_1x_auth_start(wpa_s, ssid);
+	}
+
+	return sme_build_802_1x_auth_continue(wpa_s);
+}
+
+#endif /* CONFIG_IEEE8021X_AUTH */
+
+
 /**
  * sme_auth_handle_rrm - Handle RRM aspects of current authentication attempt
  * @wpa_s: Pointer to wpa_supplicant data
@@ -1385,6 +1505,18 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	 */
 	if (params.auth_alg != WPA_AUTH_ALG_802_1X || start)
 		wpa_supplicant_initiate_eapol(wpa_s);
+
+#ifdef CONFIG_IEEE8021X_AUTH
+	if (!skip_auth && params.auth_alg == WPA_AUTH_ALG_802_1X) {
+		resp = sme_build_802_1x_auth_request(wpa_s, ssid, start);
+		if (!resp) {
+			wpas_connection_failed(wpa_s, bss->bssid, NULL);
+			return;
+		}
+		params.auth_data = wpabuf_head(resp);
+		params.auth_data_len = wpabuf_len(resp);
+	}
+#endif /* CONFIG_IEEE8021X_AUTH */
 
 #ifdef CONFIG_FILS
 	/* TODO: FILS operations can in some cases be done between different
@@ -3577,6 +3709,9 @@ void sme_clear_on_disassoc(struct wpa_supplicant *wpa_s)
 	if (wpa_s->sme.ft_ies || wpa_s->sme.ft_used)
 		sme_update_ft_ies(wpa_s, NULL, NULL, 0);
 #endif /* CONFIG_IEEE80211R */
+#ifdef CONFIG_IEEE8021X_AUTH
+	sme_802_1x_auth_data_free(wpa_s);
+#endif /* CONFIG_IEEE8021X_AUTH */
 	sme_stop_sa_query(wpa_s);
 }
 

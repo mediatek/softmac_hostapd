@@ -694,6 +694,18 @@ struct last_scan_ssid {
 	size_t ssid_len;
 };
 
+#ifdef CONFIG_IEEE8021X_AUTH
+/**
+ * struct auth_802_1x_data - Data for IEEE 802.1X Authentication algorithm
+ * @auth_trans: Authentication transaction sequence number
+ * @status: Status code
+ */
+struct auth_802_1x_data {
+	u16 auth_trans;
+	u16 status;
+};
+#endif /* CONFIG_IEEE8021X_AUTH */
+
 /**
  * struct wpa_supplicant - Internal data for wpa_supplicant interface
  *
@@ -1621,6 +1633,10 @@ struct wpa_supplicant {
 	bool supp_pbc_active; /* Set for interface when PBC is triggered */
 	bool wps_overlap;
 	bool scan_in_progress_6ghz; /* Set upon a 6 GHz scan being triggered */
+
+#ifdef CONFIG_IEEE8021X_AUTH
+	struct auth_802_1x_data *auth_1x;
+#endif /* CONFIG_IEEE8021X_AUTH */
 
 #ifdef CONFIG_PASN
 	struct pasn_data pasn;
