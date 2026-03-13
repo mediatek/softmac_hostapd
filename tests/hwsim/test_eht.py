@@ -1599,7 +1599,16 @@ def _test_eht_6ghz(dev, apdev, channel, op_class, ccfs1):
         params["ieee80211be"] = "1"
         params["channel"] = str(channel)
         params["op_class"] = str(op_class)
-        params["he_oper_centr_freq_seg0_idx"] = str(ccfs1)
+
+        if op_class == 137:
+            if ccfs1 > channel:
+                he_ccfs1 = ccfs1 - 16
+            else:
+                he_ccfs1 = ccfs1 + 16
+            params["he_oper_centr_freq_seg0_idx"] = str(he_ccfs1)
+        else:
+            params["he_oper_centr_freq_seg0_idx"] = str(ccfs1)
+
         params["eht_oper_centr_freq_seg0_idx"] = str(ccfs1)
         params["country_code"] = "CA"
 
