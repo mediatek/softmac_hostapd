@@ -829,6 +829,7 @@ void nan_set_cdw_overwrite(struct nan_data *nan, int map_id_2g, int map_id_5g);
 void nan_stop(struct nan_data *nan);
 void nan_flush(struct nan_data *nan);
 
+int siphash_2_4(const u8 *key, const u8 *data, size_t data_len, u8 *tag);
 int nan_add_peer(struct nan_data *nan, const u8 *addr,
 		 const u8 *device_attrs, size_t device_attrs_len);
 bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,

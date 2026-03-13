@@ -771,3 +771,129 @@ int nan_crypto_pmkid_list(struct dl_list *pmkid_list, const u8 *raddr,
 
 	return 0;
 }
+
+
+/*
+ * Based on the SipHash reference C implementation by Jean-Philippe
+ * Aumasson and Daniel J. Bernstein:
+ * https://github.com/veorq/SipHash
+ *
+ * The reference implementation is dedicated to the public domain under
+ * the CC0 Public Domain Dedication. This version is adapted to hostap.git
+ * interfaces and computes the 64-bit SipHash-2-4 output.
+ */
+
+/* SipHash round function */
+#define SIPROUND do { \
+	v0 += v1; v1 = ROTL64(v1, 13); v1 ^= v0; v0 = ROTL64(v0, 32); \
+	v2 += v3; v3 = ROTL64(v3, 16); v3 ^= v2; \
+	v0 += v3; v3 = ROTL64(v3, 21); v3 ^= v0; \
+	v2 += v1; v1 = ROTL64(v1, 17); v1 ^= v2; v2 = ROTL64(v2, 32); \
+} while (0)
+
+/* Rotate left for 64-bit values */
+#define ROTL64(x, b) ((u64) (((x) << (b)) | ((x) >> (64 - (b)))))
+
+#define SIPHASH_TAG_LEN 8
+
+/**
+ * siphash_2_4 - SipHash-2-4 pseudorandom function
+ * @key: 128-bit (16-byte) secret key
+ * @data: Input data to be hashed
+ * @data_len: Length of the input data in bytes
+ * @tag: Buffer for the output tag (8 bytes)
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function computes the SipHash-2-4 tag for the given data using
+ * the provided key. SipHash-2-4 uses 2 compression rounds (c=2) and
+ * 4 finalization rounds (d=4).
+ */
+int siphash_2_4(const u8 *key, const u8 *data, size_t data_len, u8 *tag)
+{
+	u64 v0, v1, v2, v3;
+	u64 k0, k1;
+	u64 m;
+	size_t i;
+	const u8 *end;
+	int left;
+	u64 b;
+
+	if (!key || !tag || (data_len > 0 && !data))
+		return -1;
+
+	/* Load 128-bit key as two 64-bit little-endian values */
+	k0 = WPA_GET_LE64(key);
+	k1 = WPA_GET_LE64(key + 8);
+
+	/* Initialize state with key and constants */
+	v0 = k0 ^ 0x736f6d6570736575ULL;
+	v1 = k1 ^ 0x646f72616e646f6dULL;
+	v2 = k0 ^ 0x6c7967656e657261ULL;
+	v3 = k1 ^ 0x7465646279746573ULL;
+
+	/* Process full 8-byte blocks */
+	end = data + (data_len - (data_len % 8));
+	for (i = 0; i < data_len / 8; i++) {
+		m = WPA_GET_LE64(data + i * 8);
+		v3 ^= m;
+
+		/* Compression rounds (c=2) */
+		SIPROUND;
+		SIPROUND;
+
+		v0 ^= m;
+	}
+
+	/* Process remaining bytes and add length */
+	left = data_len & 7;
+	b = ((u64) data_len) << 56;
+
+	switch (left) {
+	case 7:
+		b |= ((u64) end[6]) << 48;
+		__attribute__((__fallthrough__));
+	case 6:
+		b |= ((u64) end[5]) << 40;
+		__attribute__((__fallthrough__));
+	case 5:
+		b |= ((u64) end[4]) << 32;
+		__attribute__((__fallthrough__));
+	case 4:
+		b |= ((u64) end[3]) << 24;
+		__attribute__((__fallthrough__));
+	case 3:
+		b |= ((u64) end[2]) << 16;
+		__attribute__((__fallthrough__));
+	case 2:
+		b |= ((u64) end[1]) << 8;
+		__attribute__((__fallthrough__));
+	case 1:
+		b |= ((u64) end[0]);
+		break;
+	case 0:
+		break;
+	}
+
+	v3 ^= b;
+
+	/* Compression rounds (c=2) */
+	SIPROUND;
+	SIPROUND;
+
+	v0 ^= b;
+
+	/* Finalization */
+	v2 ^= 0xff;
+
+	/* Finalization rounds (d=4) */
+	SIPROUND;
+	SIPROUND;
+	SIPROUND;
+	SIPROUND;
+
+	/* Compute output tag */
+	b = v0 ^ v1 ^ v2 ^ v3;
+	WPA_PUT_LE64(tag, b);
+
+	return 0;
+}

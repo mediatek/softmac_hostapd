@@ -592,6 +592,7 @@ endif
 ifdef CONFIG_NAN_USD
 OBJS += src/common/nan_de.c
 OBJS += src/ap/nan_usd_ap.c
+OBJS += src/nan/nan_crypto.c
 L_CFLAGS += -DCONFIG_NAN_USD
 endif
 
