@@ -45,6 +45,7 @@
 #include "fils_hlp.h"
 #include "neighbor_db.h"
 #include "nan_usd_ap.h"
+#include "interference.h"
 
 
 #ifdef CONFIG_FILS
@@ -2342,6 +2343,21 @@ static void hostapd_event_dfs_cac_started(struct hostapd_data *hapd,
 			      radar->cf1, radar->cf2);
 }
 
+
+static void hostapd_event_incumbt_sig_intf_detected(
+	struct hostapd_data *hapd, struct incumbt_sig_intf_event *intf_info)
+{
+	wpa_printf(MSG_DEBUG, "Interference due to incumbent signal detected on %d MHz with intf bitmap 0x%x on link_id %d",
+		   intf_info->freq, intf_info->chan_bw_interference_bitmap,
+		   intf_info->link_id);
+	if (hostapd_incumbt_sig_intf_detected(
+		    hapd->iface, intf_info->freq, intf_info->chan_width,
+		    intf_info->cf1, intf_info->cf2,
+		    intf_info->chan_bw_interference_bitmap))
+		wpa_printf(MSG_INFO,
+			   "Failed to handle incumbent signal interference");
+}
+
 #endif /* NEED_AP_MLME */
 
 
@@ -2858,6 +2874,14 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			break;
 		hapd = switch_link_hapd(hapd, data->dfs_event.link_id);
 		hostapd_event_dfs_cac_started(hapd, &data->dfs_event);
+		break;
+	case EVENT_INCUMBT_SIG_INTF_DETECTED:
+		if (!data)
+			break;
+		hapd = switch_link_hapd(hapd,
+					data->incumbt_sig_intf_event.link_id);
+		hostapd_event_incumbt_sig_intf_detected(
+			hapd, &data->incumbt_sig_intf_event);
 		break;
 #endif /* NEED_AP_MLME */
 	case EVENT_INTERFACE_ENABLED:
