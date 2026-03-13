@@ -13171,6 +13171,11 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "randomized_service_id=", 22) == 0) {
+			params.randomize_service_id = !!atoi(token + 22);
+			continue;
+		}
+
 		if (os_strncmp(token, "nd_pmk=", 7) == 0) {
 			if (params.nd_pmk) {
 				wpa_printf(MSG_INFO,
@@ -13483,6 +13488,11 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 
 		if (os_strncmp(token, "extended_pbm=", 13) == 0) {
 			params.extended_pbm = strtol(token + 13, NULL, 0);
+			continue;
+		}
+
+		if (os_strncmp(token, "randomized_service_id=", 22) == 0) {
+			params.randomize_service_id = !!atoi(token + 22);
 			continue;
 		}
 
