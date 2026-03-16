@@ -5307,7 +5307,9 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "eml_disable") == 0) {
 		bss->eml_disable = atoi(pos);
 	} else if (os_strcmp(buf, "emlsr_on_one_link") == 0) {
-		bss->emlsr_on_one_link = atoi(pos);
+		int val = atoi(pos);
+
+		bss->emlsr_on_one_link = val < 0 ? 0 : val;
 	} else if (os_strcmp(buf, "epcs_disabled") == 0) {
 		bss->epcs_disabled = atoi(pos);
 	} else if (os_strcmp(buf, "neg_ttlm_support_mode") == 0) {
