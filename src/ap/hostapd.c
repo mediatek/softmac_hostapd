@@ -1495,6 +1495,10 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 				bool flush_old_stations)
 {
 	struct hostapd_bss_config *conf = hapd->conf;
+	bool is_mesh = conf->mesh == MESH_ENABLED;
+
+	if (is_mesh)
+		goto skip_set_beacon;
 
 	if (ieee802_11_set_beacon(hapd) < 0)
 		return -1;
@@ -1522,13 +1526,14 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_IEEE80211BE */
 
+skip_set_beacon:
 	if (hapd->driver && hapd->driver->set_operstate)
 		hapd->driver->set_operstate(hapd->drv_priv, 1);
 
 	hostapd_ubus_add_bss(hapd);
 	hostapd_ucode_add_bss(hapd);
 
-	if (conf->start_disabled)
+	if (!is_mesh && conf->start_disabled)
 		hostapd_drv_beacon_ctrl(hapd, false);
 
 	return 0;
