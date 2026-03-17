@@ -795,6 +795,11 @@ hostapd_switch_chan(struct ubus_context *ctx, struct ubus_object *obj,
 
 		if (hostapd_switch_channel(bss, &css) != 0)
 			ret = UBUS_STATUS_NOT_SUPPORTED;
+
+#ifdef CONFIG_IEEE80211BE
+		if (!ret && bss->conf->mld_ap)
+			hostapd_update_aff_link_beacon(bss, css.cs_count);
+#endif /* CONFIG_IEEE80211BE */
 	}
 
 	if (!ret || !tb[CSA_FORCE] || !blobmsg_get_bool(tb[CSA_FORCE]))
