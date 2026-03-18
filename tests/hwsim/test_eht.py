@@ -161,7 +161,7 @@ def test_prefer_eht_20(dev, apdev):
       raise Exception("Unexpected BSS1 est_throughput: " + est)
 
 def start_eht_sae_ap(apdev, ml=False, transition_mode=False,
-                     anti_clogging_token=False):
+                     anti_clogging_token=False, require_eht=False):
     params = hostapd.wpa2_params(ssid="eht", passphrase="12345678")
     params["ieee80211ax"] = "1"
     params["ieee80211be"] = "1"
@@ -178,6 +178,8 @@ def start_eht_sae_ap(apdev, ml=False, transition_mode=False,
     if ml:
         ml_elem = "ff0d6b" + "3001" + "0a" + "021122334455" + "01" + "00" + "00"
         params['vendor_elements'] = ml_elem
+    if require_eht:
+        params['require_eht'] = '1'
     try:
         hapd = hostapd.add_ap(apdev, params)
     except Exception as e:
@@ -198,6 +200,36 @@ def test_eht_sae(dev, apdev):
                        ieee80211w="2", beacon_prot="1",
                        pairwise="GCMP-256", group="GCMP-256",
                        group_mgmt="BIP-GMAC-256", scan_freq="2412")
+    finally:
+        dev[0].set("sae_groups", "")
+        dev[0].set("sae_pwe", "0")
+
+def test_eht_sae_require_eht(dev, apdev):
+    """EHT AP requiring EHT for association"""
+    check_sae_capab(dev[0])
+
+    hapd = start_eht_sae_ap(apdev[0], require_eht=True)
+    try:
+        dev[0].set("sae_groups", "20")
+        dev[0].set("sae_pwe", "2")
+        dev[0].connect("eht", key_mgmt="SAE-EXT-KEY", psk="12345678",
+                       ieee80211w="2", beacon_prot="1",
+                       pairwise="GCMP-256", group="GCMP-256",
+                       group_mgmt="BIP-GMAC-256", scan_freq="2412")
+        dev[0].request("REMOVE_NETWORK all")
+        dev[0].wait_disconnected()
+
+        dev[0].connect("eht", key_mgmt="SAE-EXT-KEY", psk="12345678",
+                       ieee80211w="2", beacon_prot="1",
+                       pairwise="GCMP-256", group="GCMP-256",
+                       group_mgmt="BIP-GMAC-256", scan_freq="2412",
+                       disable_eht="1", wait_connect=False)
+        ev = dev[0].wait_event(['CTRL-EVENT-ASSOC-REJECT'])
+        dev[0].request("DISCONNECT")
+        if not ev:
+            raise Exception('Rejection not found')
+        if "status_code=135" not in ev:
+            raise Exception("Unexpected association rejection status: " + ev)
     finally:
         dev[0].set("sae_groups", "")
         dev[0].set("sae_pwe", "0")
