@@ -5294,6 +5294,14 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->mld_ap = !!atoi(pos);
 	} else if (os_strcmp(buf, "mld_link_id") == 0) {
 		bss->mld_link_id = atoi(pos);
+	} else if (os_strcmp(buf, "mld_allowed_links") == 0) {
+		int val = atoi(pos);
+
+		bss->expected_mlo_link_num = 0;
+		while (val) {
+			bss->expected_mlo_link_num += (val & 1);
+			val >>= 1;
+		}
 	} else if (os_strcmp(buf, "expected_mlo_link_num") == 0) {
 		bss->expected_mlo_link_num = atoi(pos);
 	} else if (os_strcmp(buf, "mld_addr") == 0) {

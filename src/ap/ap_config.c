@@ -1582,6 +1582,13 @@ static int hostapd_config_check_bss(struct hostapd_bss_config *bss,
 			   "Disabling bss_require_eht as IEEE 802.11be is disabled for this BSS");
 	}
 
+	if (full_config && bss->expected_mlo_link_num >= MAX_NUM_MLD_LINKS) {
+		wpa_printf(MSG_ERROR,
+			   "Invalid Expected MLO link number: %d",
+			   bss->expected_mlo_link_num);
+		return -1;
+	}
+
 #ifdef CONFIG_TESTING_OPTIONS
 	if (full_config && (bss->mld_link_id < -1 ||
 	    bss->mld_link_id > MAX_NUM_MLD_LINKS)) {
