@@ -5924,14 +5924,14 @@ struct wpa_ssid * wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 		      (!entry->ssid ||
 		       os_memcmp(ssid, entry->ssid, ssid_len) == 0)) ||
 		     wired) &&
-		    (!entry->bssid_set ||
+		    (wpa_s->valid_links || !entry->bssid_set ||
 		     ether_addr_equal(bssid, entry->bssid)))
 			return entry;
 #ifdef CONFIG_WPS
 		if (!wpas_network_disabled(wpa_s, entry) &&
 		    (entry->key_mgmt & WPA_KEY_MGMT_WPS) &&
 		    (entry->ssid == NULL || entry->ssid_len == 0) &&
-		    (!entry->bssid_set ||
+		    (wpa_s->valid_links || !entry->bssid_set ||
 		     ether_addr_equal(bssid, entry->bssid)))
 			return entry;
 #endif /* CONFIG_WPS */
@@ -5941,7 +5941,7 @@ struct wpa_ssid * wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 		    (entry->ssid &&
 		     owe_trans_ssid_match(wpa_s, bssid, entry->ssid,
 					  entry->ssid_len)) &&
-		    (!entry->bssid_set ||
+		    (wpa_s->valid_links || !entry->bssid_set ||
 		     ether_addr_equal(bssid, entry->bssid)))
 			return entry;
 #endif /* CONFIG_OWE */
