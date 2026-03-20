@@ -955,7 +955,8 @@ int pmksa_cache_set_current(struct wpa_sm *sm, const u8 *pmkid, const u8 *bssid,
 
 
 void pmksa_cache_flush(struct rsn_pmksa_cache *pmksa, void *network_ctx,
-		       const u8 *pmk, size_t pmk_len, bool external_only)
+		       const u8 *pmk, size_t pmk_len, bool external_only,
+		       const u8 *addr)
 {
 }
 
