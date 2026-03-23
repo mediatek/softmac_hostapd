@@ -391,6 +391,12 @@ struct wpa_auth_callbacks {
 						 void *ctx), void *cb_ctx);
 	int (*for_each_auth)(void *ctx, int (*cb)(struct wpa_authenticator *a,
 						  void *ctx), void *cb_ctx);
+#ifdef CONFIG_IEEE80211BE
+	int (*for_each_partner_auth)(void *ctx,
+				     int (*cb)(struct wpa_authenticator *a,
+					       void *ctx),
+				     void *cb_ctx);
+#endif /* CONFIG_IEEE80211BE */
 	int (*send_ether)(void *ctx, const u8 *dst, u16 proto, const u8 *data,
 			  size_t data_len);
 	int (*send_oui)(void *ctx, const u8 *dst, u8 oui_suffix, const u8 *data,

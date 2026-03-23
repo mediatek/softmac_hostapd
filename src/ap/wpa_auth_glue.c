@@ -779,6 +779,29 @@ static int hostapd_wpa_auth_for_each_auth(
 }
 
 
+#ifdef CONFIG_IEEE80211BE
+static int hostapd_wpa_auth_for_each_partner_auth(
+	void *ctx, int (*cb)(struct wpa_authenticator *sm, void *ctx),
+	void *cb_ctx)
+{
+	struct hostapd_data *hapd = ctx;
+	struct hostapd_data *bss;
+
+	if (cb(hapd->wpa_auth, cb_ctx))
+		return 1;
+
+	if (!hapd->mld)
+		return 0;
+
+	for_each_mld_link(bss, hapd) {
+		if (bss != hapd && bss->wpa_auth && cb(bss->wpa_auth, cb_ctx))
+			return 1;
+	}
+	return 0;
+}
+#endif /* CONFIG_IEEE80211BE */
+
+
 #ifdef CONFIG_IEEE80211R_AP
 
 struct wpa_ft_rrb_rx_later_data {
@@ -1806,6 +1829,9 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 		.get_sta_count = hostapd_wpa_auth_get_sta_count,
 		.for_each_sta = hostapd_wpa_auth_for_each_sta,
 		.for_each_auth = hostapd_wpa_auth_for_each_auth,
+#ifdef CONFIG_IEEE80211BE
+		.for_each_partner_auth = hostapd_wpa_auth_for_each_partner_auth,
+#endif /* CONFIG_IEEE80211BE */
 		.send_ether = hostapd_wpa_auth_send_ether,
 		.send_oui = hostapd_wpa_auth_send_oui,
 		.channel_info = hostapd_channel_info,

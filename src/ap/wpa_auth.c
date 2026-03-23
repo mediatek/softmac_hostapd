@@ -418,6 +418,20 @@ int wpa_auth_for_each_auth(struct wpa_authenticator *wpa_auth,
 }
 
 
+#ifdef CONFIG_IEEE80211BE
+static int wpa_auth_for_each_partner_auth(struct wpa_authenticator *wpa_auth,
+					  int (*cb)(struct wpa_authenticator *a,
+						    void *ctx),
+					  void *cb_ctx)
+{
+	if (!wpa_auth->cb->for_each_partner_auth)
+		return 0;
+	return wpa_auth->cb->for_each_partner_auth(wpa_auth->cb_ctx, cb,
+						   cb_ctx);
+}
+#endif /* CONFIG_IEEE80211BE */
+
+
 void wpa_auth_store_ptksa(struct wpa_authenticator *wpa_auth,
 			  const u8 *addr, int cipher,
 			  u32 life_time, const struct wpa_ptk *ptk)
@@ -662,11 +676,31 @@ static int wpa_auth_pmksa_clear_cb(struct wpa_state_machine *sm, void *ctx)
 }
 
 
+
+static int wpa_auth_pmksa_clear_auth_cb(struct wpa_authenticator *wpa_auth,
+					void *ctx)
+{
+	return wpa_auth_for_each_sta(wpa_auth, wpa_auth_pmksa_clear_cb, ctx);
+}
+
+
 static void wpa_auth_pmksa_free_cb(struct rsn_pmksa_cache_entry *entry,
 				   void *ctx)
 {
 	struct wpa_authenticator *wpa_auth = ctx;
+
+#ifdef CONFIG_IEEE80211BE
+	if (!entry->is_ml) {
+		wpa_auth_for_each_sta(wpa_auth, wpa_auth_pmksa_clear_cb, entry);
+	} else {
+		/* Clear stale PMKSA references across partner MLD links. */
+		wpa_auth_for_each_partner_auth(wpa_auth,
+					       wpa_auth_pmksa_clear_auth_cb,
+					       entry);
+	}
+#else /* CONFIG_IEEE80211BE */
 	wpa_auth_for_each_sta(wpa_auth, wpa_auth_pmksa_clear_cb, entry);
+#endif /* CONFIG_IEEE80211BE */
 
 	/* Remove matching PMKID from the driver, if it had been added, e.g.,
 	 * by external SAE authentication */
@@ -6829,6 +6863,9 @@ int wpa_auth_pmksa_add_sae(struct wpa_authenticator *wpa_auth, const u8 *addr,
 		return -1;
 
 	entry->sae_vlan_id = vlan_id;
+#ifdef CONFIG_IEEE80211BE
+	entry->is_ml = is_ml;
+#endif /* CONFIG_IEEE80211BE */
 
 	return 0;
 }
@@ -6867,6 +6904,9 @@ int wpa_auth_pmksa_add2(struct wpa_authenticator *wpa_auth, const u8 *addr,
 	if (!entry)
 		return -1;
 
+#ifdef CONFIG_IEEE80211BE
+	entry->is_ml = is_ml;
+#endif /* CONFIG_IEEE80211BE */
 	if (dpp_pkhash)
 		entry->dpp_pkhash = os_memdup(dpp_pkhash, SHA256_MAC_LEN);
 

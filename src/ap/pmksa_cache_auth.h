@@ -37,6 +37,13 @@ struct rsn_pmksa_cache_entry {
 	int opportunistic;
 
 	u64 acct_multi_session_id;
+#ifdef CONFIG_IEEE80211BE
+	/**
+	 * This field is used to identify whether the entry is from ml_pmksa or
+	 * pmksa.
+	 */
+	bool is_ml;
+#endif /* CONFIG_IEEE80211BE */
 };
 
 struct rsn_pmksa_cache;
