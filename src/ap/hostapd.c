@@ -1662,10 +1662,6 @@ int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 		u8 *addr = hapd->own_addr;
 		bool use_existing = !first;
 
-#ifdef CONFIG_IEEE80211BE
-		if (hapd->conf->mld_ap)
-			addr = NULL;
-#endif /* CONFIG_IEEE80211BE */
 		if (!is_zero_ether_addr(conf->bssid)) {
 			/* Allocate the configured BSSID. */
 			os_memcpy(hapd->own_addr, conf->bssid, ETH_ALEN);
