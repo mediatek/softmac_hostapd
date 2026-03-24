@@ -895,6 +895,27 @@ void wpas_pasn_auth_stop(struct wpa_supplicant *wpa_s)
 }
 
 
+void wpas_pasn_free_params(struct wpa_supplicant *wpa_s)
+{
+	unsigned int i;
+	struct pasn_peer *peer;
+
+	if (!wpa_s->pasn_params)
+		return;
+
+	for (i = 0; i < wpa_s->pasn_params->num_peers; i++) {
+		peer = &wpa_s->pasn_params->peer[i];
+		str_clear_free(peer->password);
+		peer->password = NULL;
+		os_free(peer->comeback);
+		peer->comeback = NULL;
+	}
+
+	os_free(wpa_s->pasn_params);
+	wpa_s->pasn_params = NULL;
+}
+
+
 static int wpas_pasn_immediate_retry(struct wpa_supplicant *wpa_s,
 				     struct pasn_data *pasn,
 				     struct wpa_pasn_params_data *params)

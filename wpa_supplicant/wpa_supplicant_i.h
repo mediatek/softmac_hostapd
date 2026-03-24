@@ -2133,6 +2133,7 @@ int wpas_pasn_auth_start(struct wpa_supplicant *wpa_s, const u8 *own_addr,
 			 u16 group, int network_id,
 			 const u8 *comeback, size_t comeback_len);
 void wpas_pasn_auth_stop(struct wpa_supplicant *wpa_s);
+void wpas_pasn_free_params(struct wpa_supplicant *wpa_s);
 int wpas_pasn_auth_tx_status(struct wpa_supplicant *wpa_s,
 			     const u8 *data, size_t data_len, u8 acked);
 int wpas_pasn_auth_rx(struct wpa_supplicant *wpa_s,

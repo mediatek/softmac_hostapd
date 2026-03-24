@@ -858,6 +858,7 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 
 #ifdef CONFIG_PASN
 	wpas_pasn_auth_stop(wpa_s);
+	wpas_pasn_free_params(wpa_s);
 #endif /* CONFIG_PASN */
 #ifndef CONFIG_NO_ROBUST_AV
 	wpas_scs_deinit(wpa_s);
