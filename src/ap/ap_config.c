@@ -1511,7 +1511,8 @@ static int hostapd_config_check_bss(struct hostapd_bss_config *bss,
 			   "Enabling beacon protection as IEEE 802.11be is enabled for this BSS");
 	}
 
-	if ((!conf->ieee80211be || bss->disable_11be) && bss->mld_ap) {
+	if (full_config && (!conf->ieee80211be || bss->disable_11be) &&
+	    bss->mld_ap) {
 		wpa_printf(MSG_INFO,
 			   "Cannot enable mld_ap when IEEE 802.11be is disabled");
 		return -1;
