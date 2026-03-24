@@ -1072,7 +1072,7 @@ void wpas_pasn_auth_trigger(struct wpa_supplicant *wpa_s,
 			if (!dst->password) {
 				wpa_printf(MSG_DEBUG,
 					   "PASN: Mem alloc failed for password");
-				return;
+				goto fail;
 			}
 		}
 		if (src->comeback_len && src->comeback) {
@@ -1081,7 +1081,7 @@ void wpas_pasn_auth_trigger(struct wpa_supplicant *wpa_s,
 			if (!dst->comeback) {
 				wpa_printf(MSG_DEBUG,
 					   "PASN: Mem alloc failed for comeback cookie");
-				return;
+				goto fail;
 			}
 			dst->comeback_len = src->comeback_len;
 		}
@@ -1100,6 +1100,19 @@ void wpas_pasn_auth_trigger(struct wpa_supplicant *wpa_s,
 	} else if (pasn_auth->action == PASN_ACTION_AUTH) {
 		wpas_pasn_configure_next_peer(wpa_s, wpa_s->pasn_params);
 	}
+
+	return;
+
+fail:
+	for (i = 0; i < num_peers; i++) {
+		dst = &wpa_s->pasn_params->peer[i];
+		str_clear_free(dst->password);
+		dst->password = NULL;
+		os_free(dst->comeback);
+		dst->comeback = NULL;
+	}
+	os_free(wpa_s->pasn_params);
+	wpa_s->pasn_params = NULL;
 }
 
 
