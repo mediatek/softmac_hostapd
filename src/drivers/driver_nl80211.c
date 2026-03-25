@@ -11178,6 +11178,21 @@ static int nl80211_start_radar_detection(void *priv,
 	return -1;
 }
 
+static int nl80211_wait_dfs_nop(void *priv, s8 link_id, int freq)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+
+	if (!(drv->capa.flags & WPA_DRIVER_FLAGS_RADAR)) {
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Driver does not support radar detection");
+		return -1;
+	}
+
+	nl80211_link_set_freq(bss, link_id, freq);
+	return 0;
+}
+
 #ifdef CONFIG_TDLS
 
 static int nl80211_add_peer_capab(struct nl_msg *msg,
@@ -17058,6 +17073,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.poll_client = nl80211_poll_client,
 	.set_p2p_powersave = nl80211_set_p2p_powersave,
 	.start_dfs_cac = nl80211_start_radar_detection,
+	.wait_dfs_nop = nl80211_wait_dfs_nop,
 	.stop_ap = wpa_driver_nl80211_stop_ap,
 #ifdef CONFIG_TDLS
 	.send_tdls_mgmt = nl80211_send_tdls_mgmt,

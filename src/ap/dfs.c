@@ -645,15 +645,20 @@ dfs_get_valid_channel(struct hostapd_iface *iface,
 static int dfs_set_valid_channel(struct hostapd_iface *iface, int skip_radar)
 {
 	struct hostapd_channel_data *channel;
+	enum dfs_channel_type channel_type;
 	u8 cf1 = 0, cf2 = 0;
 	int sec = 0;
 
+	channel_type = skip_radar ? DFS_AVAILABLE : DFS_ANY_CHANNEL;
 	channel = dfs_get_valid_channel(iface, &sec, &cf1, &cf2,
-					skip_radar ? DFS_AVAILABLE :
-					DFS_ANY_CHANNEL);
+					channel_type);
 	if (!channel) {
-		wpa_printf(MSG_ERROR, "could not get valid channel");
-		return -1;
+		channel = dfs_downgrade_bandwidth(iface, &sec, &cf1, &cf2,
+						  &channel_type);
+		if (!channel) {
+			wpa_printf(MSG_ERROR, "could not get valid channel");
+			return -1;
+		}
 	}
 
 	iface->freq = channel->freq;
@@ -873,8 +878,7 @@ static unsigned int dfs_get_cac_time(struct hostapd_iface *iface,
 int hostapd_handle_dfs(struct hostapd_iface *iface)
 {
 	struct hostapd_channel_data *channel;
-	int res, n_chans, n_chans1, start_chan_idx, start_chan_idx1;
-	int sec = 0, skip_radar = 0;
+	int res, n_chans, n_chans1, start_chan_idx, start_chan_idx1, sec = 0;
 	u8 cf1 = 0, cf2 = 0;
 	bool use_radar_background = dfs_use_radar_background(iface);
 	enum dfs_channel_type channel_type = DFS_NO_CAC_YET;
@@ -931,9 +935,9 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 		wpa_printf(MSG_DEBUG, "DFS %d chans unavailable - choose other channel: %s",
 			   res, res ? "yes": "no");
 		if (res) {
-			if (dfs_set_valid_channel(iface, skip_radar) < 0) {
+			if (dfs_set_valid_channel(iface, 0) < 0) {
 				hostapd_set_state(iface, HAPD_IFACE_DFS);
-				return 0;
+				return hostapd_wait_dfs_nop(iface, iface->freq);
 			}
 		}
 	} while (res);
