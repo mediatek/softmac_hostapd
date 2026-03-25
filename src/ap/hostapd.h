@@ -803,6 +803,7 @@ struct hostapd_iface {
 #endif /* CONFIG_ACS */
 
 	void (*scan_cb)(struct hostapd_iface *iface);
+	void *scan_cb_data;
 	int num_ht40_scan_tries;
 
 	struct dl_list sta_seen; /* struct hostapd_sta_info */

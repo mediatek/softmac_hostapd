@@ -69,6 +69,7 @@
 #include "ap/dfs.h"
 #include "ap/nan_usd_ap.h"
 #include "ap/robust_av.h"
+#include "ap/hw_features.h"
 #include "wps/wps_defs.h"
 #include "wps/wps.h"
 #include "fst/fst_ctrl_iface.h"
@@ -2896,6 +2897,10 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 			return ret;
 	}
 #endif /* CONFIG_IEEE80211BE */
+
+	ret = ieee80211n_check_40mhz(iface, &settings);
+	if (ret)
+		return ret > 0 ? 0 : ret;
 
 	for (i = 0; i < iface->num_bss; i++) {
 

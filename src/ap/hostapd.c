@@ -932,6 +932,7 @@ static void hostapd_cleanup_iface(struct hostapd_iface *iface)
 	hostapd_config_free(iface->conf);
 	iface->conf = NULL;
 
+	os_free(iface->scan_cb_data);
 	os_free(iface->config_fname);
 	os_free(iface->bss);
 #ifdef CONFIG_AFC

@@ -411,10 +411,59 @@ static int ieee80211n_check_40mhz_2g4(struct hostapd_iface *iface,
 }
 
 
+static int ieee80211n_trigger_chan_switch(struct hostapd_iface *iface, bool oper40)
+{
+	struct csa_settings *settings = (struct csa_settings *)iface->scan_cb_data;
+	struct hostapd_freq_params *freq_param = &settings->freq_params;
+	int i, err = 0;
+
+	if (!oper40) {
+		freq_param->bandwidth = 20;
+		freq_param->sec_channel_offset = 0;
+		freq_param->center_freq1 = freq_param->freq;
+	}
+
+	for (i = 0; i < iface->num_bss; i++) {
+		if (!iface->bss[i]->beacon_set_done)
+			continue;
+
+		/* Save CHAN_SWITCH VHT, HE, and EHT config */
+		hostapd_chan_switch_config(iface->bss[i], freq_param);
+
+		err = hostapd_switch_channel(iface->bss[i], settings);
+		if (err) {
+			wpa_printf(MSG_ERROR,
+				   "Failed to channel switch after ht scan, restart interface");
+			goto out;
+		}
+
+#ifdef CONFIG_IEEE80211BE
+		if (iface->bss[i]->conf->mld_ap)
+			hostapd_update_aff_link_beacon(iface->bss[i], settings->cs_count);
+#endif /* CONFIG_IEEE80211BE */
+	}
+
+out:
+	os_free(iface->scan_cb_data);
+	iface->scan_cb_data = NULL;
+	if (err) {
+		iface->conf->secondary_channel = 0;
+		hostapd_set_oper_centr_freq_seg0_idx(iface->conf, 0);
+		hostapd_set_oper_centr_freq_seg1_idx(iface->conf, 0);
+		hostapd_set_oper_chwidth(iface->conf, CONF_OPER_CHWIDTH_USE_HT);
+		hostapd_disable_iface(iface);
+		hostapd_enable_iface(iface);
+	}
+
+	return err;
+}
+
+
 static void ieee80211n_check_scan(struct hostapd_iface *iface)
 {
 	struct wpa_scan_results *scan_res;
-	int oper40;
+	bool setup_ready = iface->state == HAPD_IFACE_ENABLED;
+	int oper40, sec = iface->conf->secondary_channel;
 	int res = 0;
 
 	/* Check list of neighboring BSSes (from scan) to see whether 40 MHz is
@@ -423,8 +472,11 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 	iface->scan_cb = NULL;
 
 	scan_res = hostapd_driver_get_scan_results(iface->bss[0]);
-	if (scan_res == NULL) {
-		hostapd_setup_interface_complete(iface, 1);
+	if (!scan_res) {
+		if (setup_ready)
+			ieee80211n_trigger_chan_switch(iface, false);
+		else
+			hostapd_setup_interface_complete(iface, 1);
 		return;
 	}
 
@@ -434,14 +486,13 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 		oper40 = ieee80211n_check_40mhz_2g4(iface, scan_res);
 	wpa_scan_results_free(scan_res);
 
-	iface->secondary_ch = iface->conf->secondary_channel;
+	iface->secondary_ch = sec;
 	if (!oper40) {
 		wpa_printf(MSG_INFO, "20/40 MHz operation not permitted on "
 			   "channel pri=%d sec=%d based on overlapping BSSes",
 			   iface->conf->channel,
-			   iface->conf->channel +
-			   iface->conf->secondary_channel * 4);
-		iface->conf->secondary_channel = 0;
+			   iface->conf->channel + sec * 4);
+		sec = 0;
 		if (iface->drv_flags & WPA_DRIVER_FLAGS_HT_2040_COEX) {
 			/*
 			 * TODO: Could consider scheduling another scan to check
@@ -452,8 +503,7 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 	}
 
 #ifdef CONFIG_IEEE80211AX
-	if (iface->conf->secondary_channel &&
-	    iface->current_mode->mode == HOSTAPD_MODE_IEEE80211G &&
+	if (sec && iface->current_mode->mode == HOSTAPD_MODE_IEEE80211G &&
 	    iface->conf->ieee80211ax) {
 		struct he_capabilities *he_cap;
 
@@ -462,21 +512,29 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 		      HE_PHYCAP_CHANNEL_WIDTH_SET_40MHZ_IN_2G)) {
 			wpa_printf(MSG_DEBUG,
 				   "HE: 40 MHz channel width is not supported in 2.4 GHz; clear secondary channel configuration");
-			iface->conf->secondary_channel = 0;
+			sec = 0;
 		}
 	}
 #endif /* CONFIG_IEEE80211AX */
 
-	if (iface->conf->secondary_channel)
+	if (sec)
 		res = ieee80211n_allowed_ht40_channel_pair(iface);
+
+	/* triggered by channel switch */
+	if (setup_ready) {
+		ieee80211n_trigger_chan_switch(iface, sec && res);
+		return;
+	}
+
 	if (!res) {
-		iface->conf->secondary_channel = 0;
+		sec = 0;
 		hostapd_set_oper_centr_freq_seg0_idx(iface->conf, 0);
 		hostapd_set_oper_centr_freq_seg1_idx(iface->conf, 0);
 		hostapd_set_oper_chwidth(iface->conf, CONF_OPER_CHWIDTH_USE_HT);
 		res = 1;
 		wpa_printf(MSG_INFO, "Fallback to 20 MHz");
 	}
+	iface->conf->secondary_channel = sec;
 
 	hostapd_setup_interface_complete(iface, !res);
 }
@@ -573,6 +631,7 @@ static void ap_ht40_scan_retry(void *eloop_data, void *user_data)
 #define HT2040_COEX_SCAN_RETRY 15
 	struct hostapd_iface *iface = eloop_data;
 	struct wpa_driver_scan_params params;
+	bool setup_ready = iface->state == HAPD_IFACE_ENABLED;
 	int ret;
 
 	os_memset(&params, 0, sizeof(params));
@@ -590,13 +649,25 @@ static void ap_ht40_scan_retry(void *eloop_data, void *user_data)
 		wpa_printf(MSG_ERROR,
 			   "Failed to request a scan of neighboring BSSes ret=%d (%s) - try to scan again (attempt %d)",
 			   ret, strerror(-ret), iface->num_ht40_scan_tries);
-		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, NULL);
+		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, user_data);
 		return;
 	}
 
 	if (ret == 0) {
 		iface->scan_cb = ieee80211n_check_scan;
 		iface->bss[0]->scan_cookie = params.scan_cookie;
+		/* A shallow copy is fine for csa_settings since beacon_data
+		 * will be filled afterwards
+		 */
+		if (user_data) {
+			iface->scan_cb_data = (void *)os_malloc(sizeof(*user_data));
+			os_memcpy(iface->scan_cb_data, user_data, sizeof(*user_data));
+		}
+		return;
+	}
+
+	if (setup_ready) {
+		ieee80211n_trigger_chan_switch(iface, false);
 		return;
 	}
 
@@ -617,19 +688,23 @@ void hostapd_stop_setup_timers(struct hostapd_iface *iface)
 }
 
 
-static int ieee80211n_check_40mhz(struct hostapd_iface *iface)
+int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *data)
 {
 	struct wpa_driver_scan_params params;
+	bool setup_ready = iface->state == HAPD_IFACE_ENABLED;
 	int ret;
 
 	/* Check that HT40 is used and PRI / SEC switch is allowed */
-	if (!iface->conf->secondary_channel || iface->conf->no_pri_sec_switch ||
-		iface->conf->noscan)
+	if (iface->conf->no_pri_sec_switch || iface->conf->noscan)
 		return 0;
 
-	hostapd_set_state(iface, HAPD_IFACE_HT_SCAN);
-	wpa_printf(MSG_DEBUG, "Scan for neighboring BSSes prior to enabling "
-		   "40 MHz channel");
+	if (!setup_ready && !iface->conf->secondary_channel)
+		return 0;
+
+	if (!setup_ready)
+		hostapd_set_state(iface, HAPD_IFACE_HT_SCAN);
+	wpa_printf(MSG_DEBUG, "Scan for neighboring BSSes prior to %s "
+		   "40 MHz channel", setup_ready ? "switching to a" : "enabling");
 	os_memset(&params, 0, sizeof(params));
 	if (iface->current_mode->mode == HOSTAPD_MODE_IEEE80211G)
 		ieee80211n_scan_channels_2g4(iface, &params);
@@ -644,8 +719,8 @@ static int ieee80211n_check_40mhz(struct hostapd_iface *iface)
 			   "Failed to request a scan of neighboring BSSes ret=%d (%s) - try to scan again",
 			   ret, strerror(-ret));
 		iface->num_ht40_scan_tries = 1;
-		eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
-		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, NULL);
+		eloop_cancel_timeout(ap_ht40_scan_retry, iface, data);
+		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, data);
 		return 1;
 	}
 
@@ -658,6 +733,15 @@ static int ieee80211n_check_40mhz(struct hostapd_iface *iface)
 
 	iface->scan_cb = ieee80211n_check_scan;
 	iface->bss[0]->scan_cookie = params.scan_cookie;
+
+	/* A shallow copy is fine for csa_settings since beacon_data
+	 * will be filled afterwards
+	 */
+	if (data) {
+		iface->scan_cb_data = (void *)os_malloc(sizeof(*data));
+		os_memcpy(iface->scan_cb_data, data, sizeof(*data));
+	}
+
 	return 1;
 }
 
@@ -864,7 +948,7 @@ int hostapd_check_ht_capab(struct hostapd_iface *iface)
 	    !ieee80211ac_supported_vht_capab(iface))
 		return -1;
 #endif /* CONFIG_IEEE80211AC */
-	ret = ieee80211n_check_40mhz(iface);
+	ret = ieee80211n_check_40mhz(iface, NULL);
 	if (ret)
 		return ret;
 	if (!ieee80211n_allowed_ht40_channel_pair(iface))

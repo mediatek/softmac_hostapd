@@ -27,6 +27,7 @@ int hostapd_check_he_6ghz_capab(struct hostapd_iface *iface);
 int hostapd_prepare_rates(struct hostapd_data *hapd,
 			  struct hostapd_hw_modes *mode);
 void hostapd_stop_setup_timers(struct hostapd_iface *iface);
+int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *data);
 int hostapd_hw_skip_mode(struct hostapd_iface *iface,
 			 struct hostapd_hw_modes *mode);
 int hostapd_determine_mode(struct hostapd_iface *iface);
@@ -88,6 +89,11 @@ static inline int hostapd_prepare_rates(struct hostapd_data *hapd,
 
 static inline void hostapd_stop_setup_timers(struct hostapd_iface *iface)
 {
+}
+
+int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *data)
+{
+	return 0;
 }
 
 static inline int hostapd_hw_skip_mode(struct hostapd_iface *iface,
