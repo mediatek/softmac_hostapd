@@ -893,6 +893,7 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 	}
 
 	iface->cac_started = 0;
+	iface->radar_background.channel = -1;
 
 	do {
 		/* Get start (first) channel for current configuration */
