@@ -1169,15 +1169,6 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 	}
 	data.radar_background = radar_background;
 	data.dfs_state_update = update_state;
-	data.link_id = -1;
-
-#ifdef CONFIG_IEEE80211BE
-	if (hapd->conf->mld_ap) {
-		data.link_id = hapd->mld_link_id;
-		wpa_printf(MSG_DEBUG,
-			   "hostapd_start_dfs_cac: link_id=%d", data.link_id);
-	}
-#endif /* CONFIG_IEEE80211BE */
 
 	data.link_id = -1;
 #ifdef CONFIG_IEEE80211BE
@@ -1195,6 +1186,46 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 	}
 
 	return res;
+}
+
+
+int hostapd_wait_dfs_nop(struct hostapd_iface *iface, int freq)
+{
+	struct hostapd_hw_modes *cmode = iface->current_mode;
+	struct hostapd_data *hapd = iface->bss[0];
+	struct hostapd_channel_data *chan;
+	bool valid = false;
+	s8 link_id = -1;
+	int i;
+
+	if (!hapd->driver || !hapd->driver->wait_dfs_nop || !cmode)
+		return 0;
+
+	if (!iface->conf->ieee80211h) {
+		wpa_printf(MSG_ERROR, "DFS functionality is not enabled");
+		return -1;
+	}
+
+	for (i = 0; i < cmode->num_channels; i++) {
+		chan = &cmode->channels[i];
+		if (chan->freq != freq)
+			continue;
+
+		valid = true;
+		break;
+	}
+
+	if (!valid) {
+		wpa_printf(MSG_ERROR, "Invalid frequency %d", freq);
+		return -1;
+	}
+
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->conf->mld_ap)
+		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
+
+	return hapd->driver->wait_dfs_nop(hapd->drv_priv, link_id, freq);
 }
 
 

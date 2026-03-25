@@ -4977,6 +4977,19 @@ struct wpa_driver_ops {
 	int (*start_dfs_cac)(void *priv, struct hostapd_freq_params *freq);
 
 	/**
+	 * wait_dfs_nop - Wait for NOP to finish to start radar detection
+	 * @priv: Private driver interface data
+	 * @link_id: Link ID of the specified link; -1 for non-MLD
+	 * @freq: Channel frequency
+	 * Returns: 0 on success, -1 on failure
+	 *
+	 * This callback is used when hostapd is started while all channels
+	 * are unavailable. The freq of the bss is set to receive the NOP
+	 * finish event.
+	 */
+	int (*wait_dfs_nop)(void *priv, s8 link_id, int freq);
+
+	/**
 	 * stop_ap - Removes beacon from AP
 	 * @priv: Private driver interface data
 	 * @link_id: Link ID of the specified link; -1 for non-MLD
