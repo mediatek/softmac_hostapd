@@ -2945,7 +2945,7 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 		iface->radar_background.freq = background_settings.freq_params.freq;
 		iface->radar_background.centr_freq_seg0_idx = seg0;
 		iface->radar_background.centr_freq_seg1_idx = seg1;
-		iface->radar_background.new_chwidth = -1;
+		iface->radar_background.oper_chwidth = oper_chwidth;
 		iface->radar_background.primary_backup = iface->radar_background.channel;
 	}
 
@@ -5770,10 +5770,8 @@ hostapd_ctrl_iface_set_offchain(struct hostapd_data *hapd, char *cmd,
 	iface->radar_background.centr_freq_seg0_idx = seg0;
 	iface->radar_background.centr_freq_seg1_idx = seg1;
 	iface->radar_background.primary_backup = channel;
-	if (chwidth != hostapd_get_oper_chwidth(iface->conf))
-		iface->radar_background.new_chwidth = chwidth;
-	else
-		iface->radar_background.new_chwidth = -1;
+	iface->radar_background.oper_chwidth = chwidth;
+
 	if (iface->conf->background_auto_ctrl) {
 		iface->radar_background.temp_ch = temp_ch;
 		iface->radar_background.expand_ch = expand_ch;
@@ -5811,10 +5809,7 @@ hostapd_ctrl_iface_get_offchain(struct hostapd_data *hapd, char *buf, size_t buf
 	seg0 = iface->radar_background.centr_freq_seg0_idx;
 	seg1 = iface->radar_background.centr_freq_seg1_idx;
 	sec = iface->radar_background.secondary_channel;
-	if (iface->radar_background.new_chwidth < 0)
-		oper_width = hostapd_get_oper_chwidth(iface->conf);
-	else
-		oper_width = iface->radar_background.new_chwidth;
+	oper_width = iface->radar_background.oper_chwidth;
 
 	switch (oper_width) {
 	case CONF_OPER_CHWIDTH_USE_HT:

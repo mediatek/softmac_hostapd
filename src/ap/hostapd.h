@@ -722,6 +722,7 @@ struct hostapd_iface {
 		int freq;
 		int centr_freq_seg0_idx;
 		int centr_freq_seg1_idx;
+		int oper_chwidth;
 		/* Main chain is on temporary channel during
 		 * CAC detection on radar offchain.
 		 */
@@ -732,7 +733,6 @@ struct hostapd_iface {
 		 * current offchain channel after CAC detection on radar offchain.
 		 */
 		unsigned int expand_ch:1;
-		int new_chwidth;
 		bool max_bw80;
 		/* backup the original primary channel when background radar
 		 * requires a two step CAC for 160 MHz
