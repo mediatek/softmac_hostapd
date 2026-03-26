@@ -364,9 +364,10 @@ static int ieee802_11_parse_extension(const u8 *pos, size_t elen,
 		elems->fils_pk_len = elen;
 		break;
 	case WLAN_EID_EXT_NONCE:
-		if (elen != NONCE_LEN)
+		if (elen < NONCE_LEN)
 			break;
 		elems->nonce = pos;
+		elems->nonce_len = elen;
 		break;
 	case WLAN_EID_EXT_OWE_DH_PARAM:
 		if (elen < 2)
