@@ -3457,6 +3457,113 @@ fail:
 
 #endif /* CONFIG_PASN */
 
+
+/* Converts nl80211_auth_type to WLAN_AUTH_* format */
+static int get_auth_algo(enum nl80211_auth_type auth_alg)
+{
+	switch (auth_alg) {
+	case NL80211_AUTHTYPE_OPEN_SYSTEM:
+		return WLAN_AUTH_OPEN;
+	case NL80211_AUTHTYPE_SHARED_KEY:
+		return WLAN_AUTH_SHARED_KEY;
+	case NL80211_AUTHTYPE_FT:
+		return WLAN_AUTH_FT;
+	case NL80211_AUTHTYPE_SAE:
+		return WLAN_AUTH_SAE;
+	case NL80211_AUTHTYPE_FILS_SK:
+		return WLAN_AUTH_FILS_SK;
+	case NL80211_AUTHTYPE_FILS_SK_PFS:
+		return WLAN_AUTH_FILS_SK_PFS;
+	case NL80211_AUTHTYPE_FILS_PK:
+		return WLAN_AUTH_FILS_PK;
+	case NL80211_AUTHTYPE_EPPKE:
+		return WLAN_AUTH_EPPKE;
+	default:
+		return -1;
+	}
+}
+
+
+static void qca_nl80211_external_auth(struct wpa_driver_nl80211_data *drv,
+				      u8 *data, size_t len)
+{
+	union wpa_event_data event;
+	struct external_auth *ea;
+	enum qca_wlan_vendor_external_auth_action act;
+	char mld_addr[50];
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX + 1];
+
+	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX,
+		      (struct nlattr *) data, len, NULL) ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM] ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION] ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID] ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID] ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO])
+		return;
+
+	os_memset(&event, 0, sizeof(event));
+	ea = &event.external_auth;
+	act = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION]);
+	switch (act) {
+	case QCA_WLAN_VENDOR_EXTERNAL_AUTH_START:
+		ea->action = EXT_AUTH_START;
+		break;
+	case QCA_WLAN_VENDOR_EXTERNAL_AUTH_ABORT:
+		ea->action = EXT_AUTH_ABORT;
+		break;
+	default:
+		return;
+	}
+
+	ea->key_mgmt_suite =
+		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM]);
+	ea->ssid_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID]);
+	if (ea->ssid_len > SSID_MAX_LEN)
+		return;
+	ea->ssid = nla_data(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID]);
+	ea->bssid = nla_data(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID]);
+	ea->auth_alg = get_auth_algo(
+		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO]));
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER])
+		ea->pairwise_cipher = rsn_cipher_suite_to_wpa_cipher(
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER]));
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER])
+		ea->group_cipher = rsn_cipher_suite_to_wpa_cipher(
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER]));
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER])
+		ea->group_mgmt_cipher = rsn_cipher_suite_to_wpa_cipher(
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER]));
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB])
+		ea->rsn_capab =
+			nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA]) {
+		ea->rsnxe_data =
+			nla_data(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA]);
+		ea->rsnxe_data_len =
+			nla_len(tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA]);
+	}
+
+	mld_addr[0] = '\0';
+	if (tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR]) {
+		ea->mld_addr = nla_data(
+			tb[QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR]);
+		os_snprintf(mld_addr, sizeof(mld_addr), ", MLD ADDR=" MACSTR,
+			    MAC2STR(ea->mld_addr));
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: %s: %u, AKM=0x%x, SSID=%s, auth algo=%d, pairwise_cipher=%u, group_cipher=%u, group_mgmt_cipher=%u, rsn_capab=0x%x, BSSID="
+		   MACSTR "%s",
+		   __func__, ea->action, ea->key_mgmt_suite,
+		   wpa_ssid_txt(ea->ssid, ea->ssid_len),
+		   ea->auth_alg, ea->pairwise_cipher, ea->group_cipher,
+		   ea->group_mgmt_cipher, ea->rsn_capab,
+		   MAC2STR(ea->bssid), mld_addr);
+	drv->qca_vendor_ext_auth = 1;
+	wpa_supplicant_event(drv->ctx, EVENT_EXTERNAL_AUTH, &event);
+}
+
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
 
@@ -3503,6 +3610,9 @@ static void nl80211_vendor_event_qca(struct i802_bss *bss,
 		break;
 	case QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG:
 		qca_nl80211_link_reconfig_event(bss->drv, data, len);
+		break;
+	case QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH:
+		qca_nl80211_external_auth(bss->drv, data, len);
 		break;
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 	default:

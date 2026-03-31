@@ -14843,6 +14843,42 @@ static int nl80211_send_external_auth_status(void *priv,
 	    (drv->capa.flags & WPA_DRIVER_FLAGS_SME))
 		return -1;
 
+#ifdef CONFIG_DRIVER_NL80211_QCA
+	if (drv->qca_vendor_ext_auth) {
+		struct nlattr *attr;
+
+		wpa_dbg(drv->ctx, MSG_DEBUG,
+			"nl80211: QCA vendor: External auth status: %u",
+			params->status);
+
+		msg = nl80211_bss_msg(bss, 0, NL80211_CMD_VENDOR);
+		if (!msg ||
+		    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_QCA) ||
+		    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
+				QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH))
+			goto fail;
+
+		attr = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
+		if (!attr ||
+		    nla_put_u16(msg,
+				QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_STATUS_CODE,
+				params->status) ||
+		    (params->ssid && params->ssid_len &&
+		     nla_put(msg, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID,
+			     params->ssid_len, params->ssid)) ||
+		    (params->pmkid &&
+		     nla_put(msg, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PMKID,
+			     PMKID_LEN, params->pmkid)) ||
+		    (params->bssid &&
+		     nla_put(msg, QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID,
+			     ETH_ALEN, params->bssid)))
+			goto fail;
+
+		nla_nest_end(msg, attr);
+		goto send_cmd;
+	}
+#endif /* CONFIG_DRIVER_NL80211_QCA */
+
 	wpa_dbg(drv->ctx, MSG_DEBUG,
 		"nl80211: External auth status: %u", params->status);
 
@@ -14856,6 +14892,11 @@ static int nl80211_send_external_auth_status(void *priv,
 	    (params->bssid &&
 	     nla_put(msg, NL80211_ATTR_BSSID, ETH_ALEN, params->bssid)))
 		goto fail;
+
+#ifdef CONFIG_DRIVER_NL80211_QCA
+send_cmd:
+	drv->qca_vendor_ext_auth = 0;
+#endif /* CONFIG_DRIVER_NL80211_QCA */
 	ret = send_and_recv_cmd(drv, msg);
 	msg = NULL;
 	if (ret) {

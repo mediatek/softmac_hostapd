@@ -3070,6 +3070,13 @@ enum wpa_drv_update_connect_params_mask {
  *	from user space to the driver.
  * @pmkid: Generated PMKID as part of external auth exchange (e.g., SAE).
  * @mld_addr: AP's MLD address or %NULL if MLO is not used
+ * @auth_alg: Authentication algorithm to be used
+ * @pairwise_cipher: Pairwise cipher to be used, WPA_CIPHER_*
+ * @group_cipher: Group cipher to be used, WPA_CIPHER_*
+ * @group_mgmt_cipher: Group management cipher to be used, WPA_CIPHER_*
+ * @rsn_capab: RSN capabilities
+ * @rsnxe_data: Extended RSN capabilities data
+ * @rsnxe_data_len: Length of Extended RSN capabilities data in octets
  */
 struct external_auth {
 	enum {
@@ -3083,6 +3090,13 @@ struct external_auth {
 	u16 status;
 	const u8 *pmkid;
 	const u8 *mld_addr;
+	unsigned int auth_alg;
+	int pairwise_cipher;
+	int group_cipher;
+	int group_mgmt_cipher;
+	u16 rsn_capab;
+	const u8 *rsnxe_data;
+	size_t rsnxe_data_len;
 };
 
 #define WPAS_MAX_PASN_PEERS 10
