@@ -61,7 +61,7 @@ struct pasn_data {
 	const char *password;
 	int wpa_key_mgmt;
 	int rsn_pairwise;
-	u32 rsnxe_capab;
+	u64 rsnxe_capab;
 	u8 *rsnxe_ie;
 	bool custom_pmkid_valid;
 	u8 custom_pmkid[PMKID_LEN];
@@ -293,7 +293,7 @@ void pasn_set_password(struct pasn_data *pasn, const char *password);
 void pasn_set_wpa_key_mgmt(struct pasn_data *pasn, int key_mgmt);
 void pasn_set_rsn_pairwise(struct pasn_data *pasn, int rsn_pairwise);
 void pasn_set_rsne(struct pasn_data *pasn, const u8 *rsne);
-void pasn_set_rsnxe_caps(struct pasn_data *pasn, u32 rsnxe_capab);
+void pasn_set_rsnxe_caps(struct pasn_data *pasn, u64 rsnxe_capab);
 void pasn_set_rsnxe_ie(struct pasn_data *pasn, const u8 *rsnxe_ie);
 void pasn_set_custom_pmkid(struct pasn_data *pasn, const u8 *pmkid);
 int pasn_set_extra_ies(struct pasn_data *pasn, const u8 *extra_ies,

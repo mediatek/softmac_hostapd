@@ -175,7 +175,7 @@ void pasn_set_rsn_pairwise(struct pasn_data *pasn, int rsn_pairwise)
 }
 
 
-void pasn_set_rsnxe_caps(struct pasn_data *pasn, u32 rsnxe_capab)
+void pasn_set_rsnxe_caps(struct pasn_data *pasn, u64 rsnxe_capab)
 {
 	if (!pasn)
 		return;

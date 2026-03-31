@@ -4646,7 +4646,7 @@ int wpa_pasn_parse_parameter_ie(const u8 *data, u8 len, bool from_ap,
 }
 
 
-void wpa_pasn_add_rsnxe(struct wpabuf *buf, u32 capab)
+void wpa_pasn_add_rsnxe(struct wpabuf *buf, u64 capab)
 {
 	size_t flen;
 
@@ -4654,7 +4654,15 @@ void wpa_pasn_add_rsnxe(struct wpabuf *buf, u32 capab)
 		return; /* no supported extended RSN capabilities */
 
 	/* Determine how many octets are needed to represent capab */
-	if (capab & 0xFF000000)
+	if (capab & 0xFF00000000000000ULL)
+		flen = 8;
+	else if (capab & 0x00FF000000000000ULL)
+		flen = 7;
+	else if (capab & 0x0000FF0000000000ULL)
+		flen = 6;
+	else if (capab & 0x000000FF00000000ULL)
+		flen = 5;
+	else if (capab & 0xFF000000)
 		flen = 4;
 	else if (capab & 0x00FF0000)
 		flen = 3;
@@ -4678,6 +4686,14 @@ void wpa_pasn_add_rsnxe(struct wpabuf *buf, u32 capab)
 		wpabuf_put_u8(buf, (capab >> 16) & 0x000000FF);
 	if (flen > 3)
 		wpabuf_put_u8(buf, (capab >> 24) & 0x000000FF);
+	if (flen > 4)
+		wpabuf_put_u8(buf, (capab >> 32) & 0x000000FF);
+	if (flen > 5)
+		wpabuf_put_u8(buf, (capab >> 40) & 0x000000FF);
+	if (flen > 6)
+		wpabuf_put_u8(buf, (capab >> 48) & 0x000000FF);
+	if (flen > 7)
+		wpabuf_put_u8(buf, (capab >> 56) & 0x000000FF);
 }
 
 
