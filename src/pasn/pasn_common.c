@@ -37,6 +37,7 @@ void pasn_data_deinit(struct pasn_data *pasn)
 	wpabuf_free(pasn->frame);
 	os_free(pasn->pasn_groups);
 	wpabuf_free(pasn->auth1);
+	os_free(pasn->dec_pw_id);
 	bin_clear_free(pasn, sizeof(struct pasn_data));
 }
 

@@ -66,6 +66,15 @@ struct pasn_data {
 	bool custom_pmkid_valid;
 	u8 custom_pmkid[PMKID_LEN];
 
+	/* Counter from the decrypted password identifier blob (set when
+	 * get_pt_for_pw_id() resolves an encrypted identifier) */
+	unsigned int sae_pw_id_counter;
+	/* Decrypted (real) password identifier resolved from an encrypted
+	 * identifier blob; NULL for plaintext identifiers. Owned by pasn_data
+	 * and freed by pasn_data_deinit(). */
+	u8 *dec_pw_id;
+	size_t dec_pw_id_len;
+
 	/*
 	 * Extra elements to add into Authentication frames. These can be used,
 	 * e.g., for Wi-Fi Aware use cases.
@@ -188,6 +197,13 @@ struct pasn_data {
 	 * @pw_id_len: Length of the password identifier
 	 * @group: SAE group being used
 	 * @password: Output pointer to the matching password string
+	 * @counter: Output counter value from the decrypted identifier blob
+	 *	(set to 0 for plaintext identifiers)
+	 * @dec_pw_id: Output pointer to the decrypted (real) password
+	 *	identifier for encrypted blobs; set to NULL for plaintext
+	 *	identifiers. The caller takes ownership and must free with
+	 *	os_free().
+	 * @dec_pw_id_len: Output length of the decrypted password identifier
 	 * Returns: SAE PT on success, NULL if not found
 	 *
 	 * This callback is invoked by the PASN responder when processing an
@@ -198,7 +214,10 @@ struct pasn_data {
 	struct sae_pt * (*get_pt_for_pw_id)(void *ctx,
 					    const u8 *pw_id, size_t pw_id_len,
 					    int group,
-					    const char **password);
+					    const char **password,
+					    unsigned int *counter,
+					    u8 **dec_pw_id,
+					    size_t *dec_pw_id_len);
 #endif /* CONFIG_SAE */
 };
 

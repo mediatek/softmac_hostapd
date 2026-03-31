@@ -3760,15 +3760,30 @@ static int eppke_set_key(void *ctx, enum wpa_alg alg, const u8 *addr,
  * For plaintext identifiers sae_get_password() returns the pre-computed PT
  * (pw_entry->pt). We must NOT return that pointer directly because the
  * caller will free it; clone it so the caller always owns the returned PT.
+ * counter and dec_pw_id are set to 0/NULL for plaintext identifiers.
+ *
+ * For encrypted password identifiers the PT is not pre-computed (the
+ * pre-computed PT is keyed to the decrypted identifier, not the encrypted
+ * one). Derive the PT on-the-fly using the raw (encrypted) identifier as
+ * the salt, mirroring what auth_build_sae_commit() does for regular SAE.
+ * The decrypted blob is parsed to extract the real password identifier
+ * (dec_pw_id) and the counter, both returned to the caller. dec_pw_id is
+ * heap-allocated and the caller takes ownership (must free with os_free()).
  */
 static struct sae_pt *
 hapd_pasn_get_pt_for_pw_id(void *ctx, const u8 *pw_id, size_t pw_id_len,
-			    int group, const char **password)
+			    int group, const char **password,
+			    unsigned int *counter,
+			    u8 **dec_pw_id, size_t *dec_pw_id_len)
 {
 	struct hostapd_data *hapd = ctx;
 	struct sae_password_entry *pw_entry = NULL;
 	struct sae_pt *pt = NULL;
 	int groups[2] = { group, 0 };
+
+	*counter = 0;
+	*dec_pw_id = NULL;
+	*dec_pw_id_len = 0;
 
 	*password = sae_get_password(hapd, NULL, pw_id, pw_id_len, &pw_entry,
 				     &pt, NULL);
@@ -3778,12 +3793,75 @@ hapd_pasn_get_pt_for_pw_id(void *ctx, const u8 *pw_id, size_t pw_id_len,
 	if (pt) {
 		/* Plaintext identifier: sae_get_password() found a
 		 * pre-computed PT.  Clone it so the caller can free it
-		 * without affecting the password entry's own PT. */
+		 * without affecting the password entry's own PT.
+		 * counter and dec_pw_id stay 0/NULL for plaintext. */
 		return sae_derive_pt(groups, hapd->conf->ssid.ssid,
 				     hapd->conf->ssid.ssid_len,
 				     (const u8 *) pw_entry->password,
 				     os_strlen(pw_entry->password),
 				     pw_id, pw_id_len);
+	}
+
+	if (pw_entry) {
+		/* Encrypted identifier: no pre-computed PT exists for the
+		 * raw (encrypted) identifier. Decrypt the blob once to
+		 * extract the real password identifier (dec_pw_id) and the
+		 * counter, then derive the PT using the encrypted bytes as
+		 * the salt (matching auth_build_sae_commit()).
+		 *
+		 * Decrypted format:
+		 *   4-byte date | Password ID | NUL padding | 4-byte counter
+		 */
+		if (hapd->conf->sae_pw_id_key &&
+		    pw_id_len > 4 + 4 + AES_BLOCK_SIZE) {
+			u8 *plain;
+			size_t plain_len;
+
+			plain = os_malloc(pw_id_len);
+			if (plain &&
+			    aes_siv_decrypt(
+				    wpabuf_head(hapd->conf->sae_pw_id_key),
+				    wpabuf_len(hapd->conf->sae_pw_id_key),
+				    pw_id, pw_id_len,
+				    0, NULL, NULL, plain) == 0) {
+				const u8 *id, *pos;
+
+				plain_len = pw_id_len - AES_BLOCK_SIZE;
+				/* Counter is the last 4 bytes */
+				*counter = WPA_GET_BE32(plain + plain_len - 4);
+				wpa_printf(MSG_DEBUG,
+					   "SAE: Generation time %u counter %u",
+					   WPA_GET_BE32(plain), *counter);
+				/* Real password ID starts at byte 4,
+				 * NUL-terminated before the counter */
+				id = plain + 4;
+				pos = id;
+				while (pos < plain + plain_len - 4) {
+					if (*pos == 0x00)
+						break;
+					pos++;
+				}
+				*dec_pw_id_len = pos - id;
+				wpa_hexdump_ascii(
+					MSG_DEBUG,
+					"SAE: Decrypted password identifier",
+					id, *dec_pw_id_len);
+				*dec_pw_id = os_memdup(id, *dec_pw_id_len);
+				if (!*dec_pw_id)
+					*dec_pw_id_len = 0;
+			}
+			os_free(plain);
+		}
+
+		pt = sae_derive_pt(groups, hapd->conf->ssid.ssid,
+				   hapd->conf->ssid.ssid_len,
+				   (const u8 *) pw_entry->password,
+				   os_strlen(pw_entry->password),
+				   pw_id, pw_id_len);
+		if (!pt)
+			wpa_printf(MSG_DEBUG,
+				   "PASN: Failed to derive PT for encrypted password identifier");
+		return pt;
 	}
 
 	return NULL;
@@ -6754,6 +6832,48 @@ rsnxe_done:
 			p += NONCE_LEN;
 		}
 	skip_nonce:
+#ifdef CONFIG_SAE
+		/* For EPPKE with SAE, propagate the password identifier from
+		 * the PASN wrapped SAE commit to the WPA state machine so that
+		 * wpa_auth_eid_key_delivery() can include the SAE PW IDs KDE
+		 * in the encrypted (Re)Association Response frame.
+		 */
+		if (sta->auth_alg == WLAN_AUTH_EPPKE && sta->pasn &&
+		    wpa_key_mgmt_sae(wpa_auth_sta_key_mgmt(sta->wpa_sm))) {
+			const u8 *pw_id = NULL;
+			size_t pw_id_len = 0;
+
+			/* Use the decrypted (real) identifier when the STA
+			 * presented an encrypted alternative identifier.
+			 * Fall back to the raw parsed identifier for the
+			 * plaintext case (first connection). */
+			if (sta->pasn->dec_pw_id &&
+			    sta->pasn->dec_pw_id_len) {
+				pw_id = sta->pasn->dec_pw_id;
+				pw_id_len = sta->pasn->dec_pw_id_len;
+			} else if (sta->pasn->sae.tmp) {
+				if (sta->pasn->sae.tmp->parsed_pw_id) {
+					pw_id = sta->pasn->sae.tmp->parsed_pw_id;
+					pw_id_len = sta->pasn->sae.tmp->parsed_pw_id_len;
+				} else if (sta->pasn->sae.tmp->pw_id) {
+					pw_id = sta->pasn->sae.tmp->pw_id;
+					pw_id_len =
+					sta->pasn->sae.tmp->pw_id_len;
+				}
+			}
+			if (pw_id && pw_id_len) {
+				struct wpabuf *pw_id_buf;
+
+				pw_id_buf = wpabuf_alloc_copy(pw_id, pw_id_len);
+				if (pw_id_buf) {
+					wpa_auth_set_sae_pw_id(
+						sta->wpa_sm, pw_id_buf,
+						sta->pasn->sae_pw_id_counter);
+					wpabuf_free(pw_id_buf);
+				}
+			}
+		}
+#endif /* CONFIG_SAE */
 #endif /* CONFIG_PMKSA_PRIVACY */
 
 		p = wpa_auth_write_assoc_resp_eppke(sta->wpa_sm, p,

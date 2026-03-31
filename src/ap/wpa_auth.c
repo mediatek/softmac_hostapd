@@ -8051,7 +8051,9 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 	u8 *kde, *buf;
 	const u8 *ptr;
 	size_t slice_len;
-	const size_t buflen = 1024;
+	size_t buflen = 1024;
+
+	buflen += 2 + 255; /* extra room for SAE PW IDs KDE */
 
 	/* TODO: Make sure there is sufficient length for the element */
 	buf = os_malloc(buflen);
@@ -8076,6 +8078,25 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 		kde_len = 2 + RSN_SELECTOR_LEN + 2 + gsm->GTK_len +
 			ieee80211w_kde_len(sm);
 	}
+
+#ifdef CONFIG_SAE
+	/* For EPPKE, the 4-way handshake is skipped, so deliver the SAE
+	 * Password Identifiers KDE here in the encrypted (Re)Association
+	 * Response frame. */
+	if (sm->auth_alg == WLAN_AUTH_EPPKE &&
+	    wpa_key_mgmt_sae(sm->wpa_key_mgmt) &&
+	    sm->wpa_auth->conf.sae_pw_id_num &&
+	    sm->sae_pw_id &&
+	    ieee802_11_rsnx_capab(sm->rsnxe,
+				  WLAN_RSNX_CAPAB_SAE_PW_ID_CHANGE)) {
+		u8 *new_kde = add_sae_pw_ids(sm, kde, buf + buflen);
+
+		if (new_kde) {
+			kde_len += new_kde - kde;
+			kde = new_kde;
+		}
+	}
+#endif /* CONFIG_SAE */
 
 	if (!is_ml && sm->group->wpa_group_state == WPA_GROUP_SETKEYSDONE)
 		wpa_auth_get_seqnum(sm->wpa_auth, NULL, gsm->GN, rsc);

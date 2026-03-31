@@ -159,17 +159,21 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 	if (pasn->sae.tmp && pasn->sae.tmp->parsed_pw_id &&
 	    pasn->sae.tmp->parsed_pw_id_len) {
 		const char *pw = NULL;
+		unsigned int counter = 0;
+		u8 *dec_pw_id = NULL;
+		size_t dec_pw_id_len = 0;
 
 		if (!pasn->get_pt_for_pw_id) {
 			wpa_printf(MSG_DEBUG,
 				   "PASN: No callback to resolve password identifier");
-			return -1;
+			return -2;
 		}
 
 		pt = pasn->get_pt_for_pw_id(pasn->cb_ctx,
 					    pasn->sae.tmp->parsed_pw_id,
 					    pasn->sae.tmp->parsed_pw_id_len,
-					    pasn->group, &pw);
+					    pasn->group, &pw, &counter,
+					    &dec_pw_id, &dec_pw_id_len);
 		if (!pt) {
 			wpa_printf(MSG_DEBUG,
 				   "PASN: Unknown password identifier");
@@ -178,6 +182,10 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 
 		wpa_printf(MSG_DEBUG,
 			   "PASN: Using PT for received password identifier");
+		pasn->sae_pw_id_counter = counter;
+		os_free(pasn->dec_pw_id);
+		pasn->dec_pw_id = dec_pw_id;
+		pasn->dec_pw_id_len = dec_pw_id_len;
 		if (pw)
 			pasn_set_password(pasn, pw);
 	}
