@@ -37,6 +37,14 @@ struct wpa_pasn_auth_work {
 	u16 group;
 	int network_id;
 	struct wpabuf *comeback;
+#ifdef CONFIG_ENC_ASSOC
+	unsigned int auth_alg;
+	int group_cipher;
+	int group_mgmt_cipher;
+	u16 rsn_capab;
+	u8 *rsnxe_data;
+	bool is_ml_peer;
+#endif /* CONFIG_ENC_ASSOC */
 };
 
 
@@ -74,6 +82,10 @@ static void wpas_pasn_free_auth_work(struct wpa_pasn_auth_work *awork)
 {
 	wpabuf_free(awork->comeback);
 	awork->comeback = NULL;
+#ifdef CONFIG_ENC_ASSOC
+	os_free(awork->rsnxe_data);
+	awork->rsnxe_data = NULL;
+#endif /* CONFIG_ENC_ASSOC */
 	os_free(awork);
 }
 
@@ -478,7 +490,9 @@ static void wpas_pasn_configure_next_peer(struct wpa_supplicant *wpa_s,
 					 peer->peer_addr, peer->akmp,
 					 peer->cipher, peer->group,
 					 peer->network_id,
-					 peer->comeback, peer->comeback_len)) {
+					 peer->comeback, peer->comeback_len,
+					 WLAN_AUTH_PASN, 0, 0, 0, NULL,
+					 false)) {
 			peer->status = PASN_STATUS_FAILURE;
 			wpa_msg(wpa_s, MSG_INFO, PASN_AUTH_STATUS MACSTR
 				" akmp=%s, status=%u",
@@ -798,6 +812,14 @@ static void wpas_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 #endif /* CONFIG_IEEE80211R */
 	}
 
+#ifdef CONFIG_ENC_ASSOC
+	pasn->auth_alg = awork->auth_alg;
+	pasn->group_cipher = awork->group_cipher;
+	pasn->group_mgmt_cipher = awork->group_mgmt_cipher;
+	pasn->rsn_capab = awork->rsn_capab;
+	pasn_set_rsnxe_ie(pasn, awork->rsnxe_data);
+	pasn->is_ml_peer = awork->is_ml_peer;
+#endif /* CONFIG_ENC_ASSOC */
 
 	ret = wpas_pasn_start(pasn, awork->own_addr, awork->peer_addr,
 			      awork->peer_addr, awork->akmp, awork->cipher,
@@ -827,7 +849,10 @@ fail:
 int wpas_pasn_auth_start(struct wpa_supplicant *wpa_s,
 			 const u8 *own_addr, const u8 *peer_addr,
 			 int akmp, int cipher, u16 group, int network_id,
-			 const u8 *comeback, size_t comeback_len)
+			 const u8 *comeback, size_t comeback_len,
+			 unsigned int auth_alg, int group_cipher,
+			 int group_mgmt_cipher, u16 rsn_capab,
+			 const u8 *rsnxe_data, bool is_ml_peer)
 {
 	struct wpa_pasn_auth_work *awork;
 	struct wpa_bss *bss;
@@ -873,6 +898,21 @@ int wpas_pasn_auth_start(struct wpa_supplicant *wpa_s,
 	awork->cipher = cipher;
 	awork->group = group;
 	awork->network_id = network_id;
+#ifdef CONFIG_ENC_ASSOC
+	awork->auth_alg = auth_alg;
+	awork->group_cipher = group_cipher;
+	awork->group_mgmt_cipher = group_mgmt_cipher;
+	awork->rsn_capab = rsn_capab;
+	awork->is_ml_peer = is_ml_peer;
+
+	if (rsnxe_data) {
+		awork->rsnxe_data = os_memdup(rsnxe_data, 2 + rsnxe_data[1]);
+		if (!awork->rsnxe_data) {
+			wpas_pasn_free_auth_work(awork);
+			return -1;
+		}
+	}
+#endif /* CONFIG_ENC_ASSOC */
 
 	if (comeback && comeback_len) {
 		awork->comeback = wpabuf_alloc_copy(comeback, comeback_len);
@@ -948,7 +988,10 @@ static int wpas_pasn_immediate_retry(struct wpa_supplicant *wpa_s,
 
 	return wpas_pasn_auth_start(wpa_s, own_addr, peer_addr, akmp, cipher,
 				    group, network_id, params->comeback,
-				    params->comeback_len);
+				    params->comeback_len, pasn->auth_alg,
+				    pasn->group_cipher,
+				    pasn->group_mgmt_cipher, pasn->rsn_capab,
+				    pasn->rsnxe_ie, pasn->is_ml_peer);
 }
 
 

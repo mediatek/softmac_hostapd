@@ -2131,7 +2131,10 @@ int wpas_send_dscp_query(struct wpa_supplicant *wpa_s, const char *domain_name,
 int wpas_pasn_auth_start(struct wpa_supplicant *wpa_s, const u8 *own_addr,
 			 const u8 *bssid, int akmp, int cipher,
 			 u16 group, int network_id,
-			 const u8 *comeback, size_t comeback_len);
+			 const u8 *comeback, size_t comeback_len,
+			 unsigned int auth_alg, int group_cipher,
+			 int group_mgmt_cipher, u16 rsn_capab,
+			 const u8 *rsnxe_data, bool is_ml_peer);
 void wpas_pasn_auth_stop(struct wpa_supplicant *wpa_s);
 void wpas_pasn_free_params(struct wpa_supplicant *wpa_s);
 int wpas_pasn_auth_tx_status(struct wpa_supplicant *wpa_s,

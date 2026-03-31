@@ -52,6 +52,9 @@ struct pasn_data {
 	unsigned int auth_alg;
 	u8 mld_addr[ETH_ALEN];
 	bool is_ml_peer;
+	int group_cipher;
+	int group_mgmt_cipher;
+	u16 rsn_capab;
 
 #ifdef CONFIG_SAE
 	struct sae_pt *pt;
