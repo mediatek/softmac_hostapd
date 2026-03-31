@@ -1380,7 +1380,7 @@ struct wpa_ssid {
 	 * 1 = check AP's extended capabilities
 	 * 2 = always enable
 	 */
-	u8 always_use_proxy_arp;
+	int always_use_proxy_arp;
 };
 
 #endif /* CONFIG_SSID_H */
