@@ -2201,6 +2201,41 @@ static bool is_sae_key_mgmt_suite(struct wpa_supplicant *wpa_s, u32 suite)
 }
 
 
+#ifdef CONFIG_ENC_ASSOC
+static int sme_handle_eppke_external_auth_start(struct wpa_supplicant *wpa_s,
+						union wpa_event_data *data)
+{
+	u8 peer_addr[ETH_ALEN];
+	bool is_ml_peer;
+
+	if (data->external_auth.mld_addr) {
+		is_ml_peer = true;
+		os_memcpy(peer_addr, data->external_auth.mld_addr, ETH_ALEN);
+	} else {
+		is_ml_peer = false;
+		os_memcpy(peer_addr, data->external_auth.bssid, ETH_ALEN);
+	}
+
+	if (sme_set_sae_group(wpa_s, 0) < 0) {
+		wpa_printf(MSG_DEBUG, "EPPKE: Failed to select group");
+		return -1;
+	}
+
+	return wpas_pasn_auth_start(wpa_s, wpa_s->own_addr, peer_addr,
+				    rsn_key_mgmt_to_wpa_akm(
+					    data->external_auth.key_mgmt_suite),
+				    data->external_auth.pairwise_cipher,
+				    wpa_s->sme.sae.group, 0, NULL, 0,
+				    data->external_auth.auth_alg,
+				    data->external_auth.group_cipher,
+				    data->external_auth.group_mgmt_cipher,
+				    data->external_auth.rsn_capab,
+				    data->external_auth.rsnxe_data,
+				    is_ml_peer);
+}
+#endif /* CONFIG_ENC_ASSOC */
+
+
 void sme_external_auth_trigger(struct wpa_supplicant *wpa_s,
 			       union wpa_event_data *data)
 {
@@ -2222,6 +2257,14 @@ void sme_external_auth_trigger(struct wpa_supplicant *wpa_s,
 		} else {
 			wpa_s->sme.ext_ml_auth = false;
 		}
+#ifdef CONFIG_ENC_ASSOC
+		if (data->external_auth.auth_alg == WLAN_AUTH_EPPKE &&
+		    sme_handle_eppke_external_auth_start(wpa_s, data) < 0) {
+			sme_send_external_auth_status(
+				wpa_s, WLAN_STATUS_UNSPECIFIED_FAILURE);
+			return;
+		}
+#endif /* CONFIG_ENC_ASSOC */
 		wpa_s->sme.seq_num = 0;
 		wpa_s->sme.sae.state = SAE_NOTHING;
 		wpa_s->sme.sae.send_confirm = 0;
@@ -2691,6 +2734,20 @@ void sme_external_auth_mgmt_rx(struct wpa_supplicant *wpa_s,
 				    wpa_s->sme.ext_auth_ap_mld_addr :
 				    wpa_s->sme.ext_auth_bssid) < 0)
 			return;
+#ifdef CONFIG_ENC_ASSOC
+	} else if (le_to_host16(header->u.auth.auth_alg) == WLAN_AUTH_EPPKE) {
+		int res = wpas_pasn_auth_rx(wpa_s, header, len);
+
+		if (res < 0) {
+			/* Notify failure to the driver */
+			sme_send_external_auth_status(
+				wpa_s,
+				res == -2 ?
+				le_to_host16(header->u.auth.status_code) :
+				WLAN_STATUS_UNSPECIFIED_FAILURE);
+			return;
+		}
+#endif /* CONFIG_ENC_ASSOC */
 	}
 }
 

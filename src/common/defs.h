@@ -207,6 +207,11 @@ static inline int wpa_key_mgmt_cross_akm(int akm)
 			 WPA_KEY_MGMT_SAE_EXT_KEY));
 }
 
+static inline bool wpa_key_mgmt_eppke(int akm)
+{
+	return !!(akm & WPA_KEY_MGMT_EPPKE);
+}
+
 #define WPA_PROTO_WPA BIT(0)
 #define WPA_PROTO_RSN BIT(1)
 #define WPA_PROTO_WAPI BIT(2)

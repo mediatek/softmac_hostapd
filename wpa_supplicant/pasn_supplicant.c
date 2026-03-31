@@ -744,6 +744,28 @@ static void wpas_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SPP_AMSDU) &&
 	    ieee802_11_rsnx_capab(rsnxe, WLAN_RSNX_CAPAB_SPP_A_MSDU))
 		capab |= BIT(WLAN_RSNX_CAPAB_SPP_A_MSDU);
+#ifdef CONFIG_ENC_ASSOC
+	if (awork->auth_alg == WLAN_AUTH_EPPKE) {
+		if (!ieee802_11_rsnx_capab(rsnxe, WLAN_RSNX_CAPAB_KEK_IN_PASN))
+		{
+			wpa_printf(MSG_INFO,
+				   "EPPKE: KEK_IN_PASN not set in AP RSNXE");
+			goto fail;
+		}
+		if (!ieee802_11_rsnx_capab(rsnxe,
+					   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
+			wpa_printf(MSG_INFO,
+				   "EPPKE: ASSOC_FRAME_ENCRYPTION not set in AP RSNXE");
+			goto fail;
+		}
+		if (wpa_s->drv_flags2 &
+		    WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION) {
+			capab |= BIT(WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION);
+			capab |= BIT(WLAN_RSNX_CAPAB_KEK_IN_PASN);
+			pasn->derive_kek = true;
+		}
+	}
+#endif /* CONFIG_ENC_ASSOC */
 
 	pasn_set_rsnxe_caps(pasn, capab);
 	pasn_register_callbacks(pasn, wpa_s, wpas_pasn_send_mlme, NULL, NULL,
@@ -1062,6 +1084,15 @@ int wpas_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 
 		if (pasn->pmksa_entry)
 			wpa_sm_set_cur_pmksa(wpa_s->wpa, pasn->pmksa_entry);
+
+		if (pasn->auth_alg == WLAN_AUTH_EPPKE) {
+#ifdef CONFIG_SME
+			os_memcpy(wpa_s->sme.sae.pmkid, pasn->sae.pmkid,
+				  PMKID_LEN);
+#endif /* CONFIG_SME */
+			wpa_sm_set_pmk(wpa_s->wpa, pasn->pmk, pasn->pmk_len,
+				       pasn->sae.pmkid, pasn->own_addr);
+		}
 	}
 
 	forced_memzero(pasn_get_ptk(pasn), sizeof(pasn->ptk));

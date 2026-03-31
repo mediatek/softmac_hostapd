@@ -7170,7 +7170,8 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 #ifdef CONFIG_SAE
 			if (stype == WLAN_FC_STYPE_AUTH &&
 			    !(wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME) &&
-			    (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SAE)) {
+			    ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_SAE) ||
+			    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE))) {
 				sme_external_auth_mgmt_rx(
 					wpa_s, data->rx_mgmt.frame,
 					data->rx_mgmt.frame_len);

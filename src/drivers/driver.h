@@ -1432,6 +1432,11 @@ struct wpa_driver_associate_params {
 	 * p2p_mode - P2P R1 only, P2P R2 only, or PCC mode
 	 */
 	enum wpa_p2p_mode p2p_mode;
+
+	/**
+	 * eppke_supported - Whether EPPKE authentication is supported
+	 */
+	bool eppke_supported;
 };
 
 enum hide_ssid {

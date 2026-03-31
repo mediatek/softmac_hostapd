@@ -7608,6 +7608,15 @@ static int nl80211_connect_ext(struct i802_bss *bss,
 		connect_ext_feature_set(features, QCA_CONNECT_EXT_FEATURE_RSNO);
 	}
 
+#ifdef CONFIG_ENC_ASSOC
+	if (params->eppke_supported) {
+		wpa_printf(MSG_DEBUG,
+			   "- EPPKE external authentication support");
+		connect_ext_feature_set(features,
+					QCA_CONNECT_EXT_FEATURE_EXT_AUTH_EPPKE);
+	}
+#endif /* CONFIG_ENC_ASSOC */
+
 	if (nla_put(msg, QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES,
 		    sizeof(features), features))
 		goto fail;
@@ -7722,6 +7731,8 @@ static int wpa_driver_nl80211_try_connect(
 	if (params->auth_alg & WPA_AUTH_ALG_FT)
 		algs++;
 	if (params->auth_alg & WPA_AUTH_ALG_SAE)
+		algs++;
+	if (params->auth_alg & WPA_AUTH_ALG_EPPKE)
 		algs++;
 	if (algs > 1) {
 		wpa_printf(MSG_DEBUG, "  * Leave out Auth Type for automatic "
