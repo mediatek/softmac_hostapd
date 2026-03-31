@@ -2444,6 +2444,8 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS2_EPPKE				0x0000000400000000ULL
 /** Driver supports IEEE 802.1X authentication in Authentication frames */
 #define WPA_DRIVER_FLAGS2_802_1X_AUTH		0x0000000800000000ULL
+/** Driver supports PMKSA caching privacy */
+#define WPA_DRIVER_FLAGS2_PMKSA_PRIVACY		0x0000001000000000ULL
 	u64 flags2;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
