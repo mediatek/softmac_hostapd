@@ -107,6 +107,7 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 	u16 res, alg, seq, status;
 	int groups[] = { pasn->group, 0 };
 	int ret;
+	struct sae_pt *pt = NULL;
 
 	if (!wd)
 		return -1;
@@ -143,7 +144,45 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 	}
 
 	pasn->sae.akmp = pasn->akmp;
-	if (!pasn->password || !pasn->pt) {
+
+	res = sae_parse_commit(&pasn->sae, data + 6, buf_len - 6, NULL, NULL,
+			       groups, 1, NULL);
+	if (res != WLAN_STATUS_SUCCESS) {
+		wpa_printf(MSG_DEBUG, "PASN: Failed parsing SAE commit");
+		return -1;
+	}
+
+	/*
+	 * If the commit contained a password identifier, look up the
+	 * matching PT now that we know the identifier.
+	 */
+	if (pasn->sae.tmp && pasn->sae.tmp->parsed_pw_id &&
+	    pasn->sae.tmp->parsed_pw_id_len) {
+		const char *pw = NULL;
+
+		if (!pasn->get_pt_for_pw_id) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: No callback to resolve password identifier");
+			return -1;
+		}
+
+		pt = pasn->get_pt_for_pw_id(pasn->cb_ctx,
+					    pasn->sae.tmp->parsed_pw_id,
+					    pasn->sae.tmp->parsed_pw_id_len,
+					    pasn->group, &pw);
+		if (!pt) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: Unknown password identifier");
+			return -2;
+		}
+
+		wpa_printf(MSG_DEBUG,
+			   "PASN: Using PT for received password identifier");
+		if (pw)
+			pasn_set_password(pasn, pw);
+	}
+
+	if (!pasn->password || (!pt && !pasn->pt)) {
 		wpa_printf(MSG_DEBUG, "PASN: No SAE PT found");
 		return -1;
 	}
@@ -153,17 +192,12 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 		own_addr = pasn->mld_addr;
 #endif /* CONFIG_ENC_ASSOC */
 
-	ret = sae_prepare_commit_pt(&pasn->sae, pasn->pt, own_addr, peer_addr,
-				    NULL, NULL);
+	ret = sae_prepare_commit_pt(&pasn->sae, pt ? pt : pasn->pt,
+				    own_addr, peer_addr, NULL, NULL);
+	/* Free the on-the-fly derived PT now that it has been used */
+	sae_deinit_pt(pt);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed to prepare SAE commit");
-		return -1;
-	}
-
-	res = sae_parse_commit(&pasn->sae, data + 6, buf_len - 6, NULL, NULL,
-			       groups, 1, NULL);
-	if (res != WLAN_STATUS_SUCCESS) {
-		wpa_printf(MSG_DEBUG, "PASN: Failed parsing SAE commit");
 		return -1;
 	}
 
@@ -966,7 +1000,10 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 			if (ret) {
 				wpa_printf(MSG_DEBUG,
 					   "PASN: Failed processing SAE commit");
-				status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+				if (ret == -2)
+					status = WLAN_STATUS_UNKNOWN_PASSWORD_IDENTIFIER;
+				else
+					status = WLAN_STATUS_UNSPECIFIED_FAILURE;
 				goto send_resp;
 			}
 		}

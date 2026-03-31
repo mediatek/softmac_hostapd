@@ -3749,6 +3749,48 @@ static int eppke_set_key(void *ctx, enum wpa_alg alg, const u8 *addr,
 #endif /* CONFIG_ENC_ASSOC */
 
 
+#ifdef CONFIG_SAE
+/**
+ * hapd_pasn_get_pt_for_pw_id - Look up SAE PT for a password identifier
+ *
+ * Called by the PASN responder when an SAE commit frame contains a password
+ * identifier that was not known at PASN-setup time (e.g., for EPPKE where
+ * the PT cannot be pre-selected before the commit is received).
+ *
+ * For plaintext identifiers sae_get_password() returns the pre-computed PT
+ * (pw_entry->pt). We must NOT return that pointer directly because the
+ * caller will free it; clone it so the caller always owns the returned PT.
+ */
+static struct sae_pt *
+hapd_pasn_get_pt_for_pw_id(void *ctx, const u8 *pw_id, size_t pw_id_len,
+			    int group, const char **password)
+{
+	struct hostapd_data *hapd = ctx;
+	struct sae_password_entry *pw_entry = NULL;
+	struct sae_pt *pt = NULL;
+	int groups[2] = { group, 0 };
+
+	*password = sae_get_password(hapd, NULL, pw_id, pw_id_len, &pw_entry,
+				     &pt, NULL);
+	if (!*password)
+		return NULL;
+
+	if (pt) {
+		/* Plaintext identifier: sae_get_password() found a
+		 * pre-computed PT.  Clone it so the caller can free it
+		 * without affecting the password entry's own PT. */
+		return sae_derive_pt(groups, hapd->conf->ssid.ssid,
+				     hapd->conf->ssid.ssid_len,
+				     (const u8 *) pw_entry->password,
+				     os_strlen(pw_entry->password),
+				     pw_id, pw_id_len);
+	}
+
+	return NULL;
+}
+#endif /* CONFIG_SAE */
+
+
 static void hapd_initialize_pasn(struct hostapd_data *hapd,
 				 struct sta_info *sta)
 {
@@ -3788,6 +3830,13 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 	pasn->use_anti_clogging = use_anti_clogging(hapd);
 	pasn_set_password(pasn, sae_get_password(hapd, sta, NULL, 0, NULL,
 						 &pasn->pt, NULL));
+#ifdef CONFIG_SAE
+	/* Register a callback so the PASN responder can look up the correct
+	 * SAE PT when the STA's commit frame contains a password identifier
+	 * that was not known at setup time (EPPKE cases).
+	 */
+	pasn->get_pt_for_pw_id = hapd_pasn_get_pt_for_pw_id;
+#endif /* CONFIG_SAE */
 	pasn_set_rsne(pasn, wpa_auth_get_wpa_ie(hapd->wpa_auth,
 						&pasn->rsn_ie_len));
 	pasn_set_rsnxe_ie(pasn, hostapd_wpa_ie(hapd, WLAN_EID_RSNX));

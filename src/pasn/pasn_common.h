@@ -180,6 +180,26 @@ struct pasn_data {
 	struct rsn_pmksa_cache_entry *
 	(*pmksa_cache_search)(void *ctx, const u8 *spa, const u8 *pmkid,
 			      bool is_ml);
+#ifdef CONFIG_SAE
+	/**
+	 * get_pt_for_pw_id - Look up SAE PT for a given password identifier
+	 * @ctx: Callback context from cb_ctx
+	 * @pw_id: Password identifier received in the SAE commit frame
+	 * @pw_id_len: Length of the password identifier
+	 * @group: SAE group being used
+	 * @password: Output pointer to the matching password string
+	 * Returns: SAE PT on success, NULL if not found
+	 *
+	 * This callback is invoked by the PASN responder when processing an
+	 * SAE commit frame that contains a password identifier, allowing the
+	 * AP to look up the correct PT at commit-processing time rather than
+	 * at PASN-setup time.
+	 */
+	struct sae_pt * (*get_pt_for_pw_id)(void *ctx,
+					    const u8 *pw_id, size_t pw_id_len,
+					    int group,
+					    const char **password);
+#endif /* CONFIG_SAE */
 };
 
 /* Initiator */
