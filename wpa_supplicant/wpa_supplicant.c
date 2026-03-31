@@ -2758,7 +2758,7 @@ void wpa_s_setup_sae_pt(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
 		if (password_id && ssid->pt->password_id &&
 		    password_id_len == wpabuf_len(ssid->pt->password_id) &&
 		    os_memcmp(password_id, wpabuf_head(ssid->pt->password_id),
-			      password_id_len == 0))
+			      password_id_len) == 0)
 			return; /* PT already derived for same PW ID */
 
 		/* PT was derived for another password identifier */
