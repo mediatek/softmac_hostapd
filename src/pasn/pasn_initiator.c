@@ -101,6 +101,8 @@ static struct wpabuf * wpas_pasn_wd_sae_commit(struct pasn_data *pasn)
 {
 	struct wpabuf *buf = NULL;
 	int ret;
+	const u8 *pw_id = NULL;
+	size_t pw_id_len = 0;
 
 	ret = sae_set_group(&pasn->sae, pasn->group);
 	if (ret) {
@@ -128,7 +130,12 @@ static struct wpabuf * wpas_pasn_wd_sae_commit(struct pasn_data *pasn)
 	wpabuf_put_le16(buf, 1);
 	wpabuf_put_le16(buf, WLAN_STATUS_SAE_HASH_TO_ELEMENT);
 
-	sae_write_commit(&pasn->sae, buf, NULL, NULL, 0);
+	/* Include the password identifier if the PT was derived with one */
+	if (pasn->pt && pasn->pt->password_id) {
+		pw_id = wpabuf_head(pasn->pt->password_id);
+		pw_id_len = wpabuf_len(pasn->pt->password_id);
+	}
+	sae_write_commit(&pasn->sae, buf, NULL, pw_id, pw_id_len);
 	pasn->sae.state = SAE_COMMITTED;
 
 	return buf;
