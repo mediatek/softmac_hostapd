@@ -532,7 +532,7 @@ static void send_8021x_auth_reply(struct hostapd_data *hapd,
 
 	if (sta->added_unassoc && (resp != WLAN_STATUS_SUCCESS &&
 				   resp != WLAN_STATUS_802_1_X_AUTH_SUCCESS)) {
-		ap_free_sta(hapd, sta);
+		hostapd_drv_sta_remove(hapd, sta->addr);
 		sta->added_unassoc = 0;
 	}
 	wpabuf_free(ies);
