@@ -62,6 +62,7 @@ struct wiphy_info_data {
 	struct wpa_driver_capa *capa;
 
 	unsigned int num_multichan_concurrent;
+	unsigned int num_multichan_concurrent_nan;
 
 	unsigned int error:1;
 	unsigned int device_ap_sme:1;
@@ -83,6 +84,9 @@ struct wiphy_info_data {
 	unsigned int has_key_mgmt:1;
 	unsigned int has_key_mgmt_iftype:1;
 	unsigned int support_ap_scan:1;
+
+	unsigned int nan_supported:1;
+	unsigned int nan_ndp_supported:1;
 };
 
 
@@ -161,6 +165,8 @@ static int wiphy_info_iface_comb_process(struct wiphy_info_data *info,
 		[NL80211_IFACE_LIMIT_TYPES] = { .type = NLA_NESTED },
 		[NL80211_IFACE_LIMIT_MAX] = { .type = NLA_U32 },
 	};
+	bool combination_has_nan = false, combination_has_nan_ndp = false;
+	unsigned int num_channels;
 
 	err = nla_parse_nested(tb_comb, MAX_NL80211_IFACE_COMB,
 			       nl_combi, iface_combination_policy);
@@ -188,18 +194,27 @@ static int wiphy_info_iface_comb_process(struct wiphy_info_data *info,
 				combination_has_p2p = 1;
 			if (ift == NL80211_IFTYPE_STATION)
 				combination_has_mgd = 1;
+			if (ift == NL80211_IFTYPE_NAN)
+				combination_has_nan = true;
+			if (ift == NL80211_IFTYPE_NAN_DATA)
+				combination_has_nan_ndp = true;
 		}
-		if (combination_has_p2p && combination_has_mgd)
-			break;
 	}
 
+	num_channels = nla_get_u32(tb_comb[NL80211_IFACE_COMB_NUM_CHANNELS]);
 	if (combination_has_p2p && combination_has_mgd) {
-		unsigned int num_channels =
-			nla_get_u32(tb_comb[NL80211_IFACE_COMB_NUM_CHANNELS]);
 
 		info->p2p_concurrent = 1;
 		if (info->num_multichan_concurrent < num_channels)
 			info->num_multichan_concurrent = num_channels;
+	}
+
+	if (combination_has_nan) {
+		info->nan_supported = 1;
+		info->nan_ndp_supported = combination_has_nan_ndp;
+
+		if (info->num_multichan_concurrent_nan < num_channels)
+			info->num_multichan_concurrent_nan = num_channels;
 	}
 
 	return 0;
@@ -1256,6 +1271,22 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 			capa->nan_capa.drv_flags |=
 				WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE;
 		}
+
+		if (tb_nan_capa[NL80211_NAN_CAPA_MAX_CHANNEL_SWITCH_TIME])
+			capa->nan_capa.max_channel_switch_time =
+				nla_get_u16(tb_nan_capa[NL80211_NAN_CAPA_MAX_CHANNEL_SWITCH_TIME]);
+
+		if (tb_nan_capa[NL80211_NAN_CAPA_NUM_ANTENNAS])
+			capa->nan_capa.num_antennas =
+				nla_get_u8(tb_nan_capa[NL80211_NAN_CAPA_NUM_ANTENNAS]);
+
+		if (tb_nan_capa[NL80211_NAN_CAPA_OP_MODE])
+			capa->nan_capa.op_modes =
+				nla_get_u8(tb_nan_capa[NL80211_NAN_CAPA_OP_MODE]);
+
+		if (tb_nan_capa[NL80211_NAN_CAPA_CAPABILITIES])
+			capa->nan_capa.dev_capa =
+				nla_get_u8(tb_nan_capa[NL80211_NAN_CAPA_CAPABILITIES]);
 	}
 #endif /* CONFIG_NAN */
 
@@ -1343,6 +1374,28 @@ static int wpa_driver_nl80211_get_info(struct wpa_driver_nl80211_data *drv,
 
 	if (!drv->capa.max_num_akms)
 		drv->capa.max_num_akms = NL80211_MAX_NR_AKM_SUITES;
+
+#ifdef CONFIG_NAN
+	if (info->nan_supported) {
+		wpa_printf(MSG_DEBUG, "nl80211: NAN supported");
+
+		if (info->nan_ndp_supported)
+			drv->capa.nan_capa.drv_flags |=
+				WPA_DRIVER_FLAGS_NAN_SUPPORT_NDP;
+
+		/* TODO: Currently support only a single radio */
+		drv->capa.nan_capa.num_radios = 1;
+		drv->capa.nan_capa.sched_chans =
+			info->num_multichan_concurrent_nan;
+
+		/*
+		 * nl80211 supports only a single configuration that uses 16 TU
+		 * slots and a period of 512 TUs.
+		 */
+		drv->capa.nan_capa.slot_duration = 16;
+		drv->capa.nan_capa.schedule_period = 512;
+	}
+#endif /* CONFIG_NAN */
 
 	return 0;
 }
