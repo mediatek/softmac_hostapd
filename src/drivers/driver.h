@@ -3361,6 +3361,79 @@ struct nan_cluster_config {
 };
 
 /**
+ * Even if the device supports more channels, 4 channels should be enough
+ * for any practical purpose
+ */
+#define MAX_NUM_NAN_SCHEDULE_CHANNELS 4
+
+#define MAX_NUM_NAN_MAPS 2
+
+/**
+ * struct nan_schedule_config - NAN schedule configuration
+ *
+ * @num_channels: Number of channels in the schedule
+ * @channels: Channel specific schedule information
+ * @avail_attr: NAN Availability attribute as defined in Wi-Fi Aware spec v4.0,
+ *	Table 93
+ */
+struct nan_schedule_config {
+	u8 num_channels;
+
+	/**
+	 * channels - Channel specific schedule information
+	 *
+	 * @freq: Frequency in MHz
+	 * @center_freq1: Center frequency 1 in MHz
+	 * @center_freq2: Center frequency 2 in MHz
+	 * @bandwidth: Channel bandwidth
+	 * @time_bitmap: Bitmap indicating the committed availability
+	 *     on the channel.
+	 * @rx_nss: Number of spatial streams supported for RX on the
+	 *     channel
+	 * @chan_entry: Channel Entry as defined in Wi-Fi Aware spec v4.0,
+	 *     Table 100 (Channel Entry format for the NAN Availability
+	 *     attribute).
+	 *
+	 * Note: Time bitmap slot duration and schedule length equal to the
+	 * reported NAN capabilities (see &nan_slot_duration and
+	 * &nan_schedule_length in &struct wpa_driver_capa).
+	 */
+	struct nan_schedule_channel {
+		int freq;
+		int center_freq1;
+		int center_freq2;
+		int bandwidth;
+		struct wpabuf *time_bitmap;
+		u8 rx_nss;
+
+		u8 chan_entry[6];
+	} channels[MAX_NUM_NAN_SCHEDULE_CHANNELS];
+
+	struct wpabuf *avail_attr;
+};
+
+/**
+ * struct nan_peer_schedule_config - NAN peer schedule configuration
+ *
+ * @n_maps: Number of maps in the schedule
+ * @maps: Map specific schedule information
+ */
+struct nan_peer_schedule_config {
+	u8 n_maps;
+
+	/**
+	 * maps - Map specific schedule information
+	 *
+	 * @map_id: Map ID
+	 * @sched: NAN schedule configuration for the map
+	 */
+	struct nan_schedule_map {
+		u8 map_id;
+		struct nan_schedule_config sched;
+	} maps[MAX_NUM_NAN_MAPS];
+};
+
+/**
  * struct wpa_driver_ops - Driver interface API definition
  *
  * This structure defines the API that each driver interface needs to implement
@@ -5694,6 +5767,51 @@ struct wpa_driver_ops {
 	 * @priv: Private driver interface data
 	 */
 	void (*nan_stop)(void *priv);
+
+	/**
+	 * nan_config_schedule - Configure NAN schedule
+	 * @priv: Private driver interface data
+	 * @map_id: NAN schedule map ID
+	 * @conf: NAN schedule configuration parameters
+	 * Returns 0 on success, -1 on failure
+	 *
+	 * This command configures the local NAN schedule. It should be
+	 * executed on NAN device interface after NAN has been started.
+	 * The configured schedule should be valid for RX for all NAN
+	 * activities (management and data).
+	 *
+	 * For devices that support multiple concurrent NAN radios, this
+	 * callback should be called for each radio with the corresponding
+	 * %map_id.
+	 *
+	 * If previous configuration exists, it is replaced with the new
+	 * one. To delete previous schedule, set %conf.num_channels = 0.
+	 */
+	int (*nan_config_schedule)(void *priv, u8 map_id,
+				   struct nan_schedule_config *conf);
+
+	/**
+	 * nan_config_peer_schedule - Configure NAN peer schedule
+	 * @priv: Private driver interface data
+	 * @peer: Peer's NAN device address
+	 * @cdw: Peer's committed DW.
+	 * @sequence_id: Peer's schedule sequence ID
+	 * @max_chan_switch_time: Maximum channel switch time in TUs
+	 * @ulw: Peer's unaligned window attributes or %NULL
+	 * @sched: NAN peer schedule configuration parameters
+	 * Returns 0 on success, -1 on failure
+	 *
+	 * This command configures peer's NAN schedule. To remove previous
+	 * schedule for a given %map_id, set %sched.num_channels = 0.
+	 * %ulw attributes are used to provide the initial information about
+	 * peer's unaligned schedule. Further updates to ULW should be tracked
+	 * internally by the device/driver.
+	 */
+	int (*nan_config_peer_schedule)(void *priv, const u8 *peer,
+					u16 cdw, u8 sequence_id,
+					u16 max_chan_switch_time,
+					const struct wpabuf *ulw,
+					struct nan_peer_schedule_config *sched);
 #endif /* CONFIG_NAN */
 };
 
