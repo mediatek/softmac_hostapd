@@ -2781,6 +2781,15 @@ struct hostapd_sta_add_params {
 	s8 mld_link_id;
 	const u8 *mld_link_addr;
 	u16 eml_cap;
+
+#ifdef CONFIG_NAN
+	/*
+	 * For a station added to a NAN Data Interface (NDI) indicate the
+	 * address of the NAN Management Interface (NMI) to which this station
+	 * belongs.
+	 */
+	const u8 *nmi_addr;
+#endif /* CONFIG_NAN */
 };
 
 struct mac_address {
