@@ -349,11 +349,208 @@ wpas_nan_ndp_action_notif_cb(void *ctx,
 }
 
 
+static int wpas_nan_set_ndi_keys(struct wpa_supplicant *wpa_s,
+				  const u8 *ndi_addr,
+				  enum nan_cipher_suite_id csid,
+				  const u8 *tk, size_t tk_len)
+{
+	enum wpa_alg alg;
+	u8 rsc[6];
+
+	os_memset(rsc, 0, sizeof(rsc));
+	switch (csid) {
+	case NAN_CS_SK_CCM_128:
+		alg = WPA_ALG_CCMP;
+		break;
+	case NAN_CS_SK_GCM_256:
+		alg = WPA_ALG_GCMP_256;
+		break;
+	default:
+		wpa_printf(MSG_INFO, "NAN: Unsupported CSID %d for NDI keys",
+			   csid);
+		return -1;
+	}
+
+	return wpa_drv_set_key(wpa_s, -1, alg, ndi_addr, 0, 1, rsc, sizeof(rsc),
+			       tk, tk_len, KEY_FLAG_PAIRWISE);
+}
+
+
+static int wpas_nan_remove_ndi_keys(struct wpa_supplicant *wpa_s,
+				    const u8 *ndi_addr)
+{
+	return wpa_drv_set_key(wpa_s, -1, WPA_ALG_NONE, ndi_addr, 0, 0,
+			       NULL, 0, NULL, 0, KEY_FLAG_PAIRWISE);
+}
+
+
+static struct wpa_supplicant *
+wpas_nan_get_ndi_iface(struct wpa_supplicant *wpa_s, const u8 *ndi_addr)
+{
+	struct wpa_supplicant *ndi_wpa_s;
+
+	for (ndi_wpa_s = wpa_s->global->ifaces; ndi_wpa_s;
+	     ndi_wpa_s = ndi_wpa_s->next) {
+		if (ndi_wpa_s->nan_data &&
+		    ether_addr_equal(ndi_wpa_s->own_addr, ndi_addr))
+			return ndi_wpa_s;
+	}
+
+	return NULL;
+}
+
+
+static int wpas_nan_configure_nmi_sta_capa(struct wpa_supplicant *wpa_s,
+					  const u8 *nmi_addr)
+{
+	struct hostapd_sta_add_params sta_params;
+	const u8 *ie;
+	u8 *elems;
+	int elems_len;
+
+	elems_len = nan_get_peer_elems(wpa_s->nan, nmi_addr, &elems);
+	if (elems_len < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to get peer elems for NMI station");
+		return -1;
+	}
+
+	os_memset(&sta_params, 0, sizeof(sta_params));
+	sta_params.addr = nmi_addr;
+	sta_params.set = 1;
+	sta_params.flags = WPA_STA_AUTHORIZED;
+	sta_params.flags_mask = sta_params.flags;
+
+	ie = get_ie(elems, elems_len, WLAN_EID_HT_CAP);
+	if (!ie) {
+		wpa_printf(MSG_INFO,
+			   "NAN: No HT capabilities in peer elems for NMI station");
+		return -1;
+	}
+
+	sta_params.ht_capabilities = (const void *) (ie + 2);
+	ie = get_ie(elems, elems_len, WLAN_EID_VHT_CAP);
+	sta_params.vht_capabilities = ie ? (const void *) (ie + 2) : NULL;
+
+	return wpa_drv_sta_add(wpa_s, &sta_params);
+}
+
+
+static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
+				const u8 *peer_nmi, const u8 *local_ndi,
+				const u8 *peer_ndi, bool install_keys,
+				bool first_ndp)
+{
+	u8 tk[WPA_TK_MAX_LEN];
+	size_t tk_len;
+	enum nan_cipher_suite_id csid;
+	struct wpa_supplicant *ndi_wpa_s;
+	struct hostapd_sta_add_params sta_params;
+
+	ndi_wpa_s = wpas_nan_get_ndi_iface(wpa_s, local_ndi);
+	if (!ndi_wpa_s) {
+		wpa_printf(MSG_INFO,
+			   "NAN: No NDI interface found for " MACSTR,
+			   MAC2STR(local_ndi));
+		return -1;
+	}
+
+	/* HT/VHT capabilities are configured per NMI station only for
+	 * the first NDP. After that it is assumed that capablities are not
+	 * changing.
+	 */
+	if (first_ndp &&
+	    wpas_nan_configure_nmi_sta_capa(wpa_s, peer_nmi)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to configure NMI station capabilities");
+		return -1;
+	}
+
+	os_memset(&sta_params, 0, sizeof(sta_params));
+	sta_params.addr = peer_ndi;
+	sta_params.nmi_addr = peer_nmi;
+	sta_params.flags = WPA_STA_AUTHENTICATED | WPA_STA_ASSOCIATED;
+
+	/* Set MFP flag early, to prevent races until keys are installed */
+	if (install_keys)
+		sta_params.flags |= WPA_STA_MFP;
+	else
+		sta_params.flags |= WPA_STA_AUTHORIZED;
+
+	if (wpa_drv_sta_add(ndi_wpa_s, &sta_params)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to add NDI station for peer " MACSTR,
+			   MAC2STR(peer_ndi));
+		return -1;
+	}
+
+	if (!install_keys) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDI station added without keys for peer "
+			   MACSTR, MAC2STR(peer_ndi));
+		return 0;
+	}
+
+	if (nan_peer_get_tk(wpa_s->nan, peer_nmi, peer_ndi, local_ndi, tk,
+			    &tk_len, &csid)) {
+		wpa_printf(MSG_INFO, "NAN: Failed to get TK for NDI station");
+		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+		return -1;
+	}
+
+	if (wpas_nan_set_ndi_keys(ndi_wpa_s, peer_ndi, csid, tk, tk_len)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to set NDI keys for peer " MACSTR,
+			   MAC2STR(peer_ndi));
+		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+		forced_memzero(tk, tk_len);
+		return -1;
+	}
+	forced_memzero(tk, tk_len);
+
+	return wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
+				     WPA_STA_AUTHORIZED, ~0);
+}
+
+
+static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
+				    const u8 *local_ndi,
+				    const u8 *peer_ndi)
+{
+	struct wpa_supplicant *ndi_wpa_s;
+
+	ndi_wpa_s = wpas_nan_get_ndi_iface(wpa_s, local_ndi);
+	if (!ndi_wpa_s) {
+		wpa_printf(MSG_INFO,
+			   "NAN: No NDI interface found for " MACSTR,
+			   MAC2STR(local_ndi));
+		return;
+	}
+
+	if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
+				  0, ~WPA_STA_AUTHORIZED))
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Failed to clear authorized flag for NDI station");
+
+	wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+	wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+}
+
+
 static int wpas_nan_ndp_connected_cb(void *ctx,
 				     struct nan_ndp_connection_params *params)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	char *ssi_hex = NULL;
+
+	if (wpas_nan_add_ndi_sta(wpa_s, params->ndp_id.peer_nmi,
+				 params->local_ndi, params->peer_ndi,
+				 params->install_keys,
+				 params->first_ndp) < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to add NDI station for NDP connection");
+		return -1;
+	}
 
 	if (params->ssi) {
 		size_t len = 2 * params->ssi_len + 1;
@@ -384,6 +581,7 @@ static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
+	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi);
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_DISCONNECTED
 		       "peer=" MACSTR " ndp_id=%u local_ndi=" MACSTR
 		       " peer_ndi=" MACSTR " reason=%u",
