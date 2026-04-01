@@ -343,21 +343,24 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 
 	/* Service Descriptor Extension attribute */
 	if (srv->type == NAN_DE_PUBLISH || ssi) {
-		wpabuf_put_u8(buf, NAN_ATTR_SDEA);
-		wpabuf_put_le16(buf, sdea_len);
-		wpabuf_put_u8(buf, srv->id); /* Instance ID */
 		if (srv->type == NAN_DE_PUBLISH) {
 			if (srv->publish.fsd)
 				sdea_ctrl |= NAN_SDEA_CTRL_FSD_REQ;
 			if (srv->publish.fsd_gas)
 				sdea_ctrl |= NAN_SDEA_CTRL_FSD_GAS;
 		}
-		wpabuf_put_le16(buf, sdea_ctrl);
-		if (ssi) {
-			wpabuf_put_le16(buf, 4 + wpabuf_len(ssi));
-			wpabuf_put_be24(buf, OUI_WFA);
-			wpabuf_put_u8(buf, srv->srv_proto_type);
-			wpabuf_put_buf(buf, ssi);
+
+		if (sdea_ctrl || ssi) {
+			wpabuf_put_u8(buf, NAN_ATTR_SDEA);
+			wpabuf_put_le16(buf, sdea_len);
+			wpabuf_put_u8(buf, srv->id); /* Instance ID */
+			wpabuf_put_le16(buf, sdea_ctrl);
+			if (ssi) {
+				wpabuf_put_le16(buf, 4 + wpabuf_len(ssi));
+				wpabuf_put_be24(buf, OUI_WFA);
+				wpabuf_put_u8(buf, srv->srv_proto_type);
+				wpabuf_put_buf(buf, ssi);
+			}
 		}
 	}
 
