@@ -427,9 +427,10 @@ struct nan_config {
 	 * ndp_connected - Notify that NDP was successfully connected
 	 * @ctx: Callback context from cb_ctx
 	 * @params: NDP connection parameters
+	 * Returns: 0 on success, -1 on failure
 	 */
-	void (*ndp_connected)(void *ctx,
-			      struct nan_ndp_connection_params *params);
+	int (*ndp_connected)(void *ctx,
+			     struct nan_ndp_connection_params *params);
 
 	/**
 	 * ndp_disconnected - Notify that NDP was disconnected

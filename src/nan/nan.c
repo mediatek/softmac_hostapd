@@ -1254,7 +1254,7 @@ static void nan_ndp_action_notif(struct nan_data *nan, struct nan_peer *peer)
 }
 
 
-static void nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
+static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndp_connection_params params;
 
@@ -1280,14 +1280,19 @@ static void nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 
 	nan_sec_ndp_store_keys(nan, peer, params.peer_ndi, params.local_ndi);
 
-	if (nan->cfg->ndp_connected)
-		nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params);
+	if (nan->cfg->ndp_connected &&
+	    nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params)) {
+		wpa_printf(MSG_DEBUG, "NAN: NDP connected notification failed");
+		return -1;
+	}
 
 	/* Move the NDP to the list of tracked NDPs */
 	dl_list_add(&peer->ndps, &peer->ndp_setup.ndp->list);
 	peer->ndp_setup.ndp = NULL;
 
 	nan_ndp_setup_stop(nan, peer);
+
+	return 0;
 }
 
 
@@ -1411,7 +1416,9 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP setup done");
 
-		nan_ndp_connected(nan, peer);
+		if (nan_ndp_connected(nan, peer))
+			nan_ndp_disconnected(nan, peer,
+					     NAN_REASON_UNSPECIFIED_REASON);
 		return 0;
 	}
 
@@ -1583,7 +1590,9 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: TX status: NDP setup done");
-		nan_ndp_connected(nan, peer);
+		if (nan_ndp_connected(nan, peer))
+			nan_ndp_disconnected(nan, peer,
+					     NAN_REASON_UNSPECIFIED_REASON);
 	}
 
 	return 0;

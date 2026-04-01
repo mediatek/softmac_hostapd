@@ -585,18 +585,19 @@ nan_test_ndp_action_notfi_cb(void *ctx,
  * nan_test_ndp_connected_cb - Callback for NDP connected
  * @ctx: Pointer to &struct nan_device
  * @params: NDP action notification parameters
+ * Returns: 0 on success, -1 on failure
  *
  * The handling of the event is done asynchronously through the NAN test actions
  * processing.
  */
-static void nan_test_ndp_connected_cb(void *ctx,
-				      struct nan_ndp_connection_params *params)
+static int nan_test_ndp_connected_cb(void *ctx,
+				     struct nan_ndp_connection_params *params)
 {
 	struct nan_device *dev = ctx;
 	struct nan_peer_schedule sched;
 	struct nan_peer_potential_avail pot;
 
-	DEV_NOT_INIT_ERR_VOID(dev);
+	DEV_NOT_INIT_ERR(dev);
 
 	wpa_printf(MSG_INFO,
 		   "%s: %s: Enter. local_ndi=" MACSTR " peer_ndi=" MACSTR,
@@ -618,6 +619,7 @@ static void nan_test_ndp_connected_cb(void *ctx,
 				   dev->name, dev->csid,
 				   dev->conf->ndp_confs[dev->n_ndps].
 				   expected_csid);
+			return -1;
 		}
 	}
 
@@ -625,6 +627,8 @@ static void nan_test_ndp_connected_cb(void *ctx,
 			    0, params->ssi, params->ssi_len, NAN_CS_NONE, NULL);
 
 	dev->connected_notify_received = true;
+
+	return 0;
 }
 
 
