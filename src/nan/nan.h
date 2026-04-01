@@ -493,6 +493,25 @@ struct nan_config {
 	 * instance ID; false otherse
 	 */
 	bool (*is_valid_publish_id)(void *ctx, u8 instance_id, u8 *service_id);
+
+	/**
+	 * set_peer_schedule - Configure peer schedule
+	 * @ctx: Callback context from cb_ctx
+	 * @nmi_addr: NAN Management Interface address of the peer
+	 * @new_sta: Indicates whether this is a new STA (true) or an existing
+	 *     STA that is being re-configured (false)
+	 * @cdw: Committed DW information (from device capabilities)
+	 * @sequence_id: Schedule sequence ID
+	 * @max_channel_switch_time: Maximum channel switch time
+	 * @sched: Peer schedule information; can be NULL
+	 * @ulw_elems: ULW elements buffer; can be NULL
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*set_peer_schedule)(void *ctx, const u8 *nmi_addr, bool new_sta,
+				 u16 cdw, u8 sequence_id,
+				 u16 max_channel_switch_time,
+				 const struct nan_peer_schedule *sched,
+				 const struct wpabuf *ulw_elems);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);

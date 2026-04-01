@@ -1177,11 +1177,67 @@ static bool nan_ndp_supported(struct nan_data *nan)
 	if (nan->cfg->ndp_action_notif && nan->cfg->ndp_connected &&
 	    nan->cfg->ndp_disconnected &&
 	    nan->cfg->send_naf && nan->cfg->get_chans &&
-	    nan->cfg->is_valid_publish_id)
+	    nan->cfg->is_valid_publish_id &&
+	    nan->cfg->set_peer_schedule)
 		return true;
 
 	wpa_printf(MSG_DEBUG, "NAN: NDP operations are not supported");
 	return false;
+}
+
+
+static void nan_peer_get_committed_avail(const struct nan_data *nan,
+					 const struct nan_peer *peer,
+					 struct nan_peer_schedule *sched);
+
+
+static int nan_configure_peer_schedule(struct nan_data *nan,
+				       struct nan_peer *peer)
+{
+	int ret;
+	struct nan_dev_capa_entry *cur;
+	struct nan_device_capabilities *capa = NULL;
+	struct nan_peer_schedule sched;
+
+	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule");
+
+	if (!nan_ndl_peer_schedule_intersects(nan, peer)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot configure peer NMI STA - no intersecting schedule");
+		return 0;
+	}
+
+	dl_list_for_each(cur, &peer->info.dev_capa,
+			 struct nan_dev_capa_entry, list) {
+		/*
+		 * Take the first one, as both CDW and channel switch time are
+		 * identical across all attributes
+		 */
+		capa = &cur->capa;
+		break;
+	}
+
+	if (!capa) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot configure peer NMI STA - no device capabilities");
+		return -1;
+	}
+
+	os_memset(&sched, 0, sizeof(sched));
+	nan_peer_get_committed_avail(nan, peer, &sched);
+
+	ret = nan->cfg->set_peer_schedule(nan->cfg->cb_ctx, peer->nmi_addr,
+					  !peer->configured, capa->cdw_info,
+					  peer->info.seq_id,
+					  capa->channel_switch_time, &sched,
+					  NULL);
+	if (ret) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to set peer schedule");
+		return ret;
+	}
+
+	peer->configured = true;
+	return 0;
 }
 
 
@@ -1415,8 +1471,8 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP setup done");
-
-		if (nan_ndp_connected(nan, peer))
+		if (nan_configure_peer_schedule(nan, peer) ||
+		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
 					     NAN_REASON_UNSPECIFIED_REASON);
 		return 0;
@@ -1590,7 +1646,8 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: TX status: NDP setup done");
-		if (nan_ndp_connected(nan, peer))
+		if (nan_configure_peer_schedule(nan, peer) ||
+		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
 					     NAN_REASON_UNSPECIFIED_REASON);
 	}
@@ -1630,6 +1687,11 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 
 		naf_oui = NAN_SUBTYPE_DATA_PATH_REQUEST;
 		timeout = NAN_NDP_SETUP_TIMEOUT_LONG;
+		ret = nan_configure_peer_schedule(nan, peer);
+		if (ret) {
+			nan_ndp_setup_stop(nan, peer);
+			return ret;
+		}
 		break;
 	case NAN_NDP_ACTION_RESP:
 		/*
@@ -1645,6 +1707,12 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 
 		if (peer->ndp_setup.status != NAN_NDP_STATUS_REJECTED) {
 			ret = nan_ndl_setup(nan, peer, params);
+			if (!ret) {
+				ret = nan_configure_peer_schedule(nan, peer);
+				if (ret)
+					peer->ndl->send_naf_on_error = 1;
+			}
+
 			if (ret) {
 				if (peer->ndl && peer->ndl->send_naf_on_error) {
 					nan_ndp_setup_failure(
@@ -1664,6 +1732,12 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		break;
 	case NAN_NDP_ACTION_CONF:
 		ret = nan_ndl_setup(nan, peer, params);
+		if (!ret) {
+			ret = nan_configure_peer_schedule(nan, peer);
+			if (ret)
+				peer->ndl->send_naf_on_error = 1;
+		}
+
 		if (ret) {
 			if (peer->ndl && peer->ndl->send_naf_on_error) {
 				nan_ndp_setup_failure(

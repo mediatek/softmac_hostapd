@@ -852,6 +852,33 @@ static bool nan_test_is_valid_publish_id_cb(void *ctx, u8 instance_id,
 }
 
 
+/*
+ * nan_test_set_peer_schedule_cb - Set peer schedule callback
+ *
+ * @ctx: Pointer to &struct nan_device
+ * @sched: Pointer to &struct nan_peer_schedule to be filled
+ */
+static int
+nan_test_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr, bool new_sta,
+			      u16 cdw, u8 sequence_id,
+			      u16 max_channel_switch_time,
+			      const struct nan_peer_schedule *sched,
+			      const struct wpabuf *ulw_elems)
+{
+	struct nan_device *dev = (struct nan_device *)ctx;
+
+	DEV_NOT_INIT_ERR(dev);
+
+	wpa_printf(MSG_INFO, "%s: %s: Enter", dev->name, __func__);
+	wpa_printf(MSG_INFO, "%s: nmi_addr=" MACSTR
+		   " new_sta=%d cdw=%u sequence_id=%u max_channel_switch_time=%u",
+		   dev->name, MAC2STR(nmi_addr), new_sta, cdw, sequence_id,
+		   max_channel_switch_time);
+
+	return 0;
+}
+
+
 /**
  * nan_test_dev_init - Initialize a test device instance
  * @dev: the instance of the device to initialize
@@ -872,6 +899,7 @@ static int nan_test_dev_init(struct nan_device *dev)
 	nan.send_naf = nan_test_send_naf_cb;
 	nan.get_chans = nan_test_get_chans_cb;
 	nan.is_valid_publish_id = nan_test_is_valid_publish_id_cb;
+	nan.set_peer_schedule = nan_test_set_peer_schedule_cb;
 
 	/* Awake on every DW on 2 GHz and 5 GHz */
 	nan.dev_capa.cdw_info = 0x9;
@@ -971,7 +999,23 @@ nan_test_setup_devices(struct nan_test_global *global,
 		.master_pref = 2,
 		.dual_band = 1,
 	};
-	const u8 pot_avail[] = {
+	/*
+	 * Device attributes containing:
+	 * 1. Device capability attribute (ID=0x0F, len=10):
+	 *    - map_id=0
+	 *    - cdw_info=0x0009 (awake on every DW on 2G and 5G)
+	 *    - supported_bands=0x07 (2G, 5G, 6G)
+	 *    - op_mode=0x01
+	 *    - n_antennas=0x22
+	 *    - channel_switch_time=0x000a (10)
+	 *    - capa=0x00
+	 * 2. Availability attribute (ID=0x12, len=12)
+	 */
+	const u8 attrs[] = {
+		/* Device capability attribute */
+		0x0f, 0x09, 0x00, 0x00, 0x09, 0x00, 0x07, 0x01,
+		0x22, 0x0a, 0x00, 0x00,
+		/* Availability attribute */
 		0x12, 0x0c, 0x00, 0x01, 0x20, 0x00, 0x07, 0x00,
 		0x1a, 0x00, 0x11, 0x51, 0xff, 0x07, 0x00,
 	};
@@ -990,8 +1034,8 @@ nan_test_setup_devices(struct nan_test_global *global,
 	if (!sub)
 		goto fail;
 
-	nan_add_peer(pub->nan, sub_nmi, pot_avail, sizeof(pot_avail));
-	nan_add_peer(sub->nan, pub_nmi, pot_avail, sizeof(pot_avail));
+	nan_add_peer(pub->nan, sub_nmi, attrs, sizeof(attrs));
+	nan_add_peer(sub->nan, pub_nmi, attrs, sizeof(attrs));
 
 	wpa_printf(MSG_INFO, "\n%s: Done\n", __func__);
 	return sub;

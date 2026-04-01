@@ -119,6 +119,12 @@ static void nan_ndl_clear(struct nan_data *nan, struct nan_peer *peer)
 		   MAC2STR(peer->nmi_addr),
 		   nan_ndl_state_str(peer->ndl->state), peer->ndl->state);
 
+	if (peer->configured) {
+		nan->cfg->set_peer_schedule(nan->cfg->cb_ctx, peer->nmi_addr,
+					    false, 0, 0, 0, NULL, NULL);
+		peer->configured = false;
+	}
+
 	os_free(ndl->ndc_sched);
 	ndl->ndc_sched = NULL;
 	ndl->ndc_sched_len = 0;
@@ -1750,4 +1756,78 @@ void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 	wpabuf_put_le16(buf, 1 + wpabuf_len(ndl->sched.elems));
 	wpabuf_put_u8(buf, 0);
 	wpabuf_put_buf(buf, ndl->sched.elems);
+}
+
+
+/*
+ * nan_ndl_peer_schedule_intersects - Check if local and peer schedules
+ * intersect
+ *
+ * @nan: NAN module context from nan_init()
+ * @peer: The peer with whom the NDL is being setup
+ * Returns: true if schedules intersect, false otherwise
+ *
+ * The function checks if the local device schedule intersects with the peer
+ * device schedule.
+ */
+bool nan_ndl_peer_schedule_intersects(struct nan_data *nan,
+				      struct nan_peer *peer)
+{
+	struct nan_schedule *sched;
+	size_t i;
+
+	if (!peer->ndl)
+		return false;
+
+	sched = &peer->ndl->sched;
+
+	/*
+	 * Iterate over all the channels included in the local schedule. For
+	 * each channel convert the committed and conditional slots to a
+	 * bitfield object and extract the operating class and channel bitmap.
+	 *
+	 * Using the operating class and channel bitmap find the peer
+	 * availability on that channel and check if it intersect with the
+	 * local one.
+	 */
+	wpa_printf(MSG_DEBUG, "NAN: n_chans=%u, ndc_map_id=%u",
+		   sched->n_chans, sched->ndc_map_id);
+
+	for (i = 0; i < sched->n_chans; i++) {
+		struct bitfield *own_chan_bf = NULL, *peer_chan_bf = NULL;
+		u16 cbm, pri_cbm;
+		u8 map_id, op_class;
+		int ret;
+
+		/* Convert the schedule for the current channel to bitfield */
+		ret = nan_ndl_convert_chan_sched_to_bf(nan, &sched->chans[i],
+						       &own_chan_bf, &map_id,
+						       &op_class, &cbm,
+						       &pri_cbm);
+		if (ret) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDL: Failed to convert chan sched to bitfield");
+			return false;
+		}
+
+		/* Get the peer availability for the current channel */
+		peer_chan_bf =
+			nan_avail_entries_to_bf(nan,
+						&peer->info.avail_entries,
+						op_class, cbm, pri_cbm);
+		if (!peer_chan_bf) {
+			bitfield_free(own_chan_bf);
+			continue;
+		}
+
+		ret = bitfield_intersects(own_chan_bf, peer_chan_bf);
+
+		bitfield_free(peer_chan_bf);
+		bitfield_free(own_chan_bf);
+
+		if (ret == 1)
+			return true;
+	}
+
+	return false;
 }

@@ -406,6 +406,7 @@ struct nan_ndl {
  * struct nan_peer - Represents a known NAN peer
  * @list: List node for linking peers
  * @nmi_addr: NMI of the peer
+ * @configured: Indicates if the peer has been configured to the device
  * @last_seen: Timestamp of the last time this peer was seen
  * @info: Information about the peer
  * @ndps: List of NDPs associated with this peer
@@ -416,6 +417,7 @@ struct nan_ndl {
 struct nan_peer {
 	struct dl_list list;
 	u8 nmi_addr[ETH_ALEN];
+	bool configured;
 	struct os_reltime last_seen;
 	struct nan_peer_info info;
 
@@ -565,6 +567,8 @@ int nan_ndl_add_avail_attrs(struct nan_data *nan, const struct nan_peer *peer,
 void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 				     const struct nan_peer *peer,
 				     struct wpabuf *buf);
+bool nan_ndl_peer_schedule_intersects(struct nan_data *nan,
+				      struct nan_peer *peer);
 int nan_get_chan_bm(struct nan_data *nan, struct nan_sched_chan *chan,
 		    u8 *op_class, u16 *chan_bm, u16 *pri_chan_bm);
 int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
