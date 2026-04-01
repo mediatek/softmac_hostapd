@@ -295,7 +295,8 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			  unsigned int wait_time,
 			  enum nan_service_control_type type,
 			  const u8 *dst, const u8 *a3, u8 req_instance_id,
-			  const struct wpabuf *ssi)
+			  const struct wpabuf *ssi,
+			  const struct wpabuf *attrs)
 {
 	struct wpabuf *buf;
 	size_t len = 0, sda_len, sdea_len;
@@ -339,6 +340,8 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	/* Reserve some additional space for extra attributes */
 	if (de->cb.add_extra_attrs)
 		len += 256;
+
+	len += attrs ? wpabuf_len(attrs) : 0;
 
 	buf = nan_de_alloc_sdf(len);
 	if (!buf)
@@ -412,6 +415,11 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 
 	if (de->cb.add_extra_attrs)
 		de->cb.add_extra_attrs(de->cb.ctx, buf);
+
+	if (attrs) {
+		wpa_printf(MSG_DEBUG, "NAN: Add extra NAN attributes");
+		wpabuf_put_buf(buf, attrs);
+	}
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
 		  dst, forced_addr, a3, buf);
@@ -519,7 +527,7 @@ static void nan_de_tx_multicast(struct nan_de *de, struct nan_de_service *srv,
 	}
 
 	nan_de_tx_sdf(de, srv, wait_time, type, network_id, bssid,
-		      req_instance_id, srv->ssi);
+		      req_instance_id, srv->ssi, NULL);
 	os_get_reltime(&srv->last_multicast);
 }
 
@@ -1239,7 +1247,7 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 		 * Service Specific Info field if it received a matching
 		 * unsolicited Publish message. */
 		nan_de_transmit(de, srv->id, NULL, NULL, peer_addr,
-				instance_id);
+				instance_id, NULL);
 	}
 
 send_event:
@@ -1309,7 +1317,7 @@ static bool nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
 
 	nan_de_tx_sdf(de, srv, 100, NAN_SRV_CTRL_PUBLISH,
 		      srv->publish.solicited_multicast ?
-		      network_id : peer_addr, a3, instance_id, srv->ssi);
+		      network_id : peer_addr, a3, instance_id, srv->ssi, NULL);
 
 	if (!srv->is_p2p && !srv->sync)
 		nan_de_pause_state(srv, peer_addr, instance_id);
@@ -2101,7 +2109,8 @@ void nan_de_cancel_subscribe(struct nan_de *de, int subscribe_id)
 
 int nan_de_transmit(struct nan_de *de, int handle,
 		    const struct wpabuf *ssi, const struct wpabuf *elems,
-		    const u8 *peer_addr, u8 req_instance_id)
+		    const u8 *peer_addr, u8 req_instance_id,
+		    const struct wpabuf *nan_attrs)
 {
 	struct nan_de_service *srv;
 	const u8 *a3;
@@ -2132,7 +2141,7 @@ int nan_de_transmit(struct nan_de *de, int handle,
 	else
 		a3 = network_id;
 	nan_de_tx_sdf(de, srv, 100, NAN_SRV_CTRL_FOLLOW_UP,
-		      peer_addr, a3, req_instance_id, ssi);
+		      peer_addr, a3, req_instance_id, ssi, nan_attrs);
 
 	srv->listen_stopped = false;
 	return 0;
