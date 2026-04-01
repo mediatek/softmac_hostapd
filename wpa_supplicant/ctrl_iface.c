@@ -14408,6 +14408,9 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "NAN_NDP_RESPONSE ", 17) == 0) {
 		if (wpas_nan_ndp_response(wpa_s, buf + 17) < 0)
 			reply_len = -1;
+	} else if (os_strncmp(buf, "NAN_NDP_TERMINATE ", 18) == 0) {
+		if (wpas_nan_ndp_terminate(wpa_s, buf + 18) < 0)
+			reply_len = -1;
 #endif /* CONFIG_NAN */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);

@@ -1547,6 +1547,81 @@ fail:
 }
 
 
+/* Format: NAN_NDP_TERMINATE peer_nmi=<nmi> init_ndi=<ndi> ndp_id=<id> */
+int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	struct nan_ndp_params ndp;
+	char *token, *context = NULL;
+	char *pos;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	os_memset(&ndp, 0, sizeof(ndp));
+
+	ndp.type = NAN_NDP_ACTION_TERM;
+
+	/* Parse command parameters */
+	while ((token = str_token(cmd, " ", &context))) {
+		pos = os_strchr(token, '=');
+		if (!pos) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid parameter format: %s",
+				   token);
+			return -1;
+		}
+		*pos++ = '\0';
+
+		if (os_strcmp(token, "peer_nmi") == 0) {
+			if (hwaddr_aton(pos, ndp.ndp_id.peer_nmi) < 0) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid peer NMI address: %s",
+					   pos);
+				return -1;
+			}
+		} else if (os_strcmp(token, "init_ndi") == 0) {
+			if (hwaddr_aton(pos, ndp.ndp_id.init_ndi) < 0) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid initiator NDI address: %s",
+					   pos);
+				return -1;
+			}
+		} else if (os_strcmp(token, "ndp_id") == 0) {
+			ndp.ndp_id.id = atoi(pos);
+		} else {
+			wpa_printf(MSG_DEBUG, "NAN: Unknown parameter: %s",
+				   token);
+		}
+	}
+
+	/* Validate required parameters */
+	if (is_zero_ether_addr(ndp.ndp_id.peer_nmi)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: peer_nmi");
+		return -1;
+	}
+
+	if (is_zero_ether_addr(ndp.ndp_id.init_ndi)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: init_ndi");
+		return -1;
+	}
+
+	if (!ndp.ndp_id.id) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: ndp_id");
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: Terminating NDP with peer " MACSTR
+		   " init_ndi=" MACSTR " ndp_id=%u",
+		   MAC2STR(ndp.ndp_id.peer_nmi),
+		   MAC2STR(ndp.ndp_id.init_ndi), ndp.ndp_id.id);
+
+	return nan_handle_ndp_setup(wpa_s->nan, &ndp);
+}
+
+
 void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster)
