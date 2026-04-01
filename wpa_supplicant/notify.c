@@ -1213,6 +1213,34 @@ void wpas_notify_nan_subscribe_terminated(struct wpa_supplicant *wpa_s,
 						  nan_reason_txt(reason));
 }
 
+
+void wpas_notify_nan_bootstrap_request(struct wpa_supplicant *wpa_s,
+				       const u8 *peer_nmi, u16 pbm)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_BOOTSTRAP_REQUEST
+		       "peer_nmi=" MACSTR " pbm=0x%04x",
+		       MAC2STR(peer_nmi), pbm);
+}
+
+
+void wpas_notify_nan_bootstrap_success(struct wpa_supplicant *wpa_s,
+				       const u8 *peer_nmi, u16 pbm)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_BOOTSTRAP_SUCCESS
+		       "peer_nmi=" MACSTR " pbm=0x%04x",
+		       MAC2STR(peer_nmi), pbm);
+}
+
+
+void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
+				       const u8 *peer_nmi, u16 pbm,
+				       u8 reason)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_BOOTSTRAP_FAILURE
+		       "peer_nmi=" MACSTR " pbm=0x%04x reason=%u",
+		       MAC2STR(peer_nmi), pbm, reason);
+}
+
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 

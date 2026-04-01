@@ -2374,3 +2374,28 @@ int nan_get_peer_elems(struct nan_data *nan, const u8 *addr, u8 **elems)
 
 	return -1;
 }
+
+
+/**
+ * nan_set_bootstrap_configuration - Set NAN bootstrap configuration
+ * @nan: NAN module context from nan_init()
+ * @supported_bootstrap_methods: Bitmap of supported bootstrap methods
+ * @auto_accept_bootstrap_methods: Bitmap of bootstrap methods to auto-accept
+ * @bootstrap_comeback_timeout: Timeout in TUs for bootstrap comeback
+ * Returns: 0 on success, -1 on failure.
+ */
+int nan_set_bootstrap_configuration(struct nan_data *nan,
+				    u16 supported_bootstrap_methods,
+				    u16 auto_accept_bootstrap_methods,
+				    u16 bootstrap_comeback_timeout)
+{
+	if (!nan)
+		return -1;
+
+	nan->cfg->supported_bootstrap_methods = supported_bootstrap_methods;
+	nan->cfg->auto_accept_bootstrap_methods =
+		auto_accept_bootstrap_methods;
+	nan->cfg->bootstrap_comeback_timeout = bootstrap_comeback_timeout;
+
+	return 0;
+}

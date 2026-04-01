@@ -628,5 +628,9 @@ int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr);
 int nan_get_chan_entry(struct nan_data *nan, const struct nan_sched_chan *chan,
 		       struct nan_chan_entry *chan_entry);
 int nan_get_peer_elems(struct nan_data *nan, const u8 *addr, u8 **elems);
+int nan_set_bootstrap_configuration(struct nan_data *nan,
+				    u16 supported_bootstrap_methods,
+				    u16 auto_accept_bootstrap_methods,
+				    u16 bootstrap_comeback_timeout);
 
 #endif /* NAN_H */
