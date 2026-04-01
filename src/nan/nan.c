@@ -1064,7 +1064,6 @@ int nan_add_peer(struct nan_data *nan, const u8 *addr,
 	if (!nan)
 		return -1;
 
-	/* TODO: parse the device attributes to update the peer information */
 	if (!device_attrs || !device_attrs_len) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Ignore add_peer with no device attributes");
@@ -1079,6 +1078,8 @@ int nan_add_peer(struct nan_data *nan, const u8 *addr,
 
 		os_memcpy(peer->nmi_addr, addr, ETH_ALEN);
 	}
+
+	nan_parse_device_attrs(nan, peer, device_attrs, device_attrs_len);
 
 	os_get_reltime(&peer->last_seen);
 	return 0;
@@ -1464,14 +1465,6 @@ int nan_action_rx(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
 	}
 
 	wpa_printf(MSG_DEBUG, "NAN: NAF: oui_subtype=%u", msg.oui_subtype);
-
-	ret = nan_parse_device_attrs(nan, peer, mgmt->u.action.u.naf.variable,
-				     len - IEEE80211_MIN_ACTION_LEN(naf));
-	if (ret) {
-		wpa_printf(MSG_DEBUG,
-			   "NAN: NAF: Failed to parse device attributes");
-		goto done;
-	}
 
 	switch (msg.oui_subtype) {
 	case NAN_SUBTYPE_DATA_PATH_REQUEST:
