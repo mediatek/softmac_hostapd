@@ -1201,7 +1201,13 @@ static int nan_configure_peer_schedule(struct nan_data *nan,
 
 	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule");
 
-	if (!nan_ndl_peer_schedule_intersects(nan, peer)) {
+	if (!peer->ndl) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot configure peer NMI STA - no schedule");
+		return 0;
+	}
+
+	if (!nan_peer_schedule_intersects(nan, peer, &peer->ndl->sched)) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Cannot configure peer NMI STA - no intersecting schedule");
 		return 0;

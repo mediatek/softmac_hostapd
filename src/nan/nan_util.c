@@ -1760,3 +1760,137 @@ int nan_get_chan_entry(struct nan_data *nan, const struct nan_sched_chan *chan,
 
 	return 0;
 }
+
+
+/**
+ * nan_convert_chan_sched_to_bf - Convert channel schedule to bitfield
+ * and get the channel information.
+ *
+ * @nan: NAN module context from nan_init()
+ * @chan: Channel schedule to convert
+ * @avail_bf: On successful return holds the availability bitmap of the given
+ *     channel schedule
+ * @map_id: On successful return holds the map ID for the schedule
+ * @op_class: On successful return holds the operating class for the schedule
+ *     with the peer
+ * @cbm: On successful return holds the channel bitmap for the operating class
+ * @pcbm: On successful return holds the primary channel bitmap for the
+ *     channel in case of bandwidth greater than 40 MHz
+ * Returns: 0 on success; -1 on failure
+ */
+int nan_convert_chan_sched_to_bf(struct nan_data *nan,
+				 struct nan_chan_schedule *chan,
+				 struct bitfield **avail_bf, u8 *map_id,
+				 u8 *op_class, u16 *cbm, u16 *pcbm)
+{
+	struct bitfield *committed_bf, *conditional_bf;
+	int ret;
+
+	*op_class = 0;
+	*cbm = 0;
+	*pcbm = 0;
+	*map_id = chan->map_id;
+
+	ret = nan_get_chan_bm(nan, &chan->chan, op_class, cbm, pcbm);
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDL: Failed to convert channel info");
+		return -1;
+	}
+
+	committed_bf = nan_tbm_to_bf(nan, &chan->committed);
+	if (!committed_bf) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDL: Failed to build committed bitfield");
+		return -1;
+	}
+
+	conditional_bf = nan_tbm_to_bf(nan, &chan->conditional);
+	if (!conditional_bf) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDL: Failed to build conditional bitfield");
+		bitfield_free(committed_bf);
+		return -1;
+	}
+
+	*avail_bf = bitfield_union(committed_bf, conditional_bf);
+	bitfield_free(committed_bf);
+	bitfield_free(conditional_bf);
+
+	if (!*avail_bf) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDL: Failed to unify committed and conditional bitfields");
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: NDL: map_id=%u, op_class=%u, cbm=0x%x",
+		   *map_id, *op_class, *cbm);
+	return 0;
+}
+
+
+/*
+ * nan_peer_schedule_intersects - Check if local and peer schedules intersect
+ *
+ * @nan: NAN module context from nan_init()
+ * @peer: The peer with whom to intersect the schedule
+ * @sched: Local device schedule
+ * Returns: true if schedules intersect, false otherwise
+ *
+ * The function checks if the local device schedule intersects with the peer
+ * device schedule.
+ */
+bool nan_peer_schedule_intersects(struct nan_data *nan, struct nan_peer *peer,
+				  struct nan_schedule *sched)
+{
+	size_t i;
+
+	/*
+	 * Iterate over all the channels included in the local schedule. For
+	 * each channel convert the committed and conditional slots to a
+	 * bitfield object and extract the operating class and channel bitmap.
+	 *
+	 * Using the operating class and channel bitmap find the peer
+	 * availability on that channel and check if it intersect with the
+	 * local one.
+	 */
+	wpa_printf(MSG_DEBUG, "NAN: n_chans=%u, ndc_map_id=%u",
+		   sched->n_chans, sched->ndc_map_id);
+
+	for (i = 0; i < sched->n_chans; i++) {
+		struct bitfield *own_chan_bf = NULL, *peer_chan_bf = NULL;
+		u16 cbm, pri_cbm;
+		u8 map_id, op_class;
+		int ret;
+
+		/* Convert the schedule for the current channel to bitfield */
+		ret = nan_convert_chan_sched_to_bf(nan, &sched->chans[i],
+						   &own_chan_bf, &map_id,
+						   &op_class, &cbm, &pri_cbm);
+		if (ret) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDL: Failed to convert chan sched to bitfield");
+			return false;
+		}
+
+		/* Get the peer availability for the current channel */
+		peer_chan_bf =
+			nan_avail_entries_to_bf(nan,
+						&peer->info.avail_entries,
+						op_class, cbm, pri_cbm);
+		if (!peer_chan_bf) {
+			bitfield_free(own_chan_bf);
+			continue;
+		}
+
+		ret = bitfield_intersects(own_chan_bf, peer_chan_bf);
+
+		bitfield_free(peer_chan_bf);
+		bitfield_free(own_chan_bf);
+
+		if (ret == 1)
+			return true;
+	}
+
+	return false;
+}
