@@ -6360,6 +6360,27 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 	}
 #endif /* CONFIG_ENC_ASSOC */
 
+#ifdef CONFIG_NAN
+	/*
+	 * Set the address of the NMI station to which the NDI station belongs.
+	 */
+	if (drv->nlmode == NL80211_IFTYPE_NAN_DATA) {
+		if (!params->nmi_addr) {
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: NMI address not provided for NDI station");
+			ret = -EINVAL;
+			goto fail;
+		}
+
+		wpa_printf(MSG_DEBUG, "  * nmi_addr=" MACSTR,
+			   MAC2STR(params->nmi_addr));
+
+		if (nla_put(msg, NL80211_ATTR_NAN_NMI_MAC, ETH_ALEN,
+			    params->nmi_addr))
+			goto fail;
+	}
+#endif /* CONFIG_NAN */
+
 	ret = send_and_recv_cmd(drv, msg);
 	msg = NULL;
 	if (ret)
