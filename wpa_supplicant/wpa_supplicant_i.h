@@ -1734,6 +1734,7 @@ struct wpa_supplicant {
 	struct nan_cluster_config nan_config;
 	u8 schedule_sequence_id;
 	struct nan_schedule_config nan_sched[MAX_NAN_RADIOS];
+	u16 nan_supported_csids;
 #endif /* CONFIG_NAN */
 #ifdef CONFIG_ENC_ASSOC
 	bool assoc_resp_encrypted; /* Whether (Re)Association Response frame

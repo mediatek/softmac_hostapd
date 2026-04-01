@@ -412,6 +412,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 
 	os_memset(&nan, 0, sizeof(nan));
 	nan.cb_ctx = wpa_s;
+	os_memcpy(nan.nmi_addr, wpa_s->own_addr, ETH_ALEN);
 
 	nan.start = wpas_nan_start_cb;
 	nan.stop = wpas_nan_stop_cb;
@@ -482,6 +483,10 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	wpa_s->nan_config.enable_dw_notif =
 		!!(wpa_s->nan_capa.drv_flags &
 		   WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE);
+
+	/* Currently support shared key suites only */
+	wpa_s->nan_supported_csids = BIT(NAN_CS_SK_CCM_128) |
+		BIT(NAN_CS_SK_GCM_256);
 
 	return 0;
 }
