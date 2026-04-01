@@ -569,7 +569,7 @@ void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 				     struct wpabuf *buf);
 bool nan_ndl_peer_schedule_intersects(struct nan_data *nan,
 				      struct nan_peer *peer);
-int nan_get_chan_bm(struct nan_data *nan, struct nan_sched_chan *chan,
+int nan_get_chan_bm(struct nan_data *nan, const struct nan_sched_chan *chan,
 		    u8 *op_class, u16 *chan_bm, u16 *pri_chan_bm);
 int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 			u32 map_ids_bitmap, u8 type_for_conditional,

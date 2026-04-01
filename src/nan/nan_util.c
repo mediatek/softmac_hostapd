@@ -480,7 +480,7 @@ static u16 nan_add_avail_entry(struct nan_data *nan,
 }
 
 
-int nan_get_chan_bm(struct nan_data *nan, struct nan_sched_chan *chan,
+int nan_get_chan_bm(struct nan_data *nan, const struct nan_sched_chan *chan,
 		    u8 *op_class, u16 *chan_bm, u16 *pri_chan_bm)
 {
 	u8 channel;
@@ -1729,4 +1729,34 @@ int nan_get_peer_ndc_freq(struct nan_data *nan,
 
 	bitfield_free(ndc_bf);
 	return -1;
+}
+
+
+/**
+ * nan_get_chan_entry - Get channel entry for a given NAN scheduled channel
+ * @nan: NAN module context from nan_init()
+ * @chan: NAN scheduled channel
+ * @chan_entry: On successful return holds the channel entry.
+ * Returns: 0 on success; otherwise -1
+ */
+int nan_get_chan_entry(struct nan_data *nan, const struct nan_sched_chan *chan,
+		       struct nan_chan_entry *chan_entry)
+{
+	u8 op_class;
+	u16 chan_bm, pri_chan_bm;
+	int ret;
+
+	if (!chan || !chan_entry)
+		return -1;
+
+	ret = nan_get_chan_bm(nan, chan, &op_class, &chan_bm, &pri_chan_bm);
+	if (ret)
+		return ret;
+
+	os_memset(chan_entry, 0, sizeof(*chan_entry));
+	chan_entry->op_class = op_class;
+	chan_entry->chan_bitmap = host_to_le16(chan_bm);
+	chan_entry->pri_chan_bitmap = pri_chan_bm & 0xff;
+
+	return 0;
 }
