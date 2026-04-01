@@ -568,5 +568,6 @@ void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf);
 int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr);
 int nan_get_chan_entry(struct nan_data *nan, const struct nan_sched_chan *chan,
 		       struct nan_chan_entry *chan_entry);
+int nan_get_peer_elems(struct nan_data *nan, const u8 *addr, u8 **elems);
 
 #endif /* NAN_H */

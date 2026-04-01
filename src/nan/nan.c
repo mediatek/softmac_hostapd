@@ -2275,3 +2275,68 @@ int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr)
 
 	return 0;
 }
+
+
+/**
+ * nan_get_peer_elems - Get element container data for a peer
+ * @nan: NAN module context from nan_init()
+ * @addr: NAN MAC address of the peer
+ * @elems: On return, pointer to the element container data
+ * Returns: Length of the element data on success; -1 on failure
+ *
+ * Retrieve the element container data associated with a peer. The function
+ * first looks for an entry with map_id 0. If not found and the peer has an
+ * active NDL, it returns the elements corresponding to the NDC channel's
+ * map_id. If no NDC map_id entry is found, it returns the first entry found.
+ */
+int nan_get_peer_elems(struct nan_data *nan, const u8 *addr, u8 **elems)
+{
+	struct nan_elem_container_entry *entry;
+	struct nan_peer *peer;
+	u8 ndc_map_id = 0;
+	bool ndc_map_id_found = false;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return -1;
+
+	if (peer->ndl) {
+		const struct nan_sched_entry *peer_ndc =
+			(const struct nan_sched_entry *) peer->ndl->ndc_sched;
+
+		if (peer_ndc &&
+		    peer->ndl->ndc_sched_len >= sizeof(*peer_ndc))
+			ndc_map_id = peer_ndc->map_id;
+	}
+
+	/* Prefer map_id == 0, so it applies for all */
+	dl_list_for_each(entry, &peer->info.element_container,
+			 struct nan_elem_container_entry, list) {
+		if (entry->map_id == 0) {
+			*elems = entry->data;
+			return entry->len;
+		}
+
+		if (ndc_map_id && entry->map_id == ndc_map_id)
+			ndc_map_id_found = true;
+	}
+
+	/*
+	 * TODO: Properly support different elements per map_id. For now, take
+	 * the elements that correspond to the NDC* channel if available.
+	 * Currently upper layers don't support configuring different
+	 * elements per map_id. Until that is changed, take the map_id
+	 * corresponding to the NDC channel as it at least must intersect with
+	 * the local schedule. If no such entry exists, return the first entry
+	 * found.
+	 */
+	dl_list_for_each(entry, &peer->info.element_container,
+			 struct nan_elem_container_entry, list) {
+		if (!ndc_map_id_found || entry->map_id == ndc_map_id) {
+			*elems = entry->data;
+			return entry->len;
+		}
+	}
+
+	return -1;
+}
