@@ -1285,12 +1285,16 @@ bool nan_sched_covered_by_avail_entries(struct nan_data *nan,
 		return true;
 
 	dl_list_init(&sched_entries);
-	ret = nan_sched_entries_to_avail_entries(nan, &sched_entries,
-						 sched, sched_len);
+	if (nan_sched_entries_to_avail_entries(nan,
+					       &sched_entries,
+					       sched, sched_len))
+		return false;
 
 	sched_bf = nan_sched_to_bf(nan, &sched_entries, &map_id, &reason);
-	if (!sched_bf)
+	if (!sched_bf) {
+		nan_flush_avail_entries(&sched_entries);
 		return false;
+	}
 
 	nan_flush_avail_entries(&sched_entries);
 
