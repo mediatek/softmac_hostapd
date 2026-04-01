@@ -1221,7 +1221,7 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 			   bands);
 		if ((bands & BIT(NL80211_BAND_2GHZ)) &&
 		    (bands & BIT(NL80211_BAND_5GHZ)))
-			capa->nan_flags |=
+			capa->nan_capa.drv_flags |=
 				WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND;
 	}
 
@@ -1246,14 +1246,14 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 		if (tb_nan_capa[NL80211_NAN_CAPA_CONFIGURABLE_SYNC]) {
 			wpa_printf(MSG_DEBUG,
 				   "nl80211: NAN sync offload supported");
-			capa->nan_flags |=
+			capa->nan_capa.drv_flags |=
 				WPA_DRIVER_FLAGS_NAN_SUPPORT_SYNC_CONFIG;
 		}
 
 		if (tb_nan_capa[NL80211_NAN_CAPA_USERSPACE_DE]) {
 			wpa_printf(MSG_DEBUG,
 				   "nl80211: NAN user space DE is supported");
-			capa->nan_flags |=
+			capa->nan_capa.drv_flags |=
 				WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE;
 		}
 	}

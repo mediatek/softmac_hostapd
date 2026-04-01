@@ -2169,6 +2169,77 @@ enum wpa_driver_if_type {
 };
 
 /**
+ * struct nan_capa - NAN capabilities
+ *
+ * @drv_flags: NAN capability flags (WPA_DRIVER_FLAGS_NAN_*)
+ * @num_radios: Maximum number of NAN radios
+ * @sched_chans: Maximum number of channels in NAN schedule (per map)
+ * @slot_duration: NAN schedule bitmap slot duration (16, 32, 64, or 128) in TUs
+ * @schedule_period: Schedule period (powers of 2 in range: 128-8192) in TUs
+ * @max_channel_switch_time: Max channel switch time in microseconds
+ * @num_antennas: Number of antennas (lower nibble TX, upper nibble RX)
+ * @op_modes: NAN capability operation modes
+ * @dev_capa: NAN device capabilities
+ * @ht_capab: HT capabilities information as defined in IEEE Std 802.11-2024,
+ *     9.4.2.54.2 (HT Capability Information field)
+ * @ht_ampdu_params: HT A-MPDU parameters as defined in IEEE Std 802.11-2024,
+ *     9.4.2.54.3 (A-MPDU Parameters field)
+ * @ht_mcs_set: HT MCS set as defined in IEEE Std 802.11-2024,9.4.2.54.4
+ *     (Supported MCS Set field)
+ * @vht_capab: VHT capabilities information as defined in IEEE Std 802.11-2024,
+ *     9.4.2.156.2 (VHT Capabilities Information field)
+ * @vht_mcs_set: VHT MCS set as defined in IEEE Std 802.11-2024, 9.4.2.156.3
+ *     (Supported VHT-MCS and NSS Set field)
+ * @vht_valid: Whether &vht_capab and &vht_mcs_set are both valid
+ * @he_capab: HE capabilities. See &struct he_capabilities.
+ * @he_valid: Whether HE capabilities are valid
+ *
+ * For the schedule capabilities, even if the driver/device supports multiple
+ * options, only a single option should be selected. For example, if both 16 TU
+ * and 32 TU slot durations are supported, the driver should report the shortest
+ * supported slot duration (16 TU). For schedule period, the driver should
+ * report the maximum supported period, as longer periods can always be
+ * represented by repetitions of the shorter schedule bitmap. In any case,
+ * 512/16 configuration is recommended for better interoperability.
+ *
+ * As for the PHY capabilities, HT must be supported for NAN Data path, and
+ * without valid HT capabilities NAN Data path would be disabled.
+ *
+ * TODO: For now support only a single PHY capabilities configuration. This
+ * might need to be extended to support multiple configurations in the future.
+ */
+struct nan_capa {
+/* Driver supports dual band NAN operation */
+#define WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND		0x00000001
+/* Driver supports NAN synchronization configuration */
+#define WPA_DRIVER_FLAGS_NAN_SUPPORT_SYNC_CONFIG	0x00000002
+/* Driver supports DW notifications and SDF TX/RX over NAN device interface */
+#define WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE	0x00000004
+/** Driver supports NAN Data path */
+#define WPA_DRIVER_FLAGS_NAN_SUPPORT_NDP		0x00000008
+	u32 drv_flags;
+	u8 num_radios;
+	u8 sched_chans;
+	u8 slot_duration;
+	u16 schedule_period;
+	u16 max_channel_switch_time;
+	u8 num_antennas;
+	u8 op_modes;
+	u8 dev_capa;
+
+	u16 ht_capab;
+	u8 ht_mcs_set[16];
+	u8 ht_ampdu_params;
+
+	u32 vht_capab;
+	u8 vht_mcs_set[8];
+	bool vht_valid;
+
+	struct he_capabilities he_capab;
+	bool he_valid;
+};
+
+/**
  * struct wpa_driver_capa - Driver capability information
  */
 struct wpa_driver_capa {
@@ -2593,13 +2664,7 @@ struct wpa_driver_capa {
 	u8 max_tx_sts_gt_80;
 
 #ifdef CONFIG_NAN
-/* Driver supports dual band NAN operation */
-#define WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND		0x00000001
-/* Driver supports NAN synchronization configuration */
-#define WPA_DRIVER_FLAGS_NAN_SUPPORT_SYNC_CONFIG	0x00000002
-/* Driver supports DW notifications and SDF TX/RX over NAN device interface */
-#define WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE	0x00000004
-	u32 nan_flags;
+	struct nan_capa nan_capa;
 #endif /* CONFIG_NAN */
 };
 

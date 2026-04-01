@@ -8022,7 +8022,7 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		return -1;
 
 #ifdef CONFIG_NAN
-	wpa_s->nan_drv_flags = capa.nan_flags;
+	wpa_s->nan_drv_flags = capa.nan_capa.drv_flags;
 #endif /* CONFIG_NAN */
 
 	if (wpa_supplicant_init_eapol(wpa_s) < 0)

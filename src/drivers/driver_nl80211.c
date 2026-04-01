@@ -2736,7 +2736,7 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 #ifdef CONFIG_NAN
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 
-	if (!(drv->capa.nan_flags &
+	if (!(drv->capa.nan_capa.drv_flags &
 	      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
 		wpa_printf(MSG_DEBUG,
 			   "nl80211: User space DE is not supported, don't subscribe to NAN public action frames");
@@ -15366,7 +15366,7 @@ static int nl80211_nan_config(struct i802_bss *bss,
 	bands |= BIT(NL80211_BAND_2GHZ);
 
 	if (params->dual_band) {
-		if (drv->capa.nan_flags &
+		if (drv->capa.nan_capa.drv_flags &
 		    WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND) {
 			bands |= BIT(NL80211_BAND_5GHZ);
 		} else {
@@ -15390,7 +15390,7 @@ static int nl80211_nan_config(struct i802_bss *bss,
 		goto fail;
 
 	if (params->enable_dw_notif) {
-		if (!(drv->capa.nan_flags &
+		if (!(drv->capa.nan_capa.drv_flags &
 		      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
 			wpa_printf(MSG_INFO,
 				   "nl80211: Driver doesn't support NAN DW notifications");
