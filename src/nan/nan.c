@@ -1186,9 +1186,11 @@ static bool nan_ndp_supported(struct nan_data *nan)
 }
 
 
-static void nan_peer_get_committed_avail(const struct nan_data *nan,
-					 const struct nan_peer *peer,
-					 struct nan_peer_schedule *sched);
+static void
+nan_peer_get_committed_avail(const struct nan_data *nan,
+			     const struct nan_peer *peer,
+			     const struct nan_schedule *local_sched,
+			     struct nan_peer_schedule *sched);
 
 
 static int nan_configure_peer_schedule(struct nan_data *nan,
@@ -1202,11 +1204,12 @@ static int nan_configure_peer_schedule(struct nan_data *nan,
 
 	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule");
 
-	if (!nan_peer_schedule_intersects(nan, peer, local_sched)) {
+	os_memset(&sched, 0, sizeof(sched));
+	if (nan_peer_schedule_intersects(nan, peer, local_sched))
+		nan_peer_get_committed_avail(nan, peer, local_sched, &sched);
+	else
 		wpa_printf(MSG_DEBUG,
-			   "NAN: Cannot configure peer NMI STA - no intersecting schedule");
-		return 0;
-	}
+			   "NAN: Cannot configure peer schedule since there is no intersection");
 
 	dl_list_for_each(cur, &peer->info.dev_capa,
 			 struct nan_dev_capa_entry, list) {
@@ -1223,9 +1226,6 @@ static int nan_configure_peer_schedule(struct nan_data *nan,
 			   "NAN: Cannot configure peer NMI STA - no device capabilities");
 		return -1;
 	}
-
-	os_memset(&sched, 0, sizeof(sched));
-	nan_peer_get_committed_avail(nan, peer, &sched);
 
 	ret = nan->cfg->set_peer_schedule(nan->cfg->cb_ctx, peer->nmi_addr,
 					  !peer->configured, capa->cdw_info,
@@ -1836,10 +1836,28 @@ int nan_peer_get_tk(struct nan_data *nan, const u8 *addr,
 }
 
 
+static bool
+nan_peer_channel_in_local_sched(const struct nan_data *nan,
+				int peer_ctrl_freq,
+				const struct nan_schedule *local_sched)
+{
+	unsigned int i;
+
+	/* It's enough to compare the control freqs to ensure compatibility */
+	for (i = 0; i < local_sched->n_chans; i++) {
+		if (peer_ctrl_freq == local_sched->chans[i].chan.freq)
+			return true;
+	}
+
+	return false;
+}
+
+
 static void
 nan_peer_get_committed_avail_add(const struct nan_data *nan,
 				 const struct nan_peer *peer,
 				 const struct nan_avail_entry *avail,
+				 const struct nan_schedule *local_sched,
 				 struct nan_peer_schedule *sched)
 {
 	struct nan_map *map;
@@ -1922,6 +1940,11 @@ nan_peer_get_committed_avail_add(const struct nan_data *nan,
 			freq = freq - 70 + idx * 20;
 
 		/* TODO: Missing support for 80 + 80 */
+
+		/* Skip channels that are not in local schedule */
+		if (local_sched &&
+		    !nan_peer_channel_in_local_sched(nan, freq, local_sched))
+			return;
 	}
 
 	/* Assume committed for conditional slots if setup is done */
@@ -1983,15 +2006,18 @@ nan_peer_get_committed_avail_add(const struct nan_data *nan,
 }
 
 
-static void nan_peer_get_committed_avail(const struct nan_data *nan,
-					 const struct nan_peer *peer,
-					 struct nan_peer_schedule *sched)
+static void
+nan_peer_get_committed_avail(const struct nan_data *nan,
+			     const struct nan_peer *peer,
+			     const struct nan_schedule *local_sched,
+			     struct nan_peer_schedule *sched)
 {
 	const struct nan_avail_entry *avail;
 
 	dl_list_for_each(avail, &peer->info.avail_entries,
 			 struct nan_avail_entry, list)
-		nan_peer_get_committed_avail_add(nan, peer, avail, sched);
+		nan_peer_get_committed_avail_add(nan, peer, avail,
+						 local_sched, sched);
 }
 
 
@@ -2105,7 +2131,7 @@ int nan_peer_get_schedule_info(struct nan_data *nan, const u8 *addr,
 	if (!peer)
 		return -1;
 
-	nan_peer_get_committed_avail(nan, peer, sched);
+	nan_peer_get_committed_avail(nan, peer, NULL, sched);
 	nan_peer_get_ndc_sched(nan, peer, sched);
 	nan_peer_get_immut_sched(nan, peer, sched);
 
