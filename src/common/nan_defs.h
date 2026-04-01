@@ -461,6 +461,8 @@ enum nan_cipher_suite_id {
 	NAN_CS_GTK_GCMP_256 = 6,
 	NAN_CS_PK_PASN_128  = 7,
 	NAN_CS_PK_PASN_256  = 8,
+	/* Keep last */
+	NAN_CS_MAX
 };
 
 struct nan_cipher_suite {
