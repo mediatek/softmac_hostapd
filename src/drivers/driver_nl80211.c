@@ -15586,6 +15586,307 @@ static void wpa_driver_nl80211_nan_stop(void *priv)
 	nl80211_nan_stop(bss);
 }
 
+
+static int
+wpa_driver_nl80211_nan_set_channel(struct wpa_driver_nl80211_data *drv,
+				   struct nan_schedule_channel *chan,
+				   struct nl_msg *msg)
+{
+	struct nlattr *chan_attr;
+	enum nl80211_chan_width cw;
+
+	chan_attr = nla_nest_start(msg, NL80211_ATTR_NAN_CHANNEL);
+	if (!chan)
+		return -ENOBUFS;
+
+	if (nl80211_bw_to_nl(chan->bandwidth, &cw, chan->center_freq2))
+		return -EINVAL;
+
+	if (nla_put_u32(msg, NL80211_ATTR_WIPHY_FREQ, chan->freq) ||
+	    nla_put_u32(msg, NL80211_ATTR_CENTER_FREQ1, chan->center_freq1) ||
+	    nla_put_u32(msg, NL80211_ATTR_CENTER_FREQ2, chan->center_freq2) ||
+	    nla_put_u32(msg, NL80211_ATTR_CHANNEL_WIDTH, cw) ||
+	    nla_put(msg, NL80211_ATTR_NAN_CHANNEL_ENTRY,
+		    sizeof(chan->chan_entry), chan->chan_entry)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: NAN: Failed to put channel attributes");
+		return -EINVAL;
+	}
+
+	if (chan->rx_nss &&
+	    nla_put_u8(msg, NL80211_ATTR_NAN_RX_NSS, chan->rx_nss)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: NAN: Failed to put RX NSS attribute");
+		return -EINVAL;
+	}
+
+	nla_nest_end(msg, chan_attr);
+	return 0;
+}
+
+
+static int
+wpa_driver_nl80211_nan_set_slots(struct wpa_driver_nl80211_data *drv,
+				 struct wpabuf *chan_time_bitmap,
+				 u8 *slots, u8 chan_idx)
+{
+	const u8 *time_bitmap;
+	size_t time_bitmap_len, idx;
+
+	if (!chan_time_bitmap)
+		return 0;
+
+	time_bitmap = wpabuf_head(chan_time_bitmap);
+	time_bitmap_len = wpabuf_len(chan_time_bitmap);
+	if (!time_bitmap || !time_bitmap_len)
+		return 0;
+
+	/*
+	 * nl80211 always uses a period of 512 TUs with slot duration of
+	 * 16 TUs, so the map length must be equal to 4.
+	 */
+	if (time_bitmap_len != 4) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: NAN: Invalid time bitmap len=%zu",
+			   time_bitmap_len);
+		return -EINVAL;
+	}
+
+	for (idx = 0; idx < time_bitmap_len * 8; idx++) {
+		size_t byte_idx = idx / 8;
+		size_t bit_idx = idx % 8;
+
+		if (time_bitmap[byte_idx] & BIT(bit_idx))
+			slots[idx] = chan_idx;
+	}
+
+	return 0;
+}
+
+
+static int
+wpa_driver_nl80211_nan_set_schedule(struct wpa_driver_nl80211_data *drv,
+				    struct nan_schedule_config *sched,
+				    struct nl_msg *msg)
+{
+	u8 slots[32];
+	size_t i;
+
+	os_memset(slots, NL80211_NAN_SCHED_NOT_AVAIL_SLOT, sizeof(slots));
+
+	for (i = 0; i < sched->num_channels; i++) {
+		int ret;
+
+		ret = wpa_driver_nl80211_nan_set_channel(
+			drv, &sched->channels[i], msg);
+		if (ret)
+			return ret;
+
+		ret = wpa_driver_nl80211_nan_set_slots(
+			drv, sched->channels[i].time_bitmap, slots, i);
+		if (ret)
+			return ret;
+	}
+
+	return nla_put(msg, NL80211_ATTR_NAN_TIME_SLOTS, sizeof(slots), slots);
+}
+
+
+static int
+wpa_driver_nl80211_nan_config_schedule(void *priv, u8 map_id,
+				       struct nan_schedule_config *sched)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	int ret;
+
+	if (drv->nlmode != NL80211_IFTYPE_NAN || !drv->nan_started)
+		return -EOPNOTSUPP;
+
+	if (!sched)
+		return -EINVAL;
+
+	msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_NAN_SET_LOCAL_SCHED);
+	if (!msg) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to alloc NAN local schedule command");
+		return -ENOMEM;
+	}
+
+	ret = wpa_driver_nl80211_nan_set_schedule(drv, sched, msg);
+	if (ret)
+		goto fail;
+
+	if (sched->avail_attr &&
+	    nl80211_attr_supported(drv, NL80211_ATTR_NAN_AVAIL_BLOB) &&
+	    nla_put(msg, NL80211_ATTR_NAN_AVAIL_BLOB,
+		    wpabuf_len(sched->avail_attr),
+		    wpabuf_head(sched->avail_attr)))
+		goto fail;
+
+	ret = send_and_recv_cmd(bss->drv, msg);
+	if (ret)
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to send NAN local schedule command: %d",
+			   ret);
+
+	return ret;
+
+fail:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+
+static int
+wpa_driver_nl80211_nan_config_peer_schedule(
+	void *priv, const u8 *peer, u16 cdw, u8 sequence_id,
+	u16 max_chan_switch_time, const struct wpabuf *ulw,
+	struct nan_peer_schedule_config *sched)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nan_schedule_channel *channels[MAX_NUM_NAN_MAPS *
+					      MAX_NUM_NAN_SCHEDULE_CHANNELS];
+	u8 chan_remap[MAX_NUM_NAN_MAPS][MAX_NUM_NAN_SCHEDULE_CHANNELS];
+	unsigned int map_idx, chan_idx, n_channels = 0;
+	struct nl_msg *msg;
+	struct nlattr *maps;
+	int ret;
+
+	if (drv->nlmode != NL80211_IFTYPE_NAN || !drv->nan_started)
+		return -EOPNOTSUPP;
+
+	if (!sched)
+		return -EINVAL;
+
+	os_memset(channels, 0, sizeof(channels));
+	os_memset(chan_remap, 0, sizeof(chan_remap));
+
+	/*
+	 * Kernel expects channels at the top level, and peer maps reference
+	 * them by index. Build a global channel list from all maps.
+	 */
+	for (map_idx = 0; map_idx < sched->n_maps; map_idx++) {
+		struct nan_schedule_map *map = &sched->maps[map_idx];
+
+		for (chan_idx = 0; chan_idx < map->sched.num_channels;
+		     chan_idx++) {
+			unsigned int i;
+
+			/* Check if we already have this channel */
+			for (i = 0; i < n_channels; i++) {
+				if (os_memcmp(&map->sched.channels[chan_idx].chan_entry,
+					      channels[i]->chan_entry,
+					      sizeof(channels[i]->chan_entry)) == 0)
+					break;
+			}
+
+			if (i < n_channels) {
+				chan_remap[map_idx][chan_idx] = i;
+				continue;
+			}
+
+			channels[n_channels] = &map->sched.channels[chan_idx];
+			chan_remap[map_idx][chan_idx] = n_channels++;
+		}
+	}
+
+	msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_NAN_SET_PEER_SCHED);
+	if (!msg) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to alloc NAN peer schedule command");
+		return -ENOMEM;
+	}
+
+	if (nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, peer) ||
+	    nla_put_u16(msg, NL80211_ATTR_NAN_COMMITTED_DW, cdw) ||
+	    nla_put_u16(msg, NL80211_ATTR_NAN_MAX_CHAN_SWITCH_TIME,
+			max_chan_switch_time) ||
+	    (sched->n_maps &&
+	     nla_put_u8(msg, NL80211_ATTR_NAN_SEQ_ID, sequence_id))) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: NAN: Failed to put peer schedule attributes");
+		goto fail;
+	}
+
+	if (ulw && wpabuf_len(ulw)) {
+		if (nla_put(msg, NL80211_ATTR_NAN_ULW,
+			    wpabuf_len(ulw), wpabuf_head(ulw))) {
+			wpa_printf(MSG_INFO,
+				   "nl80211: NAN: Failed to put ULW attribute");
+			goto fail;
+		}
+	}
+
+	/* Set the channels */
+	wpa_printf(MSG_DEBUG,
+		   "nl80211: NAN: Setting %u channels for peer schedule",
+		   n_channels);
+
+	for (chan_idx = 0; chan_idx < n_channels; chan_idx++) {
+		ret = wpa_driver_nl80211_nan_set_channel(drv,
+							 channels[chan_idx],
+							 msg);
+		if (ret)
+			goto fail;
+	}
+
+	/* Set the maps */
+	maps = nla_nest_start(msg, NL80211_ATTR_NAN_PEER_MAPS);
+	if (!maps)
+		goto fail;
+
+	for (map_idx = 0; map_idx < sched->n_maps; map_idx++) {
+		struct nlattr *map = nla_nest_start(msg, map_idx + 1);
+		u8 slots[32];
+
+		if (!map)
+			goto fail;
+
+		if (nla_put_u8(msg, NL80211_NAN_PEER_MAP_ATTR_MAP_ID,
+			       sched->maps[map_idx].map_id))
+			goto fail;
+
+		os_memset(slots, NL80211_NAN_SCHED_NOT_AVAIL_SLOT,
+			  sizeof(slots));
+
+		for (chan_idx = 0;
+		     chan_idx < sched->maps[map_idx].sched.num_channels;
+		     chan_idx++) {
+			struct nan_schedule_channel *chan =
+				&sched->maps[map_idx].sched.channels[chan_idx];
+
+			ret = wpa_driver_nl80211_nan_set_slots(
+				drv, chan->time_bitmap, slots,
+				chan_remap[map_idx][chan_idx]);
+			if (ret)
+				goto fail;
+		}
+
+		if (nla_put(msg, NL80211_NAN_PEER_MAP_ATTR_TIME_SLOTS,
+			    sizeof(slots), slots))
+			goto fail;
+
+		nla_nest_end(msg, map);
+	}
+
+	nla_nest_end(msg, maps);
+
+	ret = send_and_recv_cmd(bss->drv, msg);
+	if (ret)
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to send NAN peer schedule command: %d",
+			   ret);
+
+	return ret;
+
+fail:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
 #endif /* CONFIG_NAN */
 
 
@@ -15764,5 +16065,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.nan_start = wpa_driver_nl80211_nan_start,
 	.nan_stop = wpa_driver_nl80211_nan_stop,
 	.nan_change_config = wpa_driver_nl80211_nan_change_config,
+	.nan_config_schedule = wpa_driver_nl80211_nan_config_schedule,
+	.nan_config_peer_schedule = wpa_driver_nl80211_nan_config_peer_schedule,
 #endif /* CONFIG_NAN */
 };
