@@ -1682,7 +1682,8 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		if (ret)
 			return ret;
 
-		ret = nan_ndl_setup(nan, peer, params);
+		ret = nan_ndl_setup(nan, peer, params,
+				    peer->ndp_setup.dialog_token);
 		if (ret) {
 			nan_ndp_setup_stop(nan, peer);
 			return ret;
@@ -1709,7 +1710,8 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		}
 
 		if (peer->ndp_setup.status != NAN_NDP_STATUS_REJECTED) {
-			ret = nan_ndl_setup(nan, peer, params);
+			ret = nan_ndl_setup(nan, peer, params,
+					    peer->ndp_setup.dialog_token);
 			if (!ret) {
 				ret = nan_configure_peer_schedule(
 					nan, peer, &peer->ndl->sched);
@@ -1735,7 +1737,8 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		timeout = NAN_NDP_SETUP_TIMEOUT_SHORT;
 		break;
 	case NAN_NDP_ACTION_CONF:
-		ret = nan_ndl_setup(nan, peer, params);
+		ret = nan_ndl_setup(nan, peer, params,
+				    peer->ndp_setup.dialog_token);
 		if (!ret) {
 			ret = nan_configure_peer_schedule(nan, peer,
 							  &peer->ndl->sched);

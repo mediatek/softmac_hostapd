@@ -547,7 +547,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 int nan_ndp_term_req(struct nan_data *nan, struct nan_peer *peer,
 		     struct nan_ndp_id *ndp_id);
 int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
-		  const struct nan_ndp_params *params);
+		  const struct nan_ndp_params *params, u8 dialog_token);
 void nan_ndl_setup_failure(struct nan_data *nan, struct nan_peer *peer,
 			   enum nan_reason reason, bool reset_state);
 void nan_ndl_reset(struct nan_data *nan, struct nan_peer *peer);

@@ -615,13 +615,16 @@ out:
  * @nan: NAN module context from nan_init()
  * @peer: The peer for which the NDL is being setup
  * @params: NDP setup request parameters
+ * @dialog_token: Dialog token to be used for the NDL setup messages. Should be
+ *      used for a new NDL only.
  * Returns: 0 on success, negative on failure.
 
  * It is possible that an NDL with the peer already exists in which case it
  * would be reused. Otherwise, new NDL establishment will be started.
  */
 int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
-		  const struct nan_ndp_params *params)
+		  const struct nan_ndp_params *params,
+		  u8 dialog_token)
 {
 	struct nan_ndl *ndl;
 	enum nan_reason reason;
@@ -703,7 +706,7 @@ int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
 	ndl->local_qos.max_latency = params->qos.max_latency;
 
 	if (ndl->state == NAN_NDL_STATE_NONE) {
-		ndl->dialog_token = nan_get_next_dialog_token(nan);
+		ndl->dialog_token = dialog_token;
 		nan_ndl_set_state(nan, ndl, NAN_NDL_STATE_START);
 		ndl->status = NAN_NDL_STATUS_CONTINUED;
 	} else {
