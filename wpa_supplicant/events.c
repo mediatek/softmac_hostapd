@@ -5949,13 +5949,19 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_FST */
 
 	if (category == WLAN_ACTION_PUBLIC && plen >= 5 &&
-	    payload[0] == WLAN_PA_VENDOR_SPECIFIC &&
-	    WPA_GET_BE32(&payload[1]) == NAN_SDF_VENDOR_TYPE) {
-		payload += 5;
-		plen -= 5;
-		wpas_nan_de_rx_sdf(wpa_s, mgmt->sa, mgmt->bssid, freq,
-				   payload, plen, rssi);
-		return;
+	    payload[0] == WLAN_PA_VENDOR_SPECIFIC) {
+		if  (WPA_GET_BE32(&payload[1]) == NAN_SDF_VENDOR_TYPE) {
+			payload += 5;
+			plen -= 5;
+			wpas_nan_de_rx_sdf(wpa_s, mgmt->sa, mgmt->bssid, freq,
+					   payload, plen, rssi);
+			return;
+		}
+
+		if (WPA_GET_BE32(&payload[1]) == NAN_NAF_VENDOR_TYPE) {
+			wpas_nan_rx_naf(wpa_s, mgmt, len);
+			return;
+		}
 	}
 
 #ifdef CONFIG_DPP

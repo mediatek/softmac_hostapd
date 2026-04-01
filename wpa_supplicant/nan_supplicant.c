@@ -2086,3 +2086,15 @@ int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 
 	return -1;
 }
+
+
+#ifdef CONFIG_NAN
+void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
+		     const struct ieee80211_mgmt *mgmt, size_t len)
+{
+	if (!wpas_nan_ready(wpa_s))
+		return;
+
+	nan_action_rx(wpa_s->nan, mgmt, len);
+}
+#endif /* CONFIG_NAN */
