@@ -98,11 +98,18 @@ static bool wpas_nan_valid_chan(struct wpa_supplicant *wpa_s,
 	if (!center)
 		return false;
 
+	if (wpa_s->nan_max_bw && width > wpa_s->nan_max_bw)
+		return false;
+
 	span = (width - 20) / 10;
 	for (c = center - span; c <= center + span; c += 4) {
 		int freq = ieee80211_chan_to_freq(NULL, op_class, c);
 
 		if (freq < 0)
+			return false;
+
+		if (freq_range_list_includes(&wpa_s->nan_disallowed_freqs,
+					     freq))
 			return false;
 
 		if (ieee80211_is_dfs(freq, wpa_s->hw.modes,
@@ -503,6 +510,9 @@ void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 		clear_sched_config(&wpa_s->nan_sched[i]);
 
 	nan_deinit(wpa_s->nan);
+	os_free(wpa_s->nan_disallowed_freqs.range);
+	os_memset(&wpa_s->nan_disallowed_freqs, 0,
+		  sizeof(wpa_s->nan_disallowed_freqs));
 	wpa_s->nan = NULL;
 }
 
@@ -620,6 +630,23 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		os_memcpy(config->cluster_id, cluster_id, ETH_ALEN);
 		return 0;
 	}
+
+	if (os_strcmp("max_bw", cmd) == 0) {
+		wpa_s->nan_max_bw = atoi(param);
+		return 0;
+	}
+
+	if (os_strcmp("disallowed_freqs", cmd) == 0) {
+		if (freq_range_list_parse(&wpa_s->nan_disallowed_freqs,
+					  param)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid disallowed_freqs value");
+			return -1;
+		}
+
+		return 0;
+	}
+
 #undef NAN_PARSE_INT
 #undef NAN_PARSE_BAND
 
