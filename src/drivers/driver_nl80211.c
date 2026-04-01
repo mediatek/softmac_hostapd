@@ -6089,7 +6089,7 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 
 	wpa_printf(MSG_DEBUG, "nl80211: %s STA " MACSTR,
 		   cmd_string, MAC2STR(params->addr));
-	msg = nl80211_bss_msg(bss, 0, cmd);
+	msg = nl80211_cmd_msg(bss, 0, cmd);
 	if (!msg)
 		goto fail;
 
@@ -6464,7 +6464,7 @@ static int wpa_driver_nl80211_sta_remove(struct i802_bss *bss, const u8 *addr,
 	struct nl_msg *msg;
 	int ret;
 
-	if (!(msg = nl80211_bss_msg(bss, 0, NL80211_CMD_DEL_STATION)) ||
+	if (!(msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_DEL_STATION)) ||
 	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr) ||
 	    (deauth == 0 &&
 	     nla_put_u8(msg, NL80211_ATTR_MGMT_SUBTYPE,
