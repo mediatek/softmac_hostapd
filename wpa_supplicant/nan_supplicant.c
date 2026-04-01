@@ -2385,6 +2385,92 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 }
 
 
+/*
+ * Format: NAN_BOOTSTRAP <peer_nmi> <handle=<id>>
+ *     <req_instance_id=<id>> method=<number> [auth]
+ */
+int wpas_nan_bootstrap_request(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	char *pos, *token, *context = NULL;
+	int handle = 0;
+	int req_instance_id = 0;
+	u8 peer_nmi[ETH_ALEN];
+	u16 bootstrap_method = 0;
+	bool auth = false;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	/* Parse peer address first */
+	if (hwaddr_aton(cmd, peer_nmi) < 0)
+		return -1;
+
+	/* Move past the peer_mac address */
+	pos = os_strchr(cmd, ' ');
+	if (!pos)
+		return -1;
+	pos++;
+
+	while ((token = str_token(pos, " ", &context))) {
+		if (sscanf(token, "handle=%i", &handle) == 1)
+			continue;
+
+		if (sscanf(token, "req_instance_id=%i", &req_instance_id) == 1)
+			continue;
+
+		if (os_strncmp(token, "method=", 7) == 0) {
+			bootstrap_method = atoi(token + 7);
+			continue;
+		}
+
+		if (os_strcmp(token, "auth") == 0) {
+			auth = true;
+			continue;
+		}
+
+		wpa_printf(MSG_INFO,
+			   "CTRL: Invalid NAN_BOOTSTRAP parameter: %s",
+			   token);
+		return -1;
+	}
+
+	if (!bootstrap_method) {
+		wpa_printf(MSG_INFO, "CTRL: Missing NAN_BOOTSTRAP method");
+		return -1;
+	}
+
+	if (handle <= 0) {
+		wpa_printf(MSG_INFO,
+			   "CTRL: Invalid or missing NAN_BOOTSTRAP handle");
+		return -1;
+	}
+
+	if (is_zero_ether_addr(peer_nmi)) {
+		wpa_printf(MSG_INFO,
+			   "CTRL: Invalid or missing NAN_BOOTSTRAP address");
+		return -1;
+	}
+
+	return nan_bootstrap_request(wpa_s->nan, handle, peer_nmi,
+				     req_instance_id, bootstrap_method, auth);
+}
+
+
+/* Format: NAN_BOOTSTRAP_RESET <peer_nmi> */
+int wpas_nan_bootstrap_reset(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	u8 peer_nmi[ETH_ALEN];
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	if (hwaddr_aton(cmd, peer_nmi) < 0)
+		return -1;
+
+	return nan_bootstrap_peer_reset(wpa_s->nan, peer_nmi);
+}
+
+
 static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 {
 	struct wpa_supplicant *wpa_s = ctx;

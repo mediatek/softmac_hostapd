@@ -14424,6 +14424,12 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "NAN_PEER_INFO ", 14) == 0) {
 		reply_len = wpas_nan_peer_info(wpa_s, buf + 14, reply,
 					       reply_size);
+	} else if (os_strncmp(buf, "NAN_BOOTSTRAP ", 14) == 0) {
+		if (wpas_nan_bootstrap_request(wpa_s, buf + 14) < 0)
+			reply_len = -1;
+	} else if (os_strncmp(buf, "NAN_BOOTSTRAP_RESET ", 20) == 0) {
+		if (wpas_nan_bootstrap_reset(wpa_s, buf + 20) < 0)
+			reply_len = -1;
 #endif /* CONFIG_NAN */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
