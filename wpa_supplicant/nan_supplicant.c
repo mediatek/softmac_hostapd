@@ -68,8 +68,8 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	struct nan_config nan;
 
 	if (!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SUPPORT_NAN) ||
-	    !(wpa_s->nan_drv_flags & WPA_DRIVER_FLAGS_NAN_SUPPORT_SYNC_CONFIG))
-	{
+	    !(wpa_s->nan_capa.drv_flags &
+	      WPA_DRIVER_FLAGS_NAN_SUPPORT_SYNC_CONFIG)) {
 		wpa_printf(MSG_INFO, "NAN: Driver does not support NAN");
 		return -1;
 	}
@@ -92,14 +92,15 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		((1 << NAN_CDW_INFO_5G_POS) & NAN_CDW_INFO_5G_MASK);
 
 	nan.dev_capa.supported_bands = NAN_DEV_CAPA_SBAND_2G;
-	if (wpa_s->nan_drv_flags &
+	if (wpa_s->nan_capa.drv_flags &
 	    WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND)
 		nan.dev_capa.supported_bands |= NAN_DEV_CAPA_SBAND_5G;
 
-	/* TODO: set based on driver capabilities */
-	nan.dev_capa.op_mode = NAN_DEV_CAPA_OP_MODE_PHY_MODE_VHT |
-		NAN_DEV_CAPA_OP_MODE_PHY_MODE_HE |
-		NAN_DEV_CAPA_OP_MODE_HE_VHT_160;
+	nan.dev_capa.op_mode = wpa_s->nan_capa.op_modes;
+	nan.dev_capa.n_antennas = wpa_s->nan_capa.num_antennas;
+	nan.dev_capa.channel_switch_time =
+		wpa_s->nan_capa.max_channel_switch_time;
+	nan.dev_capa.capa = wpa_s->nan_capa.dev_capa;
 
 	wpa_s->nan = nan_init(&nan);
 	if (!wpa_s->nan) {
@@ -135,7 +136,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	 * active subscribe
 	 */
 	wpa_s->nan_config.enable_dw_notif =
-		!!(wpa_s->nan_drv_flags &
+		!!(wpa_s->nan_capa.drv_flags &
 		   WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE);
 
 	return 0;
@@ -755,7 +756,7 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 
 #ifdef CONFIG_NAN
 	if (params->sync) {
-		if (!(wpa_s->nan_drv_flags &
+		if (!(wpa_s->nan_capa.drv_flags &
 		      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Cannot advertise sync service, driver does not support user space DE");
@@ -915,7 +916,7 @@ int wpas_nan_subscribe(struct wpa_supplicant *wpa_s,
 
 #ifdef CONFIG_NAN
 	if (params->sync) {
-		if (!(wpa_s->nan_drv_flags &
+		if (!(wpa_s->nan_capa.drv_flags &
 		      WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE)) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Cannot subscribe sync, user space DE is not supported");
