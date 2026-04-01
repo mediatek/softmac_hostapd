@@ -2749,6 +2749,12 @@ static void wpas_nan_de_receive(void *ctx, int id, int peer_instance_id,
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
+#ifdef CONFIG_NAN
+	if (nan_process_followup(wpa_s->nan, peer_addr, buf, len,
+				 peer_instance_id, id))
+		return;
+#endif /* CONFIG_NAN */
+
 	wpas_notify_nan_receive(wpa_s, id, peer_instance_id, peer_addr,
 				ssi, ssi_len);
 }
