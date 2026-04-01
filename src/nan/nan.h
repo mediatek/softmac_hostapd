@@ -537,5 +537,8 @@ bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr);
 int nan_get_peer_ndc_freq(struct nan_data *nan,
 			  const struct nan_peer_schedule *peer_sched,
 			  u8 map_idx);
+int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
+			     enum nan_cipher_suite_id csid,
+			     const u8 *peer_nmi, u8 *nd_pmk);
 
 #endif /* NAN_H */

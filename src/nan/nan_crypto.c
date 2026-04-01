@@ -287,3 +287,25 @@ int nan_crypto_key_mic(const u8 *buf, size_t len, const u8 *kck,
 	wpa_hexdump_key(MSG_DEBUG, "NAN: MIC", mic, mic_len);
 	return 0;
 }
+
+
+int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
+			     enum nan_cipher_suite_id csid,
+			     const u8 *peer_nmi, u8 *nd_pmk)
+{
+	u8 salt[1 + 1 + NAN_SERVICE_ID_LEN + ETH_ALEN];
+
+	salt[0] = 0;
+	salt[1] = (u8) csid;
+	os_memcpy(salt + 2, service_id, NAN_SERVICE_ID_LEN);
+	os_memcpy(salt + 2 + NAN_SERVICE_ID_LEN, peer_nmi, ETH_ALEN);
+
+	switch (csid) {
+	case NAN_CS_SK_CCM_128:
+		return pbkdf2_sha256(pwd, salt, sizeof(salt), 4096, nd_pmk, 32);
+	case NAN_CS_SK_GCM_256:
+		return pbkdf2_sha384(pwd, salt, sizeof(salt), 4096, nd_pmk, 32);
+	default:
+		return -1;
+	}
+}

@@ -1425,12 +1425,38 @@ static int nan_test_crypto_auth_token(void)
 }
 
 
+static int nan_test_derive_nd_pmk(void)
+{
+	u8 pmk[PMK_LEN];
+	/* Wi-Fi Aware spec v4.0, Appendix M.1 - Test Vector 1 */
+	const char *pwd = "NAN";
+	const u8 service_id[NAN_SERVICE_ID_LEN] = {
+		0x2b, 0x9c, 0x45, 0x0f, 0x66, 0x71,
+	};
+	const u8 nmi[ETH_ALEN] = {
+		0x02, 0x90, 0x4c, 0x12, 0xd0, 0x01,
+	};
+	const u8 expected_pmk_ccm128[PMK_LEN] = {
+		0xee, 0x35, 0x85, 0x06, 0x30, 0x56, 0xd1, 0x64,
+		0xd1, 0x54, 0x54, 0xad, 0x39, 0x01, 0x0d, 0x4e,
+		0x26, 0x40, 0xb0, 0xd8, 0x2f, 0xb2, 0x4a, 0x2d,
+		0x68, 0x99, 0x86, 0x2d, 0x27, 0x3c, 0x68, 0xbf,
+	};
+
+	NAN_CRYPTO_FAIL(nan_crypto_derive_nd_pmk(pwd, service_id,
+						 NAN_CS_SK_CCM_128, nmi, pmk));
+	NAN_CRYPTO_FAIL(os_memcmp(pmk, expected_pmk_ccm128, PMK_LEN));
+
+	return 0;
+}
+
 int nan_test_crypto(void)
 {
 	NAN_CRYPTO_FAIL(nan_test_crypto_key_mic());
 	NAN_CRYPTO_FAIL(nan_test_crypto_pmkid());
 	NAN_CRYPTO_FAIL(nan_test_ptk());
 	NAN_CRYPTO_FAIL(nan_test_crypto_auth_token());
+	NAN_CRYPTO_FAIL(nan_test_derive_nd_pmk());
 
 	return 0;
 }
