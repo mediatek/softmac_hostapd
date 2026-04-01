@@ -220,15 +220,123 @@ static int wpas_nan_send_naf_cb(void *ctx, const u8 *dst, const u8 *src,
 }
 
 
+static int nan_chan_info_cmp(const void *a, const void *b)
+{
+	const struct nan_channel_info *chan_a = a;
+	const struct nan_channel_info *chan_b = b;
+
+	return chan_b->pref - chan_a->pref;
+}
+
+
 static int wpas_nan_get_chans_cb(void *ctx, u8 map_id,
 				 struct nan_channels *chans)
 {
+	struct wpa_supplicant *wpa_s = ctx;
+	int *shared_freqs = NULL;
+	struct nan_channel_info *chan_list = NULL;
+	unsigned int chan_count = 0;
+	unsigned int chan_capacity = 0;
+	int op;
+
 	wpa_printf(MSG_DEBUG, "NAN: Get channels - map_id=%u", map_id);
 
-	/* TODO: Implement actual channel selection */
+	/* Allocate one extra element so it will be 0 terminated int_array */
+	shared_freqs = os_calloc(wpa_s->num_multichan_concurrent + 1,
+				 sizeof(int));
+	if (!shared_freqs) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to allocate memory for shared freqs");
+		goto fail;
+	}
+
+	if (get_shared_radio_freqs(wpa_s, shared_freqs,
+				   wpa_s->num_multichan_concurrent,
+				   false) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to get shared radio freqs");
+		goto fail;
+	}
+
+	/* Iterate through global operating classes */
+	for (op = 0; global_op_class[op].op_class; op++) {
+		const struct oper_class_map *o = &global_op_class[op];
+		int c;
+
+		 /* Don't support 80+, 6 GHz, etc. yet */
+		if (o->op_class > 129)
+			continue;
+
+		/* Iterate through channels in this operating class */
+		for (c = o->min_chan; c <= o->max_chan; c += o->inc) {
+			int freq;
+			u8 center;
+			u8 pref;
+
+			/* Don't support 40 MHz channels on 2.4 GHz band */
+			if (o->mode == HOSTAPD_MODE_IEEE80211G && o->bw != BW20)
+				continue;
+
+			if (!wpas_nan_valid_chan(wpa_s, o->mode, c, o->bw,
+						 o->op_class, &center))
+				continue;
+
+			freq = ieee80211_chan_to_freq(NULL, o->op_class, c);
+			if (freq < 0)
+				continue;
+
+			/* Determine preference based on shared frequencies */
+			if (int_array_includes(shared_freqs, freq))
+				pref = 3;
+			else
+				pref = 1;
+
+			/* Expand channel list if needed */
+			if (chan_count >= chan_capacity) {
+				unsigned int new_capacity = chan_capacity ?
+					chan_capacity * 2 : 16;
+				struct nan_channel_info *new_list;
+
+				new_list = os_realloc_array(
+					chan_list, new_capacity,
+					sizeof(struct nan_channel_info));
+				if (!new_list) {
+					wpa_printf(MSG_INFO,
+						   "NAN: Failed to expand channel list");
+					goto fail;
+				}
+				chan_list = new_list;
+				chan_capacity = new_capacity;
+			}
+
+			/* Add channel to list */
+			chan_list[chan_count].op_class = o->op_class;
+			chan_list[chan_count].channel =
+				o->bw == BW80 || o->bw == BW160 ? center : c;
+			chan_list[chan_count].pref = pref;
+			chan_count++;
+		}
+	}
+
+	/* Sort channels by preference (higher preference first) */
+	if (chan_count > 1)
+		qsort(chan_list, chan_count, sizeof(struct nan_channel_info),
+		      nan_chan_info_cmp);
+
+	chans->n_chans = chan_count;
+	chans->chans = chan_list;
+
+	os_free(shared_freqs);
+
+	wpa_printf(MSG_DEBUG, "NAN: Get channels completed - found %u channels",
+		   chan_count);
+	return 0;
+
+fail:
+	os_free(shared_freqs);
+	os_free(chan_list);
 	chans->n_chans = 0;
 	chans->chans = NULL;
-	return 0;
+	return -1;
 }
 
 
