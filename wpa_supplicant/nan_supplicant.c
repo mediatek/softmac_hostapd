@@ -2376,6 +2376,21 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 					 "capabilities=0x%02x\n", capa->capa);
 
 		ret = written;
+	} else if (os_strncmp(pos + 1, "bootstrap", 9) == 0) {
+		u16 supported_methods;
+
+		if (nan_bootstrap_get_supported_methods(wpa_s->nan, addr,
+							&supported_methods) <
+		    0) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to get bootstrap methods for peer "
+				   MACSTR, MAC2STR(addr));
+			return -1;
+		}
+
+		ret = wpa_scnprintf(reply, reply_size,
+				    "supported_methods=0x%04x\n",
+				    supported_methods);
 	} else {
 		wpa_printf(MSG_INFO, "NAN: Unknown info type: %s", pos + 1);
 		ret = -1;

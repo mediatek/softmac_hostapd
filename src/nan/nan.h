@@ -592,6 +592,9 @@ int nan_bootstrap_request(struct nan_data *nan, int handle,
 			  const u8 *peer_addr, u8 req_instance_id, u16 pbm,
 			  bool auth);
 int nan_bootstrap_peer_reset(struct nan_data *nan, const u8 *peer_nmi);
+int nan_bootstrap_get_supported_methods(struct nan_data *nan,
+					const u8 *peer_nmi,
+					u16 *supported_methods);
 
 bool nan_publish_instance_id_valid(struct nan_data *nan, u8 instance_id,
 				   u8 *service_id);

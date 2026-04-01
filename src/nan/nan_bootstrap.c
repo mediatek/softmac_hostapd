@@ -675,3 +675,32 @@ int nan_bootstrap_peer_reset(struct nan_data *nan, const u8 *peer_nmi)
 	nan_bootstrap_reset(nan, peer);
 	return 0;
 }
+
+
+/**
+ * nan_bootstrap_get_supported_methods - Get supported bootstrap methods for a peer
+ *
+ * @nan: NAN module context from nan_init()
+ * @peer_nmi: Peer address
+ * @supported_methods: Pointer to store the supported methods bitmap
+ * Returns: 0 on success, -1 on failure
+ */
+int nan_bootstrap_get_supported_methods(struct nan_data *nan,
+					const u8 *peer_nmi,
+					u16 *supported_methods)
+{
+	struct nan_peer *peer;
+
+	if (!nan || !nan->nan_started || !supported_methods)
+		return -1;
+
+	peer = nan_get_peer(nan, peer_nmi);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Bootstrap: Get supported methods for unknown peer");
+		return -1;
+	}
+
+	*supported_methods = peer->bootstrap.supported_methods;
+	return 0;
+}
