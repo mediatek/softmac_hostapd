@@ -14396,6 +14396,9 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "NAN_UPDATE_CONF", 15) == 0) {
 		if (wpas_nan_update_conf(wpa_s) < 0)
 			reply_len = -1;
+	} else if (os_strncmp(buf, "NAN_SCHED_CONFIG_MAP ", 21) == 0) {
+		if (wpas_nan_sched_config_map(wpa_s, buf + 21) < 0)
+			reply_len = -1;
 #endif /* CONFIG_NAN */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);

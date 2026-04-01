@@ -24,6 +24,7 @@ void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster);
 void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq);
+int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd);
 
 #else /* CONFIG_NAN */
 

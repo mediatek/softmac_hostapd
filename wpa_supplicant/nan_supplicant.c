@@ -11,7 +11,9 @@
 
 #include "common.h"
 #include "utils/eloop.h"
+#include "utils/bitfield.h"
 #include "common/nan_de.h"
+#include "common/ieee802_11_common.h"
 #include "ap/hostapd.h"
 #include "wpa_supplicant_i.h"
 #include "driver_i.h"
@@ -38,6 +40,85 @@
 
 #ifdef CONFIG_NAN
 
+static int get_center(u8 channel, const u8 *center_channels,
+		      unsigned int num_chan, int width)
+{
+	int span = (width - 20) / 10;
+	unsigned int i;
+
+	for (i = 0; i < num_chan; i++) {
+		if (channel >= center_channels[i] - span &&
+		    channel <= center_channels[i] + span)
+			return center_channels[i];
+	}
+
+	return 0;
+}
+
+
+static bool wpas_nan_valid_chan(struct wpa_supplicant *wpa_s,
+				enum hostapd_hw_mode mode,
+				u8 channel, int bw, u8 op_class, u8 *cf1)
+{
+	static const u8 nan_160mhz_5ghz_chans[] = { 50, 114, 163 };
+	static const u8 nan_80mhz_5ghz_chans[] =
+		{ 42, 58, 106, 122, 138, 155, 171 };
+	struct hostapd_hw_modes *hw_mode;
+	int width, span;
+	u8 c, center = 0;
+
+	hw_mode = get_mode(wpa_s->hw.modes, wpa_s->hw.num_modes, mode, false);
+	if (!hw_mode)
+		return false;
+
+	switch (bw) {
+	case BW20:
+		width = 20;
+		center = channel;
+		break;
+	case BW40PLUS:
+	case BW40MINUS:
+		width = 40;
+		center = bw == BW40PLUS ? channel + 2 : channel - 2;
+		break;
+	case BW80:
+		width = 80;
+		center = get_center(channel, nan_80mhz_5ghz_chans,
+				    ARRAY_SIZE(nan_80mhz_5ghz_chans), width);
+		break;
+	case BW160:
+		width = 160;
+		center = get_center(channel, nan_160mhz_5ghz_chans,
+				    ARRAY_SIZE(nan_160mhz_5ghz_chans), width);
+		break;
+	default:
+		return false;
+	}
+
+	if (!center)
+		return false;
+
+	span = (width - 20) / 10;
+	for (c = center - span; c <= center + span; c += 4) {
+		int freq = ieee80211_chan_to_freq(NULL, op_class, c);
+
+		if (freq < 0)
+			return false;
+
+		if (ieee80211_is_dfs(freq, wpa_s->hw.modes,
+				     wpa_s->hw.num_modes))
+			return false;
+	}
+
+	/* Wide channels use center */
+	if (width > 40)
+		channel = center;
+
+	*cf1 = center;
+	return verify_channel(hw_mode, op_class, channel, bw) == ALLOWED;
+}
+
+
 static int wpas_nan_start_cb(void *ctx, const struct nan_cluster_config *config)
 {
 	struct wpa_supplicant *wpa_s = ctx;
@@ -55,9 +136,28 @@ static int wpas_nan_update_config_cb(void *ctx,
 }
 
 
+static void clear_sched_config(struct nan_schedule_config *sched_cfg)
+{
+	int i;
+
+	for (i = 0; i < sched_cfg->num_channels; i++)
+		wpabuf_free(sched_cfg->channels[i].time_bitmap);
+
+	os_memset(sched_cfg, 0, sizeof(*sched_cfg));
+}
+
+
 static void wpas_nan_stop_cb(void *ctx)
 {
 	struct wpa_supplicant *wpa_s = ctx;
+	int i;
+
+	for (i = 0; i < MAX_NAN_RADIOS; i++) {
+		if (wpa_s->nan_sched[i].num_channels) {
+			wpa_drv_nan_config_schedule(wpa_s, i + 1, NULL);
+			clear_sched_config(&wpa_s->nan_sched[i]);
+		}
+	}
 
 	wpa_drv_nan_stop(wpa_s);
 }
@@ -145,8 +245,13 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 
 void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 {
+	int i;
+
 	if (!wpa_s || !wpa_s->nan)
 		return;
+
+	for (i = 0; i < MAX_NAN_RADIOS; i++)
+		clear_sched_config(&wpa_s->nan_sched[i]);
 
 	nan_deinit(wpa_s->nan);
 	wpa_s->nan = NULL;
@@ -281,6 +386,331 @@ int wpas_nan_update_conf(struct wpa_supplicant *wpa_s)
 
 	wpa_printf(MSG_DEBUG, "NAN: Update NAN configuration");
 	return nan_update_config(wpa_s->nan, &wpa_s->nan_config);
+}
+
+
+static u8 nan_select_40mhz_channel(u8 chan, u8 *op_class, int *bw)
+{
+	int op;
+
+	for (op = 0; global_op_class[op].op_class; op++) {
+		const struct oper_class_map *o = &global_op_class[op];
+		int c;
+
+		/* No support for 40 MHz on 2.4 GHz */
+		if (o->mode != HOSTAPD_MODE_IEEE80211A)
+			continue;
+
+		/* Currently don't support NAN for 80+, 6 GHz, etc. */
+		if (o->op_class > 129)
+			continue;
+
+		if (o->bw != BW40MINUS && o->bw != BW40PLUS)
+			continue;
+
+		for (c = o->min_chan; c <= o->max_chan; c += o->inc) {
+			if (c != chan)
+				continue;
+
+			*op_class = o->op_class;
+			*bw = o->bw;
+			if (o->bw == BW40MINUS)
+				return chan - 2;
+			else
+				return chan + 2;
+		}
+	}
+
+	return 0;
+}
+
+
+static int wpas_nan_select_channel_params(struct wpa_supplicant *wpa_s,
+					  int freq, int *center_freq1,
+					  int *center_freq2, int *bandwidth)
+{
+	u8 chan, op_class, center;
+	enum hostapd_hw_mode mode;
+	int bw;
+
+	mode = ieee80211_freq_to_channel_ext(freq, 0, CONF_OPER_CHWIDTH_USE_HT,
+					     &op_class, &chan);
+	if (mode == NUM_HOSTAPD_MODES) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid frequency %d", freq);
+		return -1;
+	}
+
+	if (!wpas_nan_valid_chan(wpa_s, mode, chan, BW20, op_class, &center)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Channel not valid for NAN (freq = %d)",
+			   freq);
+		return -1;
+	}
+
+	/* On 2.4 GHz use 20 MHz channels */
+	if (freq >= 2412 && freq <= 2484)
+		goto out;
+
+	/* TODO: Add support for NAN on other bands */
+	if (freq < 5180 || freq > 5885) {
+		wpa_printf(MSG_DEBUG, "NAN: Unsupported frequency %d", freq);
+		return -1;
+	}
+
+	if (wpas_nan_valid_chan(wpa_s, mode, chan, BW160, 129, &center)) {
+		*center_freq1 = ieee80211_chan_to_freq(NULL, op_class, center);
+		*center_freq2 = 0;
+		*bandwidth = 160;
+		return 0;
+	}
+
+	if (wpas_nan_valid_chan(wpa_s, mode, chan, BW80, 128, &center)) {
+		*center_freq1 = ieee80211_chan_to_freq(NULL, op_class, center);
+		*center_freq2 = 0;
+		*bandwidth = 80;
+		return 0;
+	}
+
+	if (nan_select_40mhz_channel(chan, &op_class, &bw) &&
+		wpas_nan_valid_chan(wpa_s, mode, center, bw, op_class,
+				    &center)) {
+		*center_freq1 = ieee80211_chan_to_freq(NULL, op_class,
+						       center);
+		*center_freq2 = 0;
+		*bandwidth = 40;
+		return 0;
+	}
+
+out:
+	/* Fallback to 20 MHz */
+	*center_freq1 = freq;
+	*center_freq2 = 0;
+	*bandwidth = 20;
+	return 0;
+}
+
+
+static void nan_dump_sched_config(const char *title,
+				  struct nan_schedule_config *sched_cfg)
+{
+	int i;
+
+	wpa_printf(MSG_DEBUG, "%s: num_channels=%d", title,
+		   sched_cfg->num_channels);
+	for (i = 0; i < sched_cfg->num_channels; i++) {
+		wpa_printf(MSG_DEBUG,
+			   "  Channel %d: freq=%d center_freq1=%d center_freq2=%d bandwidth=%d time_bitmap_len=%zu",
+			   i + 1,
+			   sched_cfg->channels[i].freq,
+			   sched_cfg->channels[i].center_freq1,
+			   sched_cfg->channels[i].center_freq2,
+			   sched_cfg->channels[i].bandwidth,
+			   wpabuf_len(sched_cfg->channels[i].time_bitmap));
+	}
+}
+
+
+/* Parse format NAN_SCHED_CONFIG_MAP map_id=<id> [freq:bitmap_hex]..
+ * If no bitmaps provided - clear the map */
+int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
+{
+	struct nan_schedule_config sched_cfg;
+	char *token, *context = NULL;
+	u8 map_id;
+	char *pos;
+	int *shared_freqs;
+	int shared_freqs_count, unused_freqs_count, ret = -1;
+	struct bitfield *bf_total;
+	unsigned int expected_bitmap_len;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	if (os_strncmp(cmd, "map_id=", 7) != 0) {
+		wpa_printf(MSG_INFO, "NAN: Invalid schedule map format");
+		return -1;
+	}
+
+	map_id = atoi(cmd + 7);
+
+	if (!map_id || map_id >= MAX_NAN_RADIOS) {
+		wpa_printf(MSG_INFO, "NAN: Invalid map_id %d", map_id);
+		return -1;
+	}
+
+	if (map_id > wpa_s->nan_capa.num_radios) {
+		wpa_printf(MSG_INFO,
+			   "NAN: map_id %d exceeds number of supported NAN radios %d",
+			   map_id, wpa_s->nan_capa.num_radios);
+		return -1;
+	}
+
+	if (!wpa_s->nan_capa.schedule_period ||
+	    !wpa_s->nan_capa.slot_duration) {
+		    wpa_printf(MSG_INFO,
+			       "NAN: Driver doesn't advertise support for NAN scheduling");
+		    return -1;
+	}
+
+	expected_bitmap_len = (wpa_s->nan_capa.schedule_period /
+			       wpa_s->nan_capa.slot_duration + 7) / 8;
+
+	os_memset(&sched_cfg, 0, sizeof(sched_cfg));
+
+	pos = os_strchr(cmd + 7, ' ');
+	if (!pos) {
+		clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing freq:timebitmap pairs - cleanup schedule");
+		return wpa_drv_nan_config_schedule(wpa_s, map_id, &sched_cfg);
+	}
+
+	shared_freqs = os_calloc(wpa_s->num_multichan_concurrent,
+				 sizeof(int));
+	if (!shared_freqs) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to allocate memory for shared freqs");
+		return -1;
+	}
+
+	shared_freqs_count =
+		get_shared_radio_freqs(wpa_s, shared_freqs,
+				       wpa_s->num_multichan_concurrent,
+				       false);
+
+	unused_freqs_count = wpa_s->nan_capa.sched_chans - shared_freqs_count;
+
+	bf_total = bitfield_alloc(wpa_s->nan_capa.schedule_period /
+				  wpa_s->nan_capa.slot_duration);
+	if (!bf_total) {
+		wpa_printf(MSG_INFO,
+			  "NAN: Failed to allocate bitfield for total schedule");
+		goto out;
+	}
+
+	/* Parse freq:timebitmap pairs */
+	pos++;
+	while ((token = str_token(pos, " ", &context))) {
+		int j, i = sched_cfg.num_channels;;
+		struct bitfield *bf_chan = NULL;
+		char *colon = os_strchr(token, ':');
+
+		if (i >= wpa_s->nan_capa.sched_chans) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Exceeded max channels per radio %u",
+				   wpa_s->nan_capa.sched_chans);
+			goto out;
+		}
+
+		if (!colon) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid freq:timebitmap format");
+			goto out;
+		}
+
+		sched_cfg.channels[i].freq = atoi(token);
+		if (sched_cfg.channels[i].freq <= 0) {
+			wpa_printf(MSG_INFO, "NAN: Invalid frequency %d",
+				   sched_cfg.channels[i].freq);
+			goto out;
+		}
+
+		for (j = 0; j < i; j++) {
+			if (sched_cfg.channels[j].freq ==
+			    sched_cfg.channels[i].freq) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Duplicate frequency %d",
+					   sched_cfg.channels[i].freq);
+				goto out;
+			}
+		}
+
+		if (wpas_nan_select_channel_params(
+			    wpa_s, sched_cfg.channels[i].freq,
+			    &sched_cfg.channels[i].center_freq1,
+			    &sched_cfg.channels[i].center_freq2,
+			    &sched_cfg.channels[i].bandwidth)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to select channel params for freq %d",
+				   sched_cfg.channels[i].freq);
+			goto out;
+		}
+
+		if (!int_array_includes(shared_freqs,
+					sched_cfg.channels[i].freq)) {
+			if (!unused_freqs_count) {
+				wpa_printf(MSG_INFO,
+					   "NAN: No unused radio frequency available for freq %d",
+					   sched_cfg.channels[i].freq);
+				goto out;
+			}
+
+			unused_freqs_count--;
+		}
+
+		sched_cfg.channels[i].time_bitmap = wpabuf_parse_bin(colon + 1);
+		if (!sched_cfg.channels[i].time_bitmap) {
+			wpa_printf(MSG_INFO, "NAN: Invalid time bitmap");
+			goto out;
+		}
+
+		sched_cfg.num_channels++;
+
+		if (wpabuf_len(sched_cfg.channels[i].time_bitmap) !=
+		    expected_bitmap_len) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid bitmap length (%zu) for period=%d, slot length=%d",
+				   wpabuf_len(sched_cfg.channels[i].time_bitmap),
+				   wpa_s->nan_capa.schedule_period,
+				   wpa_s->nan_capa.slot_duration);
+			goto out;
+		}
+
+		bf_chan = bitfield_alloc_data(
+			wpabuf_head(sched_cfg.channels[i].time_bitmap),
+			wpabuf_len(sched_cfg.channels[i].time_bitmap));
+		if (!bf_chan) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to allocate bitfield for channel schedule");
+			goto out;
+		}
+
+		if (bitfield_intersects(bf_total, bf_chan)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Overlapping time bitmap detected for freq %d",
+				   sched_cfg.channels[i].freq);
+			bitfield_free(bf_chan);
+			goto out;
+		}
+
+		/* Extract RX NSS from upper nibble of num_antennas */
+		sched_cfg.channels[i].rx_nss =
+			(wpa_s->nan_capa.num_antennas >> 4) & 0x0f;
+
+		bitfield_union_in_place(bf_total, bf_chan);
+		bitfield_free(bf_chan);
+	}
+
+	nan_dump_sched_config("NAN: Set schedule config", &sched_cfg);
+	ret = wpa_drv_nan_config_schedule(wpa_s, map_id, &sched_cfg);
+	if (ret < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to configure NAN schedule map_id %d",
+			   map_id);
+		goto out;
+	}
+
+	/* Store the configured schedule */
+	wpa_s->schedule_sequence_id++;
+	clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
+	os_memcpy(&wpa_s->nan_sched[map_id - 1], &sched_cfg, sizeof(sched_cfg));
+out:
+	os_free(bf_total);
+	os_free(shared_freqs);
+	if (ret)
+		clear_sched_config(&sched_cfg);
+
+	return ret;
 }
 
 

@@ -1304,6 +1304,16 @@ wpa_drv_nan_update_config(struct wpa_supplicant *wpa_s,
 	return wpa_s->driver->nan_change_config(wpa_s->drv_priv, conf);
 }
 
+static inline int wpa_drv_nan_config_schedule(struct wpa_supplicant *wpa_s,
+					      u8 map_id,
+					      struct nan_schedule_config *conf)
+{
+	if (!wpa_s->driver->nan_config_schedule)
+		return -1;
+	return wpa_s->driver->nan_config_schedule(wpa_s->drv_priv, map_id,
+						  conf);
+}
+
 #endif /* CONFIG_NAN */
 
 #endif /* DRIVER_I_H */
