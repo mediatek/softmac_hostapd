@@ -404,6 +404,15 @@ struct nan_ndl {
 };
 
 /**
+ * struct nan_bootstrap - NAN bootstrap information
+ * @supported_methods: Bitmap of supported bootstrap methods. See
+ *     &enum nan_pairing_bootstrapping_method.
+ */
+struct nan_bootstrap {
+	u16 supported_methods;
+};
+
+/**
  * struct nan_peer - Represents a known NAN peer
  * @list: List node for linking peers
  * @nmi_addr: NMI of the peer
@@ -414,6 +423,7 @@ struct nan_ndl {
  * @ndp_setup: Used to hold an NDP object while NDP establishment is in
  *     progress
  * @ndl: NDL data associated with this peer
+ * @bootstrap: Bootstrap information of the peer
  */
 struct nan_peer {
 	struct dl_list list;
@@ -427,6 +437,8 @@ struct nan_peer {
 	struct nan_ndp_setup ndp_setup;
 
 	struct nan_ndl *ndl;
+
+	struct nan_bootstrap bootstrap;
 };
 
 /**
@@ -471,6 +483,7 @@ struct nan_attrs {
 	const u8 *sec_ctxt_info;
 	const u8 *shared_key_desc;
 	const u8 *dev_capa_ext;
+	const u8 *npba;
 
 	u16 ndp_len;
 	u16 ndl_len;
@@ -479,6 +492,7 @@ struct nan_attrs {
 	u16 sec_ctxt_info_len;
 	u16 shared_key_desc_len;
 	u16 dev_capa_ext_len;
+	u16 npba_len;
 };
 
 struct nan_msg {

@@ -963,6 +963,27 @@ static void nan_parse_peer_dev_capa_ext(struct nan_data *nan,
 }
 
 
+static void nan_parse_npba(struct nan_data *nan, struct nan_peer *peer,
+			   struct nan_attrs *attrs)
+{
+	const u8 *npba = attrs->npba;
+	u8 type;
+
+	if (!attrs->npba || attrs->npba_len < 5)
+		return;
+
+	/* Skip the dialog token and get the type */
+	type = npba[1] & NAN_PBA_TYPE_MASK;
+	if (type != NAN_PBA_TYPE_ADVERTISE)
+		return;
+
+	peer->bootstrap.supported_methods = WPA_GET_LE16(npba + 3);
+
+	wpa_printf(MSG_DEBUG, "NAN: Peer supports bootstrap methods: 0x%04x",
+		   peer->bootstrap.supported_methods);
+}
+
+
 /*
  * nan_parse_device_attrs - Parse device attributes and build availability info
  *
@@ -999,6 +1020,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_parse_peer_device_capa(nan, peer, &attrs);
 	nan_parse_peer_elem_container(nan, peer, &attrs);
 	nan_parse_peer_dev_capa_ext(nan, peer, &attrs);
+	nan_parse_npba(nan, peer, &attrs);
 
 	nan_peer_dump(nan, peer);
 	ret = 0;
