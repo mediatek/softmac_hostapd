@@ -395,6 +395,23 @@ struct nan_config {
 	u8 dev_capa_ext_reg_info; /* NAN_DEV_CAPA_EXT_INFO_0_* */
 	u8 dev_capa_ext_pairing_npk_caching; /* NAN_DEV_CAPA_EXT_INFO_1_* */
 
+	/*
+	 * Supported Pairing Bootstrapping Methods (PBM).
+	 * See Wi-Fi Aware spec v4.0, Table 128 (NPBA format).
+	 */
+	u16 supported_bootstrap_methods;
+
+	/* Auto-accepted bootstrapping methods.
+	 * See Wi-Fi Aware spec v4.0, Table 128 (NPBA format). */
+	u16 auto_accept_bootstrap_methods;
+
+	/*
+	 * Bootstrap comeback timeout in TUs. This value is used to indicate to
+	 * the peer NAN device requesting bootstrapping to be performed, when
+	 * to send the bootstrapping request again.
+	 */
+	u16 bootstrap_comeback_timeout;
+
 	/**
 	 * start - Start NAN
 	 * @ctx: Callback context from cb_ctx
@@ -516,6 +533,47 @@ struct nan_config {
 				 u16 max_channel_switch_time,
 				 const struct nan_peer_schedule *sched,
 				 const struct wpabuf *ulw_elems);
+	/**
+	 * bootstrap_request - Notify about received bootstrap request
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 * @pbm: Pairing Bootstrapping Methods from the request. As defined in
+	 *     Wi-Fi Aware spec v4.0, Table 128 (NPBA format).
+	 */
+	void (*bootstrap_request)(void *ctx, const u8 *peer_nmi, u16 pbm);
+
+	/**
+	 * bootstrap_completed - Notify about completed bootstrap
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 * @pbm: Pairing Bootstrapping Method used. As defined in Wi-Fi Aware
+	 *     spec v4.0, Table 128 (NPBA format).
+	 * @success: Whether bootstrap was successful
+	 * @reason_code: Reason code for failure (0 if success is true)
+	 */
+	void (*bootstrap_completed)(void *ctx, const u8 *peer_nmi, u16 pbm,
+				    bool success, u8 reason_code);
+
+	/**
+	 * transmit_followup - Transmit Follow-up message to the peer
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 * @attrs: Attributes to include in the Follow-up message
+	 * @handle: Service handle for which the follow-up is sent
+	 * @req_instance_id: Peer's service instance ID
+	 */
+	int (*transmit_followup)(void *ctx, const u8 *peer_nmi,
+				 const struct wpabuf *attrs, int handle,
+				 u8 req_instance_id);
+
+	/**
+	 * get_supported_bootstrap_methods - Get supported bootstrap methods
+	 * @ctx: Callback context from cb_ctx
+	 * @handle: Service handle for which PBM should have been defined
+	 * Returns: Supported Pairing Bootstrapping Methods (PBM) bitfield as
+	 * configured for the service or 0 if service is not found.
+	 */
+	u16 (*get_supported_bootstrap_methods)(void *ctx, int handle);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
