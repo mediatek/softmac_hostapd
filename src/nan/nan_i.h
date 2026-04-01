@@ -525,7 +525,6 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 int nan_parse_naf(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
 		  size_t len, struct nan_msg *msg);
 void nan_attrs_clear(struct nan_data *nan, struct nan_attrs *attrs);
-void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf);
 
 int nan_ndp_setup_req(struct nan_data *nan, struct nan_peer *peer,
 		      struct nan_ndp_params *params);

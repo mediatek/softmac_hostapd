@@ -540,5 +540,6 @@ int nan_get_peer_ndc_freq(struct nan_data *nan,
 int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
 			     enum nan_cipher_suite_id csid,
 			     const u8 *peer_nmi, u8 *nd_pmk);
+void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf);
 
 #endif /* NAN_H */
