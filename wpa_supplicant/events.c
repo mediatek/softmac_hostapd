@@ -6892,6 +6892,15 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 					     data->tx_status.ack) == 0)
 			break;
 #endif /* CONFIG_PASN */
+
+		if (wpa_s->nan_mgmt &&
+		    data->tx_status.type == WLAN_FC_TYPE_MGMT &&
+		    data->tx_status.stype == WLAN_FC_STYPE_ACTION &&
+		    wpas_nan_tx_status(wpa_s, data->tx_status.data,
+				       data->tx_status.data_len,
+				       data->tx_status.ack) == 0)
+			break;
+
 #ifdef CONFIG_AP
 		if (wpa_s->ap_iface == NULL) {
 #ifdef CONFIG_OFFCHANNEL
