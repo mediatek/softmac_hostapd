@@ -170,6 +170,144 @@ static void wpas_nan_stop_cb(void *ctx)
 }
 
 
+static int wpas_nan_set_peer_sched_chan(struct wpa_supplicant *wpa_s,
+					const struct nan_peer_schedule *sched,
+					int i, int j,
+					struct nan_schedule_config *sched_cfg)
+{
+	const struct nan_map_chan *src_chan = &sched->maps[i].chans[j];
+	struct nan_chan_entry *chan_entry;
+	int ch_idx;
+
+	if (!src_chan->committed)
+		return 0;
+
+	wpa_printf(MSG_DEBUG, "    Channel freq=%u, rx_nss=%u",
+		   src_chan->chan.freq, src_chan->rx_nss);
+	wpa_hexdump(MSG_DEBUG, "      committed_bitmap",
+		    src_chan->tbm.bitmap, src_chan->tbm.len);
+
+	ch_idx = sched_cfg->num_channels;
+	sched_cfg->channels[ch_idx].freq = src_chan->chan.freq;
+	sched_cfg->channels[ch_idx].center_freq1 = src_chan->chan.center_freq1;
+	sched_cfg->channels[ch_idx].center_freq2 = src_chan->chan.center_freq2;
+	sched_cfg->channels[ch_idx].bandwidth = src_chan->chan.bandwidth;
+	sched_cfg->channels[ch_idx].rx_nss = src_chan->rx_nss;
+	chan_entry = (struct nan_chan_entry *)
+		sched_cfg->channels[ch_idx].chan_entry;
+
+	if (nan_get_chan_entry(wpa_s->nan, &src_chan->chan, chan_entry)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to get chan entry for freq %d",
+			   src_chan->chan.freq);
+		return -1;
+	}
+
+	/* Copy time bitmap */
+	if (src_chan->tbm.len > 0)
+		sched_cfg->channels[ch_idx].time_bitmap =
+			wpabuf_alloc_copy(src_chan->tbm.bitmap,
+					  src_chan->tbm.len);
+
+	sched_cfg->num_channels++;
+
+	return 0;
+}
+
+
+static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
+					 bool new_sta, u16 cdw, u8 sequence_id,
+					 u16 max_channel_switch_time,
+					 const struct nan_peer_schedule *sched,
+					 const struct wpabuf *ulw_elems)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	struct nan_peer_schedule_config peer_sched;
+	int i, j, ret;
+
+	wpa_printf(MSG_DEBUG, "NAN: Set peer schedule - nmi_addr=" MACSTR
+		   " new_sta=%d cdw=%u seq_id=%u max_chan_switch_time=%u",
+		   MAC2STR(nmi_addr), new_sta, cdw, sequence_id,
+		   max_channel_switch_time);
+
+	if (new_sta) {
+		struct hostapd_sta_add_params sta_params;
+
+		wpa_printf(MSG_DEBUG, "NAN: New NMI station");
+		os_memset(&sta_params, 0, sizeof(sta_params));
+		sta_params.addr = nmi_addr;
+		sta_params.flags = WPA_STA_AUTHENTICATED | WPA_STA_ASSOCIATED;
+		sta_params.flags_mask = sta_params.flags;
+		ret = wpa_drv_sta_add(wpa_s, &sta_params);
+		if (ret) {
+			wpa_printf(MSG_INFO, "NAN: Failed to add NMI station");
+			return ret;
+		}
+	}
+
+	os_memset(&peer_sched, 0, sizeof(peer_sched));
+	if (sched) {
+		wpa_printf(MSG_DEBUG, "NAN: Peer schedule info:");
+		wpa_printf(MSG_DEBUG, "  n_maps=%u", sched->n_maps);
+
+		peer_sched.n_maps = sched->n_maps;
+		for (i = 0; i < sched->n_maps && i < MAX_NUM_NAN_MAPS; i++) {
+			struct nan_schedule_config *sched_cfg =
+				&peer_sched.maps[i].sched;
+
+			wpa_printf(MSG_DEBUG, "  Map %d: map_id=%u",
+				   i, sched->maps[i].map_id);
+
+			peer_sched.maps[i].map_id = sched->maps[i].map_id;
+			sched_cfg->num_channels = 0;
+
+			for (j = 0; j < sched->maps[i].n_chans &&
+				     sched_cfg->num_channels <
+				     MAX_NUM_NAN_SCHEDULE_CHANNELS; j++) {
+				if (wpas_nan_set_peer_sched_chan(wpa_s, sched,
+								 i, j,
+								 sched_cfg) < 0)
+					goto out;
+			}
+		}
+	}
+
+	ret = wpa_drv_nan_config_peer_schedule(wpa_s, nmi_addr,
+					       cdw, sequence_id,
+					       max_channel_switch_time,
+					       ulw_elems, &peer_sched);
+
+	/* Only print an error without returning, so we attempt to remove
+	 * the STA if needed (sched == NULL)
+	 */
+	if (ret)
+		wpa_printf(MSG_INFO, "NAN: Failed to configure peer schedule");
+
+	if (!sched && !new_sta) {
+		/* TODO: Should we maybe keep that NMI station? */
+		wpa_printf(MSG_DEBUG, "NAN: Remove NMI station");
+		ret = wpa_drv_sta_remove(wpa_s, nmi_addr);
+		if (ret)
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to remove NMI station");
+	}
+
+out:
+	/* Free allocated time bitmaps */
+	for (i = 0; i < peer_sched.n_maps; i++) {
+		struct nan_schedule_config *sched_cfg =
+			&peer_sched.maps[i].sched;
+
+		for (j = 0; j < sched_cfg->num_channels; j++) {
+			wpabuf_free(sched_cfg->channels[j].time_bitmap);
+			sched_cfg->channels[j].time_bitmap = NULL;
+		}
+	}
+
+	return ret;
+}
+
+
 static void
 wpas_nan_ndp_action_notif_cb(void *ctx,
 			     struct nan_ndp_action_notif_params *params)
@@ -435,6 +573,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.send_naf = wpas_nan_send_naf_cb;
 	nan.get_chans = wpas_nan_get_chans_cb;
 	nan.is_valid_publish_id = wpas_nan_is_valid_publish_id_cb;
+	nan.set_peer_schedule = wpas_nan_set_peer_schedule_cb;
 
 	/*
 	 * TODO: Set the device capabilities based on configuration and driver
