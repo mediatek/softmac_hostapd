@@ -1723,6 +1723,60 @@ int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
 }
 
 
+/* Format: NAN_PEER_INFO <addr> <schedule|potential> */
+int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
+		       char *reply, size_t reply_size)
+{
+	u8 addr[ETH_ALEN];
+	char *pos;
+	int ret = 0;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	if (hwaddr_aton(cmd, addr) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Invalid peer address: %s", cmd);
+		return -1;
+	}
+
+	pos = os_strchr(cmd, ' ');
+	if (!pos) {
+		wpa_printf(MSG_INFO, "NAN: Missing info type parameter");
+		return -1;
+	}
+
+	if (os_strncmp(pos + 1, "schedule", 8) == 0) {
+		struct nan_peer_schedule sched;
+
+		if (nan_peer_get_schedule_info(wpa_s->nan, addr, &sched) < 0) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to get schedule info for peer "
+				   MACSTR, MAC2STR(addr));
+			return -1;
+		}
+
+		ret = nan_peer_dump_sched_to_buf(&sched, reply, reply_size);
+	} else if (os_strncmp(pos + 1, "potential", 9) == 0) {
+		struct nan_peer_potential_avail pot_avail;
+
+		if (nan_peer_get_pot_avail(wpa_s->nan, addr, &pot_avail) < 0) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to get potential availability for peer "
+				   MACSTR, MAC2STR(addr));
+			return -1;
+		}
+
+		ret = nan_peer_dump_pot_avail_to_buf(&pot_avail, reply,
+						     reply_size);
+	} else {
+		wpa_printf(MSG_INFO, "NAN: Unknown info type: %s", pos + 1);
+		ret = -1;
+	}
+
+	return ret;
+}
+
+
 void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster)

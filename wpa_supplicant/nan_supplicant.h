@@ -30,6 +30,8 @@ void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
 		     const struct ieee80211_mgmt *mgmt, size_t len);
 int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd);
+int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
+		       char *reply, size_t reply_size);
 
 #else /* CONFIG_NAN */
 
