@@ -2259,3 +2259,18 @@ bool nan_de_is_valid_instance_id(struct nan_de *de, int handle,
 	os_memcpy(service_id, srv->service_id, NAN_SERVICE_ID_LEN);
 	return true;
 }
+
+
+u16 nan_de_get_service_bootstrap_methods(struct nan_de *de, int handle)
+{
+	struct nan_de_service *srv;
+
+	if (handle < 1 || handle > NAN_DE_MAX_SERVICE)
+		return 0;
+
+	srv = de->service[handle - 1];
+	if (!srv)
+		return 0;
+
+	return srv->pbm;
+}
