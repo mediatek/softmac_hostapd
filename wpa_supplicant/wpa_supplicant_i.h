@@ -1737,6 +1737,7 @@ struct wpa_supplicant {
 	u16 nan_supported_csids;
 	struct wpa_freq_range_list nan_disallowed_freqs;
 	u16 nan_max_bw;
+	unsigned int nan_ndi_ndp_refcount; /* Active NDP count on this NDI */
 #endif /* CONFIG_NAN */
 #ifdef CONFIG_ENC_ASSOC
 	bool assoc_resp_encrypted; /* Whether (Re)Association Response frame

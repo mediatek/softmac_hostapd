@@ -488,7 +488,7 @@ static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 		wpa_printf(MSG_DEBUG,
 			   "NAN: NDI station added without keys for peer "
 			   MACSTR, MAC2STR(peer_ndi));
-		return 0;
+		goto out_success;
 	}
 
 	if (nan_peer_get_tk(wpa_s->nan, peer_nmi, peer_ndi, local_ndi, tk,
@@ -508,8 +508,29 @@ static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 	}
 	forced_memzero(tk, tk_len);
 
-	return wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
-				     WPA_STA_AUTHORIZED, ~0);
+	if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
+				  WPA_STA_AUTHORIZED, ~0)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to set authorize for NDI station");
+		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+		return -1;
+	}
+
+out_success:
+	ndi_wpa_s->nan_ndi_ndp_refcount++;
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP refcount incremented to %u (peer_ndi=" MACSTR
+		   " peer_nmi=" MACSTR ")",
+		   ndi_wpa_s->nan_ndi_ndp_refcount,
+		   MAC2STR(peer_ndi), MAC2STR(peer_nmi));
+
+	/* Set operstate UP only when the first NDP is established on this NDI
+	 */
+	if (ndi_wpa_s->nan_ndi_ndp_refcount == 1)
+		wpa_drv_set_operstate(ndi_wpa_s, 1);
+
+	return 0;
 }
 
 
@@ -534,6 +555,19 @@ static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 
 	wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
 	wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+
+	if (!ndi_wpa_s->nan_ndi_ndp_refcount)
+		return;
+
+	ndi_wpa_s->nan_ndi_ndp_refcount--;
+	wpa_printf(MSG_DEBUG, "NAN: NDP refcount decremented to %u (peer_ndi="
+		   MACSTR ")", ndi_wpa_s->nan_ndi_ndp_refcount,
+		   MAC2STR(peer_ndi));
+
+	/* Set operstate DORMANT only when the last NDP is removed from this NDI
+	 */
+	if (!ndi_wpa_s->nan_ndi_ndp_refcount)
+		wpa_drv_set_operstate(ndi_wpa_s, 0);
 }
 
 
