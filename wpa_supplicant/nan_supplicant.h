@@ -28,6 +28,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd);
 int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd);
 void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
 		     const struct ieee80211_mgmt *mgmt, size_t len);
+int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd);
 
 #else /* CONFIG_NAN */
 

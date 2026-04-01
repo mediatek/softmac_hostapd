@@ -1380,6 +1380,173 @@ fail:
 }
 
 
+/* Command format NAN_NDP_RESPONSE accept|reject peer_nmi=<nmi>
+   [reason_code=<reject_reason>]
+   [ndi=<ifname> handle=<service_handle> init_ndi=<ndi>
+   ndp_id=<id> [ssi=<hexdata>] [qos=<slots:latency>]] */
+int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	struct nan_ndp_params ndp;
+	struct wpabuf *ssi_buf = NULL;
+	char *token, *context = NULL;
+	char *pos;
+	int ret = -1;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	os_memset(&ndp, 0, sizeof(ndp));
+
+	ndp.type = NAN_NDP_ACTION_RESP;
+	ndp.qos.min_slots = NAN_QOS_MIN_SLOTS_NO_PREF;
+	ndp.qos.max_latency = NAN_QOS_MAX_LATENCY_NO_PREF;
+
+	/* Parse accept/reject status - the first parameter is mandatory */
+	token = str_token(cmd, " ", &context);
+	if (!token) {
+		wpa_printf(MSG_INFO, "NAN: Missing accept/reject parameter");
+		return -1;
+	}
+
+	if (os_strcmp(token, "accept") == 0) {
+		ndp.u.resp.status = NAN_NDP_STATUS_ACCEPTED;
+	} else if (os_strcmp(token, "reject") == 0) {
+		ndp.u.resp.status = NAN_NDP_STATUS_REJECTED;
+	} else {
+		wpa_printf(MSG_INFO, "NAN: Invalid accept/reject parameter: %s",
+			   token);
+		return -1;
+	}
+
+	/* Parse optional parameters */
+	while ((token = str_token(cmd, " ", &context))) {
+		pos = os_strchr(token, '=');
+		if (!pos) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid parameter format: %s", token);
+			goto fail;
+		}
+		*pos++ = '\0';
+
+		if (os_strcmp(token, "reason_code") == 0) {
+			ndp.u.resp.reason_code = atoi(pos);
+		} else if (os_strcmp(token, "ndi") == 0) {
+			struct wpa_supplicant *ndi_wpa_s;
+
+			ndi_wpa_s = wpa_supplicant_get_iface(wpa_s->global,
+							     pos);
+			if (!ndi_wpa_s) {
+				wpa_printf(MSG_INFO,
+					   "NAN: NDI interface not found: %s",
+					   pos);
+				goto fail;
+			}
+
+			if (!ndi_wpa_s->nan_data) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Interface %s is not a NAN data interface",
+					   pos);
+				goto fail;
+			}
+
+			os_memcpy(ndp.u.resp.resp_ndi, ndi_wpa_s->own_addr,
+				  ETH_ALEN);
+		} else if (os_strcmp(token, "peer_nmi") == 0) {
+			if (hwaddr_aton(pos, ndp.ndp_id.peer_nmi) < 0) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid peer NMI address: %s",
+					   pos);
+				goto fail;
+			}
+		} else if (os_strcmp(token, "ndp_id") == 0) {
+			ndp.ndp_id.id = atoi(pos);
+		} else if (os_strcmp(token, "init_ndi") == 0) {
+			if (hwaddr_aton(pos, ndp.ndp_id.init_ndi) < 0) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid initiator NDI address: %s",
+					   pos);
+				goto fail;
+			}
+		} else if (os_strcmp(token, "ssi") == 0) {
+			ssi_buf = wpabuf_parse_bin(pos);
+			if (!ssi_buf) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid SSI data: %s", pos);
+				goto fail;
+			}
+
+			ndp.ssi_len = wpabuf_len(ssi_buf);
+			ndp.ssi = wpabuf_head(ssi_buf);
+		} else if (os_strcmp(token, "qos") == 0) {
+			if (sscanf(pos, "%hhu:%hu",
+				   &ndp.qos.min_slots,
+				   &ndp.qos.max_latency) != 2) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid QoS parameter: %s",
+					   pos);
+				goto fail;
+			}
+		} else {
+			wpa_printf(MSG_DEBUG, "NAN: Unknown parameter: %s",
+				   token);
+		}
+	}
+
+	/* Validate required parameters for accept case */
+	if (ndp.u.resp.status == NAN_NDP_STATUS_ACCEPTED) {
+		if (is_zero_ether_addr(ndp.u.resp.resp_ndi)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Missing required parameter for accept: ndi");
+			goto fail;
+		}
+	}
+
+	/* Validate common required parameters */
+	if (is_zero_ether_addr(ndp.ndp_id.peer_nmi)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: peer_nmi");
+		goto fail;
+	}
+
+	if (is_zero_ether_addr(ndp.ndp_id.init_ndi)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: init_ndi");
+		goto fail;
+	}
+
+	if (!ndp.ndp_id.id) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Missing required parameter: ndp_id");
+		goto fail;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: %s NDP response for peer " MACSTR
+		   " ndp_id=%u",
+		   ndp.u.resp.status == NAN_NDP_STATUS_ACCEPTED ?
+		   "Accepting" : "Rejecting",
+		   MAC2STR(ndp.ndp_id.peer_nmi), ndp.ndp_id.id);
+
+	if (wpas_nan_set_ndp_schedule(wpa_s, &ndp) < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to set NDP schedule");
+		goto fail;
+	}
+
+	/* If we initiated the NDP setup, this must be the confirmation */
+	if (ether_addr_equal(ndp.u.resp.resp_ndi, ndp.ndp_id.init_ndi))
+		ndp.type = NAN_NDP_ACTION_CONF;
+
+	ret = nan_handle_ndp_setup(wpa_s->nan, &ndp);
+	if (ret < 0)
+		wpa_printf(MSG_INFO, "NAN: Failed to handle NDP response");
+
+fail:
+	wpabuf_free(ndp.sched.elems);
+	wpabuf_free(ssi_buf);
+	return ret;
+}
+
+
 void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster)
