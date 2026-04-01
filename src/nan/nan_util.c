@@ -1671,3 +1671,62 @@ err:
 		   "NAN: Buffer too small to dump peer potential availability");
 	return -1;
 }
+
+
+/**
+ * nan_get_peer_ndc_freq - Get peer NDC frequency from schedule
+ * @nan: Pointer to NAN data struct
+ * @peer_sched: Pointer to peer schedule struct
+ * @map_idx: Index of the availability map to check
+ * Returns: Frequency of the committed channel that intersects with NDC,
+ *          or -1 on failure or if no intersection found
+ *
+ * In case NDC bitmap spans across multiple channels, only one channel is
+ * returned (that corresponds to the first NDC bit).
+ */
+int nan_get_peer_ndc_freq(struct nan_data *nan,
+			  const struct nan_peer_schedule *peer_sched,
+			  u8 map_idx)
+{
+	struct bitfield *ndc_bf;
+	int i;
+
+	if (map_idx >= peer_sched->n_maps) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Invalid map index %u for peer schedule",
+			   map_idx);
+		return -1;
+	}
+
+	ndc_bf = nan_tbm_to_bf(nan, &peer_sched->maps[map_idx].ndc);
+	if (!ndc_bf)
+		return -1;
+
+	for (i = 0; i < peer_sched->maps[map_idx].n_chans; i++) {
+		struct bitfield *committed_bf;
+
+		if (!peer_sched->maps[map_idx].chans[i].committed)
+			continue;
+
+		committed_bf =
+			nan_tbm_to_bf(nan,
+				      &peer_sched->maps[map_idx].chans[i].tbm);
+		if (!committed_bf) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to convert peer committed TBM to bitfield");
+			bitfield_free(ndc_bf);
+			return -1;
+		}
+
+		if (bitfield_intersects(ndc_bf, committed_bf)) {
+			bitfield_free(ndc_bf);
+			bitfield_free(committed_bf);
+			return peer_sched->maps[map_idx].chans[i].chan.freq;
+		}
+
+		bitfield_free(committed_bf);
+	}
+
+	bitfield_free(ndc_bf);
+	return -1;
+}
