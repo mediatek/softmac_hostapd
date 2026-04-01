@@ -6240,6 +6240,31 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 			goto fail;
 	}
 
+#ifdef CONFIG_NAN
+	if (params->set && drv->nlmode == NL80211_IFTYPE_NAN &&
+	    (params->flags & WPA_STA_AUTHORIZED)) {
+		if (params->ht_capabilities) {
+			wpa_hexdump(MSG_DEBUG, "  * ht_capabilities",
+				    params->ht_capabilities,
+				    sizeof(*params->ht_capabilities));
+			if (nla_put(msg, NL80211_ATTR_HT_CAPABILITY,
+				    sizeof(*params->ht_capabilities),
+				    params->ht_capabilities))
+				goto fail;
+		}
+
+		if (params->vht_capabilities) {
+			wpa_hexdump(MSG_DEBUG, "  * vht_capabilities",
+				    params->vht_capabilities,
+				    sizeof(*params->vht_capabilities));
+			if (nla_put(msg, NL80211_ATTR_VHT_CAPABILITY,
+				    sizeof(*params->vht_capabilities),
+				    params->vht_capabilities))
+				goto fail;
+		}
+	}
+#endif /* CONFIG_NAN */
+
 	if (params->vht_opmode_enabled) {
 		wpa_printf(MSG_DEBUG, "  * opmode=%u", params->vht_opmode);
 		if (nla_put_u8(msg, NL80211_ATTR_OPMODE_NOTIF,
