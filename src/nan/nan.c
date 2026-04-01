@@ -2154,3 +2154,46 @@ bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr)
 
 	return peer->info.npk_nik_caching_support;
 }
+
+
+/**
+ * nan_peer_del_all_ndps - Delete all NDPs with a given peer
+ * @nan: NAN module context from nan_init()
+ * @addr: NAN MAC address of the peer
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function deletes all NDPs with the given peer and stops any ongoing
+ * NDP setup. It also resets the NDL state machine and flushes any security
+ * context with the peer. The function doesn't delete the peer itself and
+ * doesn't send any NAFs to the peer notifying about the deletions.
+ */
+int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr)
+{
+	struct nan_peer *peer;
+	struct nan_ndp *ndp, *tndp;
+
+	if (!nan)
+		return -1;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return -1;
+
+	wpa_printf(MSG_DEBUG, "NAN: Deleting all NDPs with peer " MACSTR,
+		   MAC2STR(addr));
+
+	if (peer->ndp_setup.ndp)
+		nan_ndp_setup_stop(nan, peer);
+
+	dl_list_for_each_safe(ndp, tndp, &peer->ndps, struct nan_ndp, list) {
+		dl_list_del(&ndp->list);
+		peer->ndp_setup.ndp = ndp;
+		nan_ndp_disconnected(nan, peer,
+				     NAN_REASON_UNSPECIFIED_REASON);
+	}
+
+	nan_ndl_reset(nan, peer);
+	nan_peer_flush_sec(&peer->info);
+
+	return 0;
+}

@@ -541,5 +541,6 @@ int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
 			     enum nan_cipher_suite_id csid,
 			     const u8 *peer_nmi, u8 *nd_pmk);
 void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf);
+int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr);
 
 #endif /* NAN_H */
