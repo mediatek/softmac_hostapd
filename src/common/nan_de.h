@@ -135,6 +135,12 @@ struct nan_publish_params {
 
 	/* Source MAC address for this service (optional) */
 	const u8 *forced_addr;
+
+	/*
+	 * Pairing Bootstrapping Methods as defined in Wi-Fi Aware spec v4.0,
+	 * Table 128
+	 */
+	u16 pbm;
 };
 
 /* Returns -1 on failure or >0 publish_id */
@@ -200,6 +206,12 @@ struct nan_subscribe_params {
 
 	/* Source MAC address for this service (optional) */
 	const u8 *forced_addr;
+
+	/*
+	 * Pairing Bootstrapping Methods as defined in Wi-Fi Aware spec v4.0,
+	 * Table 128
+	 */
+	u16 pbm;
 };
 
 /* Returns -1 on failure or >0 subscribe_id */
