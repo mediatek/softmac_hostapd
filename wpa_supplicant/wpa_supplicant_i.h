@@ -140,6 +140,11 @@ struct wpa_interface {
 	 * nan_mgmt - Interface used for NAN management (NAN Device operations)
 	 */
 	bool nan_mgmt;
+
+	/**
+	 * nan_data - Interface used for NAN data path operations
+	 */
+	bool nan_data;
 };
 
 /**
@@ -1720,6 +1725,7 @@ struct wpa_supplicant {
 				    * we are already associated with. */
 
 	bool nan_mgmt;
+	bool nan_data;
 
 #ifdef CONFIG_NAN
 #define MAX_NAN_RADIOS 2

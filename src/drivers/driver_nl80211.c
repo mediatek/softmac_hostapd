@@ -6534,6 +6534,8 @@ const char * nl80211_iftype_str(enum nl80211_iftype mode)
 		return "OCB";
 	case NL80211_IFTYPE_NAN:
 		return "NAN DEVICE";
+	case NL80211_IFTYPE_NAN_DATA:
+		return "NAN_DATA";
 	default:
 		return "unknown";
 	}
@@ -9319,6 +9321,8 @@ static enum nl80211_iftype wpa_driver_nl80211_if_type(
 		return NL80211_IFTYPE_MESH_POINT;
 	case WPA_IF_NAN:
 		return NL80211_IFTYPE_NAN;
+	case WPA_IF_NAN_DATA:
+		return NL80211_IFTYPE_NAN_DATA;
 	default:
 		return -1;
 	}

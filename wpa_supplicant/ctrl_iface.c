@@ -4285,6 +4285,9 @@ static int iftype_str_to_index(const char *iftype_str)
 	if (os_strcmp(iftype_str, "NAN") == 0)
 		return WPA_IF_NAN;
 
+	if (os_strcmp(iftype_str, "NAN_DATA") == 0)
+		return WPA_IF_NAN_DATA;
+
 	return WPA_IF_MAX;
 }
 
@@ -14507,6 +14510,9 @@ static int wpa_supplicant_global_iface_add(struct wpa_global *global,
 			} else if (os_strcmp(pos, "nan") == 0) {
 				type = WPA_IF_NAN;
 				iface.nan_mgmt = true;
+			} else if (os_strcmp(pos, "nan_data") == 0) {
+				type = WPA_IF_NAN_DATA;
+				iface.nan_data = true;
 			} else {
 				wpa_printf(MSG_DEBUG,
 					   "INTERFACE_ADD unsupported interface type: '%s'",

@@ -2164,6 +2164,11 @@ enum wpa_driver_if_type {
 	 */
 	WPA_IF_NAN,
 
+	/*
+	 * WPA_IF_NAN_DATA - NAN Data interface
+	 */
+	WPA_IF_NAN_DATA,
+
 	/* keep last */
 	WPA_IF_MAX
 };
