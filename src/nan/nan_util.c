@@ -494,6 +494,7 @@ int nan_get_chan_bm(struct nan_data *nan, struct nan_sched_chan *chan,
 	case 20:
 	case 40:
 	default:
+		*pri_chan_bm = 0;
 		bandwidth = CONF_OPER_CHWIDTH_USE_HT;
 		break;
 	case 80:
