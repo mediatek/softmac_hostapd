@@ -163,6 +163,88 @@ static void wpas_nan_stop_cb(void *ctx)
 }
 
 
+static void
+wpas_nan_ndp_action_notif_cb(void *ctx,
+			     struct nan_ndp_action_notif_params *params)
+{
+	wpa_printf(MSG_DEBUG, "NAN: NDP action notification - peer=" MACSTR
+		   " ndp_id=%u ndp_status=%u ndl_status=%u publish_inst_id=%u",
+		   MAC2STR(params->ndp_id.peer_nmi), params->ndp_id.id,
+		   params->ndp_status, params->ndl_status,
+		   params->publish_inst_id);
+}
+
+
+static void wpas_nan_ndp_connected_cb(void *ctx,
+				      struct nan_ndp_connection_params *params)
+{
+	wpa_printf(MSG_DEBUG, "NAN: NDP connected - peer=" MACSTR
+		   " ndp_id=%u local_ndi=" MACSTR " peer_ndi=" MACSTR,
+		   MAC2STR(params->ndp_id.peer_nmi), params->ndp_id.id,
+		   MAC2STR(params->local_ndi), MAC2STR(params->peer_ndi));
+}
+
+
+static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
+					 const u8 *local_ndi,
+					 const u8 *peer_ndi,
+					 enum nan_reason reason)
+{
+	wpa_printf(MSG_DEBUG, "NAN: NDP disconnected - peer=" MACSTR
+		   " ndp_id=%u local_ndi=" MACSTR " peer_ndi=" MACSTR
+		   " reason=%u",
+		   MAC2STR(ndp_id->peer_nmi), ndp_id->id,
+		   MAC2STR(local_ndi), MAC2STR(peer_ndi), reason);
+}
+
+
+static int wpas_nan_send_naf_cb(void *ctx, const u8 *dst, const u8 *src,
+				const u8 *cluster_id, struct wpabuf *buf)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	const u8 *a2;
+	int ret;
+
+	a2 = src ? src : wpa_s->own_addr;
+
+	wpa_printf(MSG_DEBUG, "NAN: Send NAF - dst=" MACSTR " src=" MACSTR
+		   " cluster_id=" MACSTR, MAC2STR(dst), MAC2STR(a2),
+		   MAC2STR(cluster_id));
+
+	ret = wpa_drv_send_action(wpa_s, 0, 0, dst, a2, cluster_id,
+				  wpabuf_head(buf), wpabuf_len(buf), 1);
+	if (ret)
+		wpa_printf(MSG_DEBUG,
+			  "NAN: Failed to send sync Action frame (%d)", ret);
+	return ret;
+}
+
+
+static int wpas_nan_get_chans_cb(void *ctx, u8 map_id,
+				 struct nan_channels *chans)
+{
+	wpa_printf(MSG_DEBUG, "NAN: Get channels - map_id=%u", map_id);
+
+	/* TODO: Implement actual channel selection */
+	chans->n_chans = 0;
+	chans->chans = NULL;
+	return 0;
+}
+
+
+static bool wpas_nan_is_valid_publish_id_cb(void *ctx, u8 instance_id,
+					    u8 *service_id)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpa_printf(MSG_DEBUG, "NAN: Check valid publish ID - instance_id=%u",
+		   instance_id);
+
+	return nan_de_is_valid_instance_id(wpa_s->nan_de, instance_id, true,
+					   service_id);
+}
+
+
 int wpas_nan_init(struct wpa_supplicant *wpa_s)
 {
 	struct nan_config nan;
@@ -180,6 +262,14 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.start = wpas_nan_start_cb;
 	nan.stop = wpas_nan_stop_cb;
 	nan.update_config = wpas_nan_update_config_cb;
+
+	/* NDP */
+	nan.ndp_action_notif = wpas_nan_ndp_action_notif_cb;
+	nan.ndp_connected = wpas_nan_ndp_connected_cb;
+	nan.ndp_disconnected = wpas_nan_ndp_disconnected_cb;
+	nan.send_naf = wpas_nan_send_naf_cb;
+	nan.get_chans = wpas_nan_get_chans_cb;
+	nan.is_valid_publish_id = wpas_nan_is_valid_publish_id_cb;
 
 	/*
 	 * TODO: Set the device capabilities based on configuration and driver
