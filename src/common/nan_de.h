@@ -64,6 +64,7 @@ struct nan_callbacks {
 	void (*process_pr_usd_elems)(void *ctx, const u8 *buf,
 				     u16 buf_len, const u8 *peer_addr,
 				     unsigned int freq);
+	void (*add_extra_attrs)(void *ctx, struct wpabuf *buf);
 };
 
 bool nan_de_is_nan_network_id(const u8 *addr);

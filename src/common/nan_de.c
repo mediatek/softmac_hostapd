@@ -308,6 +308,10 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	if (srv->elems)
 		len += NAN_ATTR_HDR_LEN + 1 + wpabuf_len(srv->elems);
 
+	/* Reserve some additional space for extra attributes */
+	if (de->cb.add_extra_attrs)
+		len += 256;
+
 	buf = nan_de_alloc_sdf(len);
 	if (!buf)
 		return;
@@ -374,6 +378,9 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 
 	/* Use per-service source address if configured, otherwise use NMI */
 	forced_addr = srv->forced_addr_set ? srv->forced_addr : de->nmi;
+
+	if (de->cb.add_extra_attrs)
+		de->cb.add_extra_attrs(de->cb.ctx, buf);
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
 		  dst, forced_addr, a3, buf);
