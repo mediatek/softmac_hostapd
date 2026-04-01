@@ -1325,7 +1325,8 @@ offload:
 
 static bool nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 				const u8 *peer_addr, const u8 *a3,
-				u8 instance_id, const u8 *ssi, size_t ssi_len)
+				u8 instance_id, const u8 *ssi, size_t ssi_len,
+				const u8 *buf, size_t len)
 {
 	/* Follow-up function processing of a receive Follow-up message for a
 	 * Subscribe or Publish instance */
@@ -1348,7 +1349,7 @@ static bool nan_de_rx_follow_up(struct nan_de *de, struct nan_de_service *srv,
 
 	if (de->cb.receive)
 		de->cb.receive(de->cb.ctx, srv->id, instance_id, ssi, ssi_len,
-			       peer_addr);
+			       peer_addr, buf, len);
 
 	return true;
 }
@@ -1569,7 +1570,8 @@ static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 			break;
 		case NAN_SRV_CTRL_FOLLOW_UP:
 			ret |= nan_de_rx_follow_up(de, srv, peer_addr, a3,
-						   instance_id, ssi, ssi_len);
+						   instance_id, ssi, ssi_len,
+						   buf, len);
 			break;
 		}
 	}

@@ -2657,7 +2657,8 @@ static void wpas_nan_usd_offload_cancel_subscribe(void *ctx, int subscribe_id)
 
 static void wpas_nan_de_receive(void *ctx, int id, int peer_instance_id,
 				const u8 *ssi, size_t ssi_len,
-				const u8 *peer_addr)
+				const u8 *peer_addr,
+				const u8 *buf, size_t len)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 

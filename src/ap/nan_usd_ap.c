@@ -129,7 +129,8 @@ static void hostapd_nan_de_subscribe_terminated(void *ctx, int subscribe_id,
 
 static void hostapd_nan_de_receive(void *ctx, int id, int peer_instance_id,
 				   const u8 *ssi, size_t ssi_len,
-				   const u8 *peer_addr)
+				   const u8 *peer_addr,
+				   const u8 *buf, size_t len)
 {
 	struct hostapd_data *hapd = ctx;
 	char *ssi_hex;
