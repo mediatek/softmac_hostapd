@@ -1812,6 +1812,23 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 }
 
 
+static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	struct nan_schedule sched;
+	u32 map_ids = (BIT(wpa_s->nan_capa.num_radios) - 1) << 1;
+
+	if (!wpas_nan_ready(wpa_s) || !map_ids)
+		return;
+
+	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
+	nan_add_dev_capa_attr(wpa_s->nan, buf);
+	nan_convert_sched_to_avail_attrs(wpa_s->nan,
+					 wpa_s->schedule_sequence_id, map_ids,
+					 sched.n_chans, sched.chans, buf);
+}
+
+
 void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster)
@@ -2210,6 +2227,9 @@ int wpas_nan_de_init(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_PR
 	cb.process_pr_usd_elems = wpas_nan_process_pr_usd_elems;
 #endif /* CONFIG_PR */
+#ifdef CONFIG_NAN
+	cb.add_extra_attrs = wpas_nan_de_add_extra_attrs;
+#endif /* CONFIG_NAN */
 
 	wpa_s->nan_de = nan_de_init(wpa_s->own_addr, offload, false,
 				    wpa_s->max_remain_on_chan, &cb);
