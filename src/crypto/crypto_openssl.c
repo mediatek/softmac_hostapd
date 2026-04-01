@@ -1881,6 +1881,32 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
 }
 
 
+#ifdef CONFIG_SHA256
+int pbkdf2_sha256(const char *passphrase, const u8 *salt, size_t salt_len,
+		  int iterations, u8 *buf, size_t buflen)
+{
+	if (PKCS5_PBKDF2_HMAC(passphrase, os_strlen(passphrase), salt,
+			      salt_len, iterations, EVP_sha256(), buflen,
+			      buf) != 1)
+		return -1;
+	return 0;
+}
+#endif /* CONFIG_SHA256 */
+
+
+#ifdef CONFIG_SHA384
+int pbkdf2_sha384(const char *passphrase, const u8 *salt, size_t salt_len,
+		  int iterations, u8 *buf, size_t buflen)
+{
+	if (PKCS5_PBKDF2_HMAC(passphrase, os_strlen(passphrase), salt,
+			      salt_len, iterations, EVP_sha384(), buflen,
+			      buf) != 1)
+		return -1;
+	return 0;
+}
+#endif /* CONFIG_SHA384 */
+
+
 int crypto_get_random(void *buf, size_t len)
 {
 	if (RAND_bytes(buf, len) != 1)
