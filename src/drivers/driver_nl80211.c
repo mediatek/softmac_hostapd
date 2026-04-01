@@ -6108,8 +6108,11 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 			    params->supp_rates, params->supp_rates_len);
 		wpa_printf(MSG_DEBUG, "  * capability=0x%x",
 			   params->capability);
-		if (nla_put(msg, NL80211_ATTR_STA_SUPPORTED_RATES,
-			    params->supp_rates_len, params->supp_rates) ||
+		if (((params->supp_rates_len > 0 ||
+		      (drv->nlmode != NL80211_IFTYPE_NAN &&
+		       drv->nlmode != NL80211_IFTYPE_NAN_DATA)) &&
+		     nla_put(msg, NL80211_ATTR_STA_SUPPORTED_RATES,
+			     params->supp_rates_len, params->supp_rates)) ||
 		    nla_put_u16(msg, NL80211_ATTR_STA_CAPABILITY,
 				params->capability))
 			goto fail;
