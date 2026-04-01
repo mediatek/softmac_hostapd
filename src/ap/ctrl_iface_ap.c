@@ -763,14 +763,6 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 	if (hwaddr_aton(txtaddr, addr))
 		return -1;
 
-	sta = ap_get_sta(hapd, addr);
-	if (!sta && !is_broadcast_ether_addr(addr)) {
-		wpa_printf(MSG_DEBUG, "Station " MACSTR
-			   " not found for Deauthentication Request",
-			   MAC2STR(addr));
-		return -1;
-	}
-
 	pos = os_strstr(txtaddr, " reason=");
 	if (pos)
 		reason = atoi(pos + 8);
@@ -794,7 +786,7 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 					  sizeof(mgmt.u.deauth),
 					  0, NULL, 0, !encrypt) < 0)
 			return -1;
-		goto remove_sta;
+		return 0;
 	}
 
 #ifdef CONFIG_P2P_MANAGER
@@ -804,6 +796,14 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 					      atoi(pos + 5), addr);
 	}
 #endif /* CONFIG_P2P_MANAGER */
+
+	sta = ap_get_sta(hapd, addr);
+	if (!sta && !is_broadcast_ether_addr(addr)) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR
+			   " not found for Deauthentication Request",
+			   MAC2STR(addr));
+		return -1;
+	}
 
 	if (os_strstr(txtaddr, " tx=0")) {
 		struct hostapd_data *assoc_hapd = hapd;
@@ -820,16 +820,13 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 		}
 #endif /* CONFIG_IEEE80211BE */
 		ap_free_sta(assoc_hapd, assoc_sta);
-
-		return 0;
+	} else {
+		hostapd_drv_sta_deauth(hapd, addr, reason);
+		if (sta)
+			ap_sta_deauthenticate(hapd, sta, reason);
+		else if (is_broadcast_ether_addr(addr))
+			hostapd_free_stas(hapd);
 	}
-	hostapd_drv_sta_deauth(hapd, addr, reason);
-
-remove_sta:
-	if (sta)
-		ap_sta_deauthenticate(hapd, sta, reason);
-	else if (is_broadcast_ether_addr(addr))
-		hostapd_free_stas(hapd);
 
 	return 0;
 }
@@ -848,14 +845,6 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 
 	if (hwaddr_aton(txtaddr, addr))
 		return -1;
-
-	sta = ap_get_sta(hapd, addr);
-	if (!sta && !is_broadcast_ether_addr(addr)) {
-		wpa_printf(MSG_DEBUG, "Station " MACSTR
-			   " not found for Disassociation Request",
-			   MAC2STR(addr));
-		return -1;
-	}
 
 	pos = os_strstr(txtaddr, " reason=");
 	if (pos)
@@ -880,7 +869,7 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 					  sizeof(mgmt.u.deauth),
 					  0, NULL, 0, !encrypt) < 0)
 			return -1;
-		goto remove_sta;
+		return 0;
 	}
 
 #ifdef CONFIG_P2P_MANAGER
@@ -890,6 +879,14 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 					      atoi(pos + 5), addr);
 	}
 #endif /* CONFIG_P2P_MANAGER */
+
+	sta = ap_get_sta(hapd, addr);
+	if (!sta && !is_broadcast_ether_addr(addr)) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR
+			   " not found for Disassociation Request",
+			   MAC2STR(addr));
+		return -1;
+	}
 
 	if (os_strstr(txtaddr, " tx=0")) {
 		struct hostapd_data *assoc_hapd = hapd;
@@ -906,14 +903,13 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 		}
 #endif /* CONFIG_IEEE80211BE */
 		ap_free_sta(assoc_hapd, assoc_sta);
+	} else {
+		hostapd_drv_sta_disassoc(hapd, addr, reason);
+		if (sta)
+			ap_sta_disassociate(hapd, sta, reason);
+		else if (is_broadcast_ether_addr(addr))
+			hostapd_free_stas(hapd);
 	}
-	hostapd_drv_sta_disassoc(hapd, addr, reason);
-
-remove_sta:
-	if (sta)
-		ap_sta_disassociate(hapd, sta, reason);
-	else if (is_broadcast_ether_addr(addr))
-		hostapd_free_stas(hapd);
 
 	return 0;
 }
