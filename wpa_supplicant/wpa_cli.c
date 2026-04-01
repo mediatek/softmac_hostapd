@@ -3420,6 +3420,41 @@ static int wpa_cli_cmd_nan_update_conf(struct wpa_ctrl *ctrl, int argc,
 	return wpa_cli_cmd(ctrl, "NAN_UPDATE_CONF", 0, argc, argv);
 }
 
+
+static int wpa_cli_cmd_nan_sched_config_map(struct wpa_ctrl *ctrl, int argc,
+					     char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_SCHED_CONFIG_MAP", 1, argc, argv);
+}
+
+
+static int wpa_cli_cmd_nan_ndp_request(struct wpa_ctrl *ctrl, int argc,
+				       char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_NDP_REQUEST", 4, argc, argv);
+}
+
+
+static int wpa_cli_cmd_nan_ndp_response(struct wpa_ctrl *ctrl, int argc,
+					char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_NDP_RESPONSE", 3, argc, argv);
+}
+
+
+static int wpa_cli_cmd_nan_ndp_terminate(struct wpa_ctrl *ctrl, int argc,
+					 char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_NDP_TERMINATE", 3, argc, argv);
+}
+
+
+static int wpa_cli_cmd_nan_peer_info(struct wpa_ctrl *ctrl, int argc,
+				     char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_PEER_INFO", 2, argc, argv);
+}
+
 #endif /* CONFIG_NAN */
 
 
@@ -4211,6 +4246,21 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "= set NAN configuration variable" },
 	{ "nan_update_conf", wpa_cli_cmd_nan_update_conf, NULL,
 	  cli_cmd_flag_none, "= update NAN configuration" },
+	{ "nan_sched_config_map", wpa_cli_cmd_nan_sched_config_map, NULL,
+	  cli_cmd_flag_none,
+	  "map_id=<id> [freq:bitmap_hex] = Configure NAN schedule. Clear if no bitmaps provided" },
+	{ "nan_ndp_request", wpa_cli_cmd_nan_ndp_request, NULL,
+	  cli_cmd_flag_none,
+	  "handle=<id> ndi=<ifname> peer_nmi=<nmi> peer_id=<peer_instance_id> [ssi=<hexdata>] [qos=<slots:latency>] [csid = <cipher_suite> <password=<string>|pmk=<hex>>] = Request NAN data path" },
+	{ "nan_ndp_response", wpa_cli_cmd_nan_ndp_response, NULL,
+	  cli_cmd_flag_none,
+	  "accept|reject peer_nmi=<nmi> [reason_code=<reject_reason>] [ndi=<ifname> handle=<service_handle> init_ndi=<ndi> ndp_id=<id> [ssi=<hexdata>] [qos=<slots:latency>] [csid=<csid> <password=<string>|pmk=<hex>]] = Respond to NAN data path request" },
+	{ "nan_ndp_terminate", wpa_cli_cmd_nan_ndp_terminate, NULL,
+	  cli_cmd_flag_none,
+	  "peer_nmi=<nmi> init_ndi=<ndi> ndp_id=<id> = Terminate NAN data path" },
+	{ "nan_peer_info", wpa_cli_cmd_nan_peer_info, NULL,
+	  cli_cmd_flag_none,
+	  "<addr> <schedule|potential|capa> [map_id] = Get NAN peer information" },
 #endif /* CONFIG_NAN */
 	{ "new_random_mac_address", wpa_cli_cmd_generate_new_mac, NULL,
 	  cli_cmd_flag_none, "= Generate new random MAC address" },
