@@ -555,7 +555,8 @@ int nan_convert_sched_to_avail_attrs(struct nan_data *nan, u8 sequence_id,
 				     u32 map_ids_bitmap,
 				     size_t n_chans,
 				     struct nan_chan_schedule *chans,
-				     struct wpabuf *buf);
+				     struct wpabuf *buf,
+				     bool include_potential);
 bool nan_peer_pairing_supported(struct nan_data *nan, const u8 *addr);
 bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr);
 int nan_get_peer_ndc_freq(struct nan_data *nan,

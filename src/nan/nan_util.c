@@ -706,6 +706,7 @@ static void nan_build_pot_avail_entry(struct nan_data *nan, struct wpabuf *buf,
  * @n_chans: Number of channels in chans
  * @chans: Channel schedules
  * @buf: Frame buffer to which the attribute would be added
+ * @include_potential: Whether to add potential availability entries
  * Returns: 0 on success, negative on failure.
  *
  * An availability attribute is added for each map (identified by map ID) in the
@@ -716,7 +717,7 @@ static void nan_build_pot_avail_entry(struct nan_data *nan, struct wpabuf *buf,
 int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 			u32 map_ids_bitmap, u8 type_for_conditional,
 			size_t n_chans, struct nan_chan_schedule *chans,
-			struct wpabuf *buf)
+			struct wpabuf *buf, bool include_potential)
 {
 	u8 last_map_id = NAN_INVALID_MAP_ID;
 	u32 handled_map_ids = 0;
@@ -770,8 +771,9 @@ int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 					   "NAN: Add avail attr done: map_id=%u",
 					   last_map_id);
 
-				nan_build_pot_avail_entry(nan, buf,
-							  last_map_id);
+				if (include_potential)
+					nan_build_pot_avail_entry(nan, buf,
+								  last_map_id);
 				WPA_PUT_LE16(len_ptr,
 					     (u8 *) wpabuf_put(buf, 0) -
 					     len_ptr - 2);
@@ -815,7 +817,8 @@ int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 	}
 
 	if (last_map_id != NAN_INVALID_MAP_ID) {
-		nan_build_pot_avail_entry(nan, buf, last_map_id);
+		if (include_potential)
+			nan_build_pot_avail_entry(nan, buf, last_map_id);
 		WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
 
 		wpa_printf(MSG_DEBUG, "NAN: Add avail attr done: map_id=%u",
@@ -824,6 +827,9 @@ int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 		wpa_printf(MSG_DEBUG,
 			   "NAN: No committed/conditional entries were added");
 	}
+
+	if (!include_potential)
+		return 0;
 
 	/*
 	 * Add NAN availability attributes with a single potential availability

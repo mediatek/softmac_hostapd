@@ -1371,7 +1371,7 @@ int nan_ndl_add_avail_attrs(struct nan_data *nan, const struct nan_peer *peer,
 	return nan_add_avail_attrs(nan, sched->sequence_id,
 				   sched->map_ids_bitmap,
 				   type_for_conditional,
-				   sched->n_chans, sched->chans, buf);
+				   sched->n_chans, sched->chans, buf, true);
 }
 
 

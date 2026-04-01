@@ -580,7 +580,7 @@ int nan_get_chan_bm(struct nan_data *nan, const struct nan_sched_chan *chan,
 int nan_add_avail_attrs(struct nan_data *nan, u8 sequence_id,
 			u32 map_ids_bitmap, u8 type_for_conditional,
 			size_t n_chans, struct nan_chan_schedule *chans,
-			struct wpabuf *buf);
+			struct wpabuf *buf, bool include_potential);
 void nan_del_avail_entry(struct nan_avail_entry *entry);
 void nan_flush_avail_entries(struct dl_list *avail_entries);
 int nan_sched_entries_to_avail_entries(struct nan_data *nan,
