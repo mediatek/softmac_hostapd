@@ -1248,7 +1248,7 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 				struct nan_ndp_params *ndp,
 				int handle,
 				const u8 *publisher_nmi,
-				const char *pwd)
+				const char *pwd, const char *pmk)
 {
 	u8 service_id[NAN_SERVICE_ID_LEN];
 
@@ -1272,9 +1272,9 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 			return -1;
 	}
 
-	if (!pwd || os_strlen(pwd) == 0) {
+	if ((!pwd || os_strlen(pwd) == 0) && (!pmk || os_strlen(pmk) == 0)) {
 		wpa_printf(MSG_INFO,
-			   "NAN: Password required for CSID %d",
+			   "NAN: Password/PMK required for CSID %d",
 			   ndp->sec.csid);
 		return -1;
 	}
@@ -1292,6 +1292,22 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
+	if (pmk) {
+		if (os_strlen(pmk) != PMK_LEN * 2) {
+			wpa_printf(MSG_INFO, "NAN: Invalid PMK length: %zu",
+				   os_strlen(pmk));
+			return -1;
+		}
+
+		if (hexstr2bin(pmk, ndp->sec.pmk, PMK_LEN) < 0) {
+			wpa_printf(MSG_INFO, "NAN: Invalid PMK hex data");
+			return -1;
+		}
+
+		return 0;
+	}
+
+	/* Derive PMK from password */
 	return nan_crypto_derive_nd_pmk(pwd, service_id, ndp->sec.csid,
 					publisher_nmi, ndp->sec.pmk);
 }
@@ -1299,14 +1315,14 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 
 /* Command format NAN_NDP_REQUEST handle=<id> ndi=<ifname> peer_nmi=<nmi>
    peer_id=<peer_instance_id> ssi=<hexdata> qos=<slots:latency>
-   [csid = <cipher_suite> password=<string>] */
+   [csid = <cipher_suite> <password=<string>|pmk=<hex>>] */
 int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	struct nan_ndp_params ndp;
 	struct wpabuf *ssi_buf = NULL;
 	char *token, *context = NULL;
 	char *pos;
-	const char *pwd = NULL;
+	const char *pwd = NULL, *pmk = NULL;
 	int handle = -1;
 	int ret = -1;
 
@@ -1397,6 +1413,8 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 			ndp.sec.csid = atoi(pos);
 		} else if (os_strcmp(token, "password") == 0) {
 			pwd = pos;
+		} else if (os_strcmp(token, "pmk") == 0) {
+			pmk = pos;
 		} else {
 			wpa_printf(MSG_INFO, "NAN: Unknown parameter: %s",
 				   token);
@@ -1427,9 +1445,14 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 		goto fail;
 	}
 
-	/* Derive NDP PMK if needed */
+	if (pmk && pwd) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Specify only one of password or pmk");
+		goto fail;
+	}
+
 	if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle,
-				 ndp.ndp_id.peer_nmi, pwd) < 0) {
+				 ndp.ndp_id.peer_nmi, pwd, pmk) < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to derive NDP PMK");
 		goto fail;
@@ -1456,14 +1479,14 @@ fail:
    [reason_code=<reject_reason>]
    [ndi=<ifname> handle=<service_handle> init_ndi=<ndi>
    ndp_id=<id> [ssi=<hexdata>] [qos=<slots:latency>]
-   [csid=<csid> password=<string>]] */
+   [csid=<csid> <password=<string>|pmk=<hex>]] */
 int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	struct nan_ndp_params ndp;
 	struct wpabuf *ssi_buf = NULL;
 	char *token, *context = NULL;
 	char *pos;
-	const char *pwd = NULL;
+	const char *pwd = NULL, *pmk = NULL;
 	int handle = -1;
 	int ret = -1;
 
@@ -1567,6 +1590,8 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 			ndp.sec.csid = atoi(pos);
 		} else if (os_strcmp(token, "password") == 0) {
 			pwd = pos;
+		} else if (os_strcmp(token, "pmk") == 0) {
+			pmk = pos;
 		} else {
 			wpa_printf(MSG_DEBUG, "NAN: Unknown parameter: %s",
 				   token);
@@ -1598,9 +1623,14 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 			goto fail;
 		}
 
-		/* Fill the ND-PMK if needed */
+		if (pmk && pwd) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Specify only one of password or pmk");
+			goto fail;
+		}
+
 		if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle,
-					 publisher_nmi, pwd)) {
+					 publisher_nmi, pwd, pmk) < 0) {
 			wpa_printf(MSG_INFO, "NAN: Failed to derive NDP PMK");
 			goto fail;
 		}
