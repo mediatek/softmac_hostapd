@@ -130,6 +130,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 		nan_ndp_setup_stop(nan, peer);
 	}
 
+	nan_bootstrap_reset(nan, peer);
 	dl_list_del(&peer->list);
 	nan_peer_flush_avail(&peer->info);
 	nan_peer_flush_dev_capa(&peer->info);
@@ -1261,6 +1262,41 @@ static int nan_configure_peer_schedule(struct nan_data *nan,
 
 	peer->configured = true;
 	return 0;
+}
+
+
+/**
+ * nan_process_followup - Process a received NAN Follow-up Action frame
+ * @nan: NAN module context from nan_init()
+ * @addr: Source address of the received frame
+ * @buf: Buffer containing the received frame
+ * @len: Length of the received frame in octets
+ * @req_instance_id: Instance ID of the request that triggered this followup
+ * @handle: Service handle of the service associated with this followup
+ * Returns: true if the frame was processed successfully, false on failure
+ */
+bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
+			  size_t len, u8 req_instance_id, int handle)
+{
+	struct nan_attrs attrs;
+	bool ret;
+
+	if (nan_parse_attrs(nan, buf, len, &attrs)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Follow-up: Failed parsing attributes");
+		return false;
+	}
+
+	if (!attrs.npba || !attrs.npba_len) {
+		nan_attrs_clear(nan, &attrs);
+		return false;
+	}
+
+	ret = nan_bootstrap_handle_rx(nan, addr, attrs.npba, attrs.npba_len,
+				      buf, len, handle, req_instance_id);
+
+	nan_attrs_clear(nan, &attrs);
+	return ret;
 }
 
 

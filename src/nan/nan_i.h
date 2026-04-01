@@ -407,9 +407,40 @@ struct nan_ndl {
  * struct nan_bootstrap - NAN bootstrap information
  * @supported_methods: Bitmap of supported bootstrap methods. See
  *     &enum nan_pairing_bootstrapping_method.
+ * @initiator: Whether this device is the initiator
+ * @requested_pbm: Bitmap of requested bootstrap methods. See
+ *     &enum nan_pairing_bootstrapping_method.
+ * @dialog_token: Dialog token of the bootstrap exchange
+ * @status: Status of the bootstrap exchange. See &enum nan_pba_status.
+ * @reason_code: Reason code for the bootstrap exchange. See &enum nan_reason.
+ * @comeback_required: Whether the peer requested a comeback
+ * @comeback_after: Time after which the comeback is requested
+ * @cookie: Pointer to the cookie received from the peer
+ * @cookie_len: Length of the cookie
+ * @authorized: Authorized bootstrap method. See &enum
+ *     nan_pairing_bootstrapping_method.
+ * @in_progress: Whether a bootstrap exchange is in progress
+ * @handle: Follow-up context handle for the ongoing bootstrap request
+ * @req_instance_id: Instance ID of the bootstrap request
  */
 struct nan_bootstrap {
 	u16 supported_methods;
+	bool initiator;
+	u16 requested_pbm;
+	u8 dialog_token;
+	u8 status;
+	u8 reason_code;
+
+	bool comeback_required;
+	u16 comeback_after;
+	u8 *cookie;
+	u8 cookie_len;
+
+	u16 authorized;
+	bool in_progress;
+
+	int handle;
+	u8 req_instance_id;
 };
 
 /**
@@ -647,5 +678,11 @@ int nan_sec_get_tk(struct nan_data *nan, struct nan_peer *peer,
 		   const u8 *peer_ndi, const u8 *local_ndi,
 		   u8 *tk, size_t *tk_len, enum nan_cipher_suite_id *csid);
 void nan_add_dev_capa_ext_attr(struct nan_data *nan, struct wpabuf *buf);
+
+void nan_bootstrap_reset(struct nan_data *nan, struct nan_peer *peer);
+bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
+			     const u8 *npba, u16 npba_len,
+			     const u8 *buf, size_t len,
+			     int handle, u8 req_instance_id);
 
 #endif /* NAN_I_H */

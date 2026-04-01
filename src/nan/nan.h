@@ -586,6 +586,12 @@ void nan_flush(struct nan_data *nan);
 
 int nan_add_peer(struct nan_data *nan, const u8 *addr,
 		 const u8 *device_attrs, size_t device_attrs_len);
+bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
+			  size_t len, u8 req_instance_id, int handle);
+int nan_bootstrap_request(struct nan_data *nan, int handle,
+			  const u8 *peer_addr, u8 req_instance_id, u16 pbm,
+			  bool auth);
+int nan_bootstrap_peer_reset(struct nan_data *nan, const u8 *peer_nmi);
 
 bool nan_publish_instance_id_valid(struct nan_data *nan, u8 instance_id,
 				   u8 *service_id);
