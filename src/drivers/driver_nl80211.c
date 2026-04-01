@@ -5418,6 +5418,36 @@ err:
 #endif /* CONFIG_DRIVER_NL80211_QCA */
 
 
+static int nl80211_bw_to_nl(int bw, enum nl80211_chan_width *cw,
+			    int center_freq2)
+{
+	switch (bw) {
+	case 20:
+		*cw = NL80211_CHAN_WIDTH_20;
+		break;
+	case 40:
+		*cw = NL80211_CHAN_WIDTH_40;
+		break;
+	case 80:
+		if (center_freq2)
+			*cw = NL80211_CHAN_WIDTH_80P80;
+		else
+			*cw = NL80211_CHAN_WIDTH_80;
+		break;
+	case 160:
+		*cw = NL80211_CHAN_WIDTH_160;
+		break;
+	case 320:
+		*cw = NL80211_CHAN_WIDTH_320;
+		break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+
 static int nl80211_put_freq_params(struct nl_msg *msg,
 				   const struct hostapd_freq_params *freq,
 				   struct i802_bss *bss)
@@ -5446,26 +5476,11 @@ static int nl80211_put_freq_params(struct nl_msg *msg,
 		enum nl80211_chan_width cw;
 
 		wpa_printf(MSG_DEBUG, "  * bandwidth=%d", freq->bandwidth);
-		switch (freq->bandwidth) {
-		case 20:
-			cw = NL80211_CHAN_WIDTH_20;
-			break;
-		case 40:
-			cw = NL80211_CHAN_WIDTH_40;
-			break;
-		case 80:
-			if (freq->center_freq2)
-				cw = NL80211_CHAN_WIDTH_80P80;
-			else
-				cw = NL80211_CHAN_WIDTH_80;
-			break;
-		case 160:
-			cw = NL80211_CHAN_WIDTH_160;
-			break;
-		case 320:
-			cw = NL80211_CHAN_WIDTH_320;
-			break;
-		default:
+		if (nl80211_bw_to_nl(freq->bandwidth, &cw,
+				     freq->center_freq2) < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "  * Unsupported bandwidth %d MHz",
+				   freq->bandwidth);
 			return -EINVAL;
 		}
 
