@@ -1334,8 +1334,10 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 		params.peer_ndi = peer->ndp_setup.ndp->init_ndi;
 	}
 
-	nan_sec_ndp_store_keys(nan, peer, params.peer_ndi, params.local_ndi);
-
+	params.install_keys = nan_sec_ndp_store_keys(nan, peer,
+						     params.peer_ndi,
+						     params.local_ndi);
+	params.first_ndp = dl_list_empty(&peer->ndps);
 	if (nan->cfg->ndp_connected &&
 	    nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params)) {
 		wpa_printf(MSG_DEBUG, "NAN: NDP connected notification failed");
