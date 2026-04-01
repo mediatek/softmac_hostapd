@@ -167,21 +167,65 @@ static void
 wpas_nan_ndp_action_notif_cb(void *ctx,
 			     struct nan_ndp_action_notif_params *params)
 {
-	wpa_printf(MSG_DEBUG, "NAN: NDP action notification - peer=" MACSTR
-		   " ndp_id=%u ndp_status=%u ndl_status=%u publish_inst_id=%u",
-		   MAC2STR(params->ndp_id.peer_nmi), params->ndp_id.id,
-		   params->ndp_status, params->ndl_status,
-		   params->publish_inst_id);
+	struct wpa_supplicant *wpa_s = ctx;
+	char *ssi_hex = NULL;
+
+	if (params->ssi) {
+		size_t len = 2 * params->ssi_len + 1;
+
+		ssi_hex = os_zalloc(len);
+		if (!ssi_hex)
+			return;
+
+		wpa_snprintf_hex(ssi_hex, len, params->ssi, params->ssi_len);
+	}
+
+	if (params->is_request) {
+		wpa_msg_global(wpa_s, MSG_INFO,
+			       NAN_NDP_REQUEST "peer_nmi=" MACSTR
+			       " init_ndi=" MACSTR
+			       " ndp_id=%u publish_inst_id=%u ssi=%s csid=%u",
+			       MAC2STR(params->ndp_id.peer_nmi),
+			       MAC2STR(params->ndp_id.init_ndi),
+			       params->ndp_id.id,
+			       params->publish_inst_id,
+			       ssi_hex ? ssi_hex : "", params->csid);
+	} else {
+		wpa_msg_global(wpa_s, MSG_INFO,
+			       NAN_NDP_COUNTER_REQUEST "peer_nmi=" MACSTR
+			       " init_ndi=" MACSTR
+			       " ndp_id=%u ssi=%s",
+			       MAC2STR(params->ndp_id.peer_nmi),
+			       MAC2STR(params->ndp_id.init_ndi),
+			       params->ndp_id.id, ssi_hex ? ssi_hex : "");
+	}
+
+       os_free(ssi_hex);
 }
 
 
 static void wpas_nan_ndp_connected_cb(void *ctx,
 				      struct nan_ndp_connection_params *params)
 {
-	wpa_printf(MSG_DEBUG, "NAN: NDP connected - peer=" MACSTR
-		   " ndp_id=%u local_ndi=" MACSTR " peer_ndi=" MACSTR,
-		   MAC2STR(params->ndp_id.peer_nmi), params->ndp_id.id,
-		   MAC2STR(params->local_ndi), MAC2STR(params->peer_ndi));
+	struct wpa_supplicant *wpa_s = ctx;
+	char *ssi_hex = NULL;
+
+	if (params->ssi) {
+		size_t len = 2 * params->ssi_len + 1;
+
+		ssi_hex = os_zalloc(len);
+		if (!ssi_hex)
+			return;
+		wpa_snprintf_hex(ssi_hex, len, params->ssi, params->ssi_len);
+	}
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_CONNECTED "peer=" MACSTR
+		       " ndp_id=%u local_ndi=" MACSTR
+		       " peer_ndi=" MACSTR " ssi=%s",
+		       MAC2STR(params->ndp_id.peer_nmi), params->ndp_id.id,
+		       MAC2STR(params->local_ndi), MAC2STR(params->peer_ndi),
+		       ssi_hex ? ssi_hex : "");
+       os_free(ssi_hex);
 }
 
 
@@ -190,11 +234,13 @@ static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 					 const u8 *peer_ndi,
 					 enum nan_reason reason)
 {
-	wpa_printf(MSG_DEBUG, "NAN: NDP disconnected - peer=" MACSTR
-		   " ndp_id=%u local_ndi=" MACSTR " peer_ndi=" MACSTR
-		   " reason=%u",
-		   MAC2STR(ndp_id->peer_nmi), ndp_id->id,
-		   MAC2STR(local_ndi), MAC2STR(peer_ndi), reason);
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_DISCONNECTED
+		       "peer=" MACSTR " ndp_id=%u local_ndi=" MACSTR
+		       " peer_ndi=" MACSTR " reason=%u",
+		       MAC2STR(ndp_id->peer_nmi), ndp_id->id,
+		       MAC2STR(local_ndi), MAC2STR(peer_ndi), reason);
 }
 
 
