@@ -873,6 +873,8 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		int j, i = sched_cfg.num_channels;;
 		struct bitfield *bf_chan = NULL;
 		char *colon = os_strchr(token, ':');
+		struct nan_sched_chan chan;
+		struct nan_chan_entry *chan_entry;
 
 		if (i >= wpa_s->nan_capa.sched_chans) {
 			wpa_printf(MSG_INFO,
@@ -968,6 +970,19 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 
 		bitfield_union_in_place(bf_total, bf_chan);
 		bitfield_free(bf_chan);
+
+		chan.freq = sched_cfg.channels[i].freq;
+		chan.center_freq1 = sched_cfg.channels[i].center_freq1;
+		chan.center_freq2 = sched_cfg.channels[i].center_freq2;
+		chan.bandwidth = sched_cfg.channels[i].bandwidth;
+		chan_entry = (struct nan_chan_entry *)
+			&sched_cfg.channels[i].chan_entry;
+		if (nan_get_chan_entry(wpa_s->nan, &chan, chan_entry)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to get channel entry for freq %d",
+				   sched_cfg.channels[i].freq);
+			goto out;
+		}
 	}
 
 	nan_dump_sched_config("NAN: Set schedule config", &sched_cfg);
