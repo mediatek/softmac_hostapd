@@ -38,6 +38,8 @@
 #define NAN_MIN_RSSI_CLOSE  -60
 #define NAN_MIN_RSSI_MIDDLE -75
 
+#define NAN_AVAIL_ATTR_MAX_LEN 100
+
 #ifdef CONFIG_NAN
 
 static int get_center(u8 channel, const u8 *center_channels,
@@ -150,6 +152,7 @@ static void clear_sched_config(struct nan_schedule_config *sched_cfg)
 	for (i = 0; i < sched_cfg->num_channels; i++)
 		wpabuf_free(sched_cfg->channels[i].time_bitmap);
 
+	wpabuf_free(sched_cfg->avail_attr);
 	os_memset(sched_cfg, 0, sizeof(*sched_cfg));
 }
 
@@ -1160,11 +1163,17 @@ static void nan_dump_sched_config(const char *title,
 }
 
 
+static void wpas_nan_fill_ndp_schedule(struct wpa_supplicant *wpa_s,
+				       struct nan_schedule *sched);
+
+
 /* Parse format NAN_SCHED_CONFIG_MAP map_id=<id> [freq:bitmap_hex]..
  * If no bitmaps provided - clear the map */
 int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 {
 	struct nan_schedule_config sched_cfg;
+	struct nan_schedule_config old_sched_cfg;
+	struct nan_schedule sched;
 	char *token, *context = NULL;
 	u8 map_id;
 	char *pos;
@@ -1356,19 +1365,50 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		}
 	}
 
+	sched_cfg.avail_attr = wpabuf_alloc(NAN_AVAIL_ATTR_MAX_LEN);
+	if (!sched_cfg.avail_attr) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to allocate memory for Availability attribute");
+		ret = -1;
+		goto out;
+	}
+
+	/* Keep previous schedule configuration as we may need to restore it */
+	os_memcpy(&old_sched_cfg, &wpa_s->nan_sched[map_id - 1],
+		  sizeof(old_sched_cfg));
+
+	os_memcpy(&wpa_s->nan_sched[map_id - 1], &sched_cfg, sizeof(sched_cfg));
+	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
+
+	ret = nan_convert_sched_to_avail_attrs(wpa_s->nan,
+					       wpa_s->schedule_sequence_id + 1,
+					       BIT(map_id),
+					       sched.n_chans, sched.chans,
+					       sched_cfg.avail_attr,
+					       false);
+	if (ret < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to convert schedule to Availability Attributes for map_id %d",
+			   map_id);
+		os_memcpy(&wpa_s->nan_sched[map_id - 1], &old_sched_cfg,
+			  sizeof(old_sched_cfg));
+		goto out;
+	}
+
 	nan_dump_sched_config("NAN: Set schedule config", &sched_cfg);
 	ret = wpa_drv_nan_config_schedule(wpa_s, map_id, &sched_cfg);
 	if (ret < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to configure NAN schedule map_id %d",
 			   map_id);
+		os_memcpy(&wpa_s->nan_sched[map_id - 1], &old_sched_cfg,
+			  sizeof(old_sched_cfg));
 		goto out;
 	}
 
-	/* Store the configured schedule */
+	/* Free the old schedule and keep the new one (already stored) */
 	wpa_s->schedule_sequence_id++;
-	clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
-	os_memcpy(&wpa_s->nan_sched[map_id - 1], &sched_cfg, sizeof(sched_cfg));
+	clear_sched_config(&old_sched_cfg);
 out:
 	os_free(bf_total);
 	os_free(shared_freqs);
