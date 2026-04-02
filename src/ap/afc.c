@@ -348,6 +348,8 @@ hostapd_afc_build_request(struct hostapd_iface *iface)
 		goto error;
 
 	wpabuf_put_buf(req_obj, location_obj);
+	wpabuf_free(location_obj);
+	location_obj = NULL;
 
 	if (iconf->afc.freqs.num) {
 		json_start_array(req_obj, "inquiredFrequencyRange");
@@ -373,6 +375,8 @@ hostapd_afc_build_request(struct hostapd_iface *iface)
 		goto error;
 
 	wpabuf_put_buf(req_obj, op_class_list_obj);
+	wpabuf_free(op_class_list_obj);
+	op_class_list_obj = NULL;
 
 	if (iconf->afc.min_power) {
 		json_value_sep(req_obj);
