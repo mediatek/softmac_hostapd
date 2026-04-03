@@ -6669,11 +6669,21 @@ enum qca_vendor_attr_scan_freq_list_scheme {
  * @QCA_ROAM_SCAN_SCHEME_FULL_SCAN: Indicates the driver/firmware to
  *     trigger the scan on all the valid frequencies to find better
  *     candidates to roam.
+ *
+ * @QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN: Indicates the driver/firmware
+ *     to trigger the scan only on the channels obtained from the neighbor
+ *     report (e.g., neighbor request/response, RNR, BTM request).
+ *
+ * @QCA_ROAM_SCAN_SCHEME_DEFAULT: Indicates the driver/firmware to clear any
+ *     scan scheme configured earlier and revert to the default scan scheme
+ *     behavior.
  */
 enum qca_roam_scan_scheme {
 	QCA_ROAM_SCAN_SCHEME_NO_SCAN = 0,
 	QCA_ROAM_SCAN_SCHEME_PARTIAL_SCAN = 1,
 	QCA_ROAM_SCAN_SCHEME_FULL_SCAN = 2,
+	QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN = 3,
+	QCA_ROAM_SCAN_SCHEME_DEFAULT = 4,
 };
 
 /*
@@ -7036,6 +7046,11 @@ enum qca_vendor_attr_roam_candidate_selection_criteria {
  *	qca_roam_scan_scheme.
  *	It's an optional attribute. If this attribute is not configured, the
  *	driver shall proceed with default behavior.
+ *	The validity of this configuration is controlled by
+ *	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION. When that
+ *	flag is present, the configuration is valid only until the next
+ *	disconnection. When that flag is absent, the configuration persists
+ *	across disconnections.
  *
  * @QCA_ATTR_ROAM_CONTROL_CONNECTED_RSSI_THRESHOLD: Signed 32-bit value in dBm,
  *	signifying the RSSI threshold of the current connected AP, indicating
@@ -7320,6 +7335,13 @@ enum qca_vendor_attr_roam_candidate_selection_criteria {
  *	QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD in the same command.
  *	When both have been configured across separate commands, the most recent
  *	configuration takes effect and overwrites the previous one.
+ *
+ * @QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION: Flag
+ *	attribute to configure the lifetime of the scan scheme set through
+ *	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME. When this flag is present, the scan
+ *	scheme configuration is valid only until the next disconnection. When
+ *	this flag is absent, the scan scheme configuration persists across
+ *	disconnections.
  */
 enum qca_vendor_attr_roam_control {
 	QCA_ATTR_ROAM_CONTROL_ENABLE = 1,
@@ -7362,6 +7384,7 @@ enum qca_vendor_attr_roam_control {
 	QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD = 38,
 	QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD = 39,
 	QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS = 40,
+	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION = 41,
 
 	/* keep last */
 	QCA_ATTR_ROAM_CONTROL_AFTER_LAST,
