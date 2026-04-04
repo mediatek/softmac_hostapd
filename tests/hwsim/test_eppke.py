@@ -41,7 +41,7 @@ def test_eppke_akm_suite_and_rsnxe_feature_flags(dev, apdev):
     time.sleep(2)
 
 def run_eppke_sae_ext_key(dev, apdev, group):
-    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and legacy client"""
+    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and non-MLD client"""
     check_eppke_capab(dev[0])
     ssid = "test-eppke-authentication"
     passphrase = '1234567890'
@@ -71,20 +71,20 @@ def run_eppke_sae_ext_key(dev, apdev, group):
         dev[0].set("sae_groups", "")
         dev[0].set("sae_pwe", "0")
 
-def test_eppke_ap_with_base_akm_sae_ext_legacy_client_19(dev, apdev):
-    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and legacy client, group 19"""
+def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_19(dev, apdev):
+    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and non-MLD client, group 19"""
     run_eppke_sae_ext_key(dev, apdev, 19)
 
-def test_eppke_ap_with_base_akm_sae_ext_legacy_client_20(dev, apdev):
-    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and legacy client, group 20"""
+def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_20(dev, apdev):
+    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and non-MLD client, group 20"""
     run_eppke_sae_ext_key(dev, apdev, 20)
 
-def test_eppke_ap_with_base_akm_sae_ext_legacy_client_21(dev, apdev):
-    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and legacy client, group 21"""
+def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_21(dev, apdev):
+    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and non-MLD client, group 21"""
     run_eppke_sae_ext_key(dev, apdev, 21)
 
-def test_eppke_mld_ap_with_base_akm_sae_ext_legacy_client(dev, apdev):
-    """EPPKE authentication with an MLD AP with base AKM SAE-EXT and legacy client"""
+def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client(dev, apdev):
+    """EPPKE authentication with an MLD AP with base AKM SAE-EXT and non-MLD client"""
     check_eppke_capab(dev[0])
     with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface):
         passphrase = '1234567890'
@@ -156,6 +156,10 @@ def run_eppke_mld_three_links(dev, apdev, key_mgmt):
                      pairwise="CCMP GCMP-256")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=7, active_links=7)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
 def run_eppke_mld_two_links(dev, apdev, key_mgmt):
     with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
@@ -186,6 +190,10 @@ def run_eppke_mld_two_links(dev, apdev, key_mgmt):
                      pairwise="CCMP GCMP-256")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=3, active_links=3)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
 def run_eppke_mld_one_link(dev, apdev, key_mgmt):
     check_eppke_capab(dev[0])
@@ -214,6 +222,10 @@ def run_eppke_mld_one_link(dev, apdev, key_mgmt):
                      pairwise="CCMP GCMP-256")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=1, active_links=1)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
 def test_eppke_with_base_akm_sae_ext_single_link(dev, apdev):
     """EPPKE authentication with an MLD AP with base AKM SAE-EXT and MLD client using single link"""
@@ -227,8 +239,8 @@ def test_eppke_with_base_akm_sae_three_link(dev, apdev):
     """EPPKE authentication with an MLD AP with base AKM SAE-EXT and MLD client using two links"""
     run_eppke_mld_three_links(dev, apdev, key_mgmt="SAE-EXT-KEY EPPKE")
 
-def test_eppke_ap_with_base_akm_sae_ext_legacy_client_pmksa_cached(dev, apdev):
-    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and legacy client"""
+def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apdev):
+    """EPPKE authentication with a Non-MLO AP with base AKM SAE-EXT-KEY and non-MLD client"""
     check_eppke_capab(dev[0])
     ssid = "test-eppke-authentication"
     passphrase = '1234567890'
@@ -267,8 +279,8 @@ def test_eppke_ap_with_base_akm_sae_ext_legacy_client_pmksa_cached(dev, apdev):
         dev[0].set("sae_groups", "")
         dev[0].set("sae_pwe", "0")
 
-def test_eppke_mld_ap_with_base_akm_sae_ext_legacy_client_pmksa_cached(dev, apdev):
-    """EPPKE authentication with an MLD AP with base AKM SAE-EXT and legacy client"""
+def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apdev):
+    """EPPKE authentication with an MLD AP with base AKM SAE-EXT and non-MLD client"""
     check_eppke_capab(dev[0])
     with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface):
         passphrase = '1234567890'
@@ -358,6 +370,10 @@ def run_eppke_mld_one_link_pmksa_cached(dev, apdev, key_mgmt):
                      pairwise="CCMP GCMP-256", pmksa_privacy="1")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=1, active_links=1)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
         wpas.request("DISCONNECT")
         wpas.wait_disconnected()
@@ -403,6 +419,10 @@ def run_eppke_mld_two_links_pmksa_cached(dev, apdev, key_mgmt):
                      pairwise="CCMP GCMP-256", pmksa_privacy="1")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=3, active_links=3)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
         wpas.request("DISCONNECT")
         wpas.wait_disconnected()
@@ -418,7 +438,7 @@ def test_eppke_with_base_akm_sae_ext_two_link_pmksa_cached(dev, apdev):
     """EPPKE authentication with an MLD AP with base AKM SAE-EXT and MLD client using two links"""
     run_eppke_mld_two_links_pmksa_cached(dev, apdev, key_mgmt="SAE-EXT-KEY EPPKE")
 
-def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_legacy_client(dev, apdev):
+def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
     """EPPKE AP and GTK rekey"""
     check_eppke_capab(dev[0])
     ssid = "test-eppke-authentication"
@@ -480,6 +500,10 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_key_one_link(dev, apdev):
                      beacon_prot="1", pairwise="CCMP GCMP-256")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=1, active_links=1)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
         ev = wpas.wait_event(["RSN: Group rekeying completed"], timeout=11)
         if ev is None:
             raise Exception("GTK rekey timed out")
@@ -516,11 +540,15 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_key_two_link(dev, apdev):
                      beacon_prot="1", pairwise="CCMP GCMP-256")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=3, active_links=3)
+        hapd0.wait_sta();
+        sta = hapd0.get_sta(wpas.own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
         ev = wpas.wait_event(["RSN: Group rekeying completed"], timeout=11)
         if ev is None:
             raise Exception("GTK rekey timed out")
 
-def test_eppke_ap_ptk_rekey_with_base_akm_sae_ext_legacy_client(dev, apdev):
+def test_eppke_ap_ptk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
     """EPPKE AP and PTK rekey"""
     check_eppke_capab(dev[0])
     ssid = "test-eppke-authentication"
@@ -554,8 +582,8 @@ def test_eppke_ap_ptk_rekey_with_base_akm_sae_ext_legacy_client(dev, apdev):
         dev[0].set("sae_groups", "")
         dev[0].set("sae_pwe", "0")
 
-def test_eppke_ap_with_non_eppke_legacy_client(dev, apdev):
-    """Negative test: SAE authentication with an EPPKE AP and non-EPPKE client"""
+def test_eppke_ap_with_non_eppke_non_mld_client(dev, apdev):
+    """Negative test: SAE authentication with an EPPKE AP and non-EPPKE non-MLD client"""
     check_eppke_capab(dev[0])
     ssid = "test-eppke-authentication"
     passphrase = '1234567890'
