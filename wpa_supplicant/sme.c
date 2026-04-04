@@ -891,9 +891,9 @@ sme_eppke_sae_derive_pt(struct wpa_ssid *ssid, int group)
 }
 
 
-static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
-				  struct wpa_bss *bss,
-				  struct wpa_ssid *ssid)
+static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
+				 struct wpa_bss *bss,
+				 struct wpa_ssid *ssid)
 {
 	struct pasn_data *pasn;
 	const u8 *ap_rsne, *ap_rsnxe;
@@ -909,20 +909,20 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 
 	if (sme_set_sae_group(wpa_s, 0) < 0) {
 		wpa_printf(MSG_DEBUG, "EPPKE: Failed to select group");
-		return;
+		return -1;
 	}
 	group = wpa_s->sme.sae.group;
 
 	if (!dragonfly_suitable_group(group, 1)) {
 		wpa_printf(MSG_DEBUG,
 			"EPPKE: Reject unsuitable group %u", group);
-		return;
+		return -1;
 	}
 
 	ap_rsne = wpa_bss_get_rsne(wpa_s, bss, NULL, false);
 	if (!ap_rsne) {
 		wpa_printf(MSG_DEBUG, "EPPKE: Can't connect without AP RSNE");
-		return;
+		return -1;
 	}
 
 	ap_rsnxe = wpa_bss_get_rsnxe(wpa_s, bss, NULL, false);
@@ -936,7 +936,7 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 		if (!pasn->beacon_rsne_rsnxe) {
 			wpa_printf(MSG_INFO,
 				   "EPPKE: Failed storing AP's RSNE/RSNXE");
-			return;
+			return -1;
 		}
 
 		wpabuf_put_data(pasn->beacon_rsne_rsnxe, ap_rsne, ap_rsne_len);
@@ -947,21 +947,21 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 
 	if (!ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_KEK_IN_PASN)) {
 		wpa_printf(MSG_DEBUG, "EPPKE: AP does not support KEK_IN_PASN");
-		return;
+		goto fail;
 	}
 
 	if (!ieee802_11_rsnx_capab(ap_rsnxe,
 				   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
 		wpa_printf(MSG_DEBUG,
 			   "EPPKE: AP does not support association frame encryption");
-		return;
+		goto fail;
 	}
 
 	if (!(wpa_s->drv_flags2 &
 	      WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION)) {
 		wpa_printf(MSG_INFO,
 			   "EPPKE: Cannot use EPPKE without support for association frame encryption");
-		return;
+		goto fail;
 	}
 
 	capab |= BIT(WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION);
@@ -979,14 +979,14 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 		if (!ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_SAE_H2E)) {
 			wpa_printf(MSG_DEBUG,
 				   "EPPKE: AP does not support SAE H2E");
-			return;
+			goto fail;
 		}
 		if (pasn->pt)
 			sae_deinit_pt(pasn->pt);
 		pasn_set_pt(pasn, sme_eppke_sae_derive_pt(ssid, group));
 		if (!pasn->pt) {
 			wpa_printf(MSG_DEBUG, "EPPKE: Failed to derive PT");
-			return;
+			goto fail;
 		}
 		pasn->sae.state = SAE_NOTHING;
 		pasn->sae.send_confirm = 0;
@@ -994,7 +994,7 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 	} else {
 		wpa_msg(wpa_s, MSG_INFO,
 			"EPPKE: Suitable base AKM not enabled in local configuration");
-		return;
+		goto fail;
 	}
 
 	derive_kdk = (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SEC_LTF_STA) &&
@@ -1057,13 +1057,13 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 	pasn->ecdh = crypto_ecdh_init(group);
 	if (!pasn->ecdh) {
 		wpa_printf(MSG_INFO, "EPPKE: Failed to init ECDH");
-		return;
+		goto fail;
 	}
 
 	len = wpa_gen_wpa_ie(wpa_s->wpa, rsne, rsne_len);
 	if (len < 0) {
 		wpa_printf(MSG_INFO, "EPPKE: Failed to generate RSNE");
-		return;
+		goto fail;
 	}
 	pasn_set_rsne(pasn, rsne);
 	wpa_hexdump(MSG_DEBUG, "EPPKE: Set own RSNE default",
@@ -1088,6 +1088,12 @@ static void wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 		   "PASN: Init: " MACSTR " akmp=0x%x, cipher=0x%x, group=%u",
 		   MAC2STR(pasn->peer_addr), pasn->akmp,
 		   pasn->cipher, pasn->group);
+
+	return 0;
+
+fail:
+	wpa_pasn_reset(pasn);
+	return -1;
 }
 
 #endif /* CONFIG_ENC_ASSOC */
@@ -1580,7 +1586,10 @@ skip_setup:
 
 #ifdef CONFIG_ENC_ASSOC
 	if (!skip_auth && params.auth_alg == WPA_AUTH_ALG_EPPKE) {
-		wpas_eppke_initialize(wpa_s, bss, ssid);
+		if (wpas_eppke_initialize(wpa_s, bss, ssid) < 0) {
+			wpas_connection_failed(wpa_s, bss->bssid, NULL);
+			return;
+		}
 		if (start)
 			resp = wpas_pasn_build_auth_1(&wpa_s->pasn, NULL,
 						      false, 0);
