@@ -891,6 +891,36 @@ sme_eppke_sae_derive_pt(struct wpa_ssid *ssid, int group)
 }
 
 
+static bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
+				  struct wpa_bss *bss)
+{
+	const u8 *ap_rsnxe;
+
+	if (!(wpa_s->drv_flags2 &
+	      WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION)) {
+		wpa_printf(MSG_DEBUG,
+			   "EPPKE: Driver does not support association frame encryption");
+		return false;
+	}
+
+	ap_rsnxe = wpa_bss_get_rsnxe(wpa_s, bss, NULL, false);
+
+	if (!ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_KEK_IN_PASN)) {
+		wpa_printf(MSG_DEBUG, "EPPKE: AP does not support KEK_IN_PASN");
+		return false;
+	}
+
+	if (!ieee802_11_rsnx_capab(ap_rsnxe,
+				   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
+		wpa_printf(MSG_DEBUG,
+			   "EPPKE: AP does not support association frame encryption");
+		return false;
+	}
+
+	return true;
+}
+
+
 static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 				 struct wpa_bss *bss,
 				 struct wpa_ssid *ssid)
@@ -1211,7 +1241,11 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_ENC_ASSOC
 		} else if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
 			   (ssid->key_mgmt & WPA_KEY_MGMT_EPPKE) &&
-			   (ied.key_mgmt & WPA_KEY_MGMT_EPPKE)) {
+			   (ied.key_mgmt & WPA_KEY_MGMT_EPPKE) &&
+			   wpa_key_mgmt_sae_ext_key(ssid->key_mgmt) &&
+			   wpa_key_mgmt_sae_ext_key(ied.key_mgmt) &&
+			   !wpas_is_sae_avoided(wpa_s, ssid, &ied) &&
+			   wpas_eppke_ap_capable(wpa_s, bss)) {
 			wpa_dbg(wpa_s, MSG_DEBUG,
 				"Prefer EPPKE over SAE when both are enabled");
 			params.auth_alg = WPA_AUTH_ALG_EPPKE;
