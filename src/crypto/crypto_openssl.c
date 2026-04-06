@@ -4479,8 +4479,8 @@ const u8 * crypto_csr_get_attribute(struct crypto_csr *csr,
 				    size_t *len, int *type)
 {
 	X509_ATTRIBUTE *attrib;
-	ASN1_TYPE *attrib_type;
-	ASN1_STRING *data;
+	const ASN1_TYPE *attrib_type;
+	const ASN1_STRING *data;
 	int loc;
 	int nid;
 
