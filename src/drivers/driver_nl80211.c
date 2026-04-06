@@ -4738,6 +4738,9 @@ static int wpa_driver_nl80211_send_mlme(struct i802_bss *bss, const u8 *data,
 	int res;
 	struct i802_link *link = nl80211_get_link(bss, link_id);
 
+	if (data_len < 24)
+		return -1;
+
 	mgmt = (struct ieee80211_mgmt *) data;
 	fc = le_to_host16(mgmt->frame_control);
 	wpa_printf(MSG_DEBUG, "nl80211: send_mlme - da=" MACSTR " sa=" MACSTR
