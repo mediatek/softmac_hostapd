@@ -869,7 +869,10 @@ void wpa_pasn_reset(struct pasn_data *pasn)
 	crypto_ecdh_deinit(pasn->ecdh);
 	pasn->ecdh = NULL;
 
-
+	pasn->derive_kdk = false;
+	pasn->kdk_len = 0;
+	pasn->derive_kek = false;
+	pasn->kek_len = 0;
 	pasn->akmp = 0;
 	pasn->cipher = 0;
 	pasn->group = 0;
