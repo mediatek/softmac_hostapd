@@ -5398,3 +5398,85 @@ bool hostapd_acceptable_sta_addr(struct hostapd_data *hapd, const u8 *addr,
 
 	return true;
 }
+
+
+void hostapd_get_oper_chan_info_of_bss(struct hostapd_data *hapd,
+				       enum oper_chan_width *width,
+				       u8 *seg0, u8 *seg1)
+{
+	*width = hostapd_get_oper_chwidth(hapd->iconf);
+	*seg0 = hostapd_get_oper_centr_freq_seg0_idx(hapd->iconf);
+	*seg1 = hostapd_get_oper_centr_freq_seg1_idx(hapd->iconf);
+
+#ifdef CONFIG_IEEE80211BE
+	/* Re-derive the legacy channel width for EHT disabled BSS on an EHT
+	 * capable interface for punctured channel and 320 MHz bandwidth cases.
+	 */
+	if (hapd->iconf->ieee80211be && !hostapd_is_eht_enabled(hapd)) {
+		u16 punct_bitmap = hostapd_get_punct_bitmap(hapd);
+
+		if (punct_bitmap)
+			punct_update_legacy_bw(punct_bitmap,
+					       hapd->iconf->channel,
+					       width, seg0, seg1);
+
+		if (*width == CONF_OPER_CHWIDTH_320MHZ)
+			*width = CONF_OPER_CHWIDTH_160MHZ;
+	}
+#endif /* CONFIG_IEEE80211BE */
+}
+
+
+enum oper_chan_width
+hostapd_get_oper_chan_width_of_bss(struct hostapd_data *hapd)
+{
+	enum oper_chan_width width;
+	u8 seg0, seg1;
+
+	hostapd_get_oper_chan_info_of_bss(hapd, &width, &seg0, &seg1);
+
+	return width;
+}
+
+
+u8 hostapd_get_oper_class_of_bss(struct hostapd_data *hapd)
+{
+	u8 op_class = hapd->iconf->op_class;
+
+#ifdef CONFIG_IEEE80211BE
+	/* For EHT disabled BSS, re-derive the legacy operating class from
+	 * operating frequency parameters as the bandwidth that it advertises
+	 * in VHT/HE Operation element can be lower than EHT enabled BSS of the
+	 * interface.
+	 *
+	 * If EHT is not disabled on the BSS, interface's operating class is
+	 * returned without recomputation against operating frequency parameters
+	 * as operating channel information is expected to be aligned with the
+	 * interface's operating class configuration.
+	 */
+	if (hapd->iconf->ieee80211be && !hostapd_is_eht_enabled(hapd) &&
+	    hapd->iface->freq) {
+		enum oper_chan_width bss_chwidth, iface_chwidth;
+		u8 chan;
+
+		iface_chwidth = hostapd_get_oper_chwidth(hapd->iconf);
+		bss_chwidth = hostapd_get_oper_chan_width_of_bss(hapd);
+
+		/* If the BSS channel width is different from the interface
+		 * channel width, re-compute the operating class as per the BSS
+		 * channel width.
+		 */
+		if (bss_chwidth != iface_chwidth) {
+			if (ieee80211_freq_to_channel_ext(
+				    hapd->iface->freq,
+				    hapd->iconf->secondary_channel,
+				    bss_chwidth, &op_class,
+				    &chan) == NUM_HOSTAPD_MODES ||
+			    chan != hapd->iconf->channel)
+				return hapd->iconf->op_class;
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
+
+	return op_class;
+}
