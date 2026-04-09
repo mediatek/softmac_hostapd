@@ -757,5 +757,9 @@ int wpa_write_802_1x_rsne(struct wpa_authenticator *wpa_auth, u8 *buf,
 			  size_t len, const u8 *pmkid, int akmp,
 			  int pairwise_cipher, int group_cipher,
 			  int group_mgmt_cipher, enum mfp_options mfp);
+int wpa_write_eppke_rsne(const u8 *wpa_ie, size_t wpa_ie_len,
+			 u8 *buf, size_t len,
+			 const u8 *pmkid, int akmp,
+			 int pairwise_cipher, enum mfp_options mfp);
 
 #endif /* WPA_AUTH_H */

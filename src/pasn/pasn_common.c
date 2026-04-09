@@ -168,6 +168,13 @@ void pasn_set_wpa_key_mgmt(struct pasn_data *pasn, int key_mgmt)
 }
 
 
+void pasn_set_mfp(struct pasn_data *pasn, enum mfp_options mfp)
+{
+	if (pasn)
+		pasn->ieee80211w = mfp;
+}
+
+
 void pasn_set_rsn_pairwise(struct pasn_data *pasn, int rsn_pairwise)
 {
 	if (!pasn)

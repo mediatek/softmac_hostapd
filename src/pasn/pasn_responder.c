@@ -24,6 +24,7 @@
 #include "ap/comeback_token.h"
 #include "ap/ieee802_1x.h"
 #include "ap/pmksa_cache_auth.h"
+#include "ap/wpa_auth.h"
 #include "pasn_common.h"
 
 
@@ -596,10 +597,26 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 #endif /* CONFIG_FILS */
 	}
 
-	if (wpa_pasn_add_rsne(buf, pmkid,
-			      pasn->akmp, pasn->cipher) < 0)
-		goto fail;
+	if (false) {
+#ifdef CONFIG_ENC_ASSOC
+	} else if (pasn->auth_alg == WLAN_AUTH_EPPKE) {
+		int res;
 
+		res = wpa_write_eppke_rsne(pasn->rsn_ie, pasn->rsn_ie_len,
+					   wpabuf_put(buf, 0),
+					   wpabuf_tailroom(buf),
+					   pmkid, pasn->akmp, pasn->cipher,
+					   pasn->ieee80211w);
+		if (res < 0)
+			goto fail;
+
+		wpabuf_put(buf, res);
+#endif /* CONFIG_ENC_ASSOC */
+	} else {
+		if (wpa_pasn_add_rsne(buf, pmkid,
+				      pasn->akmp, pasn->cipher) < 0)
+			goto fail;
+	}
 	/* No need to derive PMK if PMKSA is given */
 	if (!pmksa)
 		wrapped_data_buf = pasn_get_wrapped_data(pasn);
