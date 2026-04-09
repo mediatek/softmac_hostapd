@@ -9552,6 +9552,51 @@ static bool hostapd_skip_rnr(size_t i, struct mbssid_ie_profiles *skip_profiles,
 }
 
 
+static bool hostapd_rnr_get_bss_info(struct hostapd_data *hapd,
+				     struct hostapd_data *reporting_hapd,
+				     struct mbssid_ie_profiles *skip_profiles,
+				     size_t i, u8 tbtt_info_len,
+				     bool mld_update,
+				     u8 *op_class, u8 *channel, u8 *match_idx)
+{
+	struct hostapd_data *bss;
+	bool ap_mld = false;
+	u8 tmp_match_idx = 255;
+
+	if (!hapd->iface || i >= hapd->iface->num_bss || !op_class || !channel)
+		return false;
+
+	bss = hapd->iface->bss[i];
+	if (!bss || !bss->conf || !bss->started || !bss->beacon_set_done ||
+	    bss == reporting_hapd)
+		return false;
+
+#ifdef CONFIG_IEEE80211BE
+	ap_mld = !!bss->conf->mld_ap;
+#endif /* CONFIG_IEEE80211BE */
+
+	/* MLD RNR has to be included for the parameter change count */
+	if (bss->conf->ignore_broadcast_ssid && !(ap_mld && mld_update))
+		return false;
+
+	if (!match_idx)
+		match_idx = &tmp_match_idx;
+
+	if (hostapd_skip_rnr(i, skip_profiles, ap_mld, tbtt_info_len,
+			     mld_update, reporting_hapd, bss, match_idx))
+		return false;
+
+	if (ieee80211_freq_to_channel_ext(
+		    bss->iface->freq,
+		    bss->iconf->secondary_channel,
+		    hostapd_get_oper_chan_width_of_bss(bss),
+		    op_class, channel) == NUM_HOSTAPD_MODES)
+		return false;
+
+	return true;
+}
+
+
 static size_t
 hostapd_eid_rnr_iface_len(struct hostapd_data *hapd,
 			  struct hostapd_data *reporting_hapd,
@@ -9559,67 +9604,109 @@ hostapd_eid_rnr_iface_len(struct hostapd_data *hapd,
 			  struct mbssid_ie_profiles *skip_profiles,
 			  bool mld_update)
 {
+	struct hostapd_iface *iface = hapd->iface;
 	size_t total_len = 0, len = *current_len;
-	int tbtt_count, total_tbtt_count = 0;
-	size_t i, start;
+	int total_tbtt_count = 0;
+	size_t i;
 	u8 tbtt_info_len = mld_update ? RNR_TBTT_INFO_MLD_LEN :
 		RNR_TBTT_INFO_LEN;
 	bool reporting_ap_mld = false;
+	bool have_pending_group;
+	u8 pending_op_class = 0, pending_channel = 0;
+	bool *tbtt_added = NULL;
 
 #ifdef CONFIG_IEEE80211BE
 	reporting_ap_mld = !!reporting_hapd->conf->mld_ap;
 #endif /* CONFIG_IEEE80211BE */
 
 repeat_rnr_len:
-	start = 0;
-	tbtt_count = 0;
+	os_free(tbtt_added);
+	tbtt_added = os_zalloc(iface->num_bss);
+	if (!tbtt_added)
+		return total_len;
 
-	while (start < hapd->iface->num_bss) {
+	have_pending_group = false;
+	for (;;) {
+		int tbtt_count = 0;
+		bool group_found = false, group_pending = false;
+		u8 rnr_op_class = 0, rnr_channel = 0;
+
+		if (have_pending_group) {
+			rnr_op_class = pending_op_class;
+			rnr_channel = pending_channel;
+			group_found = true;
+		}
+
+		if (!group_found) {
+			for (i = 0; i < iface->num_bss; i++) {
+				if (tbtt_added[i])
+					continue;
+				if (!hostapd_rnr_get_bss_info(
+					    hapd, reporting_hapd, skip_profiles,
+					    i, tbtt_info_len, mld_update,
+					    &rnr_op_class, &rnr_channel, NULL))
+					continue;
+				group_found = true;
+				break;
+			}
+		}
+
+		if (!group_found)
+			break;
+
 		if (!len ||
-		    len + RNR_TBTT_HEADER_LEN + tbtt_info_len > 255 ||
-		    tbtt_count >= RNR_TBTT_INFO_COUNT_MAX) {
+		    len + RNR_TBTT_HEADER_LEN + tbtt_info_len > 255) {
 			len = RNR_HEADER_LEN;
 			total_len += RNR_HEADER_LEN;
-			tbtt_count = 0;
 		}
 
 		len += RNR_TBTT_HEADER_LEN;
 		total_len += RNR_TBTT_HEADER_LEN;
 
-		for (i = start; i < hapd->iface->num_bss; i++) {
-			struct hostapd_data *bss = hapd->iface->bss[i];
-			bool ap_mld = false;
+		for (i = 0; i < iface->num_bss; i++) {
+			u8 bss_op_class, bss_channel;
 
-			if (!bss || !bss->conf || !bss->started ||
-			    !bss->beacon_set_done)
+			if (tbtt_added[i])
 				continue;
 
-#ifdef CONFIG_IEEE80211BE
-			ap_mld = bss->conf->mld_ap;
-#endif /* CONFIG_IEEE80211BE */
-
-			if (bss == reporting_hapd ||
-			    (bss->conf->ignore_broadcast_ssid &&
-			     !(ap_mld && mld_update)))
+			if (!hostapd_rnr_get_bss_info(
+				    hapd, reporting_hapd, skip_profiles,
+				    i, tbtt_info_len, mld_update,
+				    &bss_op_class, &bss_channel, NULL))
 				continue;
 
-			if (hostapd_skip_rnr(i, skip_profiles, ap_mld,
-					     tbtt_info_len, mld_update,
-					     reporting_hapd, bss, NULL))
+			if (rnr_op_class != bss_op_class ||
+			    rnr_channel != bss_channel)
 				continue;
 
 			if (len + tbtt_info_len > 255 ||
-			    tbtt_count >= RNR_TBTT_INFO_COUNT_MAX)
+			    tbtt_count >= RNR_TBTT_INFO_COUNT_MAX) {
+				group_pending = true;
 				break;
+			}
 
 			len += tbtt_info_len;
 			total_len += tbtt_info_len;
 			tbtt_count++;
+			tbtt_added[i] = true;
 		}
-		start = i;
-	}
 
-	total_tbtt_count += tbtt_count;
+		if (!tbtt_count) {
+			len -= RNR_TBTT_HEADER_LEN;
+			total_len -= RNR_TBTT_HEADER_LEN;
+			break;
+		}
+
+		total_tbtt_count += tbtt_count;
+
+		if (group_pending) {
+			have_pending_group = true;
+			pending_op_class = rnr_op_class;
+			pending_channel = rnr_channel;
+		} else {
+			have_pending_group = false;
+		}
+	}
 
 	/* If building for co-location, re-build again but this time include
 	 * ML TBTTs if the reporting AP is affiliated with an AP MLD.
@@ -9627,25 +9714,10 @@ repeat_rnr_len:
 	if (!mld_update && tbtt_info_len == RNR_TBTT_INFO_LEN &&
 	    reporting_ap_mld) {
 		tbtt_info_len = RNR_TBTT_INFO_MLD_LEN;
-
-		/* If no TBTT was found, adjust the len and total_len since it
-		 * would have incremented before we checked all BSSs. */
-		if (!tbtt_count && len >= RNR_TBTT_HEADER_LEN &&
-		    total_len >= RNR_TBTT_HEADER_LEN) {
-			len -= RNR_TBTT_HEADER_LEN;
-			total_len -= RNR_TBTT_HEADER_LEN;
-		}
-
 		goto repeat_rnr_len;
 	}
 
-	/* This is possible when in the re-built case and no suitable TBTT was
-	 * found. Adjust the length accordingly. */
-	if (!tbtt_count && total_tbtt_count && len >= RNR_TBTT_HEADER_LEN &&
-	    total_len >= RNR_TBTT_HEADER_LEN) {
-		len -= RNR_TBTT_HEADER_LEN;
-		total_len -= RNR_TBTT_HEADER_LEN;
-	}
+	os_free(tbtt_added);
 
 	if (!total_tbtt_count)
 		total_len = 0;
@@ -9855,34 +9927,25 @@ static u8 * hostapd_eid_nr_db(struct hostapd_data *hapd, u8 *eid,
 
 static bool hostapd_eid_rnr_bss(struct hostapd_data *hapd,
 				struct hostapd_data *reporting_hapd,
-				struct mbssid_ie_profiles *skip_profiles,
 				size_t i, u8 *tbtt_count, size_t *len,
 				u8 **pos, u8 **tbtt_count_pos, u8 tbtt_info_len,
-				u8 op_class, bool mld_update)
+				u8 op_class, u8 channel,
+				u8 match_idx)
 {
 	struct hostapd_iface *iface = hapd->iface;
 	struct hostapd_data *bss = iface->bss[i];
-	u8 bss_param = 0, match_idx = 255;
+	u8 bss_param = 0;
 	bool ap_mld = false;
 	u8 *eid = *pos;
 
-	if (!bss || !bss->conf || !bss->started ||
-	    bss == reporting_hapd || !bss->beacon_set_done)
+	if (!bss || !bss->conf || bss == reporting_hapd)
 		return false;
 
 #ifdef CONFIG_IEEE80211BE
 	ap_mld = !!bss->conf->mld_ap;
 #endif /* CONFIG_IEEE80211BE */
 
-	/* MLD RNR has to be included for the parameter change count */
-	if (bss->conf->ignore_broadcast_ssid && !(ap_mld && mld_update))
-		return false;
-
-	if (hostapd_skip_rnr(i, skip_profiles, ap_mld, tbtt_info_len,
-			     mld_update, reporting_hapd, bss, &match_idx))
-	    return false;
-
-	if (*len + RNR_TBTT_INFO_LEN > 255 ||
+	if (*len + tbtt_info_len > 255 ||
 	    *tbtt_count >= RNR_TBTT_INFO_COUNT_MAX)
 		return true;
 
@@ -9892,7 +9955,7 @@ static bool hostapd_eid_rnr_bss(struct hostapd_data *hapd,
 		*tbtt_count_pos = eid++;
 		*eid++ = tbtt_info_len;
 		*eid++ = op_class;
-		*eid++ = bss->iconf->channel;
+		*eid++ = channel;
 		*len += RNR_TBTT_HEADER_LEN;
 	}
 
@@ -9910,7 +9973,7 @@ static bool hostapd_eid_rnr_bss(struct hostapd_data *hapd,
 			bss_param |= RNR_BSS_PARAM_TRANSMITTED_BSSID;
 	}
 
-	if (is_6ghz_op_class(hapd->iconf->op_class) &&
+	if (is_6ghz_op_class(op_class) &&
 	    bss->conf->unsol_bcast_probe_resp_interval)
 		bss_param |= RNR_BSS_PARAM_UNSOLIC_PROBE_RESP_ACTIVE;
 
@@ -9961,23 +10024,19 @@ static u8 * hostapd_eid_rnr_iface(struct hostapd_data *hapd,
 				  bool mld_update)
 {
 	struct hostapd_iface *iface = hapd->iface;
-	size_t i, start;
+	size_t i;
 	size_t len = *current_len;
 	u8 *eid_start = eid, *size_offset = (eid - len) + 1;
 	u8 *tbtt_count_pos = size_offset + 1;
-	u8 tbtt_count, total_tbtt_count = 0, op_class, channel;
+	u8 total_tbtt_count = 0;
 	u8 tbtt_info_len = mld_update ? RNR_TBTT_INFO_MLD_LEN :
 		RNR_TBTT_INFO_LEN;
 	bool reporting_ap_mld = false;
+	bool have_pending_group;
+	u8 pending_op_class = 0, pending_channel = 0;
+	bool *tbtt_added = NULL;
 
 	if (!(iface->drv_flags & WPA_DRIVER_FLAGS_AP_CSA) || !iface->freq)
-		return eid;
-
-	if (ieee80211_freq_to_channel_ext(iface->freq,
-					  hapd->iconf->secondary_channel,
-					  hostapd_get_oper_chwidth(hapd->iconf),
-					  &op_class, &channel) ==
-	    NUM_HOSTAPD_MODES)
 		return eid;
 
 #ifdef CONFIG_IEEE80211BE
@@ -9985,37 +10044,93 @@ static u8 * hostapd_eid_rnr_iface(struct hostapd_data *hapd,
 #endif /* CONFIG_IEEE80211BE */
 
 repeat_rnr:
-	start = 0;
-	tbtt_count = 0;
-	while (start < iface->num_bss) {
+	os_free(tbtt_added);
+	tbtt_added = os_zalloc(iface->num_bss);
+	if (!tbtt_added)
+		return eid;
+
+	have_pending_group = false;
+	for (;;) {
+		u8 tbtt_count = 0;
+		bool group_found = false, group_pending = false;
+		u8 rnr_op_class = 0, rnr_channel = 0;
+
+		if (have_pending_group) {
+			rnr_op_class = pending_op_class;
+			rnr_channel = pending_channel;
+			group_found = true;
+		}
+
+		if (!group_found) {
+			for (i = 0; i < iface->num_bss; i++) {
+				if (tbtt_added[i])
+					continue;
+				if (!hostapd_rnr_get_bss_info(
+					    hapd, reporting_hapd, skip_profiles,
+					    i, tbtt_info_len, mld_update,
+					    &rnr_op_class, &rnr_channel, NULL))
+					continue;
+				group_found = true;
+				break;
+			}
+		}
+
+		if (!group_found)
+			break;
+
 		if (!len ||
-		    len + RNR_TBTT_HEADER_LEN + tbtt_info_len > 255 ||
-		    tbtt_count >= RNR_TBTT_INFO_COUNT_MAX) {
+		    len + RNR_TBTT_HEADER_LEN + tbtt_info_len > 255) {
 			eid_start = eid;
 			*eid++ = WLAN_EID_REDUCED_NEIGHBOR_REPORT;
 			size_offset = eid++;
 			len = RNR_HEADER_LEN;
-			tbtt_count = 0;
 		}
 
-		for (i = start; i < iface->num_bss; i++) {
-			if (hostapd_eid_rnr_bss(hapd, reporting_hapd,
-						skip_profiles, i,
+		for (i = 0; i < iface->num_bss; i++) {
+			u8 op_class, channel, match_idx = 255;
+
+			if (tbtt_added[i])
+				continue;
+
+			if (!hostapd_rnr_get_bss_info(
+				    hapd, reporting_hapd, skip_profiles,
+				    i, tbtt_info_len, mld_update,
+				    &op_class, &channel, &match_idx))
+				continue;
+
+			if (rnr_op_class != op_class ||
+			    rnr_channel != channel)
+				continue;
+
+			if (hostapd_eid_rnr_bss(hapd, reporting_hapd, i,
 						&tbtt_count, &len, &eid,
 						&tbtt_count_pos, tbtt_info_len,
-						op_class, mld_update))
+						op_class, channel,
+						match_idx)) {
+				group_pending = true;
 				break;
-		}
+			}
 
-		start = i;
+			tbtt_added[i] = true;
+		}
 
 		if (tbtt_count) {
 			*tbtt_count_pos = RNR_TBTT_INFO_COUNT(tbtt_count - 1);
 			*size_offset = (eid - size_offset) - 1;
+		} else {
+			break;
+		}
+
+		total_tbtt_count += tbtt_count;
+
+		if (group_pending) {
+			have_pending_group = true;
+			pending_op_class = rnr_op_class;
+			pending_channel = rnr_channel;
+		} else {
+			have_pending_group = false;
 		}
 	}
-
-	total_tbtt_count += tbtt_count;
 
 	/* If building for co-location, re-build again but this time include
 	 * ML TBTTs if the reporting AP is affiliated with an AP MLD.
@@ -10025,6 +10140,8 @@ repeat_rnr:
 		tbtt_info_len = RNR_TBTT_INFO_MLD_LEN;
 		goto repeat_rnr;
 	}
+
+	os_free(tbtt_added);
 
 	if (!total_tbtt_count)
 		return eid_start;
