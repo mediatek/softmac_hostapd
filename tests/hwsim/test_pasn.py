@@ -1311,3 +1311,85 @@ def test_pasn_sae_driver_comeback_0(dev, apdev):
 
     finally:
         dev[0].set("sae_pwe", "0")
+
+def check_pasn_sta_groups(dev, hapd, akmp="PASN", cipher="CCMP",
+                          expected_status=0):
+    """Trigger PASN via PASN_DRIVER and verify result"""
+    dev.flush_scan_cache()
+    dev.scan(type="ONLY", freq=2412)
+    bssid = hapd.own_addr()
+
+    cmd = "PASN_DRIVER auth bssid=%s akmp=%s cipher=%s" % (bssid, akmp, cipher)
+    resp = dev.request(cmd)
+    if "OK" not in resp:
+        raise Exception("Failed to start PASN authentication")
+
+    ev = dev.wait_event(["PASN-AUTH-STATUS"], 10)
+    if not ev:
+        raise Exception("PASN: PASN-AUTH-STATUS not seen")
+
+    if bssid + " akmp=" + akmp + ", status=" + str(expected_status) not in ev:
+        raise Exception("PASN: unexpected status: " + ev)
+
+    if expected_status == 0:
+        time.sleep(0.1)
+        check_pasn_ptk(dev, hapd, cipher)
+
+def run_pasn_sta_group(dev, apdev, group):
+    check_pasn_capab(dev[0])
+
+    params = pasn_ap_params("PASN", "CCMP", "19 20 21")
+    hapd = start_pasn_ap(apdev[0], params)
+
+    dev[0].set("pasn_groups", str(group))
+    try:
+        check_pasn_sta_groups(dev[0], hapd)
+    finally:
+        dev[0].set("pasn_groups", "")
+
+@remote_compatible
+def test_pasn_sta_groups_20(dev, apdev):
+    """PASN authentication with station pasn_groups configured to group 20"""
+    run_pasn_sta_group(dev, apdev, 20)
+
+@remote_compatible
+def test_pasn_sta_groups_21(dev, apdev):
+    """PASN authentication with station pasn_groups configured to group 21"""
+    run_pasn_sta_group(dev, apdev, 21)
+
+@remote_compatible
+def test_pasn_sta_groups_skip_unsuitable(dev, apdev):
+    """PASN authentication: station skips unsuitable group and uses next valid one"""
+    # Group 1 (MODP-768) is not a suitable ECC group; wpas_pasn_get_group()
+    # skips it and uses group 20 from the list.
+    run_pasn_sta_group(dev, apdev, "1 20")
+
+@remote_compatible
+def test_pasn_sta_groups_all_unsuitable(dev, apdev):
+    """PASN authentication: all configured groups unsuitable, authentication fails"""
+    check_pasn_capab(dev[0])
+
+    params = pasn_ap_params("PASN", "CCMP", "19")
+    hapd = start_pasn_ap(apdev[0], params)
+
+    # Groups 1 and 2 are not suitable ECC groups. When the user explicitly
+    # configures only unsuitable groups, wpas_pasn_get_group() returns
+    # failure without any fallback to default groups.
+    dev[0].set("pasn_groups", "1 2")
+    try:
+        dev[0].flush_scan_cache()
+        dev[0].scan(type="ONLY", freq=2412)
+        bssid = hapd.own_addr()
+
+        cmd = "PASN_DRIVER auth bssid=%s akmp=PASN cipher=CCMP" % bssid
+        resp = dev[0].request(cmd)
+        if "OK" not in resp:
+            raise Exception("Failed to queue PASN authentication")
+
+        # Authentication fails before any frame exchange (no suitable group
+        # found), so no PASN-AUTH-STATUS event is expected.
+        ev = dev[0].wait_event(["PASN-AUTH-STATUS"], 2)
+        if ev:
+            raise Exception("Unexpected PASN-AUTH-STATUS event: " + ev)
+    finally:
+        dev[0].set("pasn_groups", "")
