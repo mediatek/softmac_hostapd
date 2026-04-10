@@ -1002,6 +1002,10 @@ void wpas_pasn_auth_stop(struct wpa_supplicant *wpa_s)
 			      pasn->comeback_after);
 
 	wpas_pasn_reset(wpa_s);
+
+	/* Reset rejected group state when authentication ends */
+	pasn->rejected_group_idx = 0;
+	os_memset(pasn->rejected_groups, 0, sizeof(pasn->rejected_groups));
 }
 
 

@@ -179,7 +179,15 @@ def test_pasn_group_mismatch(dev, apdev):
     params = pasn_ap_params("PASN", "CCMP", "20")
     hapd = start_pasn_ap(apdev[0], params)
 
-    check_pasn_akmp_cipher(dev[0], hapd, "PASN", "CCMP", status=77)
+    # Restrict the station to group 19 only so that when the AP rejects it
+    # (AP supports group 20 only), there is no fallback group to retry with.
+    # The final PASN-AUTH-STATUS reports status=1 (failure after retry
+    # exhaustion) rather than the AP's status=77 rejection code.
+    dev[0].set("pasn_groups", "19")
+    try:
+        check_pasn_akmp_cipher(dev[0], hapd, "PASN", "CCMP", status=1)
+    finally:
+        dev[0].set("pasn_groups", "")
 
 @remote_compatible
 def test_pasn_channel_mismatch(dev, apdev):

@@ -21,6 +21,9 @@
 extern "C" {
 #endif
 
+/* Maximum number of ECC groups supported for PASN */
+#define MAX_NUM_OF_PASN_GROUPS 10
+
 enum pasn_fils_state {
 	PASN_FILS_STATE_NONE = 0,
 	PASN_FILS_STATE_PENDING_AS,
@@ -90,6 +93,10 @@ struct pasn_data {
 	bool derive_kek;
 	size_t kek_len;
 	u16 group;
+	u16 rejected_groups[MAX_NUM_OF_PASN_GROUPS];
+	unsigned int rejected_group_idx;
+	u16 ap_supported_groups[MAX_NUM_OF_PASN_GROUPS];
+	unsigned int ap_supported_group_idx;
 	bool secure_ltf;
 	int freq;
 

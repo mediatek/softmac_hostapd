@@ -913,6 +913,9 @@ void wpa_pasn_reset(struct pasn_data *pasn)
 #endif /* CONFIG_IEEE80211R */
 	pasn->status = WLAN_STATUS_UNSPECIFIED_FAILURE;
 	pasn->pmksa_entry = NULL;
+	os_memset(pasn->ap_supported_groups, 0,
+		  sizeof(pasn->ap_supported_groups));
+	pasn->ap_supported_group_idx = 0;
 #ifdef CONFIG_TESTING_OPTIONS
 	pasn->corrupt_mic = 0;
 #endif /* CONFIG_TESTING_OPTIONS */
@@ -1244,6 +1247,100 @@ static bool is_pasn_auth_frame(struct pasn_data *pasn,
 }
 
 
+static void
+wpas_pasn_store_ap_supported_groups(struct pasn_data *pasn,
+				    const struct ieee802_11_elems *elems)
+{
+	unsigned int i, num_groups;
+
+	pasn->ap_supported_group_idx = 0;
+
+	if (!elems->supported_groups || elems->supported_groups_len < 2)
+		return;
+
+	num_groups = elems->supported_groups_len / 2;
+	if (num_groups > MAX_NUM_OF_PASN_GROUPS) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: AP supported groups count %u exceeds max %u - ignoring",
+			   num_groups, MAX_NUM_OF_PASN_GROUPS);
+		return;
+	}
+
+	wpa_hexdump(MSG_DEBUG, "PASN: Supported groups advertised by responder",
+		    elems->supported_groups, elems->supported_groups_len);
+
+	for (i = 0; i < num_groups; i++)
+		pasn->ap_supported_groups[pasn->ap_supported_group_idx++] =
+			WPA_GET_LE16(elems->supported_groups + i * 2);
+
+	wpa_printf(MSG_DEBUG, "PASN: Stored %u AP supported groups",
+		   num_groups);
+}
+
+
+static int
+wpas_pasn_validate_supported_groups_rejection(struct pasn_data *pasn)
+{
+	unsigned int i;
+
+	if (!pasn->ap_supported_group_idx) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: Supported Groups element not present - skipping validation");
+		return 0;
+	}
+
+	for (i = 0; i < pasn->ap_supported_group_idx; i++) {
+		if (pasn->ap_supported_groups[i] == pasn->group) {
+			wpa_printf(MSG_INFO,
+				   "PASN: Rejected group %u is listed as supported by responder - aborting PASN",
+				   pasn->group);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+
+static int
+wpas_pasn_validate_supported_groups(struct pasn_data *pasn)
+{
+	unsigned int i, j;
+	bool current_group_found = false;
+
+	if (!pasn->ap_supported_group_idx) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: Supported Groups element not present - skipping validation");
+		return 0;
+	}
+
+	for (i = 0; i < pasn->ap_supported_group_idx; i++) {
+		u16 group = pasn->ap_supported_groups[i];
+
+		if (group == pasn->group)
+			current_group_found = true;
+
+		for (j = 0; j < pasn->rejected_group_idx; j++) {
+			if (group == pasn->rejected_groups[j]) {
+				wpa_printf(MSG_INFO,
+					   "PASN: Previously rejected group %u found in responder supported list",
+					   group);
+				return -1;
+			}
+		}
+	}
+
+	if (!current_group_found) {
+		wpa_printf(MSG_INFO,
+			   "PASN: Negotiated group %u not found in responder supported list - aborting PASN",
+			   pasn->group);
+		return -1;
+	}
+
+	return 0;
+}
+
+
 int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 			  u16 auth_transaction, u16 status,
 			  const u8 *auth_data, size_t auth_data_len,
@@ -1266,6 +1363,7 @@ int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 	}
 
 	if (status != WLAN_STATUS_SUCCESS &&
+	    status != WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED &&
 	    status != WLAN_STATUS_ASSOC_REJECTED_TEMPORARILY) {
 		wpa_printf(MSG_DEBUG,
 			   "PASN: Authentication rejected - status=%u", status);
@@ -1277,6 +1375,23 @@ int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 		wpa_printf(MSG_DEBUG,
 			   "PASN: Failed parsing Authentication frame");
 		goto fail;
+	}
+
+	wpas_pasn_store_ap_supported_groups(pasn, &elems);
+
+	if (status == WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: AP rejected group %u", pasn->group);
+
+		if (wpas_pasn_validate_supported_groups_rejection(pasn) < 0)
+			goto fail;
+
+		if (pasn->rejected_group_idx <
+		    ARRAY_SIZE(pasn->rejected_groups))
+			pasn->rejected_groups[pasn->rejected_group_idx++] =
+				pasn->group;
+
+		return 2;
 	}
 
 	if (!elems.pasn_params || !elems.pasn_params_len) {
@@ -1513,6 +1628,9 @@ int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 		goto fail;
 	}
 
+	if (wpas_pasn_validate_supported_groups(pasn) < 0)
+		goto fail;
+
 	pasn->trans_seq++;
 
 	wpa_printf(MSG_DEBUG, "PASN: Success verifying Authentication frame");
@@ -1564,6 +1682,13 @@ int wpa_pasn_auth_rx(struct pasn_data *pasn, const u8 *data, size_t len,
 	if (ret == 1) {
 		wpa_printf(MSG_DEBUG, "PASN: Temporary rejection, Retry");
 		return 1;
+	}
+
+	if (ret == 2) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: Group %u rejected - retry with next group",
+			   pasn->group);
+		return 2;
 	}
 
 	frame = wpas_pasn_build_auth_3(pasn, true);
