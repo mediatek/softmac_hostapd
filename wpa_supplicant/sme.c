@@ -955,15 +955,24 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 
 	pasn = &wpa_s->pasn;
 
-	if (sme_set_sae_group(wpa_s, 0) < 0) {
-		wpa_printf(MSG_DEBUG, "EPPKE: Failed to select group");
+	group = wpas_pasn_get_group(wpa_s, ssid, pasn);
+	if (!group) {
+		wpa_printf(MSG_DEBUG, "EPPKE: No suitable group available");
 		return -1;
 	}
-	group = wpa_s->sme.sae.group;
 
-	if (!dragonfly_suitable_group(group, 1)) {
-		wpa_printf(MSG_DEBUG,
-			"EPPKE: Reject unsuitable group %u", group);
+	/* Reset PASN data before initialization to clear state from any
+	 * previous attempt, e.g., on group rejection retries.
+	 */
+	wpa_pasn_reset(pasn);
+
+	/* As per IEEE P802.11-REVmf/D2.1, 12.13.5, when SAE is wrapped within
+	 * PASN authentication, both shall use the same finite cyclic group.
+	 * SAE-level group rejection validation is not required.
+	 */
+	if (sae_set_group(&wpa_s->sme.sae, group) < 0) {
+		wpa_printf(MSG_INFO, "EPPKE: Failed to set SAE group %u",
+			   group);
 		return -1;
 	}
 
@@ -3429,6 +3438,39 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 			wpas_connection_failed(wpa_s, wpa_s->pending_bssid,
 					       NULL);
 			wpa_supplicant_set_state(wpa_s, WPA_DISCONNECTED);
+			return;
+		}
+
+		/*
+		 * TODO: Add support for comeback if AP rejected group
+		 * negotiation temporarily.
+		 */
+
+		/*
+		 * AP rejected the proposed group; retry with the
+		 * next valid group.
+		 */
+		if (res == 2) {
+			struct wpa_bss *bss = wpa_s->current_bss;
+
+			if (!bss) {
+				bss = wpa_bss_get_bssid_latest(
+					wpa_s, wpa_s->pending_bssid);
+				if (!bss) {
+					wpas_connection_failed(
+						wpa_s, wpa_s->pending_bssid,
+						NULL);
+					wpa_supplicant_mark_disassoc(wpa_s);
+					return;
+				}
+			}
+
+			wpa_printf(MSG_DEBUG,
+				   "EPPKE: Group %u rejected by AP - retrying with next group",
+				   pasn->group);
+			wpas_connect_work_done(wpa_s);
+			wpa_supplicant_mark_disassoc(wpa_s);
+			wpa_supplicant_connect(wpa_s, bss, ssid);
 			return;
 		}
 

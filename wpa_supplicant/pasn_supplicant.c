@@ -186,8 +186,8 @@ static int wpas_pasn_sae_setup_pt(struct wpa_ssid *ssid, int group)
 #endif /* CONFIG_SAE */
 
 
-static int wpas_pasn_get_group(struct wpa_supplicant *wpa_s,
-			       struct wpa_ssid *ssid, struct pasn_data *pasn)
+int wpas_pasn_get_group(struct wpa_supplicant *wpa_s,
+			struct wpa_ssid *ssid, struct pasn_data *pasn)
 {
 	static const int default_groups[] = { 19, 20, 21, 0 };
 	const int *groups;
