@@ -1016,6 +1016,9 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 
 #ifdef CONFIG_PASN
 	os_free(conf->pasn_groups);
+#ifdef CONFIG_TESTING_OPTIONS
+	os_free(conf->pasn_test_groups);
+#endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_PASN */
 
 	wpabuf_clear_free(conf->sae_pw_id_key);

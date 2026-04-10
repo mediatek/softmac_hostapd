@@ -3913,6 +3913,7 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 
 #ifdef CONFIG_TESTING_OPTIONS
 	pasn->corrupt_mic = hapd->conf->pasn_corrupt_mic;
+	pasn->pasn_test_groups = hapd->conf->pasn_test_groups;
 	if (hapd->conf->force_kdk_derivation)
 		pasn_enable_kdk_derivation(pasn);
 #endif /* CONFIG_TESTING_OPTIONS */

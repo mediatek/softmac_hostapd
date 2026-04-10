@@ -945,6 +945,12 @@ struct hostapd_bss_config {
 
 	/* If set, corrupt the MIC in the 2nd Authentication frame of PASN */
 	int pasn_corrupt_mic;
+
+	/*
+	 * If set, override Supported Groups element in the 2nd Authentication
+	 * frame of PASN for group negotiation testing.
+	 */
+	int *pasn_test_groups;
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	int *pasn_groups;

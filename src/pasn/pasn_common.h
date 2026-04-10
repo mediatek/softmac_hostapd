@@ -141,6 +141,11 @@ struct pasn_data {
 	int fast_reauth;
 #ifdef CONFIG_TESTING_OPTIONS
 	int corrupt_mic;
+	/*
+	 * Override Supported Groups element in the second PASN Authentication
+	 * frame for group negotiation testing.
+	 */
+	const int *pasn_test_groups;
 #endif /* CONFIG_TESTING_OPTIONS */
 	int network_id;
 

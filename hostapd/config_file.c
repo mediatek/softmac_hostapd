@@ -4882,6 +4882,17 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->force_kdk_derivation = atoi(pos);
 	} else if (os_strcmp(buf, "pasn_corrupt_mic") == 0) {
 		bss->pasn_corrupt_mic = atoi(pos);
+	} else if (os_strcmp(buf, "pasn_test_groups") == 0) {
+		int *groups = NULL;
+
+		if (hostapd_parse_intlist(&groups, pos) < 0) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid pasn_test_groups value '%s'",
+				   line, pos);
+			return 1;
+		}
+		os_free(bss->pasn_test_groups);
+		bss->pasn_test_groups = groups;
 #endif /* CONFIG_TESTING_OPTIONS */
 	} else if (os_strcmp(buf, "pasn_groups") == 0) {
 		if (hostapd_parse_intlist(&bss->pasn_groups, pos)) {
