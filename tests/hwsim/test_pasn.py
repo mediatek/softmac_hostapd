@@ -1401,3 +1401,35 @@ def test_pasn_sta_groups_all_unsuitable(dev, apdev):
             raise Exception("Unexpected PASN-AUTH-STATUS event: " + ev)
     finally:
         dev[0].set("pasn_groups", "")
+
+@remote_compatible
+def test_pasn_group_negotiation_success(dev, apdev):
+    """PASN group negotiation: AP rejects group 19, station retries with group 20 and succeeds"""
+    check_pasn_capab(dev[0])
+
+    # AP supports only groups 20 and 21, not 19.
+    # Station uses default groups {19, 20, 21}: tries 19 first, AP rejects
+    # (advertises {20, 21}), station retries with 20 and succeeds.
+    params = pasn_ap_params("PASN", "CCMP", "20 21")
+    hapd = start_pasn_ap(apdev[0], params)
+
+    check_pasn_sta_groups(dev[0], hapd)
+
+@remote_compatible
+def test_pasn_group_negotiation_downgrade_attack(dev, apdev):
+    """PASN group negotiation: downgrade attack - rejected group reappears in success frame"""
+    check_pasn_capab(dev[0])
+
+    # AP actually supports groups 19, 20, and 21.
+    # Inject a reduced group list {20, 21} into the rejection frame to simulate
+    # a downgrade attack: the attacker removes group 19 from the rejection
+    # frame's Supported Groups element, forcing the station to use group 20.
+    params = pasn_ap_params("PASN", "CCMP", "19 20 21")
+    params['pasn_test_groups'] = "20 21"
+    hapd = start_pasn_ap(apdev[0], params)
+
+    # Station tries group 19, receives rejection frame with injected {20, 21}
+    # (group 19 absent), retries with 20. The success frame (MIC-protected)
+    # carries the real supported groups {19, 20, 21}. The station detects that
+    # the previously rejected group 19 reappears and aborts.
+    check_pasn_sta_groups(dev[0], hapd, expected_status=1)
