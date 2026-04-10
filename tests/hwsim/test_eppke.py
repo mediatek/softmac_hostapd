@@ -58,7 +58,7 @@ def run_eppke_sae_ext_key(dev, apdev, group):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", str(group))
+        dev[0].set("pasn_groups", str(group))
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -69,7 +69,7 @@ def run_eppke_sae_ext_key(dev, apdev, group):
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
 
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_19(dev, apdev):
@@ -103,7 +103,7 @@ def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client(dev, apdev):
         hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
 
         try:
-            dev[0].set("sae_groups", "")
+            dev[0].set("pasn_groups", "")
             dev[0].set("sae_pwe", "1")
             dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                            key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -122,7 +122,7 @@ def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client(dev, apdev):
             else:
                 raise Exception("Unknown BSSID: " + bssid)
         finally:
-            dev[0].set("sae_groups", "")
+            dev[0].set("pasn_groups", "")
             dev[0].set("sae_pwe", "0")
 
 def run_eppke_mld_three_links(dev, apdev, key_mgmt):
@@ -150,7 +150,7 @@ def run_eppke_mld_three_links(dev, apdev, key_mgmt):
         params['channel'] = '11'
         hapd1 = eht_mld_enable_ap(hapd_iface, 2, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437 2462",
                      key_mgmt=key_mgmt, ieee80211w="2", beacon_prot="1",
@@ -184,7 +184,7 @@ def run_eppke_mld_two_links(dev, apdev, key_mgmt):
         params['channel'] = '6'
         hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437",
                      key_mgmt=key_mgmt, ieee80211w="2", beacon_prot="1",
@@ -216,7 +216,7 @@ def run_eppke_mld_one_link(dev, apdev, key_mgmt):
         params['rsn_pairwise'] = "CCMP GCMP-256"
         hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412",
                      key_mgmt=key_mgmt, ieee80211w="2", beacon_prot="1",
@@ -255,7 +255,7 @@ def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -277,7 +277,7 @@ def test_eppke_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apdev):
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value after PMKSA caching")
 
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apdev):
@@ -299,7 +299,7 @@ def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apd
         hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
 
         try:
-            dev[0].set("sae_groups", "")
+            dev[0].set("pasn_groups", "")
             dev[0].set("sae_pwe", "1")
             dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                            key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -341,7 +341,7 @@ def test_eppke_mld_ap_with_base_akm_sae_ext_non_mld_client_pmksa_cached(dev, apd
                 raise Exception("Incorrect Auth Algo/AKMSuiteSelector value after PMKSA caching")
 
         finally:
-            dev[0].set("sae_groups", "")
+            dev[0].set("pasn_groups", "")
             dev[0].set("sae_pwe", "0")
 
 def run_eppke_mld_one_link_pmksa_cached(dev, apdev, key_mgmt):
@@ -364,7 +364,7 @@ def run_eppke_mld_one_link_pmksa_cached(dev, apdev, key_mgmt):
         params['rsn_pairwise'] = "CCMP GCMP-256"
         hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412",
                      key_mgmt=key_mgmt, ieee80211w="2", beacon_prot="1",
@@ -413,7 +413,7 @@ def run_eppke_mld_two_links_pmksa_cached(dev, apdev, key_mgmt):
         params['channel'] = '6'
         hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437",
                      key_mgmt=key_mgmt, ieee80211w="2", beacon_prot="1",
@@ -455,7 +455,7 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -469,7 +469,7 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
         if ev is None:
             raise Exception("GTK rekey timed out")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_key_one_link(dev, apdev):
@@ -494,7 +494,7 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_key_one_link(dev, apdev):
         params['wpa_group_rekey'] = '1'
         hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412",
                      key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -534,7 +534,7 @@ def test_eppke_ap_gtk_rekey_with_base_akm_sae_ext_key_two_link(dev, apdev):
         params['channel'] = '6'
         hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
 
-        wpas.set("sae_groups", "")
+        wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437",
                      key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -565,7 +565,7 @@ def test_eppke_ap_ptk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -580,7 +580,7 @@ def test_eppke_ap_ptk_rekey_with_base_akm_sae_ext_non_mld_client(dev, apdev):
             raise Exception("PTK rekey timed out")
 
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_ap_with_non_eppke_non_mld_client(dev, apdev):
@@ -598,7 +598,7 @@ def test_eppke_ap_with_non_eppke_non_mld_client(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY", ieee80211w="2", beacon_prot="1",
@@ -608,7 +608,7 @@ def test_eppke_ap_with_non_eppke_non_mld_client(dev, apdev):
         if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '3':
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_client_with_non_eppke_ap(dev, apdev):
@@ -625,7 +625,7 @@ def test_eppke_client_with_non_eppke_ap(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2", beacon_prot="1",
@@ -635,7 +635,7 @@ def test_eppke_client_with_non_eppke_ap(dev, apdev):
         if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '3':
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_authentication_pmkid_in_assoc(dev, apdev):
@@ -661,7 +661,7 @@ def test_eppke_fallback_no_sae_ext_key_in_ap_rsne(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
                        key_mgmt="SAE SAE-EXT-KEY EPPKE", ieee80211w="2",
@@ -672,7 +672,7 @@ def test_eppke_fallback_no_sae_ext_key_in_ap_rsne(dev, apdev):
         if sta["AKMSuiteSelector"] != '00-0f-ac-8' or sta["auth_alg"] != '3':
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def _eppke_sae_pw_id_change_params(ssid, passphrase):
@@ -752,7 +752,7 @@ def test_eppke_sae_pw_id_change(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         _eppke_connect_and_wait_pw_id_change(dev[0], ssid, passphrase, pw_id)
         hapd.wait_sta()
@@ -760,7 +760,7 @@ def test_eppke_sae_pw_id_change(dev, apdev):
         if sta["AKMSuiteSelector"] != "00-0f-ac-24" or sta["auth_alg"] != "9":
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_sae_pw_id_change_reconnect(dev, apdev):
@@ -776,7 +776,7 @@ def test_eppke_sae_pw_id_change_reconnect(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         # First connection: AP delivers SAE PW IDs KDE in encrypted assoc resp
         _eppke_connect_and_wait_pw_id_change(dev[0], ssid, passphrase, pw_id)
@@ -800,7 +800,7 @@ def test_eppke_sae_pw_id_change_reconnect(dev, apdev):
         if sta["AKMSuiteSelector"] != "00-0f-ac-24" or sta["auth_alg"] != "9":
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector after reconnect")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_sae_pw_id_change_ap_reject(dev, apdev):
@@ -816,7 +816,7 @@ def test_eppke_sae_pw_id_change_ap_reject(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         # First connection: AP delivers SAE PW IDs KDE
         _eppke_connect_and_wait_pw_id_change(dev[0], ssid, passphrase, pw_id)
@@ -843,7 +843,7 @@ def test_eppke_sae_pw_id_change_ap_reject(dev, apdev):
         if "CTRL-EVENT-SAE-UNKNOWN-PASSWORD-IDENTIFIER" not in ev:
             raise Exception("Expected UNKNOWN_PASSWORD_IDENTIFIER event, got: " + ev)
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_sae_pw_id_change_config_file(dev, apdev, params):
@@ -864,7 +864,7 @@ def test_eppke_sae_pw_id_change_config_file(dev, apdev, params):
     ap_params["sae_password"] = passphrase + "|id=" + pw_id
     hapd = hostapd.add_ap(apdev[0], ap_params)
 
-    wpas.set("sae_groups", "")
+    wpas.set("pasn_groups", "")
     wpas.set("sae_pwe", "1")
     _eppke_connect_and_wait_pw_id_change(wpas, ssid, passphrase, pw_id)
     hapd.wait_sta()
@@ -892,7 +892,7 @@ def test_eppke_sae_pw_id_change_rsnxe_capab(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
         # With sae_password_id_change=1: AP must deliver the KDE (bit 34 set)
         _eppke_connect_and_wait_pw_id_change(dev[0], ssid, passphrase, pw_id)
@@ -917,7 +917,7 @@ def test_eppke_sae_pw_id_change_rsnxe_capab(dev, apdev):
         if ev is not None and "SAE Password Identifier" in ev:
             raise Exception("AP delivered SAE PW IDs KDE even though STA did not advertise SAE_PW_ID_CHANGE capability")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
 
 def test_eppke_sae_pw_id_change_reconnect_kde(dev, apdev):
@@ -939,7 +939,7 @@ def test_eppke_sae_pw_id_change_reconnect_kde(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "1")
 
         # First connection: AP delivers SAE PW IDs KDE with the plaintext
@@ -1007,5 +1007,5 @@ def test_eppke_sae_pw_id_change_reconnect_kde(dev, apdev):
         if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
             raise Exception("Incorrect Auth Algo/AKMSuiteSelector on third connection")
     finally:
-        dev[0].set("sae_groups", "")
+        dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
