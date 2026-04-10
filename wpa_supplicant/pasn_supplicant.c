@@ -187,20 +187,50 @@ static int wpas_pasn_sae_setup_pt(struct wpa_ssid *ssid, int group)
 
 
 static int wpas_pasn_get_group(struct wpa_supplicant *wpa_s,
-			       struct wpa_ssid *ssid)
+			       struct wpa_ssid *ssid, struct pasn_data *pasn)
 {
-	int i;
+	static const int default_groups[] = { 19, 20, 21, 0 };
 	const int *groups;
+	unsigned int i, j;
 
 	if (ssid && ssid->pasn_groups)
 		groups = ssid->pasn_groups;
 	else if (wpa_s->conf->pasn_groups)
 		groups = wpa_s->conf->pasn_groups;
 	else
-		return 19;
+		groups = default_groups;
 
 	for (i = 0; groups[i]; i++) {
-		if (dragonfly_suitable_group(groups[i], 1))
+		bool rejected = false;
+		bool ap_supported = true;
+
+		if (!dragonfly_suitable_group(groups[i], 1))
+			continue;
+
+		if (!pasn)
+			return groups[i];
+
+		/* Skip groups already rejected in this session */
+		for (j = 0; j < pasn->rejected_group_idx; j++) {
+			if (groups[i] == pasn->rejected_groups[j]) {
+				rejected = true;
+				break;
+			}
+		}
+		if (rejected)
+			continue;
+
+		/* Take intersection with AP's supported groups */
+		if (pasn->ap_supported_group_idx > 0) {
+			ap_supported = false;
+			for (j = 0; j < pasn->ap_supported_group_idx; j++) {
+				if (groups[i] == pasn->ap_supported_groups[j]) {
+					ap_supported = true;
+					break;
+				}
+			}
+		}
+		if (ap_supported)
 			return groups[i];
 	}
 
@@ -220,7 +250,8 @@ static int wpas_pasn_get_params_from_bss(struct wpa_supplicant *wpa_s,
 	int sel, key_mgmt, pairwise_cipher;
 	int group;
 
-	group = wpas_pasn_get_group(wpa_s, ssid);
+	group = wpas_pasn_get_group(wpa_s, ssid, NULL);
+
 	if (!group) {
 		wpa_printf(MSG_INFO,
 			   "PASN: No suitable group found; cannot start authentication");
@@ -1053,6 +1084,35 @@ static int wpas_pasn_immediate_retry(struct wpa_supplicant *wpa_s,
 }
 
 
+static int wpas_pasn_retry_with_next_group(struct wpa_supplicant *wpa_s,
+					   struct pasn_data *pasn)
+{
+	struct wpa_pasn_params_data params;
+	u16 next_group;
+	struct wpa_ssid *ssid = NULL;
+
+#ifdef CONFIG_ENC_ASSOC
+	if (pasn->auth_alg == WLAN_AUTH_EPPKE)
+		ssid = wpa_s->current_ssid;
+#endif /* CONFIG_ENC_ASSOC */
+
+	next_group = (u16) wpas_pasn_get_group(wpa_s, ssid, pasn);
+	if (!next_group) {
+		wpa_printf(MSG_DEBUG,
+			   "PASN: No more groups to try after rejection");
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG, "PASN: Retrying with group %u after rejection",
+		   next_group);
+
+	pasn->group = next_group;
+
+	os_memset(&params, 0, sizeof(params));
+	return wpas_pasn_immediate_retry(wpa_s, pasn, &params);
+}
+
+
 static void wpas_pasn_deauth_cb(struct ptksa_cache_entry *entry)
 {
 	struct wpa_supplicant *wpa_s = entry->ctx;
@@ -1144,6 +1204,16 @@ int wpas_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 
 	if (ret == 1)
 		ret = wpas_pasn_immediate_retry(wpa_s, pasn, &pasn_data);
+
+	if (ret == 2) {
+		ret = wpas_pasn_retry_with_next_group(wpa_s, pasn);
+		if (ret) {
+			wpa_printf(MSG_INFO,
+				   "PASN: Group rejection retry failed");
+			wpas_pasn_auth_stop(wpa_s);
+			wpas_pasn_auth_work_done(wpa_s, PASN_STATUS_FAILURE);
+		}
+	}
 
 	return ret;
 }
