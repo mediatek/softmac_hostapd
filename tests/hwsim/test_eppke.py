@@ -1009,3 +1009,126 @@ def test_eppke_sae_pw_id_change_reconnect_kde(dev, apdev):
     finally:
         dev[0].set("pasn_groups", "")
         dev[0].set("sae_pwe", "0")
+
+def run_eppke_sae_ext_key_group_retry(dev, apdev):
+    """EPPKE authentication with PASN group retry - AP supports groups 20 and 21,
+    STA starts with group 19, gets rejected, retries with group 20"""
+    check_eppke_capab(dev[0])
+    ssid = "test-eppke-authentication"
+    passphrase = '1234567890'
+    params = hostapd.wpa3_params(ssid=ssid,
+				 password=passphrase)
+    params['wpa_key_mgmt'] = params['wpa_key_mgmt'] + ' ' + 'SAE-EXT-KEY EPPKE'
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params['sae_pwe'] = '2'
+    params['pasn_groups'] = "20 21"
+    params['sae_groups'] = "20 21"
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    try:
+        dev[0].set("pasn_groups", "19 20")
+        dev[0].set("sae_pwe", "1")
+        dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
+                       key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
+                       beacon_prot="1", pairwise="CCMP")
+        hapd.wait_sta()
+        sta = hapd.get_sta(dev[0].own_addr())
+        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
+            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+    finally:
+        dev[0].set("pasn_groups", "")
+        dev[0].set("sae_pwe", "0")
+
+def test_eppke_ap_with_base_akm_sae_ext_legacy_client_group_retry(dev, apdev):
+    """EPPKE Non-MLO AP: PASN group retry from 19 to 20 (AP supports groups 20 and 21)"""
+    run_eppke_sae_ext_key_group_retry(dev, apdev)
+
+def run_eppke_mld_ap_mld_sta_group_retry(dev, apdev):
+    """EPPKE authentication with MLD AP and MLD STA (single link) with PASN group retry - AP supports groups 20 and 21, STA starts with group 19, gets rejected, retries with group 20"""
+    check_eppke_capab(dev[0])
+    with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
+        HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
+
+        wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
+        wpas.interface_add(wpas_iface)
+
+        passphrase = '1234567890'
+        ssid = "test-eppke-authentication"
+        params = eht_mld_ap_wpa2_params(ssid, passphrase,
+                                        key_mgmt="SAE-EXT-KEY", mfp="2",
+                                        pwe='1', beacon_prot=1)
+        params['wpa_key_mgmt'] = params['wpa_key_mgmt'] + ' ' + 'EPPKE'
+        params['assoc_frame_encryption'] = '1'
+        params['pmksa_caching_privacy'] = '1'
+        params['rsn_pairwise'] = "CCMP GCMP-256"
+        params['pasn_groups'] = "20 21"
+        params['sae_groups'] = "20 21"
+        hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
+
+        try:
+            wpas.set("pasn_groups", "19 20")
+            wpas.set("sae_pwe", "1")
+            wpas.connect(ssid, sae_password=passphrase, scan_freq="2412",
+                         key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
+                         beacon_prot="1", pairwise="CCMP GCMP-256")
+            eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
+                              valid_links=1, active_links=1)
+            hapd0.wait_sta()
+            sta = hapd0.get_sta(wpas.own_addr())
+            if sta["AKMSuiteSelector"] != '00-0f-ac-24' or \
+               sta["auth_alg"] != '9':
+                raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+        finally:
+            wpas.set("pasn_groups", "")
+            wpas.set("sae_pwe", "0")
+
+def test_eppke_mld_ap_with_base_akm_sae_ext_mld_sta_group_retry(dev, apdev):
+    """EPPKE MLD AP with MLD STA (single link): PASN group retry from 19 to 20 (AP supports groups 20 and 21)"""
+    run_eppke_mld_ap_mld_sta_group_retry(dev, apdev)
+
+def run_eppke_mld_sta_group_retry(dev, apdev):
+    """EPPKE authentication with MLD AP and MLD STA with PASN group retry - AP supports groups 20 and 21, STA starts with group 19, gets rejected, retries with group 20"""
+    check_eppke_capab(dev[0])
+    with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
+        HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
+
+        wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
+        wpas.interface_add(wpas_iface)
+
+        passphrase = '1234567890'
+        ssid = "test-eppke-authentication"
+        params = eht_mld_ap_wpa2_params(ssid, passphrase,
+                                        key_mgmt="SAE-EXT-KEY", mfp="2",
+                                        pwe='1', beacon_prot=1)
+        params['wpa_key_mgmt'] = params['wpa_key_mgmt'] + ' ' + 'EPPKE'
+        params['assoc_frame_encryption'] = '1'
+        params['pmksa_caching_privacy'] = '1'
+        params['rsn_pairwise'] = "CCMP GCMP-256"
+        params['pasn_groups'] = "20 21"
+        params['sae_groups'] = "20 21"
+        hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
+
+        params['channel'] = '6'
+        hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
+
+        try:
+            wpas.set("pasn_groups", "19 20")
+            wpas.set("sae_pwe", "1")
+            wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437",
+                         key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
+                         beacon_prot="1", pairwise="CCMP GCMP-256")
+            hapd0.wait_sta()
+            eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
+                              valid_links=3, active_links=3)
+            sta = hapd0.get_sta(wpas.own_addr())
+            if sta["AKMSuiteSelector"] != '00-0f-ac-24' or \
+               sta["auth_alg"] != '9':
+                raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+        finally:
+            wpas.set("pasn_groups", "")
+            wpas.set("sae_pwe", "0")
+
+def test_eppke_mld_sta_with_base_akm_sae_ext_group_retry(dev, apdev):
+    """EPPKE MLD AP with MLD STA: PASN group retry from 19 to 20 (AP supports groups 20 and 21)"""
+    run_eppke_mld_sta_group_retry(dev, apdev)
