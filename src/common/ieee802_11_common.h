@@ -129,6 +129,7 @@ struct ieee802_11_elems {
 	const u8 *wfa_capab;
 	const u8 *proximity_ranging;
 	const u8 *akm_suite_selector;
+	const u8 *supported_groups;
 
 	u8 ssid_len;
 	u8 supp_rates_len;
@@ -201,6 +202,7 @@ struct ieee802_11_elems {
 	u8 wfa_capab_len;
 	size_t proximity_ranging_len;
 	u8 akm_suite_selector_len;
+	u8 supported_groups_len;
 
 	struct mb_ies_info mb_ies;
 

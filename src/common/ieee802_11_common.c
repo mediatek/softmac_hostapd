@@ -441,6 +441,12 @@ static int ieee802_11_parse_extension(const u8 *pos, size_t elen,
 		elems->akm_suite_selector = pos;
 		elems->akm_suite_selector_len = elen;
 		break;
+	case WLAN_EID_EXT_SUPPORTED_GROUPS:
+		if (elen < 2 || elen % 2 != 0)
+			break;
+		elems->supported_groups = pos;
+		elems->supported_groups_len = elen;
+		break;
 	default:
 		if (show_errors) {
 			wpa_printf(MSG_MSGDUMP,
