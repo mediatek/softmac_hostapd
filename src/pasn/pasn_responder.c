@@ -576,9 +576,19 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 	wpa_pasn_build_auth_header(buf, pasn->bssid, own_addr, peer_addr, 2,
 				   status, pasn->auth_alg == WLAN_AUTH_EPPKE);
 
-	if (status == WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED)
-		wpa_add_supported_groups(buf, pasn->pasn_groups);
+	if (status == WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED) {
+		const int *groups = pasn->pasn_groups;
 
+#ifdef CONFIG_TESTING_OPTIONS
+		if (pasn->pasn_test_groups) {
+			wpa_printf(MSG_INFO,
+				   "PASN: Override supported groups with test data");
+			groups = pasn->pasn_test_groups;
+		}
+#endif /* CONFIG_TESTING_OPTIONS */
+
+		wpa_add_supported_groups(buf, groups);
+	}
 	if (status != WLAN_STATUS_SUCCESS)
 		goto done;
 
@@ -932,6 +942,17 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 		status = WLAN_STATUS_INVALID_PARAMETERS;
 		goto send_resp;
 	}
+
+#ifdef CONFIG_TESTING_OPTIONS
+	/*
+	 * To simulate a downgrade attack, reject the group based on
+	 * pasn_test_groups and send a tampered Supported Groups element
+	 * instead of the real AP Supported Groups list in the rejection
+	 * frame.
+	 */
+	if (pasn->pasn_test_groups)
+		groups = pasn->pasn_test_groups;
+#endif /* CONFIG_TESTING_OPTIONS */
 
 	for (i = 0; groups[i] > 0 && groups[i] != pasn_params.group; i++)
 		;
