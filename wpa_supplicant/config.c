@@ -2561,6 +2561,37 @@ static char * wpa_config_write_mac_value(const struct parse_data *data,
 #endif /* NO_CONFIG_WRITE */
 
 
+#ifdef CONFIG_PASN
+static int wpa_config_parse_pasn_groups(const struct parse_data *data,
+					struct wpa_ssid *ssid, int line,
+					const char *value)
+{
+	int *groups;
+
+	groups = wpa_config_parse_int_array(value);
+	if (!groups)
+		return -1;
+	if (groups[0] == 0) {
+		os_free(groups);
+		groups = NULL;
+	}
+	os_free(ssid->pasn_groups);
+	ssid->pasn_groups = groups;
+
+	return 0;
+}
+
+
+#ifndef NO_CONFIG_WRITE
+static char * wpa_config_write_pasn_groups(const struct parse_data *data,
+					 struct wpa_ssid *ssid)
+{
+	return wpa_config_write_freqs(data, ssid->pasn_groups);
+}
+#endif /* NO_CONFIG_WRITE */
+#endif /* CONFIG_PASN */
+
+
 /* Helper macros for network block parser */
 
 #ifdef OFFSET
@@ -2925,6 +2956,9 @@ static const struct parse_data ssid_fields[] = {
 #endif /* CONFIG_IEEE8021X_AUTH */
 	{ BOOL(drop_unicast_ip_in_l2_multicast)},
 	{ INT_RANGE(always_use_proxy_arp, 0, 2)},
+#ifdef CONFIG_PASN
+	{ FUNC(pasn_groups) },
+#endif /* CONFIG_PASN */
 };
 
 #undef OFFSET
@@ -3134,6 +3168,9 @@ void wpa_config_free_ssid(struct wpa_ssid *ssid)
 #ifdef CONFIG_SAE
 	sae_deinit_pt(ssid->pt);
 #endif /* CONFIG_SAE */
+#ifdef CONFIG_PASN
+	os_free(ssid->pasn_groups);
+#endif /* CONFIG_PASN */
 	bin_clear_free(ssid, sizeof(*ssid));
 }
 
@@ -3264,6 +3301,9 @@ void wpa_config_free(struct wpa_config *config)
 	wpabuf_free(config->wps_nfc_dev_pw);
 	os_free(config->ext_password_backend);
 	os_free(config->sae_groups);
+#ifdef CONFIG_PASN
+	os_free(config->pasn_groups);
+#endif /* CONFIG_PASN */
 	wpabuf_free(config->ap_vendor_elements);
 	wpabuf_free(config->ap_assocresp_elements);
 	os_free(config->bgscan);
@@ -5493,6 +5533,37 @@ static int wpa_config_process_sae_groups(
 }
 
 
+#ifdef CONFIG_PASN
+static int wpa_config_process_pasn_groups(
+	const struct global_parse_data *data,
+	struct wpa_config *config, int line, const char *pos)
+{
+	int *groups;
+
+	if (!pos || !*pos) {
+		/* Empty string clears pasn_groups if previously set */
+		if (config->pasn_groups) {
+			os_free(config->pasn_groups);
+			config->pasn_groups = NULL;
+		}
+		return 0;
+	}
+
+	groups = wpa_config_parse_int_array(pos);
+	if (!groups) {
+		wpa_printf(MSG_ERROR, "Line %d: Invalid pasn_groups '%s'",
+			   line, pos);
+		return -1;
+	}
+
+	os_free(config->pasn_groups);
+	config->pasn_groups = groups;
+
+	return 0;
+}
+#endif /* CONFIG_PASN */
+
+
 static int wpa_config_process_ap_vendor_elements(
 	const struct global_parse_data *data,
 	struct wpa_config *config, int line, const char *pos)
@@ -5930,6 +6001,7 @@ static const struct global_parse_data global_fields[] = {
 	{ INT_RANGE(wowlan_disconnect_on_deinit, 0, 1), 0},
 	{ INT_RANGE(rsn_overriding, 0, 2), 0},
 #ifdef CONFIG_PASN
+	{ FUNC(pasn_groups), 0 },
 #ifdef CONFIG_TESTING_OPTIONS
 	{ INT_RANGE(force_kdk_derivation, 0, 1), 0 },
 	{ INT_RANGE(pasn_corrupt_mic, 0, 1), 0 },

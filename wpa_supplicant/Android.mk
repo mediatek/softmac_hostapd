@@ -427,6 +427,7 @@ NEED_HMAC_SHA256_KDF=y
 NEED_HMAC_SHA384_KDF=y
 NEED_SHA256=y
 NEED_SHA384=y
+NEED_DRAGONFLY=y
 OBJS += src/pasn/pasn_initiator.c
 OBJS += src/pasn/pasn_common.c
 OBJS += pasn_supplicant.c

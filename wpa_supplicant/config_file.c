@@ -1812,6 +1812,19 @@ static void wpa_config_write_global(FILE *f, struct wpa_config *config)
 		fprintf(f, "pr_pasn_type=%d\n", config->pr_pasn_type);
 	if (config->pr_preferred_role)
 		fprintf(f, "pr_preferred_role=%d\n", config->pr_preferred_role);
+
+#ifdef CONFIG_PASN
+	if (config->pasn_groups) {
+		int i;
+
+		fprintf(f, "pasn_groups=");
+		for (i = 0; config->pasn_groups[i] > 0; i++) {
+			fprintf(f, "%s%d", i > 0 ? " " : "",
+				config->pasn_groups[i]);
+		}
+		fprintf(f, "\n");
+	}
+#endif /* CONFIG_PASN */
 }
 
 static void wpa_config_write_identity(FILE *f, struct wpa_dev_ik *dev_ik)
