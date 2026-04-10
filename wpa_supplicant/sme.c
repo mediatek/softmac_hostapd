@@ -1648,15 +1648,19 @@ skip_setup:
 
 #ifdef CONFIG_ENC_ASSOC
 	if (!skip_auth && params.auth_alg == WPA_AUTH_ALG_EPPKE) {
-		if (wpas_eppke_initialize(wpa_s, bss, ssid) < 0) {
-			wpas_connection_failed(wpa_s, bss->bssid, NULL);
-			return;
-		}
-		if (start)
+		if (start) {
+			/* Initialize EPPKE just for the first Authentication
+			 * frame */
+			if (wpas_eppke_initialize(wpa_s, bss, ssid) < 0) {
+				wpas_connection_failed(wpa_s, bss->bssid, NULL);
+				return;
+			}
+
 			resp = wpas_pasn_build_auth_1(&wpa_s->pasn, NULL,
 						      false, 0);
-		else
+		} else {
 			resp = wpas_pasn_build_auth_3(&wpa_s->pasn, 0);
+		}
 		if (!resp) {
 			wpas_connection_failed(wpa_s, bss->bssid, NULL);
 			return;
