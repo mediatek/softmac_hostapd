@@ -841,5 +841,6 @@ int wpa_auth_802_1x_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const u8 *spa,
 			       int akmp, int cipher, const u8 *dhss,
 			       size_t dhss_len, struct wpa_ptk *ptk,
 			       size_t kdk_len);
+void wpa_add_supported_groups(struct wpabuf *buf, const int *groups);
 
 #endif /* WPA_COMMON_H */

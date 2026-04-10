@@ -4741,3 +4741,22 @@ bool rsn_is_snonce_cookie(const u8 *snonce)
 	return WPA_GET_BE24(pos) == OUI_WFA &&
 		WPA_GET_BE24(pos + 3) == 0x000029;
 }
+
+
+void wpa_add_supported_groups(struct wpabuf *buf, const int *groups)
+{
+	unsigned int count, i;
+
+	if (!buf || !groups)
+		return;
+
+	count = int_array_len(groups);
+	if (wpabuf_tailroom(buf) < 2 + 1 + count * 2)
+		return;
+
+	wpabuf_put_u8(buf, WLAN_EID_EXTENSION);
+	wpabuf_put_u8(buf, 1 + count * 2);
+	wpabuf_put_u8(buf, WLAN_EID_EXT_SUPPORTED_GROUPS);
+	for (i = 0; i < count; i++)
+		wpabuf_put_le16(buf, groups[i]);
+}
