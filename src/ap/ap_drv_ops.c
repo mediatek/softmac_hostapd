@@ -1006,10 +1006,8 @@ int hostapd_drv_sta_deauth(struct hostapd_data *hapd,
 	if (hapd->conf->mld_ap) {
 		struct sta_info *sta = ap_get_sta(hapd, addr);
 
-		if (sta)
-			link_id = sta->mld_assoc_link_id;
-		else
-			link_id = hapd->mld_link_id;
+		hapd = hostapd_select_sta_enabled_link(hapd, addr);
+		link_id = hapd->mld_link_id;
 
 		if (ap_sta_is_mld(hapd, sta))
 			own_addr = hapd->mld->mld_addr;
@@ -1033,10 +1031,11 @@ int hostapd_drv_sta_disassoc(struct hostapd_data *hapd,
 	if (hapd->conf->mld_ap) {
 		struct sta_info *sta = ap_get_sta(hapd, addr);
 
-		if (ap_sta_is_mld(hapd, sta)) {
+		hapd = hostapd_select_sta_enabled_link(hapd, addr);
+		link_id = hapd->mld_link_id;
+
+		if (ap_sta_is_mld(hapd, sta))
 			own_addr = hapd->mld->mld_addr;
-			link_id = hapd->mld_link_id;
-		}
 	}
 #endif /* CONFIG_IEEE80211BE */
 

@@ -740,9 +740,16 @@ skip_poll:
 
 	if (sta->timeout_next == STA_NULLFUNC &&
 	    (sta->flags & WLAN_STA_ASSOC)) {
+		struct hostapd_data *tx_hapd = hapd;
+
+#ifdef CONFIG_IEEE80211BE
+		/* The current link may be disabled for the STA by TTLM, so
+		 * poll the STA on a link that is still enabled instead. */
+		tx_hapd = hostapd_select_sta_enabled_link(hapd, sta->addr);
+#endif /* CONFIG_IEEE80211BE */
 		wpa_printf(MSG_DEBUG, "  Polling STA");
 		sta->flags |= WLAN_STA_PENDING_POLL;
-		hostapd_drv_poll_client(hapd, hapd->own_addr, sta->addr,
+		hostapd_drv_poll_client(tx_hapd, tx_hapd->own_addr, sta->addr,
 					sta->flags & WLAN_STA_WMM);
 	} else if (sta->timeout_next != STA_REMOVE) {
 		int deauth = sta->timeout_next == STA_DEAUTH;

@@ -3710,6 +3710,8 @@ int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info 
 			wpabuf_put_le16(buf, neg_ttlm->ulink[i]);
 	}
 
+
+	hapd = hostapd_select_sta_enabled_link(hapd, sta->addr);
 	ret = hostapd_drv_send_action(hapd, hapd->iface->freq, 0, sta->addr,
 				      wpabuf_head(buf), wpabuf_len(buf));
 	wpabuf_free(buf);
@@ -3737,6 +3739,7 @@ int ieee802_11_send_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr)
 	wpabuf_put_u8(buf, WLAN_ACTION_PROTECTED_EHT);
 	wpabuf_put_u8(buf, WLAN_PROT_EHT_T2L_MAPPING_TEARDOWN);
 
+	hapd = hostapd_select_sta_enabled_link(hapd, addr);
 	ret = hostapd_drv_send_action(hapd, hapd->iface->freq, 0, addr,
 				      wpabuf_head(buf), wpabuf_len(buf));
 	wpabuf_free(buf);

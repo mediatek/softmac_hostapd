@@ -655,6 +655,57 @@ bool hostapd_is_link_tx_allowed(struct hostapd_data *hapd, const u8 *addr,
 
 	return BIT(link_id) & links;
 }
+
+
+struct hostapd_data *
+hostapd_select_sta_enabled_link(struct hostapd_data *hapd, const u8 *addr)
+{
+	struct hostapd_mld *mld = hapd->mld;
+	struct hostapd_data *link;
+	struct sta_info *sta = ap_get_sta(hapd, addr);
+	u16 enabled_links;
+	int assoc_link_id, i;
+
+	if (!ap_sta_is_mld(hapd, sta) || !mld)
+		return hapd;
+
+	sta = sta->mld_assoc_sta;
+	if (!sta)
+		return hapd;
+
+	assoc_link_id = sta->mld_assoc_link_id;
+
+	if (sta->neg_ttlm.valid)
+		enabled_links = sta->neg_ttlm.enabled_links;
+	else {
+		enabled_links = sta->mld_info.valid_links;
+		if (hostapd_is_attlm_active(hapd))
+			enabled_links &= ~mld->new_attlm.disabled_links;
+	}
+
+	if (BIT(hapd->mld_link_id) & enabled_links)
+		return hapd;
+
+	if (assoc_link_id >= 0 && (BIT(assoc_link_id) & enabled_links)) {
+		link = hostapd_mld_get_link_bss(hapd, assoc_link_id);
+		if (link)
+			return link;
+	}
+
+	for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
+		if (BIT(i) & enabled_links) {
+			link = hostapd_mld_get_link_bss(hapd, i);
+			if (link)
+				return link;
+		}
+	}
+
+	/* Should not happen */
+	wpa_printf(MSG_ERROR,
+		   "Failed to select an enabled link for STA=" MACSTR
+		   ", return the input hapd", MAC2STR(addr));
+	return hapd;
+}
 #endif /* CONFIG_IEEE80211BE */
 
 
