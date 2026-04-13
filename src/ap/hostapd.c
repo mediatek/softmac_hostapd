@@ -3146,17 +3146,20 @@ int hostapd_setup_interface_complete(struct hostapd_iface *iface, int err)
 		int i;
 
 		for (i = 0; i < interfaces->count; i++) {
-			if (!interfaces->iface[i]->freq) {
-				/* FIXME problems remained
-				 * 1. the return value of acs_init() is
-				 *    not check
-				 * 2. if it fails the setup, next acs_init()
-				 *    will not be handled
-				 */
-				wpa_printf(MSG_DEBUG, "mtk: trigger acs_init for %s", interfaces->iface[i]->phy);
-				acs_init(interfaces->iface[i]);
-				break;
-			}
+			if (iface == interfaces->iface[i] ||
+			    interfaces->iface[i]->freq ||
+			    interfaces->iface[i]->state <= HAPD_IFACE_DISABLED)
+				continue;
+
+			/* FIXME problems remained
+			 * 1. the return value of acs_init() is
+			 *    not check
+			 * 2. if it fails the setup, next acs_init()
+			 *    will not be handled
+			 */
+			wpa_printf(MSG_DEBUG, "mtk: trigger acs_init for %s", interfaces->iface[i]->phy);
+			acs_init(interfaces->iface[i]);
+			break;
 		}
 	}
 
