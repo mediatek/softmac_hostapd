@@ -924,6 +924,12 @@ acs_find_ideal_chan_mode(struct hostapd_iface *iface,
 			if (!chan_pri_allowed(chan2))
 				continue;
 
+			/* The secondary channel in 2.4 GHz will not be
+			 * the primary channel
+			 */
+			if (is_24ghz_mode(mode->mode) && j > 1)
+				continue;
+
 			if (!is_in_chanlist(iface, chan2))
 				continue;
 
