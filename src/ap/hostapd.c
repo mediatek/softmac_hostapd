@@ -614,6 +614,16 @@ bool hostapd_is_same_attlm(struct hostapd_data *hapd1, struct hostapd_data *hapd
 }
 
 
+bool hostapd_is_link_enabled(struct hostapd_data *hapd, u8 link_id)
+{
+	if (!hostapd_is_mld_ap(hapd) || !hostapd_is_attlm_active(hapd) ||
+	    hapd->mld->new_attlm.switch_time_tsf_tu)
+		return true;
+
+	return link_id < MAX_NUM_MLD_LINKS &&
+	       !(BIT(link_id) & hapd->mld->new_attlm.disabled_links);
+}
+
 #endif /* CONFIG_IEEE80211BE */
 
 
