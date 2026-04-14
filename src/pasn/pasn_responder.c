@@ -291,6 +291,8 @@ static struct wpabuf * pasn_get_sae_wd(struct pasn_data *pasn)
 	struct wpabuf *buf = NULL;
 	u8 *len_ptr;
 	size_t len;
+	const u8 *pw_id = NULL;
+	size_t pw_id_len = 0;
 
 	/* Need to add the entire Authentication frame body */
 	buf = wpabuf_alloc(8 + SAE_COMMIT_MAX_LEN + 8 + SAE_CONFIRM_MAX_LEN);
@@ -305,8 +307,18 @@ static struct wpabuf * pasn_get_sae_wd(struct pasn_data *pasn)
 	wpabuf_put_le16(buf, 1);
 	wpabuf_put_le16(buf, WLAN_STATUS_SAE_HASH_TO_ELEMENT);
 
+	if (pasn->sae.tmp) {
+		if (pasn->sae.tmp->parsed_pw_id) {
+			pw_id = pasn->sae.tmp->parsed_pw_id;
+			pw_id_len = pasn->sae.tmp->parsed_pw_id_len;
+		} else if (pasn->sae.tmp->pw_id) {
+			pw_id = pasn->sae.tmp->pw_id;
+			pw_id_len = pasn->sae.tmp->pw_id_len;
+		}
+	}
+
 	/* Write the actual commit and update the length accordingly */
-	sae_write_commit(&pasn->sae, buf, NULL, NULL, 0);
+	sae_write_commit(&pasn->sae, buf, NULL, pw_id, pw_id_len);
 	len = wpabuf_len(buf);
 	WPA_PUT_LE16(len_ptr, len - 2);
 
