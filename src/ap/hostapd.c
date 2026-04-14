@@ -4676,8 +4676,10 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_after);
 
 	/* change back the configuration */
-	hostapd_change_config_freq(iface->bss[0], iface->conf,
-				   &old_freq, NULL);
+	if (hostapd_change_config_freq(iface->bss[0], iface->conf,
+				       &old_freq, NULL) < 0)
+		wpa_printf(MSG_INFO,
+			   "Failed to switch back to old frequency after preparing beacon data for CSA");
 
 	if (ret)
 		return ret;
