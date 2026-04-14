@@ -1000,7 +1000,7 @@ fail:
  * the time bitmap.
  */
 struct bitfield * nan_tbm_to_bf(struct nan_data *nan,
-				struct nan_time_bitmap *tbm)
+				const struct nan_time_bitmap *tbm)
 {
 	struct bitfield *bf, *base;
 	u32 slot_duration, period, len;
