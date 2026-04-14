@@ -4858,7 +4858,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 			sta->flags &= ~WLAN_STA_SPP_AMSDU;
 
 #ifdef CONFIG_IEEE80211R_AP
-		if (sta->auth_alg == WLAN_AUTH_FT) {
+		if (sta->auth_alg == WLAN_AUTH_FT && !assoc_wpa_sm) {
 			if (type != LINK_PARSE_REASSOC) {
 				wpa_printf(MSG_DEBUG, "FT: " MACSTR " tried "
 					   "to use association (not "
@@ -4872,10 +4872,10 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 						       ies_len);
 			if (resp != WLAN_STATUS_SUCCESS)
 				goto out;
-			/* prevent the group keys from being reset after other sta
-			 * connect */
-			hapd->wpa_auth->group->first_sta_seen = true;
 		}
+		/* prevent the group keys from being reset after other sta connect */
+		if (sta->auth_alg == WLAN_AUTH_FT)
+			hapd->wpa_auth->group->first_sta_seen = true;
 #endif /* CONFIG_IEEE80211R_AP */
 
 		if (assoc_wpa_sm)
