@@ -1949,6 +1949,9 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		if (wpa_s->sme.prev_bssid_set && wpa_s->sme.ft_used &&
 		    os_memcmp(md, wpa_s->sme.mobility_domain, 2) == 0 &&
 		    wpa_sm_has_ft_keys(wpa_s->wpa, md)) {
+			struct driver_sta_mlo_info drv_mlo;
+			int i;
+
 			wpa_dbg(wpa_s, MSG_DEBUG, "SME: Trying to use FT "
 				"over-the-air");
 			omit_rsnxe |= !wpa_bss_get_rsnxe(wpa_s, bss, ssid,
@@ -1956,6 +1959,14 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 			params.auth_alg = WPA_AUTH_ALG_FT;
 			params.ie = wpa_s->sme.ft_ies;
 			params.ie_len = wpa_s->sme.ft_ies_len;
+
+			if (wpa_s->valid_links &&
+			    wpas_drv_get_sta_mlo_info(wpa_s, &drv_mlo) == 0) {
+				for_each_link(wpa_s->valid_links, i)
+					os_memcpy(wpa_s->links[i].addr,
+						  drv_mlo.links[i].addr,
+						  ETH_ALEN);
+			}
 		}
 	}
 #endif /* CONFIG_IEEE80211R */
