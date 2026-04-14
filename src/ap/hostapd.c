@@ -1398,7 +1398,7 @@ static int hostapd_bss_radius_init(struct hostapd_data *hapd)
 /**
  * hostapd_setup_bss - Per-BSS setup (initialization)
  * @hapd: Pointer to BSS data
- * @first: Whether this BSS is the first BSS of an interface; -1 = not first,
+ * @first: Whether this BSS is the first BSS of an interface; false = not first,
  *	but interface may exist
  * @start_beacon: Whether Beacon frame template should be configured and
  *	transmission of Beaconf rames started at this time. This is used when
@@ -1412,7 +1412,7 @@ static int hostapd_bss_radius_init(struct hostapd_data *hapd)
  * initialized. Most of the modules that are initialized here will be
  * deinitialized in hostapd_cleanup().
  */
-static int hostapd_setup_bss(struct hostapd_data *hapd, int first,
+static int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 			     bool start_beacon)
 {
 	struct hostapd_bss_config *conf = hapd->conf;
@@ -1453,7 +1453,7 @@ static int hostapd_setup_bss(struct hostapd_data *hapd, int first,
 	}
 	hapd->started = 1;
 
-	if (!first || first == -1) {
+	if (!first) {
 		u8 *addr = hapd->own_addr;
 
 		if (!is_zero_ether_addr(conf->bssid)) {
@@ -3910,7 +3910,7 @@ int hostapd_add_iface(struct hapd_interfaces *interfaces, char *buf)
 
 			if (start_ctrl_iface_bss(hapd) < 0 ||
 			    (hapd_iface->state == HAPD_IFACE_ENABLED &&
-			     hostapd_setup_bss(hapd, -1, true))) {
+			     hostapd_setup_bss(hapd, false, true))) {
 				hostapd_bss_link_deinit(hapd);
 				hostapd_cleanup(hapd);
 				hapd_iface->bss[hapd_iface->num_bss - 1] = NULL;
