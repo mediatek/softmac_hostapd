@@ -6487,7 +6487,7 @@ skip_pmkid_update:
 #endif /* CONFIG_PMKSA_PRIVACY */
 
 #ifdef CONFIG_IEEE80211R_AP
-		if (sta->auth_alg == WLAN_AUTH_FT) {
+		if (sta->auth_alg == WLAN_AUTH_FT && !assoc_wpa_sm) {
 			if (type != LINK_PARSE_REASSOC) {
 				wpa_printf(MSG_DEBUG, "FT: " MACSTR " tried "
 					   "to use association (not "
