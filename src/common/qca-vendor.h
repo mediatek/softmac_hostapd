@@ -13277,6 +13277,21 @@ enum qca_wlan_vendor_cfr_stop_reason {
  * i.e., one report per interval per MAC address. When this flag is not
  * included, all captured frames in the reporting interval are reported.
  * Applicable only for CFR version 3.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN: Optional (u32)
+ * Total length (in bytes) of the full CFR data being delivered across
+ * multiple fragmented vendor events. Present in every fragment when
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA is bifurcated.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET: Optional (u32)
+ * Byte offset of the QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA payload
+ * within the full CFR data buffer. Present in every fragment when
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA is bifurcated.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG: Optional (flag)
+ * When present, indicates that this vendor event carries the final fragment
+ * of a bifurcated QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA payload.
+ *
  */
 enum qca_wlan_vendor_peer_cfr_capture_attr {
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_INVALID = 0,
@@ -13330,6 +13345,9 @@ enum qca_wlan_vendor_peer_cfr_capture_attr {
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_STOP_REASON = 48,
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC = 49,
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME = 50,
+	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN = 51,
+	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET = 52,
+	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG = 53,
 
 	/* Keep last */
 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_AFTER_LAST,
