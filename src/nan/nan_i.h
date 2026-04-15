@@ -568,10 +568,11 @@ int nan_ndl_add_avail_attrs(struct nan_data *nan, const struct nan_peer *peer,
 void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 				     const struct nan_peer *peer,
 				     struct wpabuf *buf);
-bool nan_peer_schedule_intersects(struct nan_data *nan, struct nan_peer *peer,
-				  struct nan_schedule *sched);
+bool nan_peer_schedule_intersects(struct nan_data *nan,
+				  const struct nan_peer *peer,
+				  const struct nan_schedule *sched);
 int nan_convert_chan_sched_to_bf(struct nan_data *nan,
-				 struct nan_chan_schedule *chan,
+				 const struct nan_chan_schedule *chan,
 				 struct bitfield **avail_bf, u8 *map_id,
 				 u8 *op_class, u16 *cbm, u16 *pcbm);
 int nan_get_chan_bm(struct nan_data *nan, const struct nan_sched_chan *chan,
