@@ -7367,7 +7367,7 @@ int wpa_auth_sta_set_vlan(struct wpa_state_machine *sm,
 {
 	struct wpa_group *group;
 
-	if (!sm || !sm->wpa_auth)
+	if (!sm || !sm->wpa_auth || !wpa_auth)
 		return 0;
 
 	group = wpa_auth->group;
