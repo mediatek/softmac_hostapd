@@ -1019,6 +1019,10 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		else if (data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA384)
 			selector = RSN_AUTH_KEY_MGMT_802_1X_SHA384;
 #endif /* CONFIG_SHA384 */
+#ifdef CONFIG_ENC_ASSOC
+		else if (data.key_mgmt & WPA_KEY_MGMT_EPPKE)
+			selector = RSN_AUTH_KEY_MGMT_EPPKE;
+#endif /* CONFIG_ENC_ASSOC */
 		wpa_auth->dot11RSNAAuthenticationSuiteSelected = selector;
 
 		selector = wpa_cipher_to_suite(WPA_PROTO_RSN,
@@ -1135,6 +1139,10 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 	else if (key_mgmt & WPA_KEY_MGMT_DPP)
 		sm->wpa_key_mgmt = WPA_KEY_MGMT_DPP;
 #endif /* CONFIG_DPP */
+#ifdef CONFIG_ENC_ASSOC
+	else if (key_mgmt & WPA_KEY_MGMT_EPPKE)
+		sm->wpa_key_mgmt = WPA_KEY_MGMT_EPPKE;
+#endif /* CONFIG_ENC_ASSOC */
 	else
 		sm->wpa_key_mgmt = WPA_KEY_MGMT_PSK;
 

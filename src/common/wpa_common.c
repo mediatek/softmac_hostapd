@@ -1558,8 +1558,9 @@ void wpa_ft_parse_ies_free(struct wpa_ft_ies *parse)
  */
 static bool pasn_use_sha384(int akmp, int cipher)
 {
-	return (akmp == WPA_KEY_MGMT_PASN && (cipher == WPA_CIPHER_CCMP_256 ||
-					      cipher == WPA_CIPHER_GCMP_256)) ||
+	return ((akmp == WPA_KEY_MGMT_PASN || akmp == WPA_KEY_MGMT_EPPKE) &&
+		(cipher == WPA_CIPHER_CCMP_256 ||
+		 cipher == WPA_CIPHER_GCMP_256)) ||
 		wpa_key_mgmt_sha384(akmp);
 }
 
@@ -4285,6 +4286,13 @@ int wpa_pasn_add_rsne(struct wpabuf *buf, const u8 *pmkid, int akmp, int cipher)
 	case WPA_KEY_MGMT_PASN:
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_PASN);
 		break;
+#ifdef CONFIG_ENC_ASSOC
+	case WPA_KEY_MGMT_EPPKE:
+		/* EPPKE without base AKM: EPPKE AKMP is used as the selected
+		 * AKMP per IEEE P802.11bi/D4.0, 12.16.9.1. */
+		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_EPPKE);
+		break;
+#endif /* CONFIG_ENC_ASSOC */
 #ifdef CONFIG_SAE
 	case WPA_KEY_MGMT_SAE:
 		RSN_SELECTOR_PUT(pos, RSN_AUTH_KEY_MGMT_SAE);
@@ -4527,6 +4535,18 @@ int wpa_pasn_validate_rsne(const struct wpa_ie_data *data, bool is_eppke)
 #endif /* CONFIG_IEEE80211R */
 	case WPA_KEY_MGMT_PASN:
 		break;
+#ifdef CONFIG_ENC_ASSOC
+	case WPA_KEY_MGMT_EPPKE:
+		/* EPPKE AKMP is used when EPPKE is performed without a base
+		 * AKM (no mutual authentication). This is only valid for EPPKE
+		 * authentication per IEEE P802.11bi/D4.0, 12.16.9.1. */
+		if (!is_eppke) {
+			wpa_printf(MSG_INFO,
+				   "PASN: EPPKE AKM not allowed for PASN");
+			return -1;
+		}
+		break;
+#endif /* CONFIG_ENC_ASSOC */
 	default:
 		wpa_printf(MSG_ERROR, "%s: invalid key_mgmt: 0x%0x",
 			   is_eppke ? "EPPKE" : "PASN", data->key_mgmt);

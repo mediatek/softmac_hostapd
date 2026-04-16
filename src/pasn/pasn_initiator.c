@@ -526,6 +526,12 @@ static struct wpabuf * wpas_pasn_get_wrapped_data(struct pasn_data *pasn)
 	case WPA_KEY_MGMT_PASN:
 		/* no wrapped data */
 		return NULL;
+#ifdef CONFIG_ENC_ASSOC
+	case WPA_KEY_MGMT_EPPKE:
+		/* EPPKE without base AKM: no wrapped data per
+		 * IEEE P802.11bi/D4.0, 12.16.9.1 */
+		return NULL;
+#endif /* CONFIG_ENC_ASSOC */
 	case WPA_KEY_MGMT_SAE:
 	case WPA_KEY_MGMT_SAE_EXT_KEY:
 #ifdef CONFIG_SAE
@@ -951,8 +957,9 @@ static int wpas_pasn_set_pmk(struct pasn_data *pasn,
 	os_memset(pasn->pmk, 0, sizeof(pasn->pmk));
 	pasn->pmk_len = 0;
 
-	if (pasn->akmp == WPA_KEY_MGMT_PASN) {
-		wpa_printf(MSG_DEBUG, "PASN: Using default PMK");
+	if (pasn->akmp == WPA_KEY_MGMT_PASN ||
+	    pasn->akmp == WPA_KEY_MGMT_EPPKE) {
+		wpa_printf(MSG_DEBUG, "PASN/EPPKE: Using default PMK");
 
 		pasn->pmk_len = WPA_PASN_PMK_LEN;
 		os_memcpy(pasn->pmk, pasn_default_pmk,
@@ -1148,6 +1155,10 @@ int wpas_pasn_start(struct pasn_data *pasn, const u8 *own_addr,
 	switch (akmp) {
 	case WPA_KEY_MGMT_PASN:
 		break;
+#ifdef CONFIG_ENC_ASSOC
+	case WPA_KEY_MGMT_EPPKE:
+		break;
+#endif /* CONFIG_ENC_ASSOC */
 #ifdef CONFIG_SAE
 	case WPA_KEY_MGMT_SAE:
 	case WPA_KEY_MGMT_SAE_EXT_KEY:
