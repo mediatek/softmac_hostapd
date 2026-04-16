@@ -936,6 +936,11 @@ struct hostapd_bss_config {
 	/* Whether to allow PASN-UNAUTH */
 	int pasn_noauth;
 
+#ifdef CONFIG_ENC_ASSOC
+	/* Whether to allow unauthenticated EPPKE (EPPKE without base AKM) */
+	bool eppke_unauth;
+#endif /* CONFIG_ENC_ASSOC */
+
 #ifdef CONFIG_TESTING_OPTIONS
 	/*
 	 * Normally, KDK should be derived if and only if both sides support

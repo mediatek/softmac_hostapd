@@ -4905,6 +4905,10 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->pasn_comeback_after = atoi(pos);
 	} else if (os_strcmp(buf, "pasn_noauth") == 0) {
 		bss->pasn_noauth = atoi(pos);
+#ifdef CONFIG_ENC_ASSOC
+	} else if (os_strcmp(buf, "eppke_unauth") == 0) {
+		bss->eppke_unauth = atoi(pos);
+#endif /* CONFIG_ENC_ASSOC */
 	} else if (os_strcmp(buf, "urnm_mfpr") == 0) {
 		bss->urnm_mfpr = !!atoi(pos);
 	} else if (os_strcmp(buf, "urnm_mfpr_x20") == 0) {

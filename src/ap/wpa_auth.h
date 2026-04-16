@@ -294,6 +294,10 @@ struct wpa_auth_config {
 	unsigned int assoc_frame_encryption:1;
 	unsigned int pmksa_caching_privacy:1;
 	unsigned int eap_using_authentication_frames:1;
+#ifdef CONFIG_PASN
+	/* Whether to allow unauthenticated EPPKE (EPPKE without base AKM) */
+	bool eppke_unauth;
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_ENC_ASSOC */
 
 	int owe_ptk_workaround;

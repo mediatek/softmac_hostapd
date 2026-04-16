@@ -590,6 +590,8 @@ static u64 rsnxe_capab(struct wpa_auth_config *conf, int key_mgmt)
 		capab |= BIT(WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
 	if (conf->eap_using_authentication_frames)
 		capab |= BIT(WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES);
+	if (conf->eppke_unauth)
+		capab |= BIT_ULL(WLAN_RSNX_CAPAB_UNAUTH_EPPKE);
 #endif /* CONFIG_ENC_ASSOC */
 
 	return capab;

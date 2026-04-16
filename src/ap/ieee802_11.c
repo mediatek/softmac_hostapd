@@ -3908,6 +3908,9 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 	os_free(pasn->pasn_groups);
 	pasn->pasn_groups = int_array_dup(hapd->conf->pasn_groups);
 	pasn->noauth = hapd->conf->pasn_noauth;
+#ifdef CONFIG_ENC_ASSOC
+	pasn->eppke_unauth = hapd->conf->eppke_unauth;
+#endif /* CONFIG_ENC_ASSOC */
 	if (hapd->iface->drv_flags2 & WPA_DRIVER_FLAGS2_SEC_LTF_AP)
 		pasn_enable_kdk_derivation(pasn);
 

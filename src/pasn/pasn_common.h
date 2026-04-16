@@ -154,6 +154,9 @@ struct pasn_data {
 
 	/* Responder */
 	bool noauth; /* Whether PASN without mutual authentication is enabled */
+#ifdef CONFIG_ENC_ASSOC
+	bool eppke_unauth; /* Whether unauthenticated EPPKE is enabled */
+#endif /* CONFIG_ENC_ASSOC */
 	int disable_pmksa_caching;
 	int *pasn_groups;
 	int use_anti_clogging;

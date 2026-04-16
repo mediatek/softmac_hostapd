@@ -915,6 +915,13 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 	pasn->akmp = rsn_data.key_mgmt;
 	pasn->cipher = rsn_data.pairwise_cipher;
 
+#ifdef CONFIG_ENC_ASSOC
+	/* For EPPKE without base AKM, use eppke_unauth to control whether
+	 * unauthenticated EPPKE is allowed. */
+	if (pasn->akmp == WPA_KEY_MGMT_EPPKE)
+		pasn->noauth = pasn->eppke_unauth;
+#endif /* CONFIG_ENC_ASSOC */
+
 	if (pasn->derive_kdk &&
 	    ieee802_11_rsnx_capab_len(elems.rsnxe, elems.rsnxe_len,
 				      WLAN_RSNX_CAPAB_SECURE_LTF))
