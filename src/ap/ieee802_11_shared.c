@@ -1115,7 +1115,7 @@ u8 * hostapd_eid_rsnxe(struct hostapd_data *hapd, u8 *eid, size_t len)
 {
 	u8 *pos = eid;
 	bool sae_pk = false;
-	u32 capab = 0, tmp;
+	u64 capab = 0, tmp;
 	size_t flen;
 
 	if (!(hapd->conf->wpa & WPA_PROTO_RSN))
