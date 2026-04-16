@@ -2141,6 +2141,11 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		wpa_s->key_mgmt = WPA_KEY_MGMT_OWE;
 		wpa_dbg(wpa_s, MSG_DEBUG, "RSN: using KEY_MGMT OWE");
 #endif /* CONFIG_OWE */
+#ifdef CONFIG_ENC_ASSOC
+	} else if (sel & WPA_KEY_MGMT_EPPKE) {
+		wpa_s->key_mgmt = WPA_KEY_MGMT_EPPKE;
+		wpa_dbg(wpa_s, MSG_DEBUG, "RSN: using KEY_MGMT EPPKE");
+#endif /* CONFIG_ENC_ASSOC */
 	} else {
 		wpa_msg(wpa_s, MSG_WARNING, "WPA: Failed to select "
 			"authenticated key management type");

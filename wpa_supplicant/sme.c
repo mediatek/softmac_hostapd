@@ -910,7 +910,7 @@ sme_eppke_sae_derive_pt(struct wpa_ssid *ssid, int group)
 
 
 static bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
-				  struct wpa_bss *bss)
+				  struct wpa_bss *bss, bool unauth_eppke)
 {
 	const u8 *ap_rsnxe;
 
@@ -932,6 +932,13 @@ static bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
 				   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
 		wpa_printf(MSG_DEBUG,
 			   "EPPKE: AP does not support association frame encryption");
+		return false;
+	}
+
+	if (unauth_eppke &&
+	    !ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_UNAUTH_EPPKE)) {
+		wpa_printf(MSG_DEBUG,
+			   "EPPKE: AP does not support unauthenticated EPPKE");
 		return false;
 	}
 
@@ -1058,6 +1065,16 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 					 WPA_PARAM_SAE_PW_ID_CHANGE, 1);
 		}
 #endif /* CONFIG_SAE */
+	} else if (wpa_key_mgmt_eppke(ssid->key_mgmt) &&
+		   wpa_key_mgmt_only_enhanced_open(ssid->key_mgmt)) {
+		/* EPPKE without base AKM: verify AP supports unauthenticated
+		 * EPPKE per IEEE P802.11bi/D4.0, 12.16.9.1 */
+		if (!ieee802_11_rsnx_capab(ap_rsnxe,
+					   WLAN_RSNX_CAPAB_UNAUTH_EPPKE)) {
+			wpa_printf(MSG_DEBUG,
+				   "EPPKE: AP does not support unauthenticated EPPKE");
+			goto fail;
+		}
 	} else {
 		wpa_msg(wpa_s, MSG_INFO,
 			"EPPKE: Suitable base AKM not enabled in local configuration");
@@ -1282,7 +1299,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 			   wpa_key_mgmt_sae_ext_key(ssid->key_mgmt) &&
 			   wpa_key_mgmt_sae_ext_key(ied.key_mgmt) &&
 			   !wpas_is_sae_avoided(wpa_s, ssid, &ied) &&
-			   wpas_eppke_ap_capable(wpa_s, bss)) {
+			   wpas_eppke_ap_capable(wpa_s, bss, false)) {
 			wpa_dbg(wpa_s, MSG_DEBUG,
 				"Prefer EPPKE over SAE when both are enabled");
 			params.auth_alg = WPA_AUTH_ALG_EPPKE;
@@ -1301,6 +1318,31 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		}
 	}
 #endif /* CONFIG_SAE */
+
+#ifdef CONFIG_ENC_ASSOC
+	if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
+	    wpa_key_mgmt_only_enhanced_open(ssid->key_mgmt) &&
+	    wpa_key_mgmt_eppke(ssid->key_mgmt)) {
+		const u8 *rsn;
+		struct wpa_ie_data ied;
+
+		rsn = wpa_bss_get_rsne(wpa_s, bss, ssid, false);
+		if (!rsn) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"EPPKE: Target BSS does not advertise RSN");
+		} else if (wpa_parse_wpa_ie(rsn, 2 + rsn[1], &ied)) {
+			wpa_printf(MSG_DEBUG, "SME: Failed parsing RSNE data");
+			return;
+		} else if (ied.key_mgmt & WPA_KEY_MGMT_EPPKE &&
+			   wpas_eppke_ap_capable(wpa_s, bss, true)) {
+			wpa_dbg(wpa_s, MSG_DEBUG, "Using EPPKE auth_alg");
+			params.auth_alg = WPA_AUTH_ALG_EPPKE;
+		} else {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"EPPKE: Target BSS does not advertise EPPKE AKM");
+		}
+	}
+#endif /* CONFIG_ENC_ASSOC */
 
 #ifdef CONFIG_WEP
 	{
