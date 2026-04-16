@@ -1132,3 +1132,84 @@ def run_eppke_mld_sta_group_retry(dev, apdev):
 def test_eppke_mld_sta_with_base_akm_sae_ext_group_retry(dev, apdev):
     """EPPKE MLD AP with MLD STA: PASN group retry from 19 to 20 (AP supports groups 20 and 21)"""
     run_eppke_mld_sta_group_retry(dev, apdev)
+
+def test_eppke_without_base_akm(dev, apdev):
+    """EPPKE authentication without a base AKM (eppke_unauth=1)"""
+    check_eppke_capab(dev[0])
+    ssid = "test-eppke-nobaseakm"
+    params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
+                                 ieee80211w="2")
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params['eppke_unauth'] = '1'
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    dev[0].connect(ssid, scan_freq="2412", key_mgmt="EPPKE", ieee80211w="2",
+                   beacon_prot="1", pairwise="CCMP")
+    hapd.wait_sta()
+    sta = hapd.get_sta(dev[0].own_addr())
+    if sta["AKMSuiteSelector"] != '00-0f-ac-29' or sta["auth_alg"] != '9':
+        raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+
+def test_eppke_without_base_akm_noauth_disabled(dev, apdev):
+    """Negative test: EPPKE without base AKM when eppke_unauth is disabled"""
+    check_eppke_capab(dev[0])
+    ssid = "test-eppke-nobaseakm-neg"
+    params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
+                                 ieee80211w="2")
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params['eppke_unauth'] = '0'
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    dev[0].connect(ssid, scan_freq="2412", key_mgmt="EPPKE", ieee80211w="2",
+                   beacon_prot="1", pairwise="CCMP", wait_connect=False)
+    ev = dev[0].wait_event(["CTRL-EVENT-CONNECTED",
+                            "CTRL-EVENT-AUTH-REJECT",
+                            "CTRL-EVENT-ASSOC-REJECT"], timeout=10)
+    if ev and "CTRL-EVENT-CONNECTED" in ev:
+        raise Exception("Unexpected connection succeeded with eppke_unauth=0")
+
+def test_eppke_without_base_akm_mld_ap(dev, apdev):
+    """EPPKE authentication without base AKM on an MLD AP (eppke_unauth=1)"""
+    check_eppke_capab(dev[0])
+    ssid = "test-eppke-nobaseakm-mld"
+
+    try:
+        with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
+             HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
+            wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
+            wpas.interface_add(wpas_iface)
+
+            params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
+                                         ieee80211w="2")
+            params['ieee80211n'] = '1'
+            params['ieee80211ax'] = '1'
+            params['ieee80211be'] = '1'
+            params['channel'] = '1'
+            params['hw_mode'] = 'g'
+            params['group_mgmt_cipher'] = "AES-128-CMAC"
+            params['beacon_prot'] = '1'
+            params['assoc_frame_encryption'] = '1'
+            params['pmksa_caching_privacy'] = '1'
+            params['eppke_unauth'] = '1'
+
+            hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
+
+            params['channel'] = '6'
+            hapd1 = eht_mld_enable_ap(hapd_iface, 1, params)
+
+            wpas.connect(ssid, scan_freq="2412 2437", key_mgmt="EPPKE",
+                         ieee80211w="2", beacon_prot="1", pairwise="CCMP")
+            eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
+                              valid_links=3, active_links=3)
+            hapd0.wait_sta()
+            sta = hapd0.get_sta(wpas.own_addr())
+            if sta["AKMSuiteSelector"] != '00-0f-ac-29' or \
+               sta["auth_alg"] != '9':
+                raise Exception(
+                    "Incorrect Auth Algo/AKMSuiteSelector value")
+    except Exception as e:
+        if "MLD not supported" in str(e) or "Failed to add" in str(e):
+            raise HwsimSkip("MLD not supported")
+        raise
