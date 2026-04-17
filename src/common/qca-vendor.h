@@ -20655,7 +20655,9 @@ enum qca_wlan_vendor_attr_chan_usage_req_mode {
  * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_EXP,
  * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_PROTECTION,
  * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_DURATION,
- * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA.
+ * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA,
+ * %QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR - For Multi-Link Operation,
+ * this represents the link address of the peer.
  */
 enum qca_wlan_vendor_attr_chan_usage_req {
 	QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_INVALID = 0,
