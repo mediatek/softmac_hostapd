@@ -8185,7 +8185,7 @@ bool wpa_auth_ap_sta_support_pmkid_privacy(struct wpa_state_machine *sm)
 
 	conf = &sm->wpa_auth->conf;
 
-	return conf->assoc_frame_encryption &&
+	return conf->pmksa_caching_privacy &&
 		ieee802_11_rsnx_capab(sm->rsnxe,
 				      WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
 }
