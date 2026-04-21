@@ -839,17 +839,17 @@ static size_t hostapd_eid_eht_ml_len(struct mld_info *info,
 
 		/* Element data and (fragmentation) headers */
 		eht_ml_len += sta_len;
-		eht_ml_len += 2 + sta_len / 255 * 2;
+		eht_ml_len += 2 + (sta_len - 1) / 255 * 2;
 	}
 
-	/* Element data */
-	len += eht_ml_len;
+	/* EID_EXT_MULTI_LINK (1) + Element data */
+	len += 1 + eht_ml_len;
 
-	/* First header (254 bytes of data) */
-	len += 3;
+	/* Fragmentation headers */
+	len += (len - 1) / 255 * 2;
 
-	/* Fragmentation headers; +1 for shorter first chunk */
-	len += (eht_ml_len + 1) / 255 * 2;
+	/* Outer header EID_EXT (1) + length (1) */
+	len += 2;
 
 	return len;
 }
