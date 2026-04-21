@@ -695,7 +695,8 @@ int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *dat
 	int ret;
 
 	/* Check that HT40 is used and PRI / SEC switch is allowed */
-	if (iface->conf->no_pri_sec_switch || iface->conf->noscan)
+	if (iface->conf->no_pri_sec_switch || iface->conf->noscan ||
+	    is_6ghz_freq(iface->freq))
 		return 0;
 
 	if (!setup_ready && !iface->conf->secondary_channel)
