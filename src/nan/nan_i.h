@@ -475,6 +475,9 @@ enum nan_pairing_role {
  * @pasn: Pointer to PASN data
  * @handle: Handle of the local service instance
  * @peer_instance_id: Instance ID of the peer service
+ * @nonce_tag_valid: Indicates if the nonce and tag fields are valid
+ * @nonce: Nonce from peer's NIRA
+ * @tag: Tag from peer's NIRA
  */
 struct nan_pairing_peer_data {
 	struct nan_pairing_cfg pairing_cfg;
@@ -482,6 +485,9 @@ struct nan_pairing_peer_data {
 	struct pasn_data *pasn;
 	int handle;
 	int peer_instance_id;
+	bool nonce_tag_valid;
+	u8 nonce[NAN_NIRA_NONCE_LEN];
+	u8 tag[NAN_NIRA_TAG_LEN];
 };
 
 /**

@@ -1010,6 +1010,24 @@ static void nan_parse_npba(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+static void nan_parse_nira(struct nan_data *nan, struct nan_peer *peer,
+			   struct nan_attrs *attrs)
+{
+	const u8 *pos;
+
+	if (!attrs->nira)
+		return;
+
+	peer->pairing.pairing_cfg.pairing_verification = true;
+
+	pos = attrs->nira + 1;
+	os_memcpy(peer->pairing.nonce, pos, NAN_NIRA_NONCE_LEN);
+	pos += NAN_NIRA_NONCE_LEN;
+	os_memcpy(peer->pairing.tag, pos, NAN_NIRA_TAG_LEN);
+	peer->pairing.nonce_tag_valid = true;
+}
+
+
 /*
  * nan_parse_device_attrs - Parse device attributes and build availability info
  *
@@ -1047,6 +1065,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_parse_peer_elem_container(nan, peer, &attrs);
 	nan_parse_peer_dev_capa_ext(nan, peer, &attrs);
 	nan_parse_npba(nan, peer, &attrs);
+	nan_parse_nira(nan, peer, &attrs);
 
 	nan_peer_dump(nan, peer);
 	ret = 0;
