@@ -484,6 +484,8 @@ struct nan_peer {
  * @cluster_id: Current cluster ID
  * @nira_nonce: Nonce for NAN Identity Resolution attribute (NIRA)
  * @nira_tag: Tag for NAN Identity Resolution attribute (NIRA)
+ * @initiator_pmksa: PMKSA cache for PASN-PMK authentication as an initiator
+ * @responder_pmksa: PMKSA cache for PASN-PMK authentication as a responder
  */
 struct nan_data {
 	struct nan_config *cfg;
@@ -497,6 +499,9 @@ struct nan_data {
 
 	u8 nira_nonce[NAN_NIRA_NONCE_LEN];
 	u8 nira_tag[NAN_NIRA_TAG_LEN];
+
+	struct rsn_pmksa_cache *initiator_pmksa;
+	struct rsn_pmksa_cache *responder_pmksa;
 };
 
 struct nan_attrs_entry {

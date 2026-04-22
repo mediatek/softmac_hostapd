@@ -10,6 +10,7 @@
 #include "common.h"
 #include "utils/eloop.h"
 #include "common/ieee802_11_common.h"
+#include "pasn/pasn_common.h"
 #include "nan.h"
 #include "nan_i.h"
 
@@ -47,6 +48,17 @@ struct nan_data * nan_init(const struct nan_config *cfg)
 		os_free(nan);
 		return NULL;
 	}
+
+#ifdef CONFIG_PASN
+	nan->initiator_pmksa = pasn_initiator_pmksa_cache_init();
+	nan->responder_pmksa = pasn_responder_pmksa_cache_init();
+	if (!nan->initiator_pmksa || !nan->responder_pmksa) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to initialize PASN PMKSA cache");
+		nan_deinit(nan);
+		return NULL;
+	}
+#endif /* CONFIG_PASN */
 
 	dl_list_init(&nan->peer_list);
 
@@ -164,6 +176,10 @@ void nan_deinit(struct nan_data *nan)
 {
 	wpa_printf(MSG_DEBUG, "NAN: Deinit");
 	nan_peer_clear_all(nan);
+#ifdef CONFIG_PASN
+	pasn_initiator_pmksa_cache_deinit(nan->initiator_pmksa);
+	pasn_responder_pmksa_cache_deinit(nan->responder_pmksa);
+#endif /* CONFIG_PASN */
 	os_free(nan->cfg);
 	os_free(nan);
 }
