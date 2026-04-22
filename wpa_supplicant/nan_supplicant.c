@@ -847,6 +847,16 @@ static u16 wpas_nan_get_service_bootstrap_methods(void *ctx, int handle)
 }
 
 
+#ifdef CONFIG_PASN
+static int wpas_nan_pasn_send_cb(void *ctx, const u8 *data, size_t data_len)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	return wpa_drv_send_mlme(wpa_s, data, data_len, 0, 0, 0);
+}
+#endif /* CONFIG_PASN */
+
+
 int wpas_nan_init(struct wpa_supplicant *wpa_s)
 {
 	struct nan_config nan;
@@ -865,6 +875,9 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.start = wpas_nan_start_cb;
 	nan.stop = wpas_nan_stop_cb;
 	nan.update_config = wpas_nan_update_config_cb;
+#ifdef CONFIG_PASN
+	nan.send_pasn = wpas_nan_pasn_send_cb;
+#endif /* CONFIG_PASN */
 
 	/* NDP */
 	nan.ndp_action_notif = wpas_nan_ndp_action_notif_cb;
