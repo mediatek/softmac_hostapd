@@ -255,6 +255,12 @@ extern "C" {
 #define NAN_BOOTSTRAP_SUCCESS "NAN-BOOTSTRAP-SUCCESS "
 #define NAN_BOOTSTRAP_FAILURE "NAN-BOOTSTRAP-FAILURE "
 
+/* NAN Pairing status
+ * addr=<peer address> akmp=<SAE|PASN> cipher=<CCMP|GCMP-256>
+ * status=<success|failure>
+ */
+#define NAN_PAIRING_STATUS "NAN-PAIRING-STATUS "
+
 /* MESH events */
 #define MESH_GROUP_STARTED "MESH-GROUP-STARTED "
 #define MESH_GROUP_REMOVED "MESH-GROUP-REMOVED "

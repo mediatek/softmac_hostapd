@@ -848,12 +848,54 @@ static u16 wpas_nan_get_service_bootstrap_methods(void *ctx, int handle)
 
 
 #ifdef CONFIG_PASN
+
 static int wpas_nan_pasn_send_cb(void *ctx, const u8 *data, size_t data_len)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
 	return wpa_drv_send_mlme(wpa_s, data, data_len, 0, 0, 0);
 }
+
+
+static int wpas_nan_pasn_auth_status_cb(void *ctx, const u8 *peer_addr,
+					int akmp, int cipher, u16 status,
+					struct wpa_ptk *ptk)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	enum wpa_alg alg;
+	u8 seq[6];
+
+	wpa_msg_global(wpa_s, MSG_INFO,
+		       NAN_PAIRING_STATUS "addr=" MACSTR
+		       " akmp=%s cipher=%s status=%s",
+		       MAC2STR(peer_addr),
+		       wpa_key_mgmt_txt(akmp, WPA_PROTO_RSN),
+		       wpa_cipher_txt(cipher),
+		       status == WLAN_STATUS_SUCCESS ? "success" : "failure");
+
+	if (status != WLAN_STATUS_SUCCESS)
+		return 0;
+
+	if (!ptk) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: No PTK provided after pairing with peer "
+			   MACSTR, MAC2STR(peer_addr));
+		return -1;
+	}
+
+	alg = cipher == WPA_CIPHER_CCMP ? WPA_ALG_CCMP : WPA_ALG_GCMP_256;
+	os_memset(seq, 0, sizeof(seq));
+	if (wpa_drv_set_key(wpa_s, -1, alg, peer_addr, 0, 1, seq, sizeof(seq),
+			    ptk->tk, ptk->tk_len, KEY_FLAG_PAIRWISE_RX_TX)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to install NM-TK for peer " MACSTR,
+			   MAC2STR(peer_addr));
+		return -1;
+	}
+
+	return 0;
+}
+
 #endif /* CONFIG_PASN */
 
 
@@ -877,6 +919,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.update_config = wpas_nan_update_config_cb;
 #ifdef CONFIG_PASN
 	nan.send_pasn = wpas_nan_pasn_send_cb;
+	nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
 #endif /* CONFIG_PASN */
 
 	/* NDP */
