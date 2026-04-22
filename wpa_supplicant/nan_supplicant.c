@@ -2140,6 +2140,19 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
+	/*
+	 * For NDP response (publisher side), check if the requested CSID is in
+	 * the service's advertised cipher suite list.
+	 */
+	if (ndp->type == NAN_NDP_ACTION_RESP &&
+	    !nan_de_service_supports_csid(wpa_s->nan_de, handle,
+					  ndp->sec.csid)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Requested CSID %d not advertised by service",
+			   ndp->sec.csid);
+		return -1;
+	}
+
 	if (pmk) {
 		if (os_strlen(pmk) != PMK_LEN * 2) {
 			wpa_printf(MSG_INFO, "NAN: Invalid PMK length: %zu",

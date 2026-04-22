@@ -260,6 +260,7 @@ void nan_de_set_cluster_id(struct nan_de *de, const u8 *cluster_id);
 bool nan_de_is_valid_instance_id(struct nan_de *de, int handle,
 				 bool publish, u8 *service_id);
 u16 nan_de_get_service_bootstrap_methods(struct nan_de *de, int handle);
+bool nan_de_service_supports_csid(struct nan_de *de, int handle, int csid);
 
 int nan_de_stop_listen(struct nan_de *de, int handle);
 

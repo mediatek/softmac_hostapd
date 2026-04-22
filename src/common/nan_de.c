@@ -2596,3 +2596,23 @@ u16 nan_de_get_service_bootstrap_methods(struct nan_de *de, int handle)
 
 	return srv->pbm;
 }
+
+
+bool nan_de_service_supports_csid(struct nan_de *de, int handle, int csid)
+{
+	struct nan_de_service *srv;
+
+	if (handle < 1 || handle > NAN_DE_MAX_SERVICE)
+		return false;
+
+	srv = de->service[handle - 1];
+	if (!srv)
+		return false;
+
+	/* If cipher_suites_list is not set, all CSIDs are allowed */
+	if (!srv->cipher_suites_list)
+		return true;
+
+	/* Check if the CSID is in the service's cipher suite list */
+	return int_array_includes(srv->cipher_suites_list, csid);
+}
