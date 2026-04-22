@@ -1528,7 +1528,8 @@ static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 			drv->send_frame_cookie = (u64) -1;
 		}
 
-		if (drv->nlmode == NL80211_IFTYPE_NAN &&
+		if ((drv->nlmode == NL80211_IFTYPE_NAN ||
+		     drv->nlmode == NL80211_IFTYPE_NAN_DATA) &&
 		    drv->num_send_frame_cookies > 0 &&
 		    find_send_frame_cookie(drv, cookie_val, &i)) {
 			/*

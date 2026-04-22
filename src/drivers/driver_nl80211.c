@@ -9836,7 +9836,8 @@ static int nl80211_send_frame_cmd(struct i802_bss *bss,
 		 * cases that the NAN Discovery Engine (NAN DE) is not managed
 		 * by the device.
 		 */
-		if (!wait && drv->nlmode != NL80211_IFTYPE_NAN)
+		if (!wait && drv->nlmode != NL80211_IFTYPE_NAN &&
+		    drv->nlmode != NL80211_IFTYPE_NAN_DATA)
 			goto fail;
 
 		if (drv->num_send_frame_cookies == MAX_SEND_FRAME_COOKIES) {
