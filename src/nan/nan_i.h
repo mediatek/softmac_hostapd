@@ -310,8 +310,6 @@ struct nan_peer_sec_info_entry {
  *	(struct nan_elem_container_entry::list entries)
  * @sec: List of security information entries of the peer
  *	(struct nan_peer_sec_info_entry::list entries)
- * @pairing_support: Indicates whether the peer supports pairing
- * @npk_nik_caching_support: Indicates whether the peer supports NPK/NIK caching
  */
 struct nan_peer_info {
 	struct os_reltime last_seen;
@@ -320,9 +318,6 @@ struct nan_peer_info {
 	struct dl_list dev_capa;
 	struct dl_list element_container;
 	struct dl_list sec;
-
-	bool pairing_support;
-	bool npk_nik_caching_support;
 };
 
 /**

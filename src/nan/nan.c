@@ -983,9 +983,9 @@ static void nan_parse_peer_dev_capa_ext(struct nan_data *nan,
 	if (!attrs->dev_capa_ext || attrs->dev_capa_ext_len <= 1)
 		return;
 
-	peer->info.pairing_support = attrs->dev_capa_ext[1] &
+	peer->pairing.pairing_cfg.pairing_setup = attrs->dev_capa_ext[1] &
 		NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP;
-	peer->info.npk_nik_caching_support = attrs->dev_capa_ext[1] &
+	peer->pairing.pairing_cfg.npk_caching = attrs->dev_capa_ext[1] &
 		NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING;
 }
 
@@ -2336,7 +2336,7 @@ bool nan_peer_pairing_supported(struct nan_data *nan, const u8 *addr)
 	if (!peer)
 		return false;
 
-	return peer->info.pairing_support;
+	return peer->pairing.pairing_cfg.pairing_setup;
 }
 
 
@@ -2348,7 +2348,7 @@ bool nan_peer_npk_nik_caching_supported(struct nan_data *nan, const u8 *addr)
 	if (!peer)
 		return false;
 
-	return peer->info.npk_nik_caching_support;
+	return peer->pairing.pairing_cfg.npk_caching;
 }
 
 
