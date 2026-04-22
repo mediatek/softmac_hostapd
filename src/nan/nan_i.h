@@ -468,6 +468,10 @@ enum nan_pairing_role {
 	NAN_PAIRING_ROLE_RESPONDER,
 };
 
+
+/* Current pairing uses pairing verification */
+#define NAN_PAIRING_FLAG_NPK_VERIFICATION BIT(0)
+
 /**
  * struct nan_pairing_peer_data - NAN pairing peer information
  * @pairing_cfg: NAN pairing configuration parameters
@@ -478,6 +482,7 @@ enum nan_pairing_role {
  * @nonce_tag_valid: Indicates if the nonce and tag fields are valid
  * @nonce: Nonce from peer's NIRA
  * @tag: Tag from peer's NIRA
+ * @flags: Bitmap of pairing flags. See NAN_PAIRING_FLAG_*
  */
 struct nan_pairing_peer_data {
 	struct nan_pairing_cfg pairing_cfg;
@@ -488,6 +493,7 @@ struct nan_pairing_peer_data {
 	bool nonce_tag_valid;
 	u8 nonce[NAN_NIRA_NONCE_LEN];
 	u8 tag[NAN_NIRA_TAG_LEN];
+	u32 flags;
 };
 
 /**

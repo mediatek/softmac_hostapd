@@ -534,11 +534,13 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 
 	peer->pairing.handle = handle;
 	peer->pairing.peer_instance_id = peer_instance_id;
+	peer->pairing.flags = 0;
 
 	if (responder)
 		return 0;
 
 	if (auth_mode == NAN_PASN_AUTH_MODE_PMK) {
+		peer->pairing.flags |= NAN_PAIRING_FLAG_NPK_VERIFICATION;
 		ret = wpa_pasn_verify(pasn, pasn->own_addr, pasn->peer_addr,
 				      pasn->bssid, pasn->akmp, pasn->cipher,
 				      pasn->group, 0, NULL, 0, NULL, 0, NULL);
@@ -576,7 +578,8 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 	int ret;
 
 	if (!nan_data->cfg->pairing_cfg.npk_caching ||
-	    !peer->pairing.pairing_cfg.npk_caching)
+	    !peer->pairing.pairing_cfg.npk_caching ||
+	    (peer->pairing.flags & NAN_PAIRING_FLAG_NPK_VERIFICATION))
 		return;
 
 	wpa_printf(MSG_DEBUG, "NAN: Pairing: Derive KEK after PASN pairing");
@@ -696,6 +699,9 @@ static int nan_send_nik(struct nan_data *nan_data, struct nan_peer *peer)
 			   "NAN: Pairing: Peer NPK caching not enabled, don't send NIK");
 		return 0;
 	}
+
+	if (peer->pairing.flags & NAN_PAIRING_FLAG_NPK_VERIFICATION)
+		return 0;
 
 	if (!peer->pairing.pasn || !peer->pairing.pasn->ptk.kek_len) {
 		wpa_printf(MSG_DEBUG,
