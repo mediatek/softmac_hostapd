@@ -8372,7 +8372,7 @@ struct wpa_supplicant * wpa_supplicant_add_iface(struct wpa_global *global,
 	wpa_supplicant_set_state(wpa_s, WPA_DISCONNECTED);
 
 #ifdef CONFIG_P2P
-	if (!wpa_s->global->p2p && !iface->nan_mgmt &&
+	if (!wpa_s->global->p2p && !wpas_is_nan_iface(wpa_s) &&
 	    !wpa_s->global->p2p_disabled && !wpa_s->conf->p2p_disabled &&
 	    (wpa_s->drv_flags & WPA_DRIVER_FLAGS_DEDICATED_P2P_DEVICE) &&
 	    wpas_p2p_add_p2pdev_interface(

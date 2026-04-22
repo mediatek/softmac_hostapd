@@ -2177,4 +2177,13 @@ void wpas_update_dfs_ap_info(struct wpa_supplicant *wpa_s, int freq,
 			     bool disconnect_evt);
 void wpas_configure_frame_filters(struct wpa_supplicant *wpa_s);
 
+static inline bool wpas_is_nan_iface(struct wpa_supplicant *wpa_s)
+{
+#ifdef CONFIG_NAN
+	return wpa_s->nan_mgmt || wpa_s->nan_data;
+#else /* CONFIG_NAN */
+	return false;
+#endif /* CONFIG_NAN */
+}
+
 #endif /* WPA_SUPPLICANT_I_H */

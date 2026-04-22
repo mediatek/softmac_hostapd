@@ -5310,6 +5310,7 @@ wpa_supplicant_event_interface_status(struct wpa_supplicant *wpa_s,
 		if (!wpa_s->global->p2p &&
 		    !wpa_s->global->p2p_disabled &&
 		    !wpa_s->conf->p2p_disabled &&
+		    !wpas_is_nan_iface(wpa_s) &&
 		    (wpa_s->drv_flags &
 		     WPA_DRIVER_FLAGS_DEDICATED_P2P_DEVICE) &&
 		    wpas_p2p_add_p2pdev_interface(
@@ -6899,7 +6900,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			break;
 #endif /* CONFIG_PASN */
 
-		if (wpa_s->nan_mgmt &&
+		if (wpas_is_nan_iface(wpa_s) &&
 		    data->tx_status.type == WLAN_FC_TYPE_MGMT &&
 		    data->tx_status.stype == WLAN_FC_STYPE_ACTION &&
 		    wpas_nan_tx_status(wpa_s, data->tx_status.data,
