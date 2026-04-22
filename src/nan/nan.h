@@ -605,6 +605,21 @@ struct nan_config {
 	 * Returns: 0 on success, -1 on failure
 	 */
 	int (*send_pasn)(void *ctx, const u8 *data, size_t data_len);
+
+	/**
+	 * pairing_status_cb - Callback for reporting NAN pairing result
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_addr: Peer NAN device address
+	 * @akmp: AKMP used in the pairing
+	 * @cipher: Cipher used in the pairing
+	 * @status: Status of the pairing (WLAN_STATUS_* )
+	 * @ptk: Derived PTK for the pairing (valid only if status is success)
+	 * Returns: 0 if status is WLAN_STATUS_SUCCESS and the key was
+	 *	installed successfully or status is
+	 *	WLAN_STATUS_UNSPECIFIED_FAILURE, -1 otherwise
+	 */
+	int (*pairing_result_cb)(void *ctx, const u8 *peer_addr, int akmp,
+				 int cipher, u16 status, struct wpa_ptk *ptk);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
@@ -681,6 +696,8 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 				   u8 auth_mode, int cipher, int handle,
 				   u8 peer_instance_id, bool responder,
 				   const char *password);
+int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
+				    size_t data_len, bool acked);
 #else /* CONFIG_PASN */
 static inline int nan_pairing_add_attrs(struct nan_data *nan_data,
 					struct wpabuf *buf)
@@ -693,6 +710,13 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 				   u8 auth_mode, int cipher, int handle,
 				   u8 peer_instance_id, bool responder,
 				   const char *password)
+{
+	return -1;
+}
+
+static inline int nan_pairing_pasn_auth_tx_status(struct nan_data *nan,
+						  const u8 *data,
+						  size_t data_len, bool acked)
 {
 	return -1;
 }

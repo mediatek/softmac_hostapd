@@ -429,3 +429,56 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 
 	return ret;
 }
+
+
+/**
+ * nan_pairing_pasn_auth_tx_status - Handle PASN Authentication frame TX status
+ * @nan: Pointer to NAN data structure
+ * @data: Pointer to the transmitted frame data
+ * @data_len: Length of the transmitted frame data in bytes
+ * @acked: Whether the frame was acknowledged
+ * Returns: 0 on success, -1 on error
+ *
+ * This function processes the transmission status of a PASN Authentication
+ * frame used in NAN pairing and triggers the pairing result callback in case
+ * PASN is done.
+ */
+int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
+				    size_t data_len, bool acked)
+{
+	int ret;
+	struct nan_peer *peer;
+	struct pasn_data *pasn;
+	const struct ieee80211_mgmt *mgmt =
+		(const struct ieee80211_mgmt *) data;
+
+	if (!nan || !data ||
+	    data_len < offsetof(struct ieee80211_mgmt, u.auth.variable))
+		return -1;
+
+	peer = nan_get_peer(nan, mgmt->da);
+	if (!peer || !peer->pairing.pasn) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Peer not found " MACSTR,
+			   MAC2STR(mgmt->da));
+		return -1;
+	}
+
+	pasn = peer->pairing.pasn;
+
+	ret = wpa_pasn_auth_tx_status(pasn, data, data_len, acked);
+	if (ret == 1) {
+		ret = nan->cfg->pairing_result_cb(nan->cfg->cb_ctx,
+						  peer->nmi_addr,
+						  pasn->akmp, pasn->cipher,
+						  pasn->status, &pasn->ptk);
+		if (pasn->status != WLAN_STATUS_SUCCESS || ret < 0) {
+			nan_pairing_deinit_peer(peer);
+			return -1;
+		}
+	}
+
+	wpabuf_free(pasn->frame);
+	pasn->frame = NULL;
+
+	return 0;
+}
