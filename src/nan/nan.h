@@ -659,6 +659,9 @@ int nan_set_bootstrap_configuration(struct nan_data *nan,
 				    u16 supported_bootstrap_methods,
 				    u16 auto_accept_bootstrap_methods,
 				    u16 bootstrap_comeback_timeout);
+struct wpabuf * nan_crypto_derive_nira_tag(const u8 *nik, size_t nik_len,
+					   const u8 *nmi_addr,
+					   const u8 *nira_nonce);
 #ifdef CONFIG_PASN
 int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
 #else /* CONFIG_PASN */

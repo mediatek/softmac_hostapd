@@ -309,3 +309,63 @@ int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
 		return -1;
 	}
 }
+
+
+/**
+ * nan_crypto_derive_nira_tag - Derive NIRA tag
+ * @nik: NAN Identity Key
+ * @nik_len: Length of &nik in bytes
+ * @nmi_addr: NAN Management Interface address (6 bytes)
+ * @nira_nonce: NIRA nonce (8 bytes)
+ * Returns: wpabuf containing the derived tag (8 bytes) or %NULL on failure
+ *
+ * Derives a NIRA tag for cipher version 0 using HMAC-SHA-256:
+ * Tag = Truncate-64(HMAC-SHA-256(NIK, "NIR" || NMI Address || Nonce))
+ * The caller is responsible for freeing the returned wpabuf using
+ * wpabuf_free().
+ */
+struct wpabuf * nan_crypto_derive_nira_tag(const u8 *nik, size_t nik_len,
+					   const u8 *nmi_addr,
+					   const u8 *nira_nonce)
+{
+	u8 data[NAN_NIRA_STR_LEN + ETH_ALEN + NAN_NIRA_NONCE_LEN];
+	u8 tag[SHA256_MAC_LEN];
+	struct wpabuf *tag_buf;
+
+	if (!nik || nik_len != NAN_NIK_LEN) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Invalid NIK for tag derivation (len=%zu)",
+			   nik ? nik_len : 0);
+		return NULL;
+	}
+
+	if (!nmi_addr || !nira_nonce) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Invalid parameters for tag derivation");
+		return NULL;
+	}
+
+	/* Tag = Truncate-64(HMAC-SHA-256(NIK, “NIR”, NMI || Nonce)) */
+
+	/* Construct data: "NIR" || NMI Address || Nonce */
+	os_memcpy(data, NAN_NIRA_STR, NAN_NIRA_STR_LEN);
+	os_memcpy(&data[NAN_NIRA_STR_LEN], nmi_addr, ETH_ALEN);
+	os_memcpy(&data[NAN_NIRA_STR_LEN + ETH_ALEN], nira_nonce,
+		  NAN_NIRA_NONCE_LEN);
+
+	/* Compute HMAC-SHA-256(NIK, data) */
+	if (hmac_sha256(nik, NAN_NIK_LEN, data, sizeof(data), tag) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to compute HMAC for tag");
+		return NULL;
+	}
+
+	tag_buf = wpabuf_alloc_copy(tag, NAN_NIRA_TAG_LEN);
+	if (!tag_buf)
+		wpa_printf(MSG_INFO, "NAN: Failed to allocate tag buffer");
+	else
+		wpa_hexdump(MSG_DEBUG, "NAN: Derived NIRA tag",
+			    wpabuf_head(tag_buf), wpabuf_len(tag_buf));
+
+	forced_memzero(tag, sizeof(tag));
+	return tag_buf;
+}

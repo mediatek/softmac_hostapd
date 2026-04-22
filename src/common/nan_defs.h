@@ -558,4 +558,13 @@ struct nan_shared_key {
 #define NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP     BIT(0)
 #define NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING   BIT(1)
 
+/* Wi-Fi Aware spec v4.0, Table 22 (NIRA Cryptographic Parameters and Methods)
+ */
+#define NAN_NIRA_NONCE_LEN	8
+#define NAN_NIRA_TAG_LEN	8
+#define NAN_NIRA_STR		"NIR"
+#define NAN_NIRA_STR_LEN	3
+#define NAN_NIRA_CIPHER_VER_128	0
+#define NAN_NIK_LEN		16
+
 #endif /* NAN_DEFS_H */
