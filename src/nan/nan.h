@@ -637,6 +637,19 @@ struct nan_config {
 					  size_t nik_len, int cipher_ver,
 					  int nik_lifetime, int akmp,
 					  const u8 *npk, size_t npk_len);
+
+	/**
+	 * get_npk_akmp - Get the cached NPK and AKMP for a peer
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 * @nonce: Nonce from the peer's NIRA
+	 * @tag: Tag from the peer's NIRA
+	 * @akmp: On success, set to the AKMP suite used to establish the NPKSA
+	 * Returns: The NPK on success, NULL on failure
+	 */
+	const struct wpabuf * (*get_npk_akmp)(void *ctx, const u8 *peer_nmi,
+					      const u8 *nonce, const u8 *tag,
+					      int *akmp);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);

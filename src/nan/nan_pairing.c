@@ -118,6 +118,12 @@ static bool nan_pairing_is_supported(struct nan_data *nan_data,
 				   "NAN: Pairing: Peer doesn't support pairing verification");
 			return false;
 		}
+
+		if (!nan_data->cfg->get_npk_akmp) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: get_npk_akmp callback not set");
+			return false;
+		}
 	}
 
 	return true;
@@ -187,6 +193,96 @@ static int nan_pairing_send_cb(void *ctx, const u8 *data, size_t data_len,
 	struct nan_data *nan_data = (struct nan_data *) ctx;
 
 	return nan_data->cfg->send_pasn(nan_data->cfg->cb_ctx, data, data_len);
+}
+
+
+/**
+ * nan_pasn_verification_init - Initialize PASN data for pairing verification
+ * @nan_data: Pointer to NAN data structure containing configuration
+ * @peer: Pointer to the NAN peer structure
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function gets the NPK and AKMP for the given peer and sets it as the
+ * PASN PMK and AKMP. It also generates the NIRA nonce and tag to be used as the
+ * custom PMKID for the PASN verification process.
+ */
+static int nan_pasn_verification_init(struct nan_data *nan_data,
+				      struct nan_peer *peer)
+{
+	struct nan_pairing_peer_data *pairing_data;
+	const struct wpabuf *npk;
+	int akmp;
+	u8 npkid[NAN_NIRA_NONCE_LEN + NAN_NIRA_TAG_LEN];
+	struct pasn_data *pasn;
+
+	pairing_data = &peer->pairing;
+	pasn = pairing_data->pasn;
+
+	if (!pairing_data->nonce_tag_valid) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: NIK ID not available for verification");
+		return -1;
+	}
+
+	npk = nan_data->cfg->get_npk_akmp(nan_data->cfg->cb_ctx, peer->nmi_addr,
+					  pairing_data->nonce,
+					  pairing_data->tag, &akmp);
+	if (!npk) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to get NPK AKMP for verification");
+		return -1;
+	}
+
+	pasn_set_akmp(pairing_data->pasn, akmp);
+
+	os_free(pasn->pasn_groups);
+	pasn->pasn_groups = os_calloc(2, sizeof(int));
+	if (!pasn->pasn_groups) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Failed to allocate PASN groups");
+		return -1;
+	}
+
+	pasn->pasn_groups[0] = pasn->group;
+
+	if (pairing_data->self_pairing_role == NAN_PAIRING_ROLE_INITIATOR)
+		pasn_initiator_pmksa_cache_add(nan_data->initiator_pmksa,
+					       nan_data->cfg->nmi_addr,
+					       peer->nmi_addr,
+					       wpabuf_head_u8(npk),
+					       wpabuf_len(npk), NULL, akmp);
+	else
+		pasn_responder_pmksa_cache_add(nan_data->responder_pmksa,
+					       nan_data->cfg->nmi_addr,
+					       peer->nmi_addr,
+					       wpabuf_head_u8(npk),
+					       wpabuf_len(npk), NULL, akmp);
+
+	/*
+	 * According to Wi-Fi Aware Specification v4.0, section 7.6.5, pairing
+	 * verification uses NPKID constructed from NIRA nonce and tag. The same
+	 * nonce and tag should be used in the NIRA added to PASN first and
+	 * second frames.
+	 */
+	if (nan_nira_get_tag_nonce(nan_data->cfg, npkid,
+				   &npkid[NAN_NIRA_NONCE_LEN]) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to get NIRA tag and nonce");
+		return -1;
+	}
+
+	pasn_set_custom_pmkid(pairing_data->pasn, npkid);
+	return 0;
+}
+
+
+static int nan_validate_custom_pmkid(void *ctx, const u8 *addr, const u8 *pmkid)
+{
+	/*
+	 * In NAN pairing, custom PMKID is constructed from NIRA nonce and tag.
+	 * Matching the tag to a known NIK is done during NIRA validation so
+	 * here we just accept any PMKID.
+	 */
+	return 0;
 }
 
 
@@ -264,6 +360,12 @@ static int nan_pairing_pasn_initialize(struct nan_data *nan_data,
 			goto fail;
 		}
 		pasn->pasn_groups[0] = pasn->group;
+	} else if (auth_mode == NAN_PASN_AUTH_MODE_PMK) {
+		if (nan_pasn_verification_init(nan_data, peer)) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: PASN verification init failed");
+			goto fail;
+		}
 	} else {
 		wpa_printf(MSG_INFO,
 			   "NAN: Pairing: Unsupported authentication mode %u",
@@ -286,8 +388,8 @@ static int nan_pairing_pasn_initialize(struct nan_data *nan_data,
 		wpabuf_free(rsnxe);
 	}
 
-	pasn_register_callbacks(pasn, nan_data, nan_pairing_send_cb, NULL,
-				NULL, NULL);
+	pasn_register_callbacks(pasn, nan_data, nan_pairing_send_cb,
+				nan_validate_custom_pmkid, NULL, NULL);
 	return 0;
 
 fail:
