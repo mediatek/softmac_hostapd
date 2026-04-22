@@ -538,9 +538,16 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 	if (responder)
 		return 0;
 
-	ret = wpas_pasn_start(pasn, pasn->own_addr, pasn->peer_addr,
-			      pasn->bssid, pasn->akmp, pasn->cipher,
-			      pasn->group, 0, NULL, 0, NULL, 0, NULL);
+	if (auth_mode == NAN_PASN_AUTH_MODE_PMK) {
+		ret = wpa_pasn_verify(pasn, pasn->own_addr, pasn->peer_addr,
+				      pasn->bssid, pasn->akmp, pasn->cipher,
+				      pasn->group, 0, NULL, 0, NULL, 0, NULL);
+	} else {
+		ret = wpas_pasn_start(pasn, pasn->own_addr, pasn->peer_addr,
+				      pasn->bssid, pasn->akmp, pasn->cipher,
+				      pasn->group, 0, NULL, 0, NULL, 0, NULL);
+	}
+
 	if (ret) {
 		wpa_printf(MSG_INFO, "NAN: Pairing: Failed to start PASN");
 		nan_pairing_deinit_peer(peer);
