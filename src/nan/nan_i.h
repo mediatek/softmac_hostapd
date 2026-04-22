@@ -738,6 +738,8 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 			     const u8 *buf, size_t len,
 			     int handle, u8 req_instance_id);
 int nan_add_nira(struct wpabuf *buf, const u8 *tag, const u8 *nonce);
+void nan_parse_peer_dev_capa_ext(struct nan_data *nan, struct nan_peer *peer,
+				 struct nan_attrs *attrs);
 #ifdef CONFIG_PASN
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag);
 void nan_pairing_deinit_peer(struct nan_peer *peer);

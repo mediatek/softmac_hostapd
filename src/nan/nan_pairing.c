@@ -9,6 +9,7 @@
 #include "includes.h"
 #include "common.h"
 #include "common/ieee802_11_defs.h"
+#include "common/ieee802_11_common.h"
 #include "pasn/pasn_common.h"
 #include "nan/nan_i.h"
 
@@ -481,4 +482,256 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 	pasn->frame = NULL;
 
 	return 0;
+}
+
+
+/**
+ * nan_parse_csia - Parse NAN Cipher Suite Info Attribute
+ * @csia: Pointer to the CSIA data buffer
+ * @len: Length of the CSIA data buffer
+ * @cs: Pointer to nan_cipher_suite structure to store parsed information
+ * Returns: 0 on success, -1 on failure
+ *
+ * Parses the NAN Cipher Suite Info Attribute (CSIA) and extracts the cipher
+ * suite ID (csid) and instance ID from the attribute. It is assumed that only
+ * one cipher suite is present in the attribute (which is the case for NAN
+ * pairing).
+ */
+static int nan_parse_csia(const u8 *csia, size_t len,
+			  struct nan_cipher_suite *cs)
+{
+	/* Capabilities (1) + Cipher Suite list (2) */
+	if (len < sizeof(struct nan_cipher_suite_info) +
+	    sizeof(struct nan_cipher_suite)) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: CSIA too short");
+		return -1;
+	}
+
+	cs->csid = csia[1];
+	cs->instance_id = csia[2];
+
+	if (cs->csid != NAN_CS_PK_PASN_128 && cs->csid != NAN_CS_PK_PASN_256) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Unsupported cipher suite in CSIA: %u",
+			   cs->csid);
+		return -1;
+	}
+
+	return 0;
+}
+
+
+/**
+ * nan_pairing_process_elems - Process NAN pairing information elements
+ * @nan_data: NAN state data
+ * @peer: NAN peer information structure
+ * @mgmt: PASN Authentication frame
+ * @len: Length of the PASN Authentication frame
+ * @cs: Output cipher suite structure to be filled
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function processes NAN pairing information elements from a PASN
+ * Authentication frame. It extracts the selected cipher suite and intance ID.
+ */
+static int nan_pairing_process_elems(struct nan_data *nan_data,
+				     struct nan_peer *peer,
+				     const struct ieee80211_mgmt *mgmt,
+				     size_t len, struct nan_cipher_suite *cs)
+{
+	const u8 *ies;
+	size_t ies_len;
+	const u8 *buf;
+	struct wpabuf *ie_buf;
+	struct nan_attrs attrs;
+	int ret;
+
+	if (len < offsetof(struct ieee80211_mgmt, u.auth.variable)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: PASN frame too short for NAN elements");
+		return -1;
+	}
+
+	ies = mgmt->u.auth.variable;
+	ies_len = len - offsetof(struct ieee80211_mgmt, u.auth.variable);
+
+	buf = get_vendor_ie(ies, ies_len, NAN_IE_VENDOR_TYPE);
+	if (!buf)
+		return -1;
+
+	ie_buf = ieee802_11_defrag(buf + 2, buf[1], false);
+	if (!ie_buf)
+		return -1;
+
+	buf = wpabuf_head(ie_buf);
+	ret = nan_parse_attrs(nan_data, &buf[4], wpabuf_len(ie_buf) - 4,
+			      &attrs);
+	if (ret)
+		goto fail;
+
+	nan_parse_peer_dev_capa_ext(nan_data, peer, &attrs);
+
+	if (!attrs.cipher_suite_info || !attrs.cipher_suite_info_len ||
+	    nan_parse_csia(attrs.cipher_suite_info, attrs.cipher_suite_info_len,
+			   cs) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: CSIA missing or invalid");
+		ret = -1;
+	}
+
+
+	nan_attrs_clear(nan_data, &attrs);
+fail:
+	wpabuf_free(ie_buf);
+	return ret;
+}
+
+
+/**
+ * nan_pairing_handle_auth_1 - Handle the first PASN frame in NAN pairing
+ * @nan_data: Pointer to NAN data structure
+ * @own_addr: Own MAC address
+ * @peer: Pointer to NAN peer structure
+ * @mgmt: Pointer to the received PASN frame
+ * @len: Length of the PASN frame
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function processes the first PASN Authentication frame during NAN
+ * pairing as a responder. It initializes the PASN data structure, prepares
+ * the necessary information elements, and delegates to the PASN module to
+ * handle the authentication.
+ */
+static int nan_pairing_handle_auth_1(struct nan_data *nan_data, u8 *own_addr,
+				     struct nan_peer *peer,
+				     const struct ieee80211_mgmt *mgmt,
+				     size_t len)
+{
+	struct nan_cipher_suite cs;
+	struct pasn_data *pasn;
+	int cipher;
+
+	if (peer->pairing.self_pairing_role != NAN_PAIRING_ROLE_RESPONDER) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Unexpected Auth1 frame");
+		return -1;
+	}
+
+	pasn = peer->pairing.pasn;
+
+	if (nan_pairing_process_elems(nan_data, peer, mgmt, len, &cs)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Handle Auth1 NAN attributes failed");
+		return -1;
+	}
+
+	cipher = cs.csid == NAN_CS_PK_PASN_256 ? WPA_CIPHER_GCMP_256 :
+		WPA_CIPHER_CCMP;
+
+	if (cipher != pasn->cipher) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Cipher suite mismatch (CSIA: %s, PASN: %s)",
+			   wpa_cipher_txt(cipher),
+			   wpa_cipher_txt(pasn->cipher));
+		return -1;
+	}
+
+	if (handle_auth_pasn_1(pasn, own_addr, peer->nmi_addr, mgmt, len,
+			       false) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Handle Auth1 failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+
+/**
+ * nan_pairing_auth_rx - Handle received NAN pairing Authentication frames
+ * @nan_data: Pointer to NAN data structure
+ * @mgmt: Pointer to the PASN Authentication frame
+ * @len: Length of the PASN Authentication frame in bytes
+ * Returns: 0 on success, -1 on failure
+ */
+int nan_pairing_auth_rx(struct nan_data *nan_data,
+			const struct ieee80211_mgmt *mgmt, size_t len)
+{
+	struct nan_peer *peer;
+	u16 auth_alg, auth_transaction, status_code;
+	int ret;
+	struct wpabuf *nan_ie;
+	const u8 *buf;
+
+	if (len < offsetof(struct ieee80211_mgmt, u.auth.variable))
+		return -1;
+
+	if (!ether_addr_equal(mgmt->da, nan_data->cfg->nmi_addr)) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Not our frame");
+		return -1;
+	}
+
+	auth_alg = le_to_host16(mgmt->u.auth.auth_alg);
+	auth_transaction = le_to_host16(mgmt->u.auth.auth_transaction);
+	status_code = le_to_host16(mgmt->u.auth.status_code);
+
+	if (auth_alg != WLAN_AUTH_PASN) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Not a PASN frame, auth_alg=%d",
+			   auth_alg);
+		return -1;
+	}
+
+	buf = get_vendor_ie(mgmt->u.auth.variable,
+			    len - offsetof(struct ieee80211_mgmt,
+					   u.auth.variable),
+			    NAN_IE_VENDOR_TYPE);
+	if (!buf)
+		return -1;
+
+	nan_ie = ieee802_11_defrag(buf + 2, buf[1], false);
+	if (!nan_ie) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: No NAN element in PASN Authentication frame");
+		return -1;
+	}
+
+	ret = nan_add_peer(nan_data, mgmt->sa, wpabuf_head_u8(nan_ie) + 4,
+			   wpabuf_len(nan_ie) - 4);
+	wpabuf_free(nan_ie);
+	if (ret) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to add peer from PASN");
+		return -1;
+	}
+
+	peer = nan_get_peer(nan_data, mgmt->sa);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to get a peer that was just added");
+		return -1;
+	}
+
+	if (!peer->pairing.pasn) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: PASN data not initialized for peer");
+		return -1;
+	}
+
+	if (status_code != WLAN_STATUS_SUCCESS) {
+		struct pasn_data *pasn = peer->pairing.pasn;
+
+		nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
+						 peer->nmi_addr, pasn->akmp,
+						 pasn->cipher, status_code,
+						 NULL);
+		nan_pairing_deinit_peer(peer);
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Authentication rejected - status=%u",
+			   status_code);
+		return -1;
+	}
+
+	if (auth_transaction == 1)
+		return nan_pairing_handle_auth_1(nan_data,
+						 nan_data->cfg->nmi_addr, peer,
+						 mgmt, len);
+
+	return -1;
 }

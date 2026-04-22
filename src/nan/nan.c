@@ -976,9 +976,8 @@ static void nan_parse_peer_elem_container(struct nan_data *nan,
 }
 
 
-static void nan_parse_peer_dev_capa_ext(struct nan_data *nan,
-					struct nan_peer *peer,
-					struct nan_attrs *attrs)
+void nan_parse_peer_dev_capa_ext(struct nan_data *nan, struct nan_peer *peer,
+				 struct nan_attrs *attrs)
 {
 	if (!attrs->dev_capa_ext || attrs->dev_capa_ext_len <= 1)
 		return;
