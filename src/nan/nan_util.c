@@ -204,6 +204,18 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 			attrs->npba = pos;
 			attrs->npba_len = attr_len;
 			break;
+		case NAN_ATTR_NIRA:
+			if (pos[0] != NAN_NIRA_CIPHER_VER_128)
+				break;
+
+			/* Cipher Version (1) + Nonce (8) + Tag (8) */
+			if (attr_len !=
+			    1 + NAN_NIRA_NONCE_LEN + NAN_NIRA_TAG_LEN)
+				break;
+
+			attrs->nira = pos;
+			attrs->nira_len = attr_len;
+			break;
 		case NAN_ATTR_MASTER_INDICATION:
 		case NAN_ATTR_CLUSTER:
 		case NAN_ATTR_NAN_ATTR_SERVICE_ID_LIST:
@@ -229,7 +241,6 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 		case NAN_ATTR_PUBLIC_AVAILABILITY:
 		case NAN_ATTR_SUBSC_SERVICE_ID_LIST:
 		case NAN_ATTR_NDP_EXT:
-		case NAN_ATTR_NIRA:
 		case NAN_ATTR_S3:
 		case NAN_ATTR_TPEA:
 		case NAN_ATTR_VENDOR_SPECIFIC:
