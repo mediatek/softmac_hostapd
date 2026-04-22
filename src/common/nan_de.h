@@ -37,7 +37,9 @@ struct nan_callbacks {
 				 enum nan_service_protocol_type srv_proto_type,
 				 const u8 *ssi, size_t ssi_len,
 				 int peer_publish_id,
-				 const u8 *peer_addr, bool fsd, bool fsd_gas);
+				 const u8 *peer_addr, bool fsd, bool fsd_gas,
+				 const u8 *pmkid_list,
+				 unsigned int pmkid_count);
 
 	void (*replied)(void *ctx, int publish_id, const u8 *peer_addr,
 			int peer_subscribe_id,

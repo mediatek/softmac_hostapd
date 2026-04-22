@@ -3142,7 +3142,8 @@ static void
 wpas_nan_de_discovery_result(void *ctx, int subscribe_id,
 			     enum nan_service_protocol_type srv_proto_type,
 			     const u8 *ssi, size_t ssi_len, int peer_publish_id,
-			     const u8 *peer_addr, bool fsd, bool fsd_gas)
+			     const u8 *peer_addr, bool fsd, bool fsd_gas,
+			     const u8 *pmkid_list, unsigned int pmkid_count)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 

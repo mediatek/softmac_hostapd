@@ -1133,6 +1133,65 @@ static void nan_de_get_sdea(const u8 *buf, size_t len, u8 instance_id,
 }
 
 
+static unsigned int nan_de_parse_scia(const u8 *buf, size_t len, u8 instance_id,
+				      u8 *pmkid_list, unsigned int max_pmkids)
+{
+	const u8 *scia, *end;
+	u16 scia_len;
+	unsigned int pmkid_count = 0;
+
+	scia = nan_de_get_attr(buf, len, NAN_ATTR_SCIA, 0);
+	if (!scia)
+		return 0;
+
+	scia++;
+	scia_len = WPA_GET_LE16(scia);
+	scia += 2;
+
+	end = scia + scia_len;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Parsing Security Context Information attribute (len=%u)",
+		   scia_len);
+
+	/* Parse list of Security Context Identifiers */
+	while ((size_t) (end - scia) >= sizeof(struct nan_sec_ctxt)) {
+		const struct nan_sec_ctxt *sec_ctx =
+			(const struct nan_sec_ctxt *) scia;
+		u16 scid_len = le_to_host16(sec_ctx->len);
+
+		if (scid_len + sizeof(*sec_ctx) > (size_t) (end - scia)) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Invalid SCID length %u (remaining %zu)",
+				   scid_len, (size_t) (end - scia));
+			break;
+		}
+
+		/* Check if this is for our instance_id and is a PMKID type */
+		if (sec_ctx->scid == NAN_SEC_CTX_TYPE_ND_PMKID &&
+		    sec_ctx->instance_id == instance_id) {
+			if (scid_len == PMKID_LEN && pmkid_count < max_pmkids) {
+				os_memcpy(&pmkid_list[pmkid_count * PMKID_LEN],
+					  sec_ctx->ctxt, PMKID_LEN);
+				pmkid_count++;
+				wpa_hexdump(MSG_DEBUG, "NAN: Parsed PMKID",
+					    sec_ctx->ctxt, PMKID_LEN);
+			} else {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Unexpected SCID length %u or max PMKIDs reached",
+					   scid_len);
+			}
+		}
+
+		scia += scid_len + sizeof(*sec_ctx);
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: Parsed %u PMKIDs from SCIA", pmkid_count);
+
+	return pmkid_count;
+}
+
+
 static void nan_de_process_elem_container(struct nan_de *de, const u8 *buf,
 					  size_t len, const u8 *peer_addr,
 					  unsigned int freq, bool p2p, bool pr)
@@ -1271,8 +1330,13 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			      u8 req_instance_id, u16 sdea_control,
 			      enum nan_service_protocol_type srv_proto_type,
 			      const u8 *ssi, size_t ssi_len,
-			      bool range_limit, int rssi)
+			      bool range_limit, int rssi,
+			      const u8 *buf, size_t buf_len)
 {
+	/* The SCIA can potentially contain a PMKID for each cipher suite */
+	u8 pmkid_list[(NAN_CS_MAX - 1) * PMKID_LEN];
+	unsigned int pmkid_count = 0;
+
 	if (!nan_de_filter_match(srv, matching_filter, matching_filter_len))
 		return false;
 
@@ -1312,13 +1376,22 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 	}
 
 send_event:
+	if (buf && buf_len > 0) {
+		/* Parse Security Context Information attribute */
+		pmkid_count = nan_de_parse_scia(buf, buf_len, instance_id,
+						pmkid_list,
+						sizeof(pmkid_list) / PMKID_LEN);
+	}
+
 	if (de->cb.discovery_result)
 		de->cb.discovery_result(
 			de->cb.ctx, srv->id, srv_proto_type,
 			ssi, ssi_len, instance_id,
 			peer_addr,
 			sdea_control & NAN_SDEA_CTRL_FSD_REQ,
-			sdea_control & NAN_SDEA_CTRL_FSD_GAS);
+			sdea_control & NAN_SDEA_CTRL_FSD_GAS,
+			pmkid_count > 0 ? pmkid_list : NULL,
+			pmkid_count);
 
 	return true;
 }
@@ -1627,7 +1700,7 @@ static bool nan_de_rx_sda(struct nan_de *de, const u8 *peer_addr, const u8 *a3,
 				req_instance_id, sdea_control, srv_proto_type,
 				ssi, ssi_len,
 				ctrl & NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED,
-				rssi);
+				rssi, buf, len);
 			break;
 		case NAN_SRV_CTRL_SUBSCRIBE:
 			ret |= nan_de_rx_subscribe(
