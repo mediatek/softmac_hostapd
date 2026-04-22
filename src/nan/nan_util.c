@@ -392,14 +392,23 @@ int nan_add_csia(struct wpabuf *buf, u8 capab, size_t cs_list_len,
  */
 void nan_add_dev_capa_ext_attr(struct nan_data *nan, struct wpabuf *buf)
 {
+	u8 pairing_and_npk_caching = 0;
+
+	if (nan->cfg->pairing_cfg.pairing_setup)
+		pairing_and_npk_caching |=
+			NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP;
+	if (nan->cfg->pairing_cfg.npk_caching)
+		pairing_and_npk_caching |=
+			NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING;
+
 	if (!nan->cfg->dev_capa_ext_reg_info &&
-	    !nan->cfg->dev_capa_ext_pairing_npk_caching)
+	    !pairing_and_npk_caching)
 		return;
 
 	wpabuf_put_u8(buf, NAN_ATTR_DCEA);
 	wpabuf_put_le16(buf, 2);
 	wpabuf_put_u8(buf, nan->cfg->dev_capa_ext_reg_info);
-	wpabuf_put_u8(buf, nan->cfg->dev_capa_ext_pairing_npk_caching);
+	wpabuf_put_u8(buf, pairing_and_npk_caching);
 }
 
 

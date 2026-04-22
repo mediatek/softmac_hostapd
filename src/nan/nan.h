@@ -385,6 +385,23 @@ struct nan_peer_potential_avail {
 	} maps[NAN_MAX_MAPS];
 };
 
+#define NAN_PAIRING_PASN_128  BIT(0)
+#define NAN_PAIRING_PASN_256  BIT(1)
+
+/**
+ * struct nan_pairing_cfg - NAN pairing configuration parameters
+ * @pairing_setup: Whether pairing setup is enabled
+ * @npk_caching: Whether NPK caching is enabled
+ * @pairing_verification: Whether pairing verification is enabled
+ * @cipher_suites: Bitmap of supported cipher suites (NAN_PAIRING_PASN_*)
+ */
+struct nan_pairing_cfg {
+	bool pairing_setup;
+	bool npk_caching;
+	bool pairing_verification;
+	u32 cipher_suites;
+};
+
 struct nan_config {
 	void *cb_ctx;
 	u8 nmi_addr[ETH_ALEN];
@@ -393,7 +410,8 @@ struct nan_config {
 
 	/* Wi-Fi Aware spec v4.0, Table 141 (Capability Info field) */
 	u8 dev_capa_ext_reg_info; /* NAN_DEV_CAPA_EXT_INFO_0_* */
-	u8 dev_capa_ext_pairing_npk_caching; /* NAN_DEV_CAPA_EXT_INFO_1_* */
+
+	struct nan_pairing_cfg pairing_cfg;
 
 	/*
 	 * Supported Pairing Bootstrapping Methods (PBM).

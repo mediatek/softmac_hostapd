@@ -913,9 +913,8 @@ static int nan_test_dev_init(struct nan_device *dev)
 	nan.dev_capa.capa = 0;
 
 	nan.dev_capa_ext_reg_info = 0;
-	nan.dev_capa_ext_pairing_npk_caching =
-		NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP |
-		NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING;
+	nan.pairing_cfg.npk_caching = true;
+	nan.pairing_cfg.pairing_setup = true;
 
 	dev->nan = nan_init(&nan);
 	if (!dev->nan) {
