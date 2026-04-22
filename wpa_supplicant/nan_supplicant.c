@@ -1061,6 +1061,11 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
 	nan.update_pairing_credentials = wpas_nan_update_pairing_credentials_cb;
 	nan.get_npk_akmp = wpas_nan_get_npk_akmp_cb;
+	nan.pairing_cfg.pairing_setup = true;
+	nan.pairing_cfg.npk_caching = true;
+	nan.pairing_cfg.pairing_verification = true;
+	nan.pairing_cfg.cipher_suites = NAN_PAIRING_PASN_128 |
+		NAN_PAIRING_PASN_256;
 #endif /* CONFIG_PASN */
 
 	/* NDP */
