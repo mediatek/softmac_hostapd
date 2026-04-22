@@ -12778,6 +12778,7 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	int ret = -1;
 	enum nan_service_protocol_type srv_proto_type = 0;
 	int *freq_list = NULL;
+	int *cipher_list = NULL;
 	bool p2p = false;
 
 	os_memset(&params, 0, sizeof(params));
@@ -12889,6 +12890,20 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "cipher_suites=", 14) == 0) {
+			char *pos = token + 14;
+
+			while (pos && pos[0]) {
+				int_array_add_unique(&cipher_list, atoi(pos));
+				pos = os_strchr(pos, ',');
+				if (pos)
+					pos++;
+			}
+
+			params.cipher_suites_list = cipher_list;
+			continue;
+		}
+
 		wpa_printf(MSG_INFO, "CTRL: Invalid NAN_PUBLISH parameter: %s",
 			   token);
 		goto fail;
@@ -12901,6 +12916,7 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 fail:
 	wpabuf_free(ssi);
 	os_free(freq_list);
+	os_free(cipher_list);
 	return ret;
 }
 
