@@ -9770,14 +9770,21 @@ static int nl80211_send_frame_cmd(struct i802_bss *bss,
 			   "cookie 0x%llx", no_ack ? " (no ACK)" : "",
 			   (long long unsigned int) cookie);
 
-		if (save_cookie)
-			drv->send_frame_cookie = no_ack ? (u64) -1 : cookie;
+		if (drv->nlmode == NL80211_IFTYPE_NAN_DATA || no_ack)
+			drv->send_frame_cookie = (u64) -1;
+		else if (save_cookie)
+			drv->send_frame_cookie = cookie;
 
-		if (!wait) {
-			 /* There is no need to store this cookie since there
-			  * is no wait that could be canceled later.  */
+		/*
+		 * Store the cookie only in case there is a wait that needs to
+		 * be cancelled later or in case of a NAN Device interface,
+		 * where multiple Action frames might be sent, specifically in
+		 * cases that the NAN Discovery Engine (NAN DE) is not managed
+		 * by the device.
+		 */
+		if (!wait && drv->nlmode != NL80211_IFTYPE_NAN)
 			goto fail;
-		}
+
 		if (drv->num_send_frame_cookies == MAX_SEND_FRAME_COOKIES) {
 			wpa_printf(MSG_DEBUG,
 				   "nl80211: Drop oldest pending send frame cookie 0x%llx",
@@ -9910,6 +9917,10 @@ static void wpa_driver_nl80211_send_action_cancel_wait(void *priv)
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	unsigned int i;
 	u64 cookie;
+
+	/* As there are no waits for NAN Device, nothing to do here */
+	if (drv->nlmode == NL80211_IFTYPE_NAN)
+		return;
 
 	/* Cancel the last pending TX cookie */
 	if (drv->send_frame_cookie != (u64) -1)

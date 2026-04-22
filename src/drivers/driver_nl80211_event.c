@@ -1465,6 +1465,23 @@ static void mlme_event_mgmt(struct i802_bss *bss,
 }
 
 
+static bool find_send_frame_cookie(struct wpa_driver_nl80211_data *drv,
+				   u64 cookie_val, unsigned int *idx)
+{
+	unsigned int i;
+
+	for (i = 0; i < drv->num_send_frame_cookies; i++) {
+		if (cookie_val == drv->send_frame_cookies[i]) {
+			if (idx)
+				*idx = i;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 				      struct nlattr *cookie, const u8 *frame,
 				      size_t len, struct nlattr *ack)
@@ -1500,15 +1517,41 @@ static void mlme_event_mgmt_tx_status(struct i802_bss *bss,
 
 	if (!is_ap_interface(drv->nlmode) &&
 	    WLAN_FC_GET_STYPE(fc) == WLAN_FC_STYPE_ACTION) {
+		bool known = false;
+		unsigned int i;
+
 		if (!cookie)
 			return;
+
+		if (cookie_val == drv->send_frame_cookie) {
+			known = true;
+			drv->send_frame_cookie = (u64) -1;
+		}
+
+		if (drv->nlmode == NL80211_IFTYPE_NAN &&
+		    drv->num_send_frame_cookies > 0 &&
+		    find_send_frame_cookie(drv, cookie_val, &i)) {
+			/*
+			 * Check the cookie is stored for previously sent
+			 * frames. If it is found, remove it and in case of NAN
+			 * mark it as known.
+			 */
+			if (i + 1 < drv->num_send_frame_cookies)
+				os_memmove(&drv->send_frame_cookies[i],
+					   &drv->send_frame_cookies[i + 1],
+					   (drv->num_send_frame_cookies -
+					    (i + 1)) * sizeof(u64));
+
+			drv->num_send_frame_cookies--;
+			known = true;
+		}
 
 		wpa_printf(MSG_DEBUG,
 			   "nl80211: Frame TX status: cookie=0x%llx%s (ack=%d)",
 			   (long long unsigned int) cookie_val,
-			   cookie_val == drv->send_frame_cookie ?
-			   " (match)" : " (unknown)", ack != NULL);
-		if (cookie_val != drv->send_frame_cookie)
+			   known ? " (match)" : " (unknown)", ack != NULL);
+
+		if (!known)
 			return;
 	} else if (!is_ap_interface(drv->nlmode) &&
 		   WLAN_FC_GET_STYPE(fc) == WLAN_FC_STYPE_AUTH) {
