@@ -1293,6 +1293,32 @@ static void nan_de_process_elem_container(struct nan_de *de, const u8 *buf,
 }
 
 
+static void nan_de_parse_dcea(const u8 *buf, size_t len, bool *pairing_setup,
+			      bool *npk_nik_caching)
+{
+	const u8 *dcea;
+	u16 dcea_len;
+
+	*pairing_setup = false;
+	*npk_nik_caching = false;
+
+	dcea = nan_de_get_attr(buf, len, NAN_ATTR_DCEA, 0);
+	if (!dcea)
+		return;
+
+	dcea_len = WPA_GET_LE16(dcea + 1);
+	if (dcea_len < 2) {
+		wpa_printf(MSG_DEBUG, "NAN: DCEA length=%u too short",
+			   dcea_len);
+		return;
+	}
+
+	*pairing_setup =  !!(dcea[4] & NAN_DEV_CAPA_EXT_INFO_1_PAIRING_SETUP);
+	*npk_nik_caching = !!(dcea[4] &
+			      NAN_DEV_CAPA_EXT_INFO_1_NPK_NIK_CACHING);
+}
+
+
 static bool nan_de_filter_match(struct nan_de_service *srv,
 				const u8 *matching_filter,
 				size_t matching_filter_len)
@@ -1461,6 +1487,14 @@ send_event:
 		pmkid_count = nan_de_parse_scia(buf, buf_len, instance_id,
 						pmkid_list,
 						sizeof(pmkid_list) / PMKID_LEN);
+
+		/*
+		 * Parse Device Capability Extension attribute for pairing
+		 * setup and NPK/NIK caching support
+		 */
+		nan_de_parse_dcea(buf, buf_len,
+				  &res.pairing_setup_supp,
+				  &res.npk_nik_caching_supp);
 	}
 
 	os_memset(&res, 0, sizeof(res));

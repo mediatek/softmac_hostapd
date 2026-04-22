@@ -37,6 +37,8 @@ struct nan_discovery_result {
 	unsigned int pmkid_count;
 	const u8 *cipher_suites;
 	unsigned int n_cipher_suites;
+	bool pairing_setup_supp;
+	bool npk_nik_caching_supp;
 };
 
 struct nan_callbacks {
