@@ -1153,11 +1153,16 @@ int nan_add_peer(struct nan_data *nan, const u8 *addr,
 }
 
 
-static void nan_action_build_header(struct nan_data *nan, struct wpabuf *buf,
+static void nan_action_build_header(struct nan_data *nan, struct nan_peer *peer,
+				    struct wpabuf *buf,
 				    enum nan_subtype subtype)
 {
-	/* TODO: need to also support protected dual */
-	wpabuf_put_u8(buf, WLAN_ACTION_PUBLIC);
+	u8 category = WLAN_ACTION_PUBLIC;
+
+	if (nan_pairing_is_peer_paired(nan, peer->nmi_addr))
+		category = WLAN_ACTION_PROTECTED_DUAL;
+
+	wpabuf_put_u8(buf, category);
 	wpabuf_put_u8(buf, WLAN_PA_VENDOR_SPECIFIC);
 	wpabuf_put_be24(buf, OUI_WFA);
 	wpabuf_put_u8(buf, NAN_NAF_OUI_TYPE);
@@ -1172,7 +1177,7 @@ static int nan_action_build(struct nan_data *nan, struct nan_peer *peer,
 
 	wpa_printf(MSG_DEBUG, "NAN: Build NAF");
 
-	nan_action_build_header(nan, buf, subtype);
+	nan_action_build_header(nan, peer, buf, subtype);
 
 	nan_add_dev_capa_attr(nan, buf);
 	nan_add_dev_capa_ext_attr(nan, buf);
