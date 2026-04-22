@@ -3152,7 +3152,8 @@ wpas_nan_de_discovery_result(void *ctx, int subscribe_id,
 	wpas_notify_nan_discovery_result(wpa_s, srv_proto_type, subscribe_id,
 					 peer_publish_id, peer_addr, fsd,
 					 fsd_gas, ssi, ssi_len,
-					 pmkid_list, pmkid_count);
+					 pmkid_list, pmkid_count,
+					 cipher_suite, n_cipher_suite);
 }
 
 

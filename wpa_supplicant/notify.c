@@ -1107,9 +1107,12 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 				      bool fsd, bool fsd_gas,
 				      const u8 *ssi, size_t ssi_len,
 				      const u8 *pmkid_list,
-				      unsigned int pmkid_count)
+				      unsigned int pmkid_count,
+				      const u8 *cipher_suite_list,
+				      unsigned int cipher_suite_count)
 {
 	char *ssi_hex, *pmkid_hex = NULL;
+	char *cipher_suites_str = NULL;
 
 	ssi_hex = os_zalloc(2 * ssi_len + 1);
 	if (!ssi_hex)
@@ -1135,15 +1138,43 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 		}
 	}
 
+	if (cipher_suite_list && cipher_suite_count > 0) {
+		char *pos;
+		unsigned int i;
+
+		/* Allocate enough space for trailing space after each cipher */
+		cipher_suites_str = os_zalloc(cipher_suite_count * 2);
+		if (!cipher_suites_str)
+			goto err;
+
+		pos = cipher_suites_str;
+
+		for (i = 0; i < cipher_suite_count; i++) {
+			int ret;
+			size_t left = cipher_suite_count * 2 -
+				(pos - cipher_suites_str);
+
+			ret = os_snprintf(pos, left, "%s%u", i > 0 ? "," : "",
+					  cipher_suite_list[i]);
+			if (os_snprintf_error(left, ret))
+				break;
+			pos += ret;
+		}
+	}
+err:
+
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_DISCOVERY_RESULT
 		       "subscribe_id=%d publish_id=%d address=" MACSTR
-		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s",
+		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s%s%s",
 		       subscribe_id, peer_publish_id, MAC2STR(peer_addr),
 		       fsd, fsd_gas, srv_proto_type, ssi_hex,
 		       pmkid_hex ? " pmkid=" : "",
-		       pmkid_hex ? pmkid_hex : "");
+		       pmkid_hex ? pmkid_hex : "",
+		       cipher_suites_str ? " cipher_suites=" : "",
+		       cipher_suites_str ? cipher_suites_str : "");
 	os_free(ssi_hex);
 	os_free(pmkid_hex);
+	os_free(cipher_suites_str);
 
 	wpas_dbus_signal_nan_discovery_result(wpa_s, srv_proto_type,
 					      subscribe_id, peer_publish_id,
