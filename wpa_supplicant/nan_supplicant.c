@@ -366,9 +366,11 @@ static int wpas_nan_set_ndi_keys(struct wpa_supplicant *wpa_s,
 	os_memset(rsc, 0, sizeof(rsc));
 	switch (csid) {
 	case NAN_CS_SK_CCM_128:
+	case NAN_CS_PK_PASN_128:
 		alg = WPA_ALG_CCMP;
 		break;
 	case NAN_CS_SK_GCM_256:
+	case NAN_CS_PK_PASN_256:
 		alg = WPA_ALG_GCMP_256;
 		break;
 	default:
@@ -1174,9 +1176,12 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		!!(wpa_s->nan_capa.drv_flags &
 		   WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE);
 
-	/* Currently support shared key suites only */
 	wpa_s->nan_supported_csids = BIT(NAN_CS_SK_CCM_128) |
 		BIT(NAN_CS_SK_GCM_256);
+#ifdef CONFIG_PASN
+	wpa_s->nan_supported_csids |= BIT(NAN_CS_PK_PASN_128) |
+		BIT(NAN_CS_PK_PASN_256);
+#endif /* CONFIG_PASN */
 
 	return 0;
 }

@@ -496,6 +496,14 @@ enum nan_cipher_suite_id {
 	NAN_CS_MAX
 };
 
+/* Helper macros to check CSID properties */
+#define NAN_CS_IS_128(csid) \
+	((csid) == NAN_CS_SK_CCM_128 || (csid) == NAN_CS_PK_PASN_128)
+#define NAN_CS_IS_256(csid) \
+	((csid) == NAN_CS_SK_GCM_256 || (csid) == NAN_CS_PK_PASN_256)
+#define NAN_CS_IS_VALID_NDP(csid) \
+	(NAN_CS_IS_128(csid) || NAN_CS_IS_256(csid))
+
 struct nan_cipher_suite {
 	u8 csid; /* Cipher Suite ID */
 	u8 instance_id; /* Publish ID */

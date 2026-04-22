@@ -120,8 +120,7 @@ static int nan_sec_parse_csia(const u8 *csia, size_t csia_len, u8 *instance_id,
 				return -1;
 			}
 
-			if (cs->csid != NAN_CS_SK_CCM_128 &&
-			    cs->csid != NAN_CS_SK_GCM_256) {
+			if (!NAN_CS_IS_VALID_NDP(cs->csid)) {
 				wpa_printf(MSG_DEBUG,
 					   "NAN: SEC: Unsupported cipher suite=%u",
 					   cs->csid);
@@ -206,9 +205,9 @@ static int nan_sec_key_mic_ver(struct nan_data *nan, const u8 *buf, size_t len,
 
 	os_memset(mic, 0, sizeof(mic));
 
-	if (csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(csid))
 		mic_len = NAN_KEY_MIC_LEN;
-	else if (csid == NAN_CS_SK_GCM_256)
+	else if (NAN_CS_IS_256(csid))
 		mic_len = NAN_KEY_MIC_24_LEN;
 	else
 		return -1;
@@ -270,7 +269,7 @@ static int nan_sec_rx_m2(struct nan_data *nan, struct nan_peer *peer,
 	 * with the MIC differently.
 	 */
 	pos = (const u8 *) (key + 1);
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		pos += NAN_KEY_MIC_LEN;
 	else
 		pos += NAN_KEY_MIC_24_LEN;
@@ -338,7 +337,7 @@ static int nan_sec_rx_m3(struct nan_data *nan, struct nan_peer *peer,
 	 * with the mic differently
 	 */
 	pos = (u8 *) (key + 1);
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		mic_len = NAN_KEY_MIC_LEN;
 	else
 		mic_len = NAN_KEY_MIC_24_LEN;
@@ -396,7 +395,7 @@ static int nan_sec_rx_m4(struct nan_data *nan, struct nan_peer *peer,
 	 * Due to the different MIC size, need to handle the fields starting
 	 * with the mic differently
 	 */
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		pos += NAN_KEY_MIC_LEN;
 	else
 		pos += NAN_KEY_MIC_24_LEN;
@@ -490,7 +489,7 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 
 	total_len = sizeof(*key) + 2;
 
-	if (cipher == NAN_CS_SK_CCM_128) {
+	if (NAN_CS_IS_128(cipher)) {
 		if (shared_key_desc_len <
 		    sizeof(struct nan_shared_key) + sizeof(*key) +
 		    NAN_KEY_MIC_LEN + 2) {
@@ -655,9 +654,9 @@ static int nan_sec_add_m1_attrs(struct nan_data *nan, struct nan_peer *peer,
 	size_t key_len = sizeof(struct wpa_eapol_key) + 2;
 	int ret;
 
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_LEN;
-	else if (ndp_sec->i_csid == NAN_CS_SK_GCM_256)
+	else if (NAN_CS_IS_256(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_24_LEN;
 	else
 		return -1;
@@ -738,9 +737,9 @@ static int nan_sec_add_m2_attrs(struct nan_data *nan, struct nan_peer *peer,
 	size_t key_len;
 
 	key_len = sizeof(struct wpa_eapol_key) + 2;
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_LEN;
-	else if (ndp_sec->i_csid == NAN_CS_SK_GCM_256)
+	else if (NAN_CS_IS_256(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_24_LEN;
 	else
 		return -1;
@@ -811,9 +810,9 @@ static int nan_sec_add_key_attrs(struct nan_data *nan, struct nan_peer *peer,
 	u16 info;
 	size_t key_len = sizeof(struct wpa_eapol_key) + 2;
 
-	if (ndp_sec->i_csid == NAN_CS_SK_CCM_128)
+	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_LEN;
-	else if (ndp_sec->i_csid == NAN_CS_SK_GCM_256)
+	else if (NAN_CS_IS_256(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_24_LEN;
 	else
 		return -1;
@@ -903,8 +902,7 @@ int nan_sec_add_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_sec_dump(nan, peer);
 
 	/* No security configuration */
-	if (peer->ndp_setup.sec.i_csid != NAN_CS_SK_CCM_128 &&
-	    peer->ndp_setup.sec.i_csid != NAN_CS_SK_GCM_256)
+	if (!NAN_CS_IS_VALID_NDP(peer->ndp_setup.sec.i_csid))
 		return 0;
 
 	switch (subtype) {
@@ -1154,8 +1152,7 @@ bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
 	    peer->ndp_setup.state != NAN_NDP_STATE_DONE)
 		return false;
 
-	if (ndp_sec->i_csid != NAN_CS_SK_CCM_128 &&
-	    ndp_sec->i_csid != NAN_CS_SK_GCM_256)
+	if (!NAN_CS_IS_VALID_NDP(ndp_sec->i_csid))
 		return false;
 
 	dl_list_for_each_safe(cur, next, &peer->info.sec,
