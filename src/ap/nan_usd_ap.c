@@ -44,28 +44,23 @@ static int hostapd_nan_de_listen(void *ctx, unsigned int freq,
 
 
 static void
-hostapd_nan_de_discovery_result(void *ctx, int subscribe_id,
-				enum nan_service_protocol_type srv_proto_type,
-				const u8 *ssi, size_t ssi_len,
-				int peer_publish_id, const u8 *peer_addr,
-				bool fsd, bool fsd_gas,
-				const u8 *pmkid_list, unsigned int pmkid_count,
-				const u8 *cipher_suite,
-				unsigned int n_cipher_suite)
+hostapd_nan_de_discovery_result(void *ctx, struct nan_discovery_result *res)
 {
 	struct hostapd_data *hapd = ctx;
 	char *ssi_hex;
 
-	ssi_hex = os_zalloc(2 * ssi_len + 1);
+	ssi_hex = os_zalloc(2 * res->ssi_len + 1);
 	if (!ssi_hex)
 		return;
-	if (ssi)
-		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+	if (res->ssi)
+		wpa_snprintf_hex(ssi_hex, 2 * res->ssi_len + 1,
+				 res->ssi, res->ssi_len);
 	wpa_msg(hapd->msg_ctx, MSG_INFO, NAN_DISCOVERY_RESULT
 		"subscribe_id=%d publish_id=%d address=" MACSTR
 		" fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s",
-		subscribe_id, peer_publish_id, MAC2STR(peer_addr),
-		fsd, fsd_gas, srv_proto_type, ssi_hex);
+		res->subscribe_id, res->peer_publish_id,
+		MAC2STR(res->peer_addr), res->fsd, res->fsd_gas,
+		res->srv_proto_type, ssi_hex);
 	os_free(ssi_hex);
 }
 

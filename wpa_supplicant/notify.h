@@ -19,6 +19,7 @@ struct wpa_cred;
 struct rsn_pmksa_cache_entry;
 enum nan_de_reason;
 enum nan_service_protocol_type;
+struct nan_discovery_result;
 
 int wpas_notify_supplicant_initialized(struct wpa_global *global);
 void wpas_notify_supplicant_deinitialized(struct wpa_global *global);
@@ -185,16 +186,7 @@ void wpas_notify_signal_change(struct wpa_supplicant *wpa_s);
 void wpas_notify_hs20_t_c_acceptance(struct wpa_supplicant *wpa_s,
 				     const char *url);
 void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
-				      enum nan_service_protocol_type
-				      srv_proto_type,
-				      int subscribe_id, int peer_publish_id,
-				      const u8 *peer_addr,
-				      bool fsd, bool fsd_gas,
-				      const u8 *ssi, size_t ssi_len,
-				      const u8 *pmkid_list,
-				      unsigned int pmkid_count,
-				      const u8 *cipher_suite_list,
-				      unsigned int cipher_suite_count);
+				      struct nan_discovery_result *res);
 void wpas_notify_nan_replied(struct wpa_supplicant *wpa_s,
 			     enum nan_service_protocol_type srv_proto_type,
 			     int publish_id, int peer_subscribe_id,

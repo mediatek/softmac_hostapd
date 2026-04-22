@@ -3349,21 +3349,11 @@ static int wpas_nan_de_listen(void *ctx, unsigned int freq,
 
 
 static void
-wpas_nan_de_discovery_result(void *ctx, int subscribe_id,
-			     enum nan_service_protocol_type srv_proto_type,
-			     const u8 *ssi, size_t ssi_len, int peer_publish_id,
-			     const u8 *peer_addr, bool fsd, bool fsd_gas,
-			     const u8 *pmkid_list, unsigned int pmkid_count,
-			     const u8 *cipher_suite,
-			     unsigned int n_cipher_suite)
+wpas_nan_de_discovery_result(void *ctx, struct nan_discovery_result *res)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	wpas_notify_nan_discovery_result(wpa_s, srv_proto_type, subscribe_id,
-					 peer_publish_id, peer_addr, fsd,
-					 fsd_gas, ssi, ssi_len,
-					 pmkid_list, pmkid_count,
-					 cipher_suite, n_cipher_suite);
+	wpas_notify_nan_discovery_result(wpa_s, res);
 }
 
 

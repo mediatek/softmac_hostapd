@@ -24,6 +24,21 @@ enum nan_de_reason {
 	NAN_DE_REASON_FAILURE,
 };
 
+struct nan_discovery_result {
+	int subscribe_id;
+	enum nan_service_protocol_type srv_proto_type;
+	const u8 *ssi;
+	size_t ssi_len;
+	int peer_publish_id;
+	const u8 *peer_addr;
+	bool fsd;
+	bool fsd_gas;
+	const u8 *pmkid_list;
+	unsigned int pmkid_count;
+	const u8 *cipher_suites;
+	unsigned int n_cipher_suites;
+};
+
 struct nan_callbacks {
 	void *ctx;
 
@@ -33,15 +48,7 @@ struct nan_callbacks {
 	int (*listen)(void *ctx, unsigned int freq, unsigned int duration);
 
 	/* NAN DE Events */
-	void (*discovery_result)(void *ctx, int subscribe_id,
-				 enum nan_service_protocol_type srv_proto_type,
-				 const u8 *ssi, size_t ssi_len,
-				 int peer_publish_id,
-				 const u8 *peer_addr, bool fsd, bool fsd_gas,
-				 const u8 *pmkid_list,
-				 unsigned int pmkid_count,
-				 const u8 *cipher_suite,
-				 unsigned int n_cipher_suite);
+	void (*discovery_result)(void *ctx, struct nan_discovery_result *res);
 
 	void (*replied)(void *ctx, int publish_id, const u8 *peer_addr,
 			int peer_subscribe_id,

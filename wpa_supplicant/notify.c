@@ -1100,62 +1100,55 @@ void wpas_notify_hs20_t_c_acceptance(struct wpa_supplicant *wpa_s,
 #if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
 
 void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
-				      enum nan_service_protocol_type
-				      srv_proto_type,
-				      int subscribe_id, int peer_publish_id,
-				      const u8 *peer_addr,
-				      bool fsd, bool fsd_gas,
-				      const u8 *ssi, size_t ssi_len,
-				      const u8 *pmkid_list,
-				      unsigned int pmkid_count,
-				      const u8 *cipher_suite_list,
-				      unsigned int cipher_suite_count)
+				      struct nan_discovery_result *res)
 {
 	char *ssi_hex, *pmkid_hex = NULL;
 	char *cipher_suites_str = NULL;
 
-	ssi_hex = os_zalloc(2 * ssi_len + 1);
+	ssi_hex = os_zalloc(2 * res->ssi_len + 1);
 	if (!ssi_hex)
 		return;
-	if (ssi)
-		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+	if (res->ssi)
+		wpa_snprintf_hex(ssi_hex, 2 * res->ssi_len + 1,
+				 res->ssi, res->ssi_len);
 
-	if (pmkid_list && pmkid_count > 0) {
+	if (res->pmkid_list && res->pmkid_count > 0) {
 		const size_t pmkid_hex_len = 2 * PMKID_LEN + 1;
 		unsigned int i;
 
-		pmkid_hex = os_zalloc(pmkid_count * pmkid_hex_len);
+		pmkid_hex = os_zalloc(res->pmkid_count * pmkid_hex_len);
 		if (pmkid_hex) {
-			for (i = 0; i < pmkid_count; i++) {
+			for (i = 0; i < res->pmkid_count; i++) {
 				char *pos = &pmkid_hex[i * pmkid_hex_len];
 
-				wpa_snprintf_hex(pos, pmkid_hex_len,
-						 &pmkid_list[i * PMKID_LEN],
-						 PMKID_LEN);
-				if (i < pmkid_count - 1)
+				wpa_snprintf_hex(
+					pos, pmkid_hex_len,
+					&res->pmkid_list[i * PMKID_LEN],
+					PMKID_LEN);
+				if (i < res->pmkid_count - 1)
 					pos[2 * PMKID_LEN] = ',';
 			}
 		}
 	}
 
-	if (cipher_suite_list && cipher_suite_count > 0) {
+	if (res->cipher_suites && res->n_cipher_suites > 0) {
 		char *pos;
 		unsigned int i;
 
 		/* Allocate enough space for trailing space after each cipher */
-		cipher_suites_str = os_zalloc(cipher_suite_count * 2);
+		cipher_suites_str = os_zalloc(res->n_cipher_suites * 2);
 		if (!cipher_suites_str)
 			goto err;
 
 		pos = cipher_suites_str;
 
-		for (i = 0; i < cipher_suite_count; i++) {
+		for (i = 0; i < res->n_cipher_suites; i++) {
 			int ret;
-			size_t left = cipher_suite_count * 2 -
+			size_t left = res->n_cipher_suites * 2 -
 				(pos - cipher_suites_str);
 
 			ret = os_snprintf(pos, left, "%s%u", i > 0 ? "," : "",
-					  cipher_suite_list[i]);
+					  res->cipher_suites[i]);
 			if (os_snprintf_error(left, ret))
 				break;
 			pos += ret;
@@ -1166,8 +1159,9 @@ err:
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_DISCOVERY_RESULT
 		       "subscribe_id=%d publish_id=%d address=" MACSTR
 		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s%s%s",
-		       subscribe_id, peer_publish_id, MAC2STR(peer_addr),
-		       fsd, fsd_gas, srv_proto_type, ssi_hex,
+		       res->subscribe_id, res->peer_publish_id,
+		       MAC2STR(res->peer_addr),
+		       res->fsd, res->fsd_gas, res->srv_proto_type, ssi_hex,
 		       pmkid_hex ? " pmkid=" : "",
 		       pmkid_hex ? pmkid_hex : "",
 		       cipher_suites_str ? " cipher_suites=" : "",
@@ -1176,10 +1170,13 @@ err:
 	os_free(pmkid_hex);
 	os_free(cipher_suites_str);
 
-	wpas_dbus_signal_nan_discovery_result(wpa_s, srv_proto_type,
-					      subscribe_id, peer_publish_id,
-					      peer_addr, fsd, fsd_gas,
-					      ssi, ssi_len);
+	wpas_dbus_signal_nan_discovery_result(wpa_s,
+					      res->srv_proto_type,
+					      res->subscribe_id,
+					      res->peer_publish_id,
+					      res->peer_addr,
+					      res->fsd, res->fsd_gas,
+					      res->ssi, res->ssi_len);
 }
 
 

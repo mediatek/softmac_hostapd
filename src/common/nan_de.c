@@ -1403,6 +1403,8 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 			      bool range_limit, int rssi,
 			      const u8 *buf, size_t buf_len)
 {
+	struct nan_discovery_result res;
+
 	/* The SCIA can potentially contain a PMKID for each cipher suite */
 	u8 pmkid_list[(NAN_CS_MAX - 1) * PMKID_LEN];
 	unsigned int pmkid_count = 0;
@@ -1461,17 +1463,22 @@ send_event:
 						sizeof(pmkid_list) / PMKID_LEN);
 	}
 
+	os_memset(&res, 0, sizeof(res));
+	res.subscribe_id = srv->id;
+	res.srv_proto_type = srv_proto_type;
+	res.ssi = ssi;
+	res.ssi_len = ssi_len;
+	res.peer_publish_id = instance_id;
+	res.peer_addr = peer_addr;
+	res.fsd = !!(sdea_control & NAN_SDEA_CTRL_FSD_REQ);
+	res.fsd_gas = !!(sdea_control & NAN_SDEA_CTRL_FSD_GAS);
+	res.cipher_suites = cipher_suite_count > 0 ? cipher_suites : NULL;
+	res.n_cipher_suites = cipher_suite_count;
+	res.pmkid_list = pmkid_count > 0 ? pmkid_list : NULL;
+	res.pmkid_count = pmkid_count;
+
 	if (de->cb.discovery_result)
-		de->cb.discovery_result(
-			de->cb.ctx, srv->id, srv_proto_type,
-			ssi, ssi_len, instance_id,
-			peer_addr,
-			sdea_control & NAN_SDEA_CTRL_FSD_REQ,
-			sdea_control & NAN_SDEA_CTRL_FSD_GAS,
-			pmkid_count > 0 ? pmkid_list : NULL,
-			pmkid_count,
-			cipher_suite_count > 0 ? cipher_suites : NULL,
-			cipher_suite_count);
+		de->cb.discovery_result(de->cb.ctx, &res);
 
 	return true;
 }
