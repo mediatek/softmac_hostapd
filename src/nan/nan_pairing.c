@@ -666,6 +666,37 @@ static int nan_pairing_handle_auth_2(struct nan_data *nan_data,
 }
 
 
+static int nan_pairing_handle_auth_3(struct nan_data *nan_data,
+				     struct nan_peer *peer,
+				     const struct ieee80211_mgmt *mgmt,
+				     size_t len)
+{
+	struct pasn_data *pasn = peer->pairing.pasn;
+	int ret;
+	u16 status = WLAN_STATUS_SUCCESS;
+
+	ret = handle_auth_pasn_3(pasn, nan_data->cfg->nmi_addr, peer->nmi_addr,
+				 mgmt, len);
+	if (ret < 0) {
+		status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Handle Auth3 failed");
+	}
+
+	ret = nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
+					       peer->nmi_addr, pasn->akmp,
+					       pasn->cipher, status,
+					       &pasn->ptk);
+	if (ret < 0 || status != WLAN_STATUS_SUCCESS)
+		nan_pairing_deinit_peer(peer);
+
+	/* Don't clear PASN data if pairing is successful. If caching is
+	 * enabled, it will still be needed when the NIK is received from
+	 * the peer.
+	 */
+	return status == WLAN_STATUS_SUCCESS ? ret : -1;
+}
+
+
 /**
  * nan_pairing_auth_rx - Handle received NAN pairing Authentication frames
  * @nan_data: Pointer to NAN data structure
@@ -757,6 +788,8 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 						 mgmt, len);
 	if (auth_transaction == 2)
 		return nan_pairing_handle_auth_2(nan_data, peer, mgmt, len);
+	if (auth_transaction == 3)
+		return nan_pairing_handle_auth_3(nan_data, peer, mgmt, len);
 
 	return -1;
 }
