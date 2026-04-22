@@ -1321,6 +1321,38 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 #undef NAN_PARSE_INT
 #undef NAN_PARSE_BAND
 
+#define NAN_PARSE_PAIRING_BOOL(_str)                                 \
+	if (os_strcmp(#_str, cmd) == 0) {                            \
+		int val = atoi(param);                               \
+								     \
+		if (val != 0 && val != 1) {                          \
+			wpa_printf(MSG_INFO,                         \
+				   "NAN: Invalid value for " #_str); \
+			return -1;                                   \
+		}                                                    \
+		return nan_pairing_set_##_str(wpa_s->nan, val);      \
+	}
+
+#define NAN_PARSE_PAIRING_INT(_str, _mask)                           \
+	if (os_strcmp(#_str, cmd) == 0) {                            \
+		unsigned int val = atoi(param);                      \
+								     \
+		if ((val & (_mask)) != val) {                        \
+			wpa_printf(MSG_INFO,                         \
+				   "NAN: Invalid value for " #_str); \
+			return -1;                                   \
+		}                                                    \
+		return nan_pairing_set_##_str(wpa_s->nan, val);      \
+	}
+
+	NAN_PARSE_PAIRING_BOOL(pairing_setup);
+	NAN_PARSE_PAIRING_BOOL(npk_caching);
+	NAN_PARSE_PAIRING_BOOL(pairing_verification);
+	NAN_PARSE_PAIRING_INT(cipher_suites,
+			      NAN_PAIRING_PASN_128 | NAN_PAIRING_PASN_256);
+#undef NAN_PARSE_PAIRING_BOOL
+#undef NAN_PARSE_PAIRING_INT
+
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
 }
