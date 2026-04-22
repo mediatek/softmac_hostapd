@@ -405,6 +405,7 @@ fail:
  * @peer: Pointer to NAN peer structure
  * @extra_ies: Buffer to which the NAN element is appended
  * @publish_id: Publish ID to use in the CSIA
+ * @auth_mode: Pairing authentication mode
  *
  * This function adds a NAN element containing the NAN attributes that shall be
  * included in the first and second PASN frames for NAN pairing.
@@ -417,7 +418,7 @@ fail:
 static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 					   struct nan_peer *peer,
 					   struct wpabuf *extra_ies,
-					   int publish_id)
+					   int publish_id, int auth_mode)
 {
 	u8 *len_ptr;
 	struct nan_cipher_suite cs;
@@ -431,7 +432,6 @@ static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 	/* OUI + OUI Type */
 	wpabuf_put_be32(extra_ies, NAN_IE_VENDOR_TYPE);
 
-	nan_add_dev_capa_ext_attr(nan_data, extra_ies);
 	if (peer->pairing.pasn->cipher == WPA_CIPHER_GCMP_256)
 		cs.csid = NAN_CS_PK_PASN_256;
 	else
@@ -445,8 +445,23 @@ static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 	 */
 	nan_add_csia(extra_ies, 0, 1, &cs);
 
-	if (peer->bootstrap.npba)
-		wpabuf_put_buf(extra_ies, peer->bootstrap.npba);
+	if (auth_mode == NAN_PASN_AUTH_MODE_SAE ||
+	    auth_mode == NAN_PASN_AUTH_MODE_PASN) {
+		nan_add_dev_capa_ext_attr(nan_data, extra_ies);
+		if (peer->bootstrap.npba)
+			wpabuf_put_buf(extra_ies, peer->bootstrap.npba);
+	} else {
+		const u8 *npkid = peer->pairing.pasn->custom_pmkid;
+
+		/*
+		 * Add NIRA with the same nonce and tag as in the NPKID.
+		 * NPKID is: NONCE || TAG.
+		 */
+		if (nan_add_nira(extra_ies, &npkid[NAN_NIRA_NONCE_LEN],
+				 npkid)) {
+			wpa_printf(MSG_DEBUG, "NAN: Failed to add NIRA");
+		}
+	}
 
 	*len_ptr = wpabuf_len(extra_ies) - initial_len - 2;
 }
@@ -511,7 +526,8 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 	/* TODO: Add support for NAN element fragmentation if it's larger than
 	 * 255 octets, as defined in Wi-Fi Aware Specification v4.0 section 9.1.
 	 */
-	nan_pairing_prepare_pasn_elems(nan_data, peer, extra_ies, handle);
+	nan_pairing_prepare_pasn_elems(nan_data, peer, extra_ies, handle,
+				       auth_mode);
 	pasn_set_extra_ies(pasn, wpabuf_head_u8(extra_ies),
 			   wpabuf_len(extra_ies));
 	wpabuf_free(extra_ies);
