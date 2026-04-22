@@ -1241,6 +1241,41 @@ void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
 		       MAC2STR(peer_nmi), pbm, reason);
 }
 
+
+#ifdef CONFIG_PASN
+void wpas_notify_nan_nik_received(struct wpa_supplicant *wpa_s,
+				  const u8 *nik, size_t nik_len,
+				  int cipher_ver, int akmp,
+				  const u8 *npk, size_t npk_len,
+				  int nik_lifetime, int identity_id)
+{
+	char *nik_hex, *npk_hex;
+	size_t nik_hex_len = 2 * nik_len + 1;
+	size_t npk_hex_len = 2 * npk_len + 1;
+
+	nik_hex = os_malloc(nik_hex_len);
+	npk_hex = os_malloc(npk_hex_len);
+	if (!nik_hex || !npk_hex) {
+		wpa_printf(MSG_INFO,
+			   "NAN NIK received: Failed to allocate memory");
+		goto out;
+	}
+
+	wpa_snprintf_hex(nik_hex, nik_hex_len, nik, nik_len);
+	wpa_snprintf_hex(npk_hex, npk_hex_len, npk, npk_len);
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NIK_RECEIVED
+		       "nik=%s cipher_version=%d akmp=%s pmk=%s lifetime=%d identity_id=%d",
+		       nik_hex, cipher_ver,
+		       wpa_key_mgmt_txt(akmp, WPA_PROTO_RSN),
+		       npk_hex, nik_lifetime, identity_id);
+
+out:
+	bin_clear_free(nik_hex, nik_hex_len);
+	bin_clear_free(npk_hex, npk_hex_len);
+}
+#endif /* CONFIG_PASN */
+
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 

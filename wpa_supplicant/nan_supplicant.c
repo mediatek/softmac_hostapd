@@ -952,6 +952,11 @@ static int wpas_nan_update_pairing_credentials_cb(void *ctx, const u8 *nik,
 
 	wpa_printf(MSG_INFO, "NAN: Stored NIK as device identity (id=%d)",
 		   ik->id);
+
+	/* Notify control interface about received NIK */
+	wpas_notify_nan_nik_received(wpa_s, nik, nik_len, cipher_ver, akmp,
+				     npk, npk_len, nik_lifetime, ik->id);
+
 	return ik->id;
 
 fail:
