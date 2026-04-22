@@ -2810,6 +2810,26 @@ void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 
 #ifdef CONFIG_PASN
 
+static int wpas_nan_pasn_update_station(struct wpa_supplicant *wpa_s,
+					const u8 *nmi_addr)
+{
+	struct hostapd_sta_add_params params;
+
+	os_memset(&params, 0, sizeof(params));
+	params.addr = nmi_addr;
+	params.flags = WPA_STA_MFP;
+	params.set = 1;
+
+	if (wpa_drv_sta_add(wpa_s, &params) < 0) {
+		wpa_printf(MSG_INFO, "NAN PASN: Failed to update PASN station "
+			   MACSTR, MAC2STR(nmi_addr));
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /**
  * wpas_nan_pair - Initiate NAN pairing with a peer device
  * @wpa_s: Pointer to wpa_supplicant data structure
@@ -2836,7 +2856,9 @@ int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 	ret = nan_pairing_initiate_pasn_auth(wpa_s->nan, peer_addr, auth_mode,
 					     cipher, handle, peer_instance_id,
 					     responder, password, &sched);
-	if (ret)
+	if (!ret)
+		ret = wpas_nan_pasn_update_station(wpa_s, peer_addr);
+	else
 		wpa_printf(MSG_INFO,
 			   "NAN PASN: Failed to start PASN authentication");
 
