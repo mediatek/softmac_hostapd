@@ -569,4 +569,32 @@ struct nan_shared_key {
 
 #define NAN_PASN_SSID "516F9A010000"
 
+/* Wi-Fi Aware spec v4.0, Table 126 (NAN KDE field format) */
+#define NAN_KEY_DATA_NIK RSN_SELECTOR(0x50, 0x6f, 0x9a, 36)
+#define NAN_KEY_DATA_LIFETIME RSN_SELECTOR(0x50, 0x6f, 0x9a, 37)
+
+/* Wi-Fi Aware spec v4.0, Figure 61 (NIK KDE format)
+ * Note: The NIK field is defined with a variable length in Figure 61, but
+ * since only one cipher version is defined for now (which determines the
+ * length), use a fixed length here.
+ */
+struct nan_nik_kde {
+	u8 cipher_ver;
+	u8 nik[NAN_NIK_LEN];
+} STRUCT_PACKED;
+
+/* Wi-Fi Aware spec v4.0, Figure 63 (Key Bitmap format) */
+#define NAN_KEY_LIFETIME_GTK    BIT(0)
+#define NAN_KEY_LIFETIME_IGTK   BIT(1)
+#define NAN_KEY_LIFETIME_BIGTK  BIT(2)
+#define NAN_KEY_LIFETIME_NIK    BIT(3)
+#define NAN_KEY_LIFETIME_ND_TK  BIT(4)
+#define NAN_KEY_LIFETIME_NM_TK  BIT(5)
+
+/* Wi-Fi Aware spec v4.0, Figure 62 (NAN Key Lifetime KDE format) */
+struct nan_key_lifetime_kde {
+	le16 key_bitmap;
+	be32 lifetime_sec;
+} STRUCT_PACKED;
+
 #endif /* NAN_DEFS_H */
