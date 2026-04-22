@@ -310,6 +310,9 @@ OBJS += src/nan/nan_ndl.c
 OBJS += src/nan/nan_crypto.c
 OBJS += src/nan/nan_sec.c
 OBJS += src/nan/nan_bootstrap.c
+ifdef CONFIG_PASN
+OBJS += src/nan/nan_pairing.c
+endif
 endif
 
 ifdef CONFIG_OWE

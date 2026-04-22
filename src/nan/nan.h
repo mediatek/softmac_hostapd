@@ -659,5 +659,14 @@ int nan_set_bootstrap_configuration(struct nan_data *nan,
 				    u16 supported_bootstrap_methods,
 				    u16 auto_accept_bootstrap_methods,
 				    u16 bootstrap_comeback_timeout);
+#ifdef CONFIG_PASN
+int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
+#else /* CONFIG_PASN */
+static inline int nan_pairing_add_attrs(struct nan_data *nan_data,
+					struct wpabuf *buf)
+{
+	return 0;
+}
+#endif /* CONFIG_PASN */
 
 #endif /* NAN_H */
