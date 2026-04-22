@@ -305,6 +305,9 @@ static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
 
 	if (!sched && !new_sta) {
 		/* TODO: Should we maybe keep that NMI station? */
+		wpa_printf(MSG_DEBUG, "NAN: Unpair NMI station before removal");
+		nan_pairing_unpair_peer(wpa_s->nan, nmi_addr);
+
 		wpa_printf(MSG_DEBUG, "NAN: Remove NMI station");
 		ret = wpa_drv_sta_remove(wpa_s, nmi_addr);
 		if (ret)

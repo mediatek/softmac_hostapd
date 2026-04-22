@@ -1542,3 +1542,19 @@ bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr)
 
 	return !!(peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED);
 }
+
+
+void nan_pairing_unpair_peer(struct nan_data *nan_data, const u8 *peer_addr)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan_data, peer_addr);
+	if (!peer)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Unpair peer " MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	peer->pairing.flags &= ~NAN_PAIRING_FLAG_PAIRED;
+	nan_pairing_deinit_peer(peer);
+}

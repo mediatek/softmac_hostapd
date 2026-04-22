@@ -773,6 +773,7 @@ int nan_pairing_set_nik(struct nan_data *nan, const u8 *nik, size_t nik_len);
 int nan_pairing_set_nik_lifetime(struct nan_data *nan, u32 lifetime);
 bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr);
 int nan_pairing_abort(struct nan_data *nan_data, const u8 *peer_addr);
+void nan_pairing_unpair_peer(struct nan_data *nan_data, const u8 *peer_addr);
 #else /* CONFIG_PASN */
 static inline int nan_pairing_add_attrs(struct nan_data *nan_data,
 					struct wpabuf *buf)
@@ -809,6 +810,12 @@ bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr)
 {
 	return false;
 }
+
+static inline
+void nan_pairing_unpair_peer(struct nan_data *nan_data, const u8 *peer_addr)
+{
+}
+
 #endif /* CONFIG_PASN */
 
 #endif /* NAN_H */
