@@ -433,6 +433,72 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 
 
 /**
+ * nan_pairing_done - Derive NPK caching related keys after successful pairing
+ * @nan_data: NAN interface data
+ * @peer: NAN peer with which pairing is being completed
+ *
+ * This function completes the NAN pairing process by deriving the necessary
+ * cryptographic keys (KEK and NPK for opportunistic pairing) when NPK caching
+ * is enabled.
+ */
+static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
+{
+	u8 npk[NAN_NPK_LEN];
+	struct pasn_data *pasn = peer->pairing.pasn;
+	int cipher = pasn_get_cipher(pasn);
+	enum nan_cipher_suite_id csid;
+	u8 *initiator_nmi, *responder_nmi;
+	int ret;
+
+	if (!nan_data->cfg->pairing_cfg.npk_caching ||
+	    !peer->pairing.pairing_cfg.npk_caching)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Pairing: Derive KEK after PASN pairing");
+
+	if (peer->pairing.self_pairing_role == NAN_PAIRING_ROLE_INITIATOR) {
+		initiator_nmi = nan_data->cfg->nmi_addr;
+		responder_nmi = peer->nmi_addr;
+	} else {
+		initiator_nmi = peer->nmi_addr;
+		responder_nmi = nan_data->cfg->nmi_addr;
+	}
+
+	csid = cipher == WPA_CIPHER_GCMP_256 ? NAN_CS_PK_PASN_256 :
+		NAN_CS_PK_PASN_128;
+
+	ret = nan_crypto_derive_kek(pasn->ptk.kdk, pasn->ptk.kdk_len, csid,
+				    initiator_nmi, responder_nmi,
+				    &pasn->ptk);
+	if (ret) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Failed to derive KEK");
+		return;
+	}
+
+	/* For SAE AKMP, NPK was already derived inside the PASN module and
+	 * stored in pasn->pmk. For PASN AKMP, derive NPK here and configure it
+	 * to the PASN module. The NPK will be stored alongside the peer's NIK
+	 * when the NIK is received from the peer.
+	 */
+	if (pasn_get_akmp(pasn) != WPA_KEY_MGMT_PASN)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Pairing: Derive NPK after PASN pairing");
+
+	ret = nan_crypto_derive_npk(pasn->ptk.kdk, pasn->ptk.kdk_len, csid,
+				    initiator_nmi, responder_nmi, npk,
+				    sizeof(npk));
+	if (ret) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Failed to derive NPK");
+		return;
+	}
+
+	os_memcpy(pasn->pmk, npk, NAN_NPK_LEN);
+	pasn->pmk_len = NAN_NPK_LEN;
+}
+
+
+/**
  * nan_pairing_pasn_auth_tx_status - Handle PASN Authentication frame TX status
  * @nan: Pointer to NAN data structure
  * @data: Pointer to the transmitted frame data
@@ -476,6 +542,8 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 			nan_pairing_deinit_peer(peer);
 			return -1;
 		}
+
+		nan_pairing_done(nan, peer);
 	}
 
 	wpabuf_free(pasn->frame);
@@ -688,6 +756,8 @@ static int nan_pairing_handle_auth_3(struct nan_data *nan_data,
 					       &pasn->ptk);
 	if (ret < 0 || status != WLAN_STATUS_SUCCESS)
 		nan_pairing_deinit_peer(peer);
+	else if (status == WLAN_STATUS_SUCCESS)
+		nan_pairing_done(nan_data, peer);
 
 	/* Don't clear PASN data if pairing is successful. If caching is
 	 * enabled, it will still be needed when the NIK is received from
