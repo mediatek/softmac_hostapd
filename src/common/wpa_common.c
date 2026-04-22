@@ -19,6 +19,7 @@
 #include "ieee802_11_defs.h"
 #include "ieee802_11_common.h"
 #include "defs.h"
+#include "common/nan_defs.h"
 #include "wpa_common.h"
 
 
@@ -4042,6 +4043,27 @@ static int wpa_parse_generic(const u8 *pos, struct wpa_eapol_ie_parse *ie)
 			    ie->rsn_selection, ie->rsn_selection_len);
 		return 0;
 	}
+
+#if defined(CONFIG_NAN) || defined(CONFIG_PASN)
+	if (left >= sizeof(struct nan_nik_kde) &&
+	    selector == NAN_KEY_DATA_NIK) {
+		ie->nan_nik = p;
+		ie->nan_nik_len = left;
+		wpa_hexdump_key(MSG_DEBUG, "RSN: NAN NIK KDE in EAPOL-Key",
+				ie->nan_nik, ie->nan_nik_len);
+		return 0;
+	}
+
+	if (left >= sizeof(struct nan_key_lifetime_kde) &&
+	    selector == NAN_KEY_DATA_LIFETIME) {
+		ie->nan_key_lifetime = p;
+		ie->nan_key_lifetime_len = left;
+		wpa_hexdump(MSG_DEBUG,
+			    "RSN: NAN Key Lifetime KDE in EAPOL-Key",
+			    ie->nan_key_lifetime, ie->nan_key_lifetime_len);
+		return 0;
+	}
+#endif /* CONFIG_NAN || CONFIG_PASN */
 
 	return 2;
 }
