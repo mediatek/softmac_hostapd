@@ -2542,6 +2542,39 @@ void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 	nan_de_dw_trigger(wpa_s->nan_de, freq);
 }
 
+
+#ifdef CONFIG_PASN
+/**
+ * wpas_nan_pair - Initiate NAN pairing with a peer device
+ * @wpa_s: Pointer to wpa_supplicant data structure
+ * @peer_addr: MAC address of the peer device to pair with
+ * @auth_mode: Authentication mode to use for pairing
+ * @cipher: Cipher suite to use for the pairing session
+ * @handle: Handle of the service for which pairing is requested
+ * @peer_instance_id: Instance ID of the peer service
+ * @responder: True if the local device is the responder, false if initiator
+ * @password: Password for PASN authentication
+ * Returns: 0 on success, -1 on failure
+ */
+int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
+		  u8 auth_mode, int cipher, int handle, u8 peer_instance_id,
+		  bool responder, const char *password)
+{
+	int ret;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	ret = nan_pairing_initiate_pasn_auth(wpa_s->nan, peer_addr, auth_mode,
+					     cipher, handle, peer_instance_id,
+					     responder, password);
+	if (ret)
+		wpa_printf(MSG_INFO,
+			   "NAN PASN: Failed to start PASN authentication");
+
+	return ret;
+}
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 
 
