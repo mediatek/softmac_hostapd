@@ -12,6 +12,7 @@
 #include "crypto/sha256.h"
 #include "crypto/sha384.h"
 #include "crypto/crypto.h"
+#include "crypto/aes_wrap.h"
 #include "nan_i.h"
 
 #define NAN_KCK_MAX_LEN 24
@@ -520,4 +521,81 @@ int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
 	return nan_crypto_derive_from_kdk(kdk, kdk_len, cipher, label,
 					  initiator_nmi, responder_nmi,
 					  ptk->kek, ptk->kek_len);
+}
+
+
+/**
+ * nan_crypto_encrypt_key - Encrypt key data using AES Key Wrap (RFC 3394)
+ * @key_data: Key data to be encrypted
+ * @kek: Key Encryption Key (KEK)
+ * @kek_len: Length of KEK in octets
+ * Returns: Encrypted key data in a newly allocated wpabuf, or NULL on failure.
+ *
+ * This function encrypts the provided key data using AES Key Wrap algorithm
+ * as defined in RFC 3394. The input data is padded to 8-byte alignment before
+ * encryption. The padding scheme uses 0xdd as the first padding byte followed
+ * by zeros.
+ *
+ * The caller is responsible for freeing the returned wpabuf.
+ */
+struct wpabuf * nan_crypto_encrypt_key_data(const struct wpabuf *key_data,
+					    const u8 *kek, size_t kek_len)
+{
+	size_t key_data_len;
+	size_t pad;
+	size_t padded_len;
+	u8 *padded_key_data;
+	struct wpabuf *encrypted_key_data;
+
+	if (!key_data || !kek || !kek_len) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Invalid parameters for key data encryption");
+		return NULL;
+	}
+
+	key_data_len = wpabuf_len(key_data);
+	if (!key_data_len) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Key data is empty for encryption");
+		return NULL;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Plain key data", wpabuf_head(key_data),
+			key_data_len);
+
+	/* Calculate padding to align to 8 bytes (AES block size) */
+	pad = key_data_len % 8;
+	if (pad)
+		pad = 8 - pad;
+
+	padded_len = key_data_len + pad;
+	padded_key_data = os_zalloc(padded_len);
+	if (!padded_key_data)
+		return NULL;
+
+	/* Copy key data and apply padding (0xdd followed by zeros) */
+	os_memcpy(padded_key_data, wpabuf_head(key_data), key_data_len);
+	if (pad)
+		padded_key_data[key_data_len] = 0xdd;
+
+	/* Allocate buffer for encrypted data (input length + 8 bytes for IV) */
+	encrypted_key_data = wpabuf_alloc(padded_len + 8);
+	if (!encrypted_key_data)
+		goto fail;
+
+	/* Encrypt the padded data using AES Key Wrap */
+	if (aes_wrap(kek, kek_len, padded_len / 8, padded_key_data,
+		     wpabuf_put(encrypted_key_data, padded_len + 8))) {
+		wpa_printf(MSG_INFO, "NAN: Pairing: AES wrap failed");
+		wpabuf_free(encrypted_key_data);
+		encrypted_key_data = NULL;
+	} else {
+		wpa_hexdump(MSG_DEBUG, "NAN: Encrypted key data",
+			    wpabuf_head(encrypted_key_data),
+			    wpabuf_len(encrypted_key_data));
+	}
+
+fail:
+	bin_clear_free(padded_key_data, padded_len);
+	return encrypted_key_data;
 }
