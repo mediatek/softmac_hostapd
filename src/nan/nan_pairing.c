@@ -577,6 +577,8 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 	u8 *initiator_nmi, *responder_nmi;
 	int ret;
 
+	peer->pairing.flags |= NAN_PAIRING_FLAG_PAIRED;
+
 	if (!nan_data->cfg->pairing_cfg.npk_caching ||
 	    !peer->pairing.pairing_cfg.npk_caching ||
 	    (peer->pairing.flags & NAN_PAIRING_FLAG_NPK_VERIFICATION))
@@ -1350,4 +1352,16 @@ int nan_pairing_set_cipher_suites(struct nan_data *nan, u32 value)
 
 	nan->cfg->pairing_cfg.cipher_suites = value;
 	return 0;
+}
+
+
+bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan_data, peer_addr);
+	if (!peer)
+		return false;
+
+	return !!(peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED);
 }

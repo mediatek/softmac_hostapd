@@ -471,6 +471,8 @@ enum nan_pairing_role {
 
 /* Current pairing uses pairing verification */
 #define NAN_PAIRING_FLAG_NPK_VERIFICATION BIT(0)
+/* Peer is paired */
+#define NAN_PAIRING_FLAG_PAIRED BIT(1)
 
 /**
  * struct nan_pairing_peer_data - NAN pairing peer information

@@ -744,6 +744,7 @@ int nan_pairing_set_pairing_setup(struct nan_data *nan_data, bool value);
 int nan_pairing_set_npk_caching(struct nan_data *nan_data, bool value);
 int nan_pairing_set_pairing_verification(struct nan_data *nan_data, bool value);
 int nan_pairing_set_cipher_suites(struct nan_data *nan_data, u32 value);
+bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr);
 #else /* CONFIG_PASN */
 static inline int nan_pairing_add_attrs(struct nan_data *nan_data,
 					struct wpabuf *buf)
@@ -772,6 +773,12 @@ static inline int nan_pairing_auth_rx(struct nan_data *nan_data,
 				      size_t len)
 {
 	return -1;
+}
+
+static inline
+bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr)
+{
+	return false;
 }
 #endif /* CONFIG_PASN */
 
