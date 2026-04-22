@@ -525,6 +525,35 @@ int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
 
 
 /**
+ * nan_crypto_derive_nd_pmk_from_kdk - Derive ND-PMK from NM-KDK
+ * @kdk: NM-KDK (NAN Master Key Derivation Key)
+ * @kdk_len: Length of KDK in bytes
+ * @cipher: Cipher suite identifier (NAN_CS_PK_PASN_128 or NAN_CS_PK_PASN_256)
+ * @initiator_nmi: Pairing Initiator NMI address (6 bytes)
+ * @responder_nmi: Pairing Responder NMI address (6 bytes)
+ * @nd_pmk: Buffer for the derived ND-PMK (must be 32 bytes)
+ * Returns: 0 on success, -1 on failure
+ *
+ * ND-PMK = KDF-HASH-256(NM-KDK, "NDP PMK Derivation",
+ *                       Pairing Initiator NMI || Pairing Responder NMI)
+ */
+int nan_crypto_derive_nd_pmk_from_kdk(const u8 *kdk, size_t kdk_len,
+				      enum nan_cipher_suite_id cipher,
+				      const u8 *initiator_nmi,
+				      const u8 *responder_nmi, u8 *nd_pmk)
+{
+	const char *label = "NDP PMK Derivation";
+
+	wpa_printf(MSG_DEBUG, "NAN: Deriving ND-PMK from NM-KDK");
+
+	/* ND-PMK always uses SHA-256, resulting in 32 bytes */
+	return nan_crypto_derive_from_kdk(kdk, kdk_len, cipher, label,
+					  initiator_nmi, responder_nmi, nd_pmk,
+					  PMK_LEN);
+}
+
+
+/**
  * nan_crypto_encrypt_key - Encrypt key data using AES Key Wrap (RFC 3394)
  * @key_data: Key data to be encrypted
  * @kek: Key Encryption Key (KEK)

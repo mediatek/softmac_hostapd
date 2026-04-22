@@ -740,6 +740,10 @@ int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
 			  enum nan_cipher_suite_id cipher,
 			  const u8 *initiator_nmi, const u8 *responder_nmi,
 			  struct wpa_ptk *ptk);
+int nan_crypto_derive_nd_pmk_from_kdk(const u8 *kdk, size_t kdk_len,
+				      enum nan_cipher_suite_id cipher,
+				      const u8 *initiator_nmi,
+				      const u8 *responder_nmi, u8 *nd_pmk);
 struct wpabuf * nan_crypto_encrypt_key_data(const struct wpabuf *key_data,
 					    const u8 *kek, size_t kek_len);
 struct wpabuf * nan_crypto_decrypt_key_data(const u8 *kek, size_t kek_len,
