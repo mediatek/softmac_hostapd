@@ -653,6 +653,18 @@ static int wpas_nan_send_naf_cb(void *ctx, const u8 *dst, const u8 *src,
 
 	a2 = src ? src : wpa_s->own_addr;
 
+	if (src && !ether_addr_equal(src, wpa_s->own_addr)) {
+		wpa_printf(MSG_DEBUG, "NAN: Use NDI interface for sending NAF");
+
+		wpa_s = wpas_nan_get_ndi_iface(wpa_s, src);
+		if (!wpa_s) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: No NDI interface found for address "
+				   MACSTR, MAC2STR(src));
+			wpa_s = ctx;
+		}
+	}
+
 	wpa_printf(MSG_DEBUG, "NAN: Send NAF - dst=" MACSTR " src=" MACSTR
 		   " cluster_id=" MACSTR, MAC2STR(dst), MAC2STR(a2),
 		   MAC2STR(cluster_id));
@@ -3852,6 +3864,21 @@ void wpas_nan_usd_state_change_notif(struct wpa_supplicant *wpa_s)
 }
 
 
+static struct wpa_supplicant *
+wpas_nan_get_mgmt_iface(struct wpa_supplicant *wpa_s)
+{
+	struct wpa_supplicant *nmi_wpa_s;
+
+	for (nmi_wpa_s = wpa_s->global->ifaces; nmi_wpa_s;
+	     nmi_wpa_s = nmi_wpa_s->next) {
+		if (nmi_wpa_s->nan_mgmt)
+			return nmi_wpa_s;
+	}
+
+	return wpa_s;
+}
+
+
 int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 			const u8 *data, size_t data_len, int acked)
 {
@@ -3859,6 +3886,7 @@ int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 	const struct ieee80211_mgmt *mgmt =
 		(const struct ieee80211_mgmt *) data;
 
+	wpa_s = wpas_nan_get_mgmt_iface(wpa_s);
 	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
@@ -3879,6 +3907,16 @@ int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
 		     const struct ieee80211_mgmt *mgmt, size_t len)
 {
+	if (mgmt->u.action.category == WLAN_ACTION_PROTECTED_DUAL) {
+		wpa_printf(MSG_DEBUG, "NAN: RX NAF: ifname=%s: protected",
+			   wpa_s->ifname);
+
+		wpa_s = wpas_nan_get_mgmt_iface(wpa_s);
+
+		wpa_printf(MSG_DEBUG, "NAN: RX NAF: Continue processing on %s",
+			   wpa_s->ifname);
+	}
+
 	if (!wpas_nan_ndp_allowed(wpa_s))
 		return;
 

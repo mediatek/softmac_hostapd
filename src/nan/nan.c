@@ -1159,7 +1159,8 @@ static void nan_action_build_header(struct nan_data *nan, struct nan_peer *peer,
 {
 	u8 category = WLAN_ACTION_PUBLIC;
 
-	if (nan_pairing_is_peer_paired(nan, peer->nmi_addr))
+	if (nan_pairing_is_peer_paired(nan, peer->nmi_addr) ||
+	    !dl_list_empty(&peer->info.sec))
 		category = WLAN_ACTION_PROTECTED_DUAL;
 
 	wpabuf_put_u8(buf, category);
@@ -1218,6 +1219,8 @@ static int nan_action_send(struct nan_data *nan, struct nan_peer *peer,
 			   enum nan_subtype subtype)
 {
 	struct wpabuf *buf;
+	struct nan_peer_sec_info_entry *cur, *next;
+	const u8 *src, *dst;
 	int ret;
 
 	buf = wpabuf_alloc(NAN_MAX_NAF_LEN);
@@ -1234,9 +1237,27 @@ static int nan_action_send(struct nan_data *nan, struct nan_peer *peer,
 
 	if (!nan->cfg->send_naf)
 		goto out;
-	ret = nan->cfg->send_naf(nan->cfg->cb_ctx, peer->nmi_addr, NULL,
-				 nan->cluster_id, buf);
 
+	/*
+	 * By default, the NAN management interface is used for the NAF
+	 * transmission. However, when pairing was not established with the peer
+	 * and there is a secure NDP with the peer, need to use the NDIs so that
+	 * the NAF would be sent in a secure manner
+	 */
+	src = NULL;
+	dst = peer->nmi_addr;
+
+	if (!(peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED)) {
+		dl_list_for_each_safe(cur, next, &peer->info.sec,
+				      struct nan_peer_sec_info_entry, list) {
+			src = cur->local_ndi;
+			dst = cur->peer_ndi;
+			break;
+		}
+	}
+
+	ret = nan->cfg->send_naf(nan->cfg->cb_ctx, dst, src,
+				 nan->cluster_id, buf);
 out:
 	wpa_printf(MSG_DEBUG, "NAN: send_naf: ret=%d", ret);
 	wpabuf_free(buf);
@@ -1604,6 +1625,67 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 
 
 /*
+ * nan_action_substitute_src - Substitute the source address in the NAF if
+ * it matches an NDI of an existing NDP
+ *
+ * @nan: NAN module context from nan_init()
+ * @mgmt: Pointer to the IEEE 802.11 management frame
+ * @len: Length of the management frame in octets
+ *
+ * NAFs can be sent and received on NDIs. In such cases, the source address
+ * in the 802.11 header would be the NDI address. This function checks if
+ * the source address matches any known NDI address and if so, substitutes
+ * it with the NMI address of the corresponding peer.
+ */
+static void nan_action_substitute_src(struct nan_data *nan,
+				      const struct ieee80211_mgmt *mgmt,
+				      size_t len)
+{
+	struct nan_peer *peer;
+
+	/* If the peer is known, nothing needs to be changed */
+	peer = nan_get_peer(nan, mgmt->sa);
+	if (peer)
+		return;
+
+	/*
+	 * Find a peer with which we have an NDI that matches the source address
+	 * in the frame, and if found, substitute the frames source address with
+	 * the peer NMI
+	 */
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		struct nan_ndp *pndp;
+
+		/* When a peer is paired, NAFs are not allowed on NDIs */
+		if (peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED)
+			continue;
+
+		dl_list_for_each(pndp, &peer->ndps, struct nan_ndp, list) {
+			const u8 *addr;
+
+			if (pndp->initiator)
+				addr = pndp->resp_ndi;
+			else
+				addr = pndp->init_ndi;
+
+			if (os_memcmp(addr, mgmt->sa, ETH_ALEN))
+				continue;
+
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NAF from=" MACSTR " Received on NDI=" MACSTR,
+				   MAC2STR(peer->nmi_addr), MAC2STR(mgmt->sa));
+
+			os_memcpy((void *)mgmt->sa, peer->nmi_addr, ETH_ALEN);
+		}
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NAF from unknown peer=" MACSTR,
+		   MAC2STR(mgmt->sa));
+}
+
+
+/*
  * nan_action_rx - Process a received NAN Action Frame
  * @nan: NAN module context from nan_init()
  * @mgmt: Pointer to the IEEE 802.11 Management frame
@@ -1621,7 +1703,10 @@ int nan_action_rx(struct nan_data *nan, const struct ieee80211_mgmt *mgmt,
 	if (!nan_ndp_supported(nan))
 		return -1;
 
+	nan_action_substitute_src(nan, mgmt, len);
+
 	/* Parse the NAF and validate its general structure */
+
 	ret = nan_parse_naf(nan, mgmt, len, &msg);
 	if (ret)
 		return ret;
@@ -1709,6 +1794,68 @@ void nan_set_cluster_id(struct nan_data *nan, const u8 *cluster_id)
 
 
 /*
+ * nan_tx_status_get_peer - Get the peer for a transmitted NAF
+ *
+ * @nan: NAN module context from nan_init()
+ * @dst: Destination address of the transmitted frame
+ * Return: Pointer to the peer or NULL if not found
+ */
+static struct nan_peer *nan_tx_status_get_peer(struct nan_data *nan,
+					       const u8 *dst)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan, dst);
+	if (peer)
+		return peer;
+
+	/*
+	 * It is possible that the NAF was transmitted over an NDI, e.g.,
+	 * in case that a secure NDP was established with the peer
+	 */
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		struct nan_ndp *pndp;
+		const u8 *paddr;
+
+		/* When a peer is paired, NAFs are not allowed on NDIs */
+		if (peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED)
+			continue;
+
+		/*
+		 * When an NDP termination is initiated locally, the NDP is
+		 * removed from the list and is set to the 'ndp_setup' object
+		 * so need to also check that one.
+		 */
+		if (peer->ndp_setup.ndp) {
+			pndp = peer->ndp_setup.ndp;
+
+			if (pndp->initiator)
+				paddr = pndp->resp_ndi;
+			else
+				paddr = pndp->init_ndi;
+
+			if (!os_memcmp(dst, paddr, ETH_ALEN))
+				return peer;
+		}
+
+		dl_list_for_each(pndp, &peer->ndps, struct nan_ndp, list) {
+			if (pndp->initiator)
+				paddr = pndp->resp_ndi;
+			else
+				paddr = pndp->init_ndi;
+
+			if (os_memcmp(dst, paddr, ETH_ALEN))
+				continue;
+
+			return peer;
+		}
+	}
+
+	return NULL;
+}
+
+
+/*
  * nan_tx_status - Notification of the result of a transmitted NAN Action frame
  * @nan: NAN module context from nan_init()
  * @dst: Destination address of the transmitted frame
@@ -1731,7 +1878,7 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 	wpa_printf(MSG_DEBUG, "NAN: TX status: peer=" MACSTR ", acked=%u",
 		   MAC2STR(dst), acked);
 
-	peer = nan_get_peer(nan, dst);
+	peer = nan_tx_status_get_peer(nan, dst);
 	if (!peer) {
 		wpa_printf(MSG_DEBUG, "NAN: TX status: peer not found");
 		return 0;
