@@ -859,19 +859,28 @@ static int wpas_nan_pasn_send_cb(void *ctx, const u8 *data, size_t data_len)
 
 static int wpas_nan_pasn_auth_status_cb(void *ctx, const u8 *peer_addr,
 					int akmp, int cipher, u16 status,
-					struct wpa_ptk *ptk)
+					struct wpa_ptk *ptk, const u8 *nd_pmk)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	enum wpa_alg alg;
 	u8 seq[6];
+	char nd_pmk_hex[2 * PMK_LEN + 1];
+
+	if (nd_pmk)
+		wpa_snprintf_hex(nd_pmk_hex, sizeof(nd_pmk_hex), nd_pmk,
+				 PMK_LEN);
+	else
+		nd_pmk_hex[0] = '\0';
 
 	wpa_msg_global(wpa_s, MSG_INFO,
 		       NAN_PAIRING_STATUS "addr=" MACSTR
-		       " akmp=%s cipher=%s status=%s",
+		       " akmp=%s cipher=%s status=%s%s%s",
 		       MAC2STR(peer_addr),
 		       wpa_key_mgmt_txt(akmp, WPA_PROTO_RSN),
 		       wpa_cipher_txt(cipher),
-		       status == WLAN_STATUS_SUCCESS ? "success" : "failure");
+		       status == WLAN_STATUS_SUCCESS ? "success" : "failure",
+		       nd_pmk ? " nd_pmk=" : "",
+		       nd_pmk ? nd_pmk_hex : "");
 
 	if (status != WLAN_STATUS_SUCCESS)
 		return 0;

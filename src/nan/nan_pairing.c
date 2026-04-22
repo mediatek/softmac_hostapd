@@ -775,6 +775,39 @@ static int nan_send_nik(struct nan_data *nan_data, struct nan_peer *peer)
 }
 
 
+static int nan_pairing_derive_nd_pmk(struct nan_data *nan_data,
+				     struct nan_peer *peer, u8 *nd_pmk)
+{
+	struct pasn_data *pasn = peer->pairing.pasn;
+	int cipher = pasn_get_cipher(pasn);
+	enum nan_cipher_suite_id csid;
+	const u8 *initiator_nmi, *responder_nmi;
+	int ret;
+
+	wpa_printf(MSG_DEBUG, "NAN: Pairing: Derive ND-PMK after PASN pairing");
+
+	if (peer->pairing.self_pairing_role == NAN_PAIRING_ROLE_INITIATOR) {
+		initiator_nmi = nan_data->cfg->nmi_addr;
+		responder_nmi = peer->nmi_addr;
+	} else {
+		initiator_nmi = peer->nmi_addr;
+		responder_nmi = nan_data->cfg->nmi_addr;
+	}
+
+	csid = cipher == WPA_CIPHER_GCMP_256 ? NAN_CS_PK_PASN_256 :
+		NAN_CS_PK_PASN_128;
+
+	ret = nan_crypto_derive_nd_pmk_from_kdk(pasn->ptk.kdk,
+						pasn->ptk.kdk_len, csid,
+						initiator_nmi, responder_nmi,
+						nd_pmk);
+	if (ret)
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Failed to derive ND PMK");
+	return ret;
+}
+
+
 /**
  * nan_pairing_pasn_auth_tx_status - Handle PASN Authentication frame TX status
  * @nan: Pointer to NAN data structure
@@ -811,10 +844,23 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 
 	ret = wpa_pasn_auth_tx_status(pasn, data, data_len, acked);
 	if (ret == 1) {
+		u8 nd_pmk[PMK_LEN];
+
+		if (pasn->status == WLAN_STATUS_SUCCESS &&
+		    nan_pairing_derive_nd_pmk(nan, peer, nd_pmk)) {
+			pasn->status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: Failed to derive ND PMK");
+		}
+
 		ret = nan->cfg->pairing_result_cb(nan->cfg->cb_ctx,
-						  peer->nmi_addr,
-						  pasn->akmp, pasn->cipher,
-						  pasn->status, &pasn->ptk);
+						  peer->nmi_addr, pasn->akmp,
+						  pasn->cipher, pasn->status,
+						  &pasn->ptk,
+						  pasn->status ==
+						  WLAN_STATUS_SUCCESS ? nd_pmk :
+						  NULL);
+		forced_memzero(nd_pmk, PMK_LEN);
 		if (pasn->status != WLAN_STATUS_SUCCESS || ret < 0) {
 			nan_pairing_deinit_peer(peer);
 			return -1;
@@ -1018,7 +1064,8 @@ static int nan_pairing_handle_auth_2(struct nan_data *nan_data,
 			   "NAN: Pairing: wpa_pasn_auth_rx() failed");
 		nan_data->cfg->pairing_result_cb(
 			nan_data->cfg->cb_ctx, peer->nmi_addr, pasn->akmp,
-			pasn->cipher, WLAN_STATUS_UNSPECIFIED_FAILURE, NULL);
+			pasn->cipher, WLAN_STATUS_UNSPECIFIED_FAILURE, NULL,
+			NULL);
 		nan_pairing_deinit_peer(peer);
 		return -1;
 	}
@@ -1035,18 +1082,28 @@ static int nan_pairing_handle_auth_3(struct nan_data *nan_data,
 	struct pasn_data *pasn = peer->pairing.pasn;
 	int ret;
 	u16 status = WLAN_STATUS_SUCCESS;
+	u8 nd_pmk[PMK_LEN];
 
 	ret = handle_auth_pasn_3(pasn, nan_data->cfg->nmi_addr, peer->nmi_addr,
 				 mgmt, len);
 	if (ret < 0) {
 		status = WLAN_STATUS_UNSPECIFIED_FAILURE;
 		wpa_printf(MSG_DEBUG, "NAN: Pairing: Handle Auth3 failed");
+	} else {
+		if (nan_pairing_derive_nd_pmk(nan_data, peer, nd_pmk)) {
+			status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: Failed to derive ND PMK");
+		}
 	}
 
 	ret = nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
 					       peer->nmi_addr, pasn->akmp,
 					       pasn->cipher, status,
-					       &pasn->ptk);
+					       &pasn->ptk,
+					       status == WLAN_STATUS_SUCCESS ?
+					       nd_pmk : NULL);
+	forced_memzero(nd_pmk, PMK_LEN);
 	if (ret < 0 || status != WLAN_STATUS_SUCCESS)
 		nan_pairing_deinit_peer(peer);
 	else if (status == WLAN_STATUS_SUCCESS)
@@ -1137,7 +1194,7 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 		nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
 						 peer->nmi_addr, pasn->akmp,
 						 pasn->cipher, status_code,
-						 NULL);
+						 NULL, NULL);
 		nan_pairing_deinit_peer(peer);
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Pairing: Authentication rejected - status=%u",

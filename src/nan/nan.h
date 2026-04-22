@@ -620,12 +620,14 @@ struct nan_config {
 	 * @cipher: Cipher used in the pairing
 	 * @status: Status of the pairing (WLAN_STATUS_* )
 	 * @ptk: Derived PTK for the pairing (valid only if status is success)
+	 * @nd_pmk: ND-PMK from the pairing (valid only if status is success)
 	 * Returns: 0 if status is WLAN_STATUS_SUCCESS and the key was
 	 *	installed successfully or status is
 	 *	WLAN_STATUS_UNSPECIFIED_FAILURE, -1 otherwise
 	 */
 	int (*pairing_result_cb)(void *ctx, const u8 *peer_addr, int akmp,
-				 int cipher, u16 status, struct wpa_ptk *ptk);
+				 int cipher, u16 status, struct wpa_ptk *ptk,
+				 const u8 *nd_pmk);
 
 	/**
 	 * update_pairing_credentials - Report received NIK and NPK for a peer

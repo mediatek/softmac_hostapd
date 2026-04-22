@@ -258,7 +258,7 @@ extern "C" {
 
 /* NAN Pairing status
  * addr=<peer address> akmp=<SAE|PASN> cipher=<CCMP|GCMP-256>
- * status=<success|failure>
+ * status=<success|failure> [nd_pmk=<hex>]
  */
 #define NAN_PAIRING_STATUS "NAN-PAIRING-STATUS "
 
