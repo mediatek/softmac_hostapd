@@ -1208,11 +1208,30 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 		if (status_code == WLAN_STATUS_SUCCESS &&
 		    auth_transaction == 1) {
 			struct nan_cipher_suite cs;
+			const u8 *rsne;
+			struct wpa_ie_data rsn_data;
 
 			if (nan_pairing_process_elems(nan_data, peer, mgmt, len,
 						      &cs)) {
 				wpa_printf(MSG_DEBUG,
 					   "NAN: Pairing: Handle Auth1 NAN attributes failed");
+				return -1;
+			}
+
+			rsne = get_ie(mgmt->u.auth.variable,
+				      len - offsetof(struct ieee80211_mgmt,
+						     u.auth.variable),
+				      WLAN_EID_RSN);
+			if (!rsne) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Pairing: RSNE missing in Auth1");
+				return -1;
+			}
+
+			if (wpa_parse_wpa_ie_rsn(rsne, rsne[1] + 2,
+						 &rsn_data)) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Pairing: Failed to parse RSNE in Auth1");
 				return -1;
 			}
 
@@ -1224,7 +1243,8 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 
 			nan_data->cfg->pairing_request(nan_data->cfg->cb_ctx,
 						       peer->nmi_addr, cs.csid,
-						       cs.instance_id);
+						       cs.instance_id,
+						       &rsn_data);
 			return 0;
 		}
 

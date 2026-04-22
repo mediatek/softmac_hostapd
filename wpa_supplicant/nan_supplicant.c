@@ -1030,11 +1030,14 @@ static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
 
 static void
 wpas_nan_pasn_pairing_request_cb(void *ctx, const u8 *peer_nmi, u8 csid,
-				 u8 instance_id)
+				 u8 instance_id,
+				 const struct wpa_ie_data *rsn_data)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	wpas_notify_nan_pairing_request(wpa_s, peer_nmi, csid, instance_id);
+	wpas_notify_nan_pairing_request(wpa_s, peer_nmi, csid, instance_id,
+					rsn_data->key_mgmt,
+					!!rsn_data->num_pmkid);
 }
 
 #endif /* CONFIG_PASN */

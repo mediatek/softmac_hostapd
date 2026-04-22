@@ -1341,11 +1341,15 @@ out:
 
 void wpas_notify_nan_pairing_request(struct wpa_supplicant *wpa_s,
 				     const u8 *peer_nmi, u8 csid,
-				     u8 instance_id)
+				     u8 instance_id, int key_mgmt,
+				     bool verify)
 {
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_PAIRING_REQUEST
-		       "peer_nmi=" MACSTR " csid=%u instance_id=%u",
-		       MAC2STR(peer_nmi), csid, instance_id);
+		       "peer_nmi=" MACSTR
+		       " csid=%u instance_id=%u key_mgmt=%s verify=%d",
+		       MAC2STR(peer_nmi), csid, instance_id,
+		       wpa_key_mgmt_txt(key_mgmt, WPA_PROTO_RSN),
+		       verify);
 }
 
 #endif /* CONFIG_PASN */

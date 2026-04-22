@@ -671,9 +671,11 @@ struct nan_config {
 	 * @peer_nmi: Peer NMI address
 	 * @csid: Cipher suite ID requested by the peer
 	 * @instance_id: Service instance ID for which the pairing is requested
+	 * @rsn_data: Parsed RSNE data from peer's Authentication frame
 	 */
 	void (*pairing_request)(void *ctx, const u8 *peer_nmi, u8 csid,
-				u8 instance_id);
+				u8 instance_id,
+				const struct wpa_ie_data *rsn_data);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
