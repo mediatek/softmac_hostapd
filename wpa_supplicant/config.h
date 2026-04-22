@@ -456,6 +456,11 @@ struct wpa_dev_ik {
 	 * pmkid - PMKID used in the previous connection with the device
 	 */
 	struct wpabuf *pmkid;
+
+	/**
+	 * akmp - AKMP suite used in the previous connection with the device
+	 */
+	int akmp;
 };
 
 

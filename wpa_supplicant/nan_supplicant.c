@@ -896,6 +896,70 @@ static int wpas_nan_pasn_auth_status_cb(void *ctx, const u8 *peer_addr,
 	return 0;
 }
 
+
+static int wpas_nan_update_pairing_credentials_cb(void *ctx, const u8 *nik,
+						  size_t nik_len,
+						  int cipher_ver,
+						  int nik_lifetime, int akmp,
+						  const u8 *npk, size_t npk_len)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	struct wpa_dev_ik *ik;
+
+	if (!nik || cipher_ver != NAN_NIRA_CIPHER_VER_128 ||
+	    nik_len != NAN_NIK_LEN || !npk || !npk_len) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid NIK/NPK parameters");
+		return -1;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Received NIK", nik, nik_len);
+	wpa_printf(MSG_DEBUG, "NAN: NIK lifetime=%d cipher_ver=%d",
+		   nik_lifetime, cipher_ver);
+
+	/* Check if an identity with the same NIK already exists */
+	for (ik = wpa_s->conf->identity; ik; ik = ik->next) {
+		if (nik_len == wpabuf_len(ik->dik) &&
+		    os_memcmp(nik, wpabuf_head(ik->dik), nik_len) == 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Remove previous device identity entry for matching NIK");
+			wpa_config_remove_identity(wpa_s->conf, ik->id);
+			break;
+		}
+	}
+
+	/* Create a new device identity entry */
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Create a new device identity entry for NIK");
+	ik = wpa_config_add_identity(wpa_s->conf);
+	if (!ik) {
+		wpa_printf(MSG_INFO, "NAN: Failed to allocate identity");
+		return -1;
+	}
+
+	/* Store the NIK as the DIK */
+	ik->dik = wpabuf_alloc_copy(nik, nik_len);
+	if (!ik->dik)
+		goto fail;
+
+	/* Store the NPK as the PMK */
+	ik->pmk = wpabuf_alloc_copy(npk, npk_len);
+	if (!ik->pmk)
+		goto fail;
+
+	/* Store cipher version and AKMP */
+	ik->dik_cipher = cipher_ver;
+	ik->akmp = akmp;
+
+	wpa_printf(MSG_INFO, "NAN: Stored NIK as device identity (id=%d)",
+		   ik->id);
+	return ik->id;
+
+fail:
+	wpa_printf(MSG_INFO, "NAN: Failed to store NIK as device identity");
+	wpa_config_remove_identity(wpa_s->conf, ik->id);
+	return -1;
+}
+
 #endif /* CONFIG_PASN */
 
 
@@ -920,6 +984,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 #ifdef CONFIG_PASN
 	nan.send_pasn = wpas_nan_pasn_send_cb;
 	nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
+	nan.update_pairing_credentials = wpas_nan_update_pairing_credentials_cb;
 #endif /* CONFIG_PASN */
 
 	/* NDP */
