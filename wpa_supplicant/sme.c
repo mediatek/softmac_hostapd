@@ -2313,10 +2313,11 @@ void sme_external_auth_trigger(struct wpa_supplicant *wpa_s,
 			wpa_s->sme.ext_ml_auth = false;
 		}
 #ifdef CONFIG_ENC_ASSOC
-		if (data->external_auth.auth_alg == WLAN_AUTH_EPPKE &&
-		    sme_handle_eppke_external_auth_start(wpa_s, data) < 0) {
-			sme_send_external_auth_status(
-				wpa_s, WLAN_STATUS_UNSPECIFIED_FAILURE);
+		if (data->external_auth.auth_alg == WLAN_AUTH_EPPKE) {
+			if (sme_handle_eppke_external_auth_start(wpa_s, data) <
+			    0)
+				sme_send_external_auth_status(
+					wpa_s, WLAN_STATUS_UNSPECIFIED_FAILURE);
 			return;
 		}
 #endif /* CONFIG_ENC_ASSOC */
