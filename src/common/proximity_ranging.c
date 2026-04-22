@@ -1768,14 +1768,16 @@ static int pr_pasn_initialize(struct pr_data *pr, struct pr_device *dev,
 						       pasn->peer_addr,
 						       dev->pmk,
 						       dev->pmk_len,
-						       pmkid);
+						       pmkid,
+						       WPA_KEY_MGMT_SAE);
 		else
 			pasn_responder_pmksa_cache_add(pr->responder_pmksa,
 						       pasn->own_addr,
 						       pasn->peer_addr,
 						       dev->pmk,
 						       dev->pmk_len,
-						       pmkid);
+						       pmkid,
+						       WPA_KEY_MGMT_SAE);
 		pasn->akmp = WPA_KEY_MGMT_SAE;
 	} else {
 		pasn->akmp = WPA_KEY_MGMT_PASN;

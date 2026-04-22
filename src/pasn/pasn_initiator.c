@@ -42,10 +42,10 @@ void pasn_initiator_pmksa_cache_deinit(struct rsn_pmksa_cache *pmksa)
 int pasn_initiator_pmksa_cache_add(struct rsn_pmksa_cache *pmksa,
 				   const u8 *own_addr, const u8 *bssid,
 				   const u8 *pmk,
-				   size_t pmk_len, const u8 *pmkid)
+				   size_t pmk_len, const u8 *pmkid, int akmp)
 {
 	if (pmksa_cache_add(pmksa, pmk, pmk_len, pmkid, NULL, 0, bssid,
-			    own_addr, NULL, WPA_KEY_MGMT_SAE, NULL, 0))
+			    own_addr, NULL, akmp, NULL, 0))
 		return 0;
 	return -1;
 }
@@ -957,8 +957,8 @@ static int wpas_pasn_set_pmk(struct pasn_data *pasn,
 	os_memset(pasn->pmk, 0, sizeof(pasn->pmk));
 	pasn->pmk_len = 0;
 
-	if (pasn->akmp == WPA_KEY_MGMT_PASN ||
-	    pasn->akmp == WPA_KEY_MGMT_EPPKE) {
+	if ((pasn->akmp == WPA_KEY_MGMT_PASN ||
+	     pasn->akmp == WPA_KEY_MGMT_EPPKE) && !rsn_data->num_pmkid) {
 		wpa_printf(MSG_DEBUG, "PASN/EPPKE: Using default PMK");
 
 		pasn->pmk_len = WPA_PASN_PMK_LEN;

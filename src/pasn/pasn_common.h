@@ -317,7 +317,7 @@ void pasn_initiator_pmksa_cache_deinit(struct rsn_pmksa_cache *pmksa);
 int pasn_initiator_pmksa_cache_add(struct rsn_pmksa_cache *pmksa,
 				   const u8 *own_addr, const u8 *bssid,
 				   const u8 *pmk, size_t pmk_len,
-				   const u8 *pmkid);
+				   const u8 *pmkid, int akmp);
 int pasn_initiator_pmksa_cache_get(struct rsn_pmksa_cache *pmksa,
 				   const u8 *bssid, u8 *pmkid, u8 *pmk,
 				   size_t *pmk_len);
@@ -343,7 +343,7 @@ void pasn_responder_pmksa_cache_deinit(struct rsn_pmksa_cache *pmksa);
 int pasn_responder_pmksa_cache_add(struct rsn_pmksa_cache *pmksa,
 				   const u8 *own_addr, const u8 *bssid,
 				   const u8 *pmk, size_t pmk_len,
-				   const u8 *pmkid);
+				   const u8 *pmkid, int akmp);
 int pasn_responder_pmksa_cache_get(struct rsn_pmksa_cache *pmksa,
 				   const u8 *bssid, u8 *pmkid, u8 *pmk,
 				   size_t *pmk_len);
