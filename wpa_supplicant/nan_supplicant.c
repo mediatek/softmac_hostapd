@@ -2791,13 +2791,15 @@ int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		  bool responder, const char *password)
 {
 	int ret;
+	struct nan_schedule sched;
 
 	if (!wpas_nan_ready(wpa_s))
 		return -1;
 
+	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
 	ret = nan_pairing_initiate_pasn_auth(wpa_s->nan, peer_addr, auth_mode,
 					     cipher, handle, peer_instance_id,
-					     responder, password);
+					     responder, password, &sched);
 	if (ret)
 		wpa_printf(MSG_INFO,
 			   "NAN PASN: Failed to start PASN authentication");

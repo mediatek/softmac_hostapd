@@ -483,7 +483,8 @@ static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 				   u8 auth_mode, int cipher, int handle,
 				   u8 peer_instance_id, bool responder,
-				   const char *password)
+				   const char *password,
+				   const struct nan_schedule *sched)
 {
 	int ret = 0;
 	struct pasn_data *pasn;
@@ -535,6 +536,9 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 	peer->pairing.handle = handle;
 	peer->pairing.peer_instance_id = peer_instance_id;
 	peer->pairing.flags = 0;
+
+	if (nan_configure_peer_schedule(nan_data, peer, sched))
+		wpa_printf(MSG_DEBUG, "NAN: Could not configure peer schedule");
 
 	if (responder)
 		return 0;

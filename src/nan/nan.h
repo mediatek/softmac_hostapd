@@ -735,7 +735,8 @@ int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 				   u8 auth_mode, int cipher, int handle,
 				   u8 peer_instance_id, bool responder,
-				   const char *password);
+				   const char *password,
+				   const struct nan_schedule *sched);
 int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 				    size_t data_len, bool acked);
 int nan_pairing_auth_rx(struct nan_data *nan_data,
@@ -756,7 +757,8 @@ static inline
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 				   u8 auth_mode, int cipher, int handle,
 				   u8 peer_instance_id, bool responder,
-				   const char *password)
+				   const char *password,
+				   const struct nan_schedule *sched)
 {
 	return -1;
 }

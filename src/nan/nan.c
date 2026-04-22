@@ -1260,9 +1260,8 @@ nan_peer_get_committed_avail(const struct nan_data *nan,
 			     struct nan_peer_schedule *sched);
 
 
-static int nan_configure_peer_schedule(struct nan_data *nan,
-				       struct nan_peer *peer,
-				       const struct nan_schedule *local_sched)
+int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
+				const struct nan_schedule *local_sched)
 {
 	int ret;
 	struct nan_dev_capa_entry *cur;
