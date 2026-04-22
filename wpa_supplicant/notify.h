@@ -234,5 +234,26 @@ void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
 void wpas_notify_nan_pairing_request(struct wpa_supplicant *wpa_s,
 				     const u8 *peer_nmi, u8 csid,
 				     u8 instance_id);
+void wpas_notify_nan_ndp_request(struct wpa_supplicant *wpa_s,
+				 const u8 *peer_nmi, const u8 *init_ndi,
+				 u32 ndp_id, u8 publish_inst_id,
+				 const u8 *ssi, size_t ssi_len, u32 csid);
+void wpas_notify_nan_ndp_counter_request(struct wpa_supplicant *wpa_s,
+					 const u8 *peer_nmi,
+					 const u8 *init_ndi, u32 ndp_id,
+					 const u8 *ssi, size_t ssi_len);
+void wpas_notify_nan_ndp_connected(struct wpa_supplicant *wpa_s,
+				   const u8 *peer_nmi, u32 ndp_id,
+				   const u8 *local_ndi, const u8 *peer_ndi,
+				   const u8 *ssi, size_t ssi_len);
+void wpas_notify_nan_ndp_disconnected(struct wpa_supplicant *wpa_s,
+				      const u8 *peer_nmi, u32 ndp_id,
+				      const u8 *local_ndi, const u8 *peer_ndi,
+				      enum nan_reason reason);
+void wpas_notify_nan_cluster_join(struct wpa_supplicant *wpa_s,
+				  const u8 *cluster_id, bool new_cluster);
+void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
+				    const u8 *peer_addr, int akmp, int cipher,
+				    u16 status, const u8 *nd_pmk);
 
 #endif /* NOTIFY_H */

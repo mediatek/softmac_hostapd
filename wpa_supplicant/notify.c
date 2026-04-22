@@ -1350,6 +1350,130 @@ void wpas_notify_nan_pairing_request(struct wpa_supplicant *wpa_s,
 
 #endif /* CONFIG_PASN */
 
+
+void wpas_notify_nan_ndp_request(struct wpa_supplicant *wpa_s,
+				 const u8 *peer_nmi, const u8 *init_ndi,
+				 u32 ndp_id, u8 publish_inst_id,
+				 const u8 *ssi, size_t ssi_len, u32 csid)
+{
+	char *ssi_hex = NULL;
+
+	if (ssi) {
+		ssi_hex = os_zalloc(2 * ssi_len + 1);
+		if (!ssi_hex)
+			return;
+
+		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+	}
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_REQUEST "peer_nmi=" MACSTR
+		       " init_ndi=" MACSTR
+		       " ndp_id=%u publish_inst_id=%u ssi=%s csid=%u",
+		       MAC2STR(peer_nmi), MAC2STR(init_ndi),
+		       ndp_id, publish_inst_id,
+		       ssi_hex ? ssi_hex : "", csid);
+
+	os_free(ssi_hex);
+}
+
+
+void wpas_notify_nan_ndp_counter_request(struct wpa_supplicant *wpa_s,
+					 const u8 *peer_nmi,
+					 const u8 *init_ndi, u32 ndp_id,
+					 const u8 *ssi, size_t ssi_len)
+{
+	char *ssi_hex = NULL;
+
+	if (ssi) {
+		ssi_hex = os_zalloc(2 * ssi_len + 1);
+		if (!ssi_hex)
+			return;
+
+		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+	}
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_COUNTER_REQUEST
+		       "peer_nmi=" MACSTR " init_ndi=" MACSTR
+		       " ndp_id=%u ssi=%s",
+		       MAC2STR(peer_nmi), MAC2STR(init_ndi),
+		       ndp_id, ssi_hex ? ssi_hex : "");
+
+	os_free(ssi_hex);
+}
+
+
+void wpas_notify_nan_ndp_connected(struct wpa_supplicant *wpa_s,
+				   const u8 *peer_nmi, u32 ndp_id,
+				   const u8 *local_ndi,
+				   const u8 *peer_ndi,
+				   const u8 *ssi, size_t ssi_len)
+{
+	char *ssi_hex = NULL;
+
+	if (ssi) {
+		ssi_hex = os_zalloc(2 * ssi_len + 1);
+		if (!ssi_hex)
+			return;
+
+		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+	}
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_CONNECTED "peer=" MACSTR
+		       " ndp_id=%u local_ndi=" MACSTR
+		       " peer_ndi=" MACSTR " ssi=%s",
+		       MAC2STR(peer_nmi), ndp_id, MAC2STR(local_ndi),
+		       MAC2STR(peer_ndi), ssi_hex ? ssi_hex : "");
+
+	os_free(ssi_hex);
+}
+
+
+void wpas_notify_nan_ndp_disconnected(struct wpa_supplicant *wpa_s,
+				      const u8 *peer_nmi, u32 ndp_id,
+				      const u8 *local_ndi,
+				      const u8 *peer_ndi,
+				      enum nan_reason reason)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_DISCONNECTED
+		       "peer=" MACSTR " ndp_id=%u local_ndi=" MACSTR
+		       " peer_ndi=" MACSTR " reason=%u",
+		       MAC2STR(peer_nmi), ndp_id,
+		       MAC2STR(local_ndi), MAC2STR(peer_ndi), reason);
+}
+
+
+void wpas_notify_nan_cluster_join(struct wpa_supplicant *wpa_s,
+				  const u8 *cluster_id, bool new_cluster)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_CLUSTER_JOIN "cluster_id=" MACSTR
+		       " new=%d", MAC2STR(cluster_id), new_cluster);
+}
+
+
+void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
+				    const u8 *peer_addr, int akmp,
+				    int cipher, u16 status,
+				    const u8 *nd_pmk)
+{
+	char nd_pmk_hex[2 * PMK_LEN + 1];
+
+	if (nd_pmk)
+		wpa_snprintf_hex(nd_pmk_hex, sizeof(nd_pmk_hex), nd_pmk,
+				 PMK_LEN);
+	else
+		nd_pmk_hex[0] = '\0';
+
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_PAIRING_STATUS "addr=" MACSTR
+		       " akmp=%s cipher=%s status=%s%s%s",
+		       MAC2STR(peer_addr),
+		       wpa_key_mgmt_txt(akmp, WPA_PROTO_RSN),
+		       wpa_cipher_txt(cipher),
+		       status == WLAN_STATUS_SUCCESS ? "success" : "failure",
+		       nd_pmk ? " nd_pmk=" : "",
+		       nd_pmk ? nd_pmk_hex : "");
+	forced_memzero(nd_pmk_hex, sizeof(nd_pmk_hex));
+}
+
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 
