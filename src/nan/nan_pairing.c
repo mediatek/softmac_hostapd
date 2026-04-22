@@ -643,6 +643,29 @@ static int nan_pairing_handle_auth_1(struct nan_data *nan_data, u8 *own_addr,
 }
 
 
+static int nan_pairing_handle_auth_2(struct nan_data *nan_data,
+				     struct nan_peer *peer,
+				     const struct ieee80211_mgmt *mgmt,
+				     size_t len)
+{
+	struct wpa_pasn_params_data pasn_data;
+	struct pasn_data *pasn = peer->pairing.pasn;
+
+	if (wpa_pasn_auth_rx(peer->pairing.pasn, (const u8 *)mgmt, len,
+			     &pasn_data) < 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: wpa_pasn_auth_rx() failed");
+		nan_data->cfg->pairing_result_cb(
+			nan_data->cfg->cb_ctx, peer->nmi_addr, pasn->akmp,
+			pasn->cipher, WLAN_STATUS_UNSPECIFIED_FAILURE, NULL);
+		nan_pairing_deinit_peer(peer);
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /**
  * nan_pairing_auth_rx - Handle received NAN pairing Authentication frames
  * @nan_data: Pointer to NAN data structure
@@ -732,6 +755,8 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 		return nan_pairing_handle_auth_1(nan_data,
 						 nan_data->cfg->nmi_addr, peer,
 						 mgmt, len);
+	if (auth_transaction == 2)
+		return nan_pairing_handle_auth_2(nan_data, peer, mgmt, len);
 
 	return -1;
 }
