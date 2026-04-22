@@ -503,6 +503,8 @@ enum nan_cipher_suite_id {
 	((csid) == NAN_CS_SK_GCM_256 || (csid) == NAN_CS_PK_PASN_256)
 #define NAN_CS_IS_VALID_NDP(csid) \
 	(NAN_CS_IS_128(csid) || NAN_CS_IS_256(csid))
+#define NAN_CS_IS_PASN(csid) \
+	((csid) == NAN_CS_PK_PASN_128 || (csid) == NAN_CS_PK_PASN_256)
 
 struct nan_cipher_suite {
 	u8 csid; /* Cipher Suite ID */

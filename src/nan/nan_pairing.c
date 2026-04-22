@@ -599,11 +599,13 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 	u8 npk[NAN_NPK_LEN];
 	struct pasn_data *pasn = peer->pairing.pasn;
 	int cipher = pasn_get_cipher(pasn);
-	enum nan_cipher_suite_id csid;
 	u8 *initiator_nmi, *responder_nmi;
 	int ret;
 
 	peer->pairing.flags |= NAN_PAIRING_FLAG_PAIRED;
+
+	peer->pairing.pairing_csid = cipher == WPA_CIPHER_GCMP_256 ?
+		NAN_CS_PK_PASN_256 : NAN_CS_PK_PASN_128;
 
 	if (!nan_data->cfg->pairing_cfg.npk_caching ||
 	    !peer->pairing.pairing_cfg.npk_caching ||
@@ -620,10 +622,8 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 		responder_nmi = nan_data->cfg->nmi_addr;
 	}
 
-	csid = cipher == WPA_CIPHER_GCMP_256 ? NAN_CS_PK_PASN_256 :
-		NAN_CS_PK_PASN_128;
-
-	ret = nan_crypto_derive_kek(pasn->ptk.kdk, pasn->ptk.kdk_len, csid,
+	ret = nan_crypto_derive_kek(pasn->ptk.kdk, pasn->ptk.kdk_len,
+				    peer->pairing.pairing_csid,
 				    initiator_nmi, responder_nmi,
 				    &pasn->ptk);
 	if (ret) {
@@ -641,7 +641,8 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 
 	wpa_printf(MSG_DEBUG, "NAN: Pairing: Derive NPK after PASN pairing");
 
-	ret = nan_crypto_derive_npk(pasn->ptk.kdk, pasn->ptk.kdk_len, csid,
+	ret = nan_crypto_derive_npk(pasn->ptk.kdk, pasn->ptk.kdk_len,
+				    peer->pairing.pairing_csid,
 				    initiator_nmi, responder_nmi, npk,
 				    sizeof(npk));
 	if (ret) {

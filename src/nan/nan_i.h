@@ -486,6 +486,7 @@ enum nan_pairing_role {
  * @tag: Tag from peer's NIRA
  * @flags: Bitmap of pairing flags. See NAN_PAIRING_FLAG_*
  * @pending_auth1: Pending PASN Authentication frame 1 to be processed
+ * @pairing_csid: Cipher suite ID used for the pairing
  */
 struct nan_pairing_peer_data {
 	struct nan_pairing_cfg pairing_cfg;
@@ -498,6 +499,7 @@ struct nan_pairing_peer_data {
 	u8 tag[NAN_NIRA_TAG_LEN];
 	u32 flags;
 	struct wpabuf *pending_auth1;
+	enum nan_cipher_suite_id pairing_csid;
 };
 
 /**

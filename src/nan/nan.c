@@ -1930,6 +1930,23 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		return -1;
 	}
 
+	/*
+	 * If the peer is paired, select the CSID based on the pairing
+	 * information (and ignore the CSID in the parameters, if any).
+	 * Otherwise, make sure that PASN CSIDs are not used.
+	 */
+	if (peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED) {
+		params->sec.csid = peer->pairing.pairing_csid;
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Paired peer, selected CSID=%d from pairing",
+			   params->sec.csid);
+	} else if (NAN_CS_IS_PASN(params->sec.csid)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: PASN CSID %d requires peer to be paired",
+			   params->sec.csid);
+		return -1;
+	}
+
 	switch (params->type) {
 	case NAN_NDP_ACTION_REQ:
 		params->ndp_id.id = nan_get_next_ndp_id(nan);
