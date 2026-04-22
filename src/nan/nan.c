@@ -160,6 +160,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_ndl_reset(nan, peer);
 	nan_peer_flush_sec(&peer->info);
 	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
+	nan_pairing_deinit_peer(peer);
 	os_free(peer);
 }
 

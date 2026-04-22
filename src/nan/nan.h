@@ -596,6 +596,15 @@ struct nan_config {
 	 * configured for the service or 0 if service is not found.
 	 */
 	u16 (*get_supported_bootstrap_methods)(void *ctx, int handle);
+
+	/**
+	 * send_pasn - Transmit a PASN Authentication frame
+	 * @ctx: Callback context from cb_ctx
+	 * @data: Frame to transmit
+	 * @data_len: Length of frame to transmit
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*send_pasn)(void *ctx, const u8 *data, size_t data_len);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
@@ -668,11 +677,24 @@ struct wpabuf * nan_crypto_derive_nira_tag(const u8 *nik, size_t nik_len,
 					   const u8 *nira_nonce);
 #ifdef CONFIG_PASN
 int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
+int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
+				   u8 auth_mode, int cipher, int handle,
+				   u8 peer_instance_id, bool responder,
+				   const char *password);
 #else /* CONFIG_PASN */
 static inline int nan_pairing_add_attrs(struct nan_data *nan_data,
 					struct wpabuf *buf)
 {
 	return 0;
+}
+
+static inline
+int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
+				   u8 auth_mode, int cipher, int handle,
+				   u8 peer_instance_id, bool responder,
+				   const char *password)
+{
+	return -1;
 }
 #endif /* CONFIG_PASN */
 

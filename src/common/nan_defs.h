@@ -567,4 +567,6 @@ struct nan_shared_key {
 #define NAN_NIRA_CIPHER_VER_128	0
 #define NAN_NIK_LEN		16
 
+#define NAN_PASN_SSID "516F9A010000"
+
 #endif /* NAN_DEFS_H */

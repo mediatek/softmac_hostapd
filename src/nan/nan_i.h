@@ -24,6 +24,8 @@ struct nan_config;
 #define NAN_KEK_MAX_LEN 32
 #define NAN_TK_MAX_LEN  32
 
+#define NAN_ELEMENT_MAX_SIZE 1024
+
 /**
  * struct nan_ptk - NAN Pairwise Transient Key
  * @kck: Key Confirmation Key
@@ -447,6 +449,46 @@ struct nan_bootstrap {
 };
 
 /**
+ * enum nan_pasn_auth_mode - NAN pairing authentication modes
+ * @NAN_PASN_AUTH_MODE_PASN: Unauthenticated PASN
+ * @NAN_PASN_AUTH_MODE_SAE: PASN authentication with SAE tunneling
+ * @NAN_PASN_AUTH_MODE_PMK: PASN authentication with PMK caching
+ */
+enum nan_pasn_auth_mode {
+	NAN_PASN_AUTH_MODE_PASN = 0,
+	NAN_PASN_AUTH_MODE_SAE = 1,
+	NAN_PASN_AUTH_MODE_PMK = 2,
+};
+
+/**
+ * enum nan_pairing_role - NAN pairing role types
+ * @NAN_PAIRING_ROLE_IDLE: No active pairing role
+ * @NAN_PAIRING_ROLE_INITIATOR: Device acting as pairing initiator
+ * @NAN_PAIRING_ROLE_RESPONDER: Device acting as pairing responder
+ */
+enum nan_pairing_role {
+	NAN_PAIRING_ROLE_IDLE,
+	NAN_PAIRING_ROLE_INITIATOR,
+	NAN_PAIRING_ROLE_RESPONDER,
+};
+
+/**
+ * struct nan_pairing_peer_data - NAN pairing peer information
+ * @pairing_cfg: NAN pairing configuration parameters
+ * @self_pairing_role: Role of this device in the pairing process
+ * @pasn: Pointer to PASN data
+ * @handle: Handle of the local service instance
+ * @peer_instance_id: Instance ID of the peer service
+ */
+struct nan_pairing_peer_data {
+	struct nan_pairing_cfg pairing_cfg;
+	enum nan_pairing_role self_pairing_role;
+	struct pasn_data *pasn;
+	int handle;
+	int peer_instance_id;
+};
+
+/**
  * struct nan_peer - Represents a known NAN peer
  * @list: List node for linking peers
  * @nmi_addr: NMI of the peer
@@ -458,6 +500,7 @@ struct nan_bootstrap {
  *     progress
  * @ndl: NDL data associated with this peer
  * @bootstrap: Bootstrap information of the peer
+ * @pairing: Pairing data associated with this peer
  */
 struct nan_peer {
 	struct dl_list list;
@@ -473,6 +516,8 @@ struct nan_peer {
 	struct nan_ndl *ndl;
 
 	struct nan_bootstrap bootstrap;
+
+	struct nan_pairing_peer_data pairing;
 };
 
 /**
@@ -700,11 +745,16 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 int nan_add_nira(struct wpabuf *buf, const u8 *tag, const u8 *nonce);
 #ifdef CONFIG_PASN
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag);
+void nan_pairing_deinit_peer(struct nan_peer *peer);
 #else /* CONFIG_PASN */
 static inline
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag)
 {
 	return -1;
+}
+
+static inline void nan_pairing_deinit_peer(struct nan_peer *peer)
+{
 }
 #endif /* CONFIG_PASN */
 
