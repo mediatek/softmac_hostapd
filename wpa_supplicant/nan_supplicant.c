@@ -2502,14 +2502,19 @@ static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 	struct nan_schedule sched;
 	u32 map_ids = (BIT(wpa_s->nan_capa.num_radios) - 1) << 1;
 
-	if (!wpas_nan_ready(wpa_s) || !map_ids)
+	if (!wpas_nan_ready(wpa_s))
 		return;
 
-	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
-	nan_add_dev_capa_attr(wpa_s->nan, buf);
-	nan_convert_sched_to_avail_attrs(wpa_s->nan,
-					 wpa_s->schedule_sequence_id, map_ids,
-					 sched.n_chans, sched.chans, buf, true);
+	if (map_ids) {
+		wpas_nan_fill_ndp_schedule(wpa_s, &sched);
+		nan_add_dev_capa_attr(wpa_s->nan, buf);
+		nan_convert_sched_to_avail_attrs(wpa_s->nan,
+						 wpa_s->schedule_sequence_id,
+						 map_ids, sched.n_chans,
+						 sched.chans, buf, true);
+	}
+
+	nan_pairing_add_attrs(wpa_s->nan, buf);
 }
 
 
