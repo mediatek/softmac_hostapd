@@ -2687,6 +2687,18 @@ int wpas_nan_pasn_auth_tx_status(struct wpa_supplicant *wpa_s, const u8 *data,
 	return nan_pairing_pasn_auth_tx_status(nan, data, data_len, acked);
 }
 
+
+int wpas_nan_pasn_auth_rx(struct wpa_supplicant *wpa_s,
+			  const struct ieee80211_mgmt *mgmt, size_t len)
+{
+	struct nan_data *nan = wpa_s->nan;
+
+	if (!nan || !wpas_nan_ready(wpa_s))
+		return -1;
+
+	return nan_pairing_auth_rx(nan, mgmt, len);
+}
+
 #endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 

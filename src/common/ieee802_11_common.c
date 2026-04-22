@@ -170,6 +170,11 @@ static int ieee802_11_parse_vendor_specific(const u8 *pos, size_t elen,
 			elems->proximity_ranging = pos;
 			elems->proximity_ranging_len = elen;
 			break;
+		case NAN_SDF_OUI_TYPE:
+			/* Wi-Fi Alliance - NAN IE */
+			elems->nan_ie = pos;
+			elems->nan_len = elen;
+			break;
 		default:
 			wpa_printf(MSG_MSGDUMP, "Unknown WFA "
 				   "information element ignored "
