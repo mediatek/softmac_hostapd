@@ -54,6 +54,9 @@
 
 #define DEFAULT_NAN_BOOTSTRAP_COMEBACK_TIMEOUT 1024
 
+/* Default NAN NIK lifetime in seconds - 12 hours */
+#define NAN_NIK_LIFETIME_DEFAULT 43200
+
 #ifdef CONFIG_NAN
 
 static int get_center(u8 channel, const u8 *center_channels,
@@ -901,6 +904,13 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.supported_bootstrap_methods = DEFAULT_NAN_SUPP_PBM;
 	nan.auto_accept_bootstrap_methods = DEFAULT_NAN_AUTO_ACCEPT_PBM;
 	nan.bootstrap_comeback_timeout = DEFAULT_NAN_BOOTSTRAP_COMEBACK_TIMEOUT;
+
+	if (os_get_random(nan.nik, NAN_NIK_LEN) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to get random data for NIK");
+		return -1;
+	}
+
+	nan.nik_lifetime = NAN_NIK_LIFETIME_DEFAULT;
 
 	wpa_s->nan = nan_init(&nan);
 	if (!wpa_s->nan) {

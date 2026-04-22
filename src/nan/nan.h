@@ -412,6 +412,10 @@ struct nan_config {
 	u8 dev_capa_ext_reg_info; /* NAN_DEV_CAPA_EXT_INFO_0_* */
 
 	struct nan_pairing_cfg pairing_cfg;
+	u8 nik[NAN_NIK_LEN];
+
+	/* in seconds */
+	u32 nik_lifetime;
 
 	/*
 	 * Supported Pairing Bootstrapping Methods (PBM).
