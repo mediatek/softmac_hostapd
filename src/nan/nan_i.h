@@ -422,6 +422,7 @@ struct nan_ndl {
  * @in_progress: Whether a bootstrap exchange is in progress
  * @handle: Follow-up context handle for the ongoing bootstrap request
  * @req_instance_id: Instance ID of the bootstrap request
+ * @npba: The NPBA from the last successful bootstrap
  */
 struct nan_bootstrap {
 	u16 supported_methods;
@@ -441,6 +442,8 @@ struct nan_bootstrap {
 
 	int handle;
 	u8 req_instance_id;
+
+	struct wpabuf *npba;
 };
 
 /**

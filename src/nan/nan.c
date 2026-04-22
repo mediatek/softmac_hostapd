@@ -149,6 +149,8 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 		nan_ndp_setup_stop(nan, peer);
 	}
 
+	wpabuf_free(peer->bootstrap.npba);
+	peer->bootstrap.npba = NULL;
 	nan_bootstrap_reset(nan, peer);
 	dl_list_del(&peer->list);
 	nan_peer_flush_avail(&peer->info);

@@ -65,7 +65,7 @@ void nan_bootstrap_reset(struct nan_data *nan, struct nan_peer *peer)
 
 	/*
 	 * Do not use memset to reset all data to preserve the peer's
-	 * supported bootstrap methods.
+	 * supported bootstrap methods and the NPBA buffer if present.
 	 */
 	peer->bootstrap.cookie = NULL;
 	peer->bootstrap.cookie_len = 0;
@@ -200,13 +200,16 @@ static void nan_bootstrap_timeout(void *eloop_data, void *user_ctx)
  * @status: Status field from the request
  * @handle: Follow-up handle
  * @req_instance_id: Follow-up instance ID
+ * @npba: NPBA from the request
+ * @npba_len: Length of the NPBA
  */
 static void nan_bootstrap_handle_rx_request(struct nan_data *nan,
 					    struct nan_peer *peer,
 					    u8 dialog_token, u16 pbm,
 					    const u8 *cookie,
 					    u8 cookie_len, u8 status,
-					    int handle, u8 req_instance_id)
+					    int handle, u8 req_instance_id,
+					    const u8 *npba, u16 npba_len)
 {
 	struct wpabuf *attr = NULL;
 	u16 supported_methods;
@@ -335,6 +338,19 @@ send_response:
 		return;
 	}
 
+	if (peer->bootstrap.status == NAN_PBA_STATUS_ACCEPTED) {
+		wpabuf_free(peer->bootstrap.npba);
+		peer->bootstrap.npba = wpabuf_alloc(3 + npba_len);
+		if (peer->bootstrap.npba) {
+			wpabuf_put_u8(peer->bootstrap.npba, NAN_ATTR_NPBA);
+			wpabuf_put_le16(peer->bootstrap.npba, npba_len);
+			wpabuf_put_data(peer->bootstrap.npba, npba, npba_len);
+		} else {
+			wpa_printf(MSG_INFO,
+				   "NAN: Bootstrap: Failed to store NPBA");
+		}
+	}
+
 	nan->cfg->bootstrap_completed(nan->cfg->cb_ctx,
 				      peer->nmi_addr,
 				      peer->bootstrap.requested_pbm,
@@ -382,6 +398,8 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 	u8 dialog_token, type, status, reason_code, cookie_len = 0;
 	u16 pbm, comeback_after = 0;
 	struct nan_peer *peer;
+	const u8 *orig_npba = npba;
+	u16 orig_npba_len = npba_len;
 
 	if (!nan_bootstrap_supported(nan)) {
 		wpa_printf(MSG_DEBUG,
@@ -466,7 +484,8 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 		nan_bootstrap_handle_rx_request(nan, peer, dialog_token,
 						pbm, cookie, cookie_len,
 						status, handle,
-						req_instance_id);
+						req_instance_id,
+						orig_npba, orig_npba_len);
 		return true;
 	}
 
@@ -562,7 +581,6 @@ int nan_bootstrap_request(struct nan_data *nan, int handle,
 			  bool auth)
 {
 	struct nan_peer *peer;
-	struct wpabuf *npba;
 	int ret;
 
 	if (!nan || !nan->nan_started)
@@ -630,15 +648,15 @@ int nan_bootstrap_request(struct nan_data *nan, int handle,
 	peer->bootstrap.handle = handle;
 	peer->bootstrap.req_instance_id = req_instance_id;
 
-	npba = nan_bootstrap_build_npba(nan, peer);
-	if (!npba) {
+	peer->bootstrap.npba = nan_bootstrap_build_npba(nan, peer);
+	if (!peer->bootstrap.npba) {
 		nan_bootstrap_reset(nan, peer);
 		return -1;
 	}
 
 	ret = nan->cfg->transmit_followup(nan->cfg->cb_ctx, peer->nmi_addr,
-					  npba, handle, req_instance_id);
-	wpabuf_free(npba);
+					  peer->bootstrap.npba, handle,
+					  req_instance_id);
 	if (ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Bootstrap: Failed to transmit follow-up");
