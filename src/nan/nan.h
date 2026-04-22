@@ -745,6 +745,8 @@ int nan_pairing_set_pairing_setup(struct nan_data *nan_data, bool value);
 int nan_pairing_set_npk_caching(struct nan_data *nan_data, bool value);
 int nan_pairing_set_pairing_verification(struct nan_data *nan_data, bool value);
 int nan_pairing_set_cipher_suites(struct nan_data *nan_data, u32 value);
+int nan_pairing_set_nik(struct nan_data *nan, const u8 *nik, size_t nik_len);
+int nan_pairing_set_nik_lifetime(struct nan_data *nan, u32 lifetime);
 bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr);
 #else /* CONFIG_PASN */
 static inline int nan_pairing_add_attrs(struct nan_data *nan_data,

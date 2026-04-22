@@ -1359,6 +1359,57 @@ int nan_pairing_set_cipher_suites(struct nan_data *nan, u32 value)
 }
 
 
+int nan_pairing_set_nik(struct nan_data *nan, const u8 *nik, size_t nik_len)
+{
+	u8 nonce[NAN_NIRA_NONCE_LEN];
+	u8 tag[NAN_NIRA_TAG_LEN];
+
+	if (!nik || nik_len != NAN_NIK_LEN) {
+		wpa_printf(MSG_INFO, "NAN: Pairing: Invalid NIK (len=%zu)",
+			   nik_len);
+		return -1;
+	}
+
+	if (nan->cfg->pairing_cfg.pairing_verification) {
+		if (nan_nira_get_tag_nonce(nan->cfg, nonce, tag) < 0) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to set NIRA for new NIK");
+			return -1;
+		}
+		os_memcpy(nan->nira_nonce, nonce, NAN_NIRA_NONCE_LEN);
+		wpa_hexdump_key(MSG_DEBUG, "NAN: NIRA nonce",
+				nan->nira_nonce, NAN_NIRA_NONCE_LEN);
+		os_memcpy(nan->nira_tag, tag, NAN_NIRA_TAG_LEN);
+		wpa_hexdump_key(MSG_DEBUG, "NAN: NIRA tag",
+				nan->nira_tag, NAN_NIRA_TAG_LEN);
+	} else {
+		os_memset(nan->nira_nonce, 0, NAN_NIRA_NONCE_LEN);
+		os_memset(nan->nira_tag, 0, NAN_NIRA_TAG_LEN);
+	}
+
+	os_memcpy(nan->cfg->nik, nik, NAN_NIK_LEN);
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: New NIK", nan->cfg->nik, NAN_NIK_LEN);
+
+	return 0;
+}
+
+
+int nan_pairing_set_nik_lifetime(struct nan_data *nan, u32 lifetime)
+{
+	if (!lifetime) {
+		wpa_printf(MSG_INFO, "NAN: Pairing: Invalid NIK lifetime (%u)",
+			   lifetime);
+		return -1;
+	}
+
+	nan->cfg->nik_lifetime = lifetime;
+	wpa_printf(MSG_DEBUG, "NAN: SET: NIK lifetime: %u seconds",
+		   lifetime);
+	return 0;
+}
+
+
 bool nan_pairing_is_peer_paired(struct nan_data *nan_data, const u8 *peer_addr)
 {
 	struct nan_peer *peer;

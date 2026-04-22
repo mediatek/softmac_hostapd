@@ -1358,6 +1358,32 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 #undef NAN_PARSE_PAIRING_BOOL
 #undef NAN_PARSE_PAIRING_INT
 
+	if (os_strcmp("nik", cmd) == 0) {
+		u8 nik[NAN_NIK_LEN];
+		int res;
+
+		/* Parse NIK value (hex string) */
+		if (hexstr2bin(param, nik, NAN_NIK_LEN) < 0) {
+			wpa_printf(MSG_INFO, "NAN: Invalid NIK format");
+			return -1;
+		}
+
+		res = nan_pairing_set_nik(wpa_s->nan, nik, NAN_NIK_LEN);
+		forced_memzero(nik, NAN_NIK_LEN);
+		return res;
+	}
+
+	if (os_strcmp("nik_lifetime", cmd) == 0) {
+		u32 lifetime = atoi(param);
+
+		if (lifetime == 0) {
+			wpa_printf(MSG_INFO, "NAN: Invalid NIK lifetime");
+			return -1;
+		}
+
+		return nan_pairing_set_nik_lifetime(wpa_s->nan, lifetime);
+	}
+
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
 }
