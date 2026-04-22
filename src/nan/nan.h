@@ -620,6 +620,23 @@ struct nan_config {
 	 */
 	int (*pairing_result_cb)(void *ctx, const u8 *peer_addr, int akmp,
 				 int cipher, u16 status, struct wpa_ptk *ptk);
+
+	/**
+	 * update_pairing_credentials - Report received NIK and NPK for a peer
+	 * @ctx: Callback context from cb_ctx
+	 * @nik: NAN Identity Key received from peer
+	 * @nik_len: Length of the NIK
+	 * @cipher_ver: Cipher version of the NIK
+	 * @nik_lifetime: Lifetime of the NIK in seconds
+	 * @akmp: AKMP suite used to establish the NPKSA
+	 * @npk: The NPK associated with the received NIK
+	 * @npk_len: Length of the NPK
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*update_pairing_credentials)(void *ctx, const u8 *nik,
+					  size_t nik_len, int cipher_ver,
+					  int nik_lifetime, int akmp,
+					  const u8 *npk, size_t npk_len);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);

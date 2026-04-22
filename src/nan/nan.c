@@ -1304,7 +1304,7 @@ bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
 			  size_t len, u8 req_instance_id, int handle)
 {
 	struct nan_attrs attrs;
-	bool ret;
+	bool ret = false;
 
 	if (nan_parse_attrs(nan, buf, len, &attrs)) {
 		wpa_printf(MSG_DEBUG,
@@ -1312,13 +1312,15 @@ bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
 		return false;
 	}
 
-	if (!attrs.npba || !attrs.npba_len) {
-		nan_attrs_clear(nan, &attrs);
-		return false;
-	}
-
-	ret = nan_bootstrap_handle_rx(nan, addr, attrs.npba, attrs.npba_len,
-				      buf, len, handle, req_instance_id);
+	if (attrs.npba && attrs.npba_len)
+		ret = nan_bootstrap_handle_rx(nan, addr, attrs.npba,
+					      attrs.npba_len, buf, len, handle,
+					      req_instance_id);
+	else if (attrs.shared_key_desc)
+		ret = nan_pairing_followup_rx(nan, addr,
+					      (const struct nan_shared_key *)
+					      attrs.shared_key_desc,
+					      attrs.shared_key_desc_len);
 
 	nan_attrs_clear(nan, &attrs);
 	return ret;

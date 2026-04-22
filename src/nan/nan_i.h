@@ -757,6 +757,9 @@ void nan_parse_peer_dev_capa_ext(struct nan_data *nan, struct nan_peer *peer,
 #ifdef CONFIG_PASN
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag);
 void nan_pairing_deinit_peer(struct nan_peer *peer);
+bool nan_pairing_followup_rx(struct nan_data *nan_data, const u8 *peer_addr,
+			     const struct nan_shared_key *shared_key_descr,
+			     size_t attr_len);
 #else /* CONFIG_PASN */
 static inline
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag)

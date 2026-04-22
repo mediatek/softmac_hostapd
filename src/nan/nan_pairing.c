@@ -1019,3 +1019,150 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 
 	return -1;
 }
+
+
+/**
+ * nan_pairing_followup_rx - Process received NAN pairing follow-up frame
+ * @nan_data: NAN data context
+ * @peer_addr: MAC address of the peer device
+ * @shared_key_descr: Pointer to the shared key descriptor attribute
+ * @attr_len: Length of the shared key descriptor attribute
+ * Returns: true if the follow-up frame was processed, false otherwise.
+ *
+ * This function processes a received NAN pairing follow-up frame. It extracts
+ * the NIK (NAN Identity Key) from the frame and notifies about the received
+ * NIK.
+ *
+ * If the local device acted as the responder in the pairing process, it also
+ * sends the local NIK to the peer.
+ */
+bool nan_pairing_followup_rx(struct nan_data *nan_data, const u8 *peer_addr,
+			     const struct nan_shared_key *shared_key_descr,
+			     size_t attr_len)
+{
+	struct nan_peer *peer;
+	struct pasn_data *pasn;
+	const struct wpa_eapol_key *key_desc;
+	struct wpa_eapol_ie_parse ie;
+	const struct nan_nik_kde *nik_kde;
+	const struct nan_key_lifetime_kde *lifetime_kde;
+	const u8 *pos;
+	struct wpabuf *key_data = NULL;
+	u16 key_data_len, key_info;
+	bool ret = false;
+	u16 lifetime_bitmap;
+
+	peer = nan_get_peer(nan_data, peer_addr);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Follow-up frame from unknown peer");
+		return false;
+	}
+
+	pasn = peer->pairing.pasn;
+	if (!pasn || !pasn->ptk.kek_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: No PASN data for follow-up frame");
+		return false;
+	}
+
+	if (!nan_data->cfg->pairing_cfg.npk_caching) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: NPK caching not enabled, ignore follow-up frame");
+		return false;
+	}
+
+	key_desc = (const struct wpa_eapol_key *) shared_key_descr->key;
+	key_info = WPA_GET_BE16(key_desc->key_info);
+
+	if (!(key_info & WPA_KEY_INFO_KEY_TYPE)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Follow-up frame does not contain pairwise key");
+		return false;
+	}
+
+	if (!(key_info & WPA_KEY_INFO_ENCR_KEY_DATA)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Follow-up frame does not contain encrypted key data");
+		return false;
+	}
+
+	if (attr_len < sizeof(*shared_key_descr) + sizeof(*key_desc) + 2) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Follow-up frame too short for Key Data Length field");
+		return false;
+	}
+
+	pos = shared_key_descr->key + sizeof(*key_desc);
+	key_data_len = WPA_GET_BE16(pos);
+
+	if (attr_len < sizeof(*shared_key_descr) + sizeof(*key_desc) + 2 +
+	    key_data_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Follow-up frame too short for Key Data field");
+		return false;
+	}
+
+	pos += 2;
+
+	key_data = nan_crypto_decrypt_key_data(pasn->ptk.kek, pasn->ptk.kek_len,
+					       pos, key_data_len);
+	if (!key_data) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to decrypt key data in follow-up frame");
+		goto fail;
+	}
+
+	if (wpa_parse_kde_ies(wpabuf_head(key_data), wpabuf_len(key_data),
+			      &ie) < 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to parse decrypted key data in follow-up frame");
+		goto fail;
+	}
+
+	if (!ie.nan_nik) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: NIK KDE missing in decrypted key data");
+		goto fail;
+	}
+
+	nik_kde = (const struct nan_nik_kde *) ie.nan_nik;
+	if (nik_kde->cipher_ver != NAN_NIRA_CIPHER_VER_128) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Unsupported NIK cipher version: %u",
+			   nik_kde->cipher_ver);
+		goto fail;
+	}
+
+	if (!ie.nan_key_lifetime) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Key Lifetime KDE missing in decrypted key data");
+		goto fail;
+	}
+
+	lifetime_kde = (const struct nan_key_lifetime_kde *)
+		ie.nan_key_lifetime;
+	lifetime_bitmap = le_to_host16(lifetime_kde->key_bitmap);
+	if (!(lifetime_bitmap & NAN_KEY_LIFETIME_NIK)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Unexpected key bitmap in Key "
+			   "Lifetime KDE: 0x%02x",
+			   lifetime_bitmap);
+		goto fail;
+	}
+
+	nan_data->cfg->update_pairing_credentials(
+		nan_data->cfg->cb_ctx, nik_kde->nik, NAN_NIK_LEN,
+		nik_kde->cipher_ver, be_to_host32(lifetime_kde->lifetime_sec),
+		pasn_get_akmp(pasn),
+		pasn_get_pmk(pasn), pasn_get_pmk_len(pasn));
+
+	if (peer->pairing.self_pairing_role == NAN_PAIRING_ROLE_RESPONDER)
+		nan_send_nik(nan_data, peer);
+
+	ret = true;
+fail:
+	nan_pairing_deinit_peer(peer);
+	wpabuf_free(key_data);
+	return ret;
+}
