@@ -34,6 +34,7 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		       char *reply, size_t reply_size);
 int wpas_nan_bootstrap_request(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_bootstrap_reset(struct wpa_supplicant *wpa_s, char *cmd);
+bool wpas_nan_is_peer_paired(struct wpa_supplicant *wpa_s, const u8 *peer_addr);
 
 int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		  u8 auth_mode, int cipher, int handle, u8 peer_instance_id,
@@ -89,6 +90,12 @@ static inline void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
 				   const struct ieee80211_mgmt *mgmt,
 				   size_t len)
 {}
+
+static inline bool wpas_nan_is_peer_paired(struct wpa_supplicant *wpa_s,
+					  const u8 *peer_addr)
+{
+	return false;
+}
 #endif /* CONFIG_NAN */
 
 struct nan_subscribe_params;

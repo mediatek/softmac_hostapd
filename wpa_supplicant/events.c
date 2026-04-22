@@ -5952,6 +5952,12 @@ static void wpas_event_rx_mgmt_action(struct wpa_supplicant *wpa_s,
 	if ((category == WLAN_ACTION_PUBLIC ||
 	     category == WLAN_ACTION_PROTECTED_DUAL) &&
 	    plen >= 5 && payload[0] == WLAN_PA_VENDOR_SPECIFIC) {
+		/* Drop unprotected unicast NAN frames from paired peers */
+		if (category == WLAN_ACTION_PUBLIC &&
+		    !is_multicast_ether_addr(mgmt->da) &&
+		    wpas_nan_is_peer_paired(wpa_s, mgmt->sa))
+			return;
+
 		if  (WPA_GET_BE32(&payload[1]) == NAN_SDF_VENDOR_TYPE) {
 			payload += 5;
 			plen -= 5;

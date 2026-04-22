@@ -248,14 +248,18 @@ static void nan_de_unpause_state(struct nan_de_service *srv)
 	srv->sel_peer_id = 0;
 }
 
-
-static struct wpabuf * nan_de_alloc_sdf(size_t len)
+static struct wpabuf * nan_de_alloc_sdf(struct nan_de *de, const u8 *dst,
+					size_t len)
 {
 	struct wpabuf *buf;
+	u8 category = WLAN_ACTION_PUBLIC;
+
+	if (de->cb.is_peer_paired && de->cb.is_peer_paired(de->cb.ctx, dst))
+		category = WLAN_ACTION_PROTECTED_DUAL;
 
 	buf = wpabuf_alloc(2 + 4 + len);
 	if (buf) {
-		wpabuf_put_u8(buf, WLAN_ACTION_PUBLIC);
+		wpabuf_put_u8(buf, category);
 		wpabuf_put_u8(buf, WLAN_PA_VENDOR_SPECIFIC);
 		wpabuf_put_be32(buf, NAN_SDF_VENDOR_TYPE);
 	}
@@ -373,7 +377,7 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			list_len * (sizeof(struct nan_sec_ctxt) + PMKID_LEN);
 	}
 
-	buf = nan_de_alloc_sdf(len);
+	buf = nan_de_alloc_sdf(de, dst, len);
 	if (!buf)
 		return;
 

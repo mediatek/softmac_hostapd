@@ -2954,6 +2954,16 @@ int wpas_nan_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 }
 
 #endif /* CONFIG_PASN */
+
+
+bool wpas_nan_is_peer_paired(struct wpa_supplicant *wpa_s, const u8 *peer_addr)
+{
+	if (!wpa_s->nan)
+		return false;
+
+	return nan_pairing_is_peer_paired(wpa_s->nan, peer_addr);
+}
+
 #endif /* CONFIG_NAN */
 
 
@@ -3317,6 +3327,16 @@ static void wpas_nan_process_pr_usd_elems(void *ctx, const u8 *buf, u16 buf_len,
 #endif /* CONFIG_PR */
 
 
+#if defined(CONFIG_NAN) && defined(CONFIG_PASN)
+static bool wpas_nan_is_peer_paired_cb(void *ctx, const u8 *peer_addr)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	return wpas_nan_is_peer_paired(wpa_s, peer_addr);
+}
+#endif /* CONFIG_NAN && CONFIG_PASN */
+
+
 int wpas_nan_de_init(struct wpa_supplicant *wpa_s)
 {
 	struct nan_callbacks cb;
@@ -3342,6 +3362,9 @@ int wpas_nan_de_init(struct wpa_supplicant *wpa_s)
 #endif /* CONFIG_PR */
 #ifdef CONFIG_NAN
 	cb.add_extra_attrs = wpas_nan_de_add_extra_attrs;
+#ifdef CONFIG_PASN
+	cb.is_peer_paired = wpas_nan_is_peer_paired_cb;
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 
 	wpa_s->nan_de = nan_de_init(wpa_s->own_addr, offload, false,

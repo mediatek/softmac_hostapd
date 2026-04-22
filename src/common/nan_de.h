@@ -70,6 +70,7 @@ struct nan_callbacks {
 				     u16 buf_len, const u8 *peer_addr,
 				     unsigned int freq);
 	void (*add_extra_attrs)(void *ctx, struct wpabuf *buf);
+	bool (*is_peer_paired)(void *ctx, const u8 *addr);
 };
 
 bool nan_de_is_nan_network_id(const u8 *addr);
