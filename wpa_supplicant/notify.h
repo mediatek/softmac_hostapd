@@ -190,7 +190,9 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 				      int subscribe_id, int peer_publish_id,
 				      const u8 *peer_addr,
 				      bool fsd, bool fsd_gas,
-				      const u8 *ssi, size_t ssi_len);
+				      const u8 *ssi, size_t ssi_len,
+				      const u8 *pmkid_list,
+				      unsigned int pmkid_count);
 void wpas_notify_nan_replied(struct wpa_supplicant *wpa_s,
 			     enum nan_service_protocol_type srv_proto_type,
 			     int publish_id, int peer_subscribe_id,

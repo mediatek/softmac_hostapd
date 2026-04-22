@@ -1105,21 +1105,45 @@ void wpas_notify_nan_discovery_result(struct wpa_supplicant *wpa_s,
 				      int subscribe_id, int peer_publish_id,
 				      const u8 *peer_addr,
 				      bool fsd, bool fsd_gas,
-				      const u8 *ssi, size_t ssi_len)
+				      const u8 *ssi, size_t ssi_len,
+				      const u8 *pmkid_list,
+				      unsigned int pmkid_count)
 {
-	char *ssi_hex;
+	char *ssi_hex, *pmkid_hex = NULL;
 
 	ssi_hex = os_zalloc(2 * ssi_len + 1);
 	if (!ssi_hex)
 		return;
 	if (ssi)
 		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
+
+	if (pmkid_list && pmkid_count > 0) {
+		const size_t pmkid_hex_len = 2 * PMKID_LEN + 1;
+		unsigned int i;
+
+		pmkid_hex = os_zalloc(pmkid_count * pmkid_hex_len);
+		if (pmkid_hex) {
+			for (i = 0; i < pmkid_count; i++) {
+				char *pos = &pmkid_hex[i * pmkid_hex_len];
+
+				wpa_snprintf_hex(pos, pmkid_hex_len,
+						 &pmkid_list[i * PMKID_LEN],
+						 PMKID_LEN);
+				if (i < pmkid_count - 1)
+					pos[2 * PMKID_LEN] = ',';
+			}
+		}
+	}
+
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_DISCOVERY_RESULT
 		       "subscribe_id=%d publish_id=%d address=" MACSTR
-		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s",
+		       " fsd=%d fsd_gas=%d srv_proto_type=%u ssi=%s%s%s",
 		       subscribe_id, peer_publish_id, MAC2STR(peer_addr),
-		       fsd, fsd_gas, srv_proto_type, ssi_hex);
+		       fsd, fsd_gas, srv_proto_type, ssi_hex,
+		       pmkid_hex ? " pmkid=" : "",
+		       pmkid_hex ? pmkid_hex : "");
 	os_free(ssi_hex);
+	os_free(pmkid_hex);
 
 	wpas_dbus_signal_nan_discovery_result(wpa_s, srv_proto_type,
 					      subscribe_id, peer_publish_id,
