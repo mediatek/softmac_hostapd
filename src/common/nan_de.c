@@ -86,6 +86,11 @@ struct nan_de_service {
 	/* Bootstrapping methods */
 	u16 pbm;
 
+	/* For Publish - int_array of supported cipher suites */
+	int *cipher_suites_list;
+
+	/* Bitmap of NAN_CS_INFO_CAPA_* */
+	u8 security_capab;
 };
 
 #define NAN_DE_N_MIN 5
@@ -168,6 +173,7 @@ static void nan_de_service_free(struct nan_de_service *srv)
 	wpabuf_free(srv->matching_filter_rx);
 	wpabuf_free(srv->srf);
 	os_free(srv->freq_list);
+	os_free(srv->cipher_suites_list);
 	os_free(srv);
 }
 
@@ -303,6 +309,7 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	u8 ctrl = type;
 	u16 sdea_ctrl = 0;
 	const u8 *forced_addr;
+	size_t cs_num = int_array_len(srv->cipher_suites_list);
 
 	/* Service Descriptor attribute */
 	sda_len = NAN_SERVICE_ID_LEN + 1 + 1 + 1;
@@ -342,6 +349,12 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 		len += 256;
 
 	len += attrs ? wpabuf_len(attrs) : 0;
+
+	/* Cipher Suite Information Attribute */
+	if (srv->type == NAN_DE_PUBLISH && srv->cipher_suites_list) {
+		len += NAN_ATTR_HDR_LEN + sizeof(struct nan_cipher_suite_info) +
+			cs_num * sizeof(struct nan_cipher_suite);
+	}
 
 	buf = nan_de_alloc_sdf(len);
 	if (!buf)
@@ -419,6 +432,19 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	if (attrs) {
 		wpa_printf(MSG_DEBUG, "NAN: Add extra NAN attributes");
 		wpabuf_put_buf(buf, attrs);
+	}
+
+	if (srv->type == NAN_DE_PUBLISH && srv->cipher_suites_list) {
+		size_t i;
+
+		wpabuf_put_u8(buf, NAN_ATTR_CSIA);
+		wpabuf_put_le16(buf, sizeof(struct nan_cipher_suite_info) +
+				cs_num * sizeof(struct nan_cipher_suite));
+		wpabuf_put_u8(buf, srv->security_capab);
+		for (i = 0; i < cs_num; i++) {
+			wpabuf_put_u8(buf, (u8) srv->cipher_suites_list[i]);
+			wpabuf_put_u8(buf, srv->id);
+		}
 	}
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
@@ -1795,6 +1821,28 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 		srv->forced_addr_set = true;
 		wpa_printf(MSG_DEBUG, "NAN: Using source address " MACSTR
 			   " for publish service", MAC2STR(srv->forced_addr));
+	}
+
+	srv->security_capab = params->security_capab;
+
+	if (params->cipher_suites_list) {
+		int i = 0;
+
+		while (params->cipher_suites_list[i] && i < NAN_CS_MAX) {
+			if (params->cipher_suites_list[i] >= NAN_CS_MAX) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Invalid cipher suite %d in publish",
+					   params->cipher_suites_list[i]);
+				goto fail;
+			}
+
+			i++;
+		}
+
+		srv->cipher_suites_list =
+			int_array_dup(params->cipher_suites_list);
+		if (!srv->cipher_suites_list)
+			goto fail;
 	}
 
 	/* Prepare for single and multi-channel states; starting with

@@ -142,6 +142,12 @@ struct nan_publish_params {
 	 * Table 128
 	 */
 	u16 pbm;
+
+	/* int_array of cipher suites */
+	const int *cipher_suites_list;
+
+	/* Bitmap of NAN_CS_INFO_CAPA_* */
+	u8 security_capab;
 };
 
 /* Returns -1 on failure or >0 publish_id */
