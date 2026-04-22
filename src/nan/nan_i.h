@@ -726,6 +726,9 @@ int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
 			  struct wpa_ptk *ptk);
 struct wpabuf * nan_crypto_encrypt_key_data(const struct wpabuf *key_data,
 					    const u8 *kek, size_t kek_len);
+struct wpabuf * nan_crypto_decrypt_key_data(const u8 *kek, size_t kek_len,
+					    const u8 *encrypted_data,
+					    size_t encrypted_len);
 void nan_sec_reset(struct nan_data *nan, struct nan_ndp_sec *ndp_sec);
 int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	       struct nan_msg *msg);

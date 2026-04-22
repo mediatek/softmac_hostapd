@@ -599,3 +599,71 @@ fail:
 	bin_clear_free(padded_key_data, padded_len);
 	return encrypted_key_data;
 }
+
+
+/**
+ * nan_crypto_decrypt_key_data - Decrypt NAN key data using AES-UNWRAP
+ * @kek: Key Encryption Key
+ * @kek_len: KEK length in bytes
+ * @encrypted_data: Encrypted key data to decrypt
+ * @encrypted_len: Length of encrypted data in bytes
+ * Returns: wpabuf containing decrypted data or %NULL on failure
+ *
+ * This function decrypts NAN key data that was encrypted using AES-WRAP.
+ * The encrypted data must be at least 16 bytes and a multiple of 8 bytes
+ * (AES-WRAP requirement). The caller is responsible for freeing the returned
+ * wpabuf using wpabuf_free().
+ */
+struct wpabuf * nan_crypto_decrypt_key_data(const u8 *kek, size_t kek_len,
+					    const u8 *encrypted_data,
+					    size_t encrypted_len)
+{
+	struct wpabuf *decrypted;
+	size_t plain_len;
+	u8 *buf;
+
+	if (!encrypted_data || !encrypted_len) {
+		wpa_printf(MSG_INFO, "NAN: Invalid encrypted key data");
+		return NULL;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Encrypted key data",
+			encrypted_data, encrypted_len);
+
+	if (!kek || !kek_len) {
+		wpa_printf(MSG_INFO,
+			   "NAN: No KEK available for key data decryption");
+		return NULL;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: KEK for decryption", kek, kek_len);
+
+	/* AES-WRAP adds 8 bytes overhead */
+	if (encrypted_len < 16 || encrypted_len % 8 != 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Invalid encrypted key data length %zu",
+			   encrypted_len);
+		return NULL;
+	}
+
+	plain_len = encrypted_len - 8;
+	decrypted = wpabuf_alloc(plain_len);
+	if (!decrypted) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to allocate decryption buffer");
+		return NULL;
+	}
+
+	buf = wpabuf_put(decrypted, plain_len);
+	if (aes_unwrap(kek, kek_len, plain_len / 8, encrypted_data, buf)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: AES unwrap failed - could not decrypt key data");
+		wpabuf_free(decrypted);
+		return NULL;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Decrypted key data",
+			wpabuf_head(decrypted), wpabuf_len(decrypted));
+
+	return decrypted;
+}
