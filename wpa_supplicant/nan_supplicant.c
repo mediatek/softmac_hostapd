@@ -1065,26 +1065,40 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.start = wpas_nan_start_cb;
 	nan.stop = wpas_nan_stop_cb;
 	nan.update_config = wpas_nan_update_config_cb;
+
+	/* NDP and bootstrapping enabled */
+	if (wpa_s->nan_capa.drv_flags & WPA_DRIVER_FLAGS_NAN_SUPPORT_NDP) {
 #ifdef CONFIG_PASN
-	nan.send_pasn = wpas_nan_pasn_send_cb;
-	nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
-	nan.update_pairing_credentials = wpas_nan_update_pairing_credentials_cb;
-	nan.get_npk_akmp = wpas_nan_get_npk_akmp_cb;
-	nan.pairing_cfg.pairing_setup = true;
-	nan.pairing_cfg.npk_caching = true;
-	nan.pairing_cfg.pairing_verification = true;
-	nan.pairing_cfg.cipher_suites = NAN_PAIRING_PASN_128 |
-		NAN_PAIRING_PASN_256;
+		wpa_printf(MSG_DEBUG, "NAN: Pairing support enabled");
+		nan.send_pasn = wpas_nan_pasn_send_cb;
+		nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
+		nan.update_pairing_credentials =
+			wpas_nan_update_pairing_credentials_cb;
+		nan.get_npk_akmp = wpas_nan_get_npk_akmp_cb;
+		nan.pairing_cfg.pairing_setup = true;
+		nan.pairing_cfg.npk_caching = true;
+		nan.pairing_cfg.pairing_verification = true;
+		nan.pairing_cfg.cipher_suites = NAN_PAIRING_PASN_128 |
+			NAN_PAIRING_PASN_256;
 #endif /* CONFIG_PASN */
 
-	/* NDP */
-	nan.ndp_action_notif = wpas_nan_ndp_action_notif_cb;
-	nan.ndp_connected = wpas_nan_ndp_connected_cb;
-	nan.ndp_disconnected = wpas_nan_ndp_disconnected_cb;
-	nan.send_naf = wpas_nan_send_naf_cb;
-	nan.get_chans = wpas_nan_get_chans_cb;
-	nan.is_valid_publish_id = wpas_nan_is_valid_publish_id_cb;
-	nan.set_peer_schedule = wpas_nan_set_peer_schedule_cb;
+		wpa_printf(MSG_DEBUG, "NAN: NDP support enabled");
+
+		nan.ndp_action_notif = wpas_nan_ndp_action_notif_cb;
+		nan.ndp_connected = wpas_nan_ndp_connected_cb;
+		nan.ndp_disconnected = wpas_nan_ndp_disconnected_cb;
+		nan.send_naf = wpas_nan_send_naf_cb;
+		nan.get_chans = wpas_nan_get_chans_cb;
+		nan.is_valid_publish_id = wpas_nan_is_valid_publish_id_cb;
+		nan.set_peer_schedule = wpas_nan_set_peer_schedule_cb;
+
+		wpa_printf(MSG_DEBUG, "NAN: Bootstrap support enabled");
+		nan.bootstrap_request = wpas_nan_bootstrap_request_cb;
+		nan.bootstrap_completed = wpas_nan_bootstrap_completed_cb;
+		nan.transmit_followup = wpas_nan_transmit_followup_cb;
+		nan.get_supported_bootstrap_methods =
+			wpas_nan_get_service_bootstrap_methods;
+	}
 
 	/*
 	 * TODO: Set the device capabilities based on configuration and driver
@@ -1106,11 +1120,6 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.dev_capa.channel_switch_time =
 		wpa_s->nan_capa.max_channel_switch_time;
 	nan.dev_capa.capa = wpa_s->nan_capa.dev_capa;
-	nan.bootstrap_request = wpas_nan_bootstrap_request_cb;
-	nan.bootstrap_completed = wpas_nan_bootstrap_completed_cb;
-	nan.transmit_followup = wpas_nan_transmit_followup_cb;
-	nan.get_supported_bootstrap_methods =
-		wpas_nan_get_service_bootstrap_methods;
 
 	nan.supported_bootstrap_methods = DEFAULT_NAN_SUPP_PBM;
 	nan.auto_accept_bootstrap_methods = DEFAULT_NAN_AUTO_ACCEPT_PBM;
@@ -1191,10 +1200,17 @@ void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 }
 
 
-static int wpas_nan_ready(struct wpa_supplicant *wpa_s)
+static bool wpas_nan_ready(struct wpa_supplicant *wpa_s)
 {
 	return wpa_s->nan_mgmt && wpa_s->nan && wpa_s->nan_de &&
 		wpa_s->wpa_state != WPA_INTERFACE_DISABLED;
+}
+
+
+static bool wpas_nan_ndp_allowed(struct wpa_supplicant *wpa_s)
+{
+	return wpas_nan_ready(wpa_s) &&
+		(wpa_s->nan_capa.drv_flags & WPA_DRIVER_FLAGS_NAN_SUPPORT_NDP);
 }
 
 
@@ -1553,7 +1569,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 	struct bitfield *bf_total;
 	unsigned int expected_bitmap_len;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	if (os_strncmp(cmd, "map_id=", 7) != 0) {
@@ -2155,7 +2171,7 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 
 	os_memset(&ndp, 0, sizeof(ndp));
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	ndp.type = NAN_NDP_ACTION_REQ;
@@ -2317,7 +2333,7 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 	int handle = -1;
 	int ret = -1;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	os_memset(&ndp, 0, sizeof(ndp));
@@ -2512,7 +2528,7 @@ int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
 	char *token, *context = NULL;
 	char *pos;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	os_memset(&ndp, 0, sizeof(ndp));
@@ -2697,7 +2713,7 @@ int wpas_nan_bootstrap_request(struct wpa_supplicant *wpa_s, char *cmd)
 	u16 bootstrap_method = 0;
 	bool auth = false;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	/* Parse peer address first */
@@ -2760,7 +2776,7 @@ int wpas_nan_bootstrap_reset(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	u8 peer_nmi[ETH_ALEN];
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	if (hwaddr_aton(cmd, peer_nmi) < 0)
@@ -2776,17 +2792,15 @@ static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 	struct nan_schedule sched;
 	u32 map_ids = (BIT(wpa_s->nan_capa.num_radios) - 1) << 1;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s) || !map_ids)
 		return;
 
-	if (map_ids) {
-		wpas_nan_fill_ndp_schedule(wpa_s, &sched);
-		nan_add_dev_capa_attr(wpa_s->nan, buf);
-		nan_convert_sched_to_avail_attrs(wpa_s->nan,
-						 wpa_s->schedule_sequence_id,
-						 map_ids, sched.n_chans,
-						 sched.chans, buf, true);
-	}
+	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
+	nan_add_dev_capa_attr(wpa_s->nan, buf);
+	nan_convert_sched_to_avail_attrs(wpa_s->nan,
+					 wpa_s->schedule_sequence_id,
+					 map_ids, sched.n_chans,
+					 sched.chans, buf, true);
 
 	nan_pairing_add_attrs(wpa_s->nan, buf);
 }
@@ -2858,7 +2872,7 @@ int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 	int ret;
 	struct nan_schedule sched;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
@@ -2978,7 +2992,7 @@ int wpas_nan_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 {
 	struct nan_data *nan = wpa_s->nan;
 
-	if (!nan || !wpas_nan_ready(wpa_s))
+	if (!nan || !wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	return nan_pairing_auth_rx(nan, mgmt, len);
@@ -3845,7 +3859,7 @@ int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 	const struct ieee80211_mgmt *mgmt =
 		(const struct ieee80211_mgmt *) data;
 
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
 
 	wpa_printf(MSG_DEBUG, "NAN: TX status for frame len=%zu acked=%u",
@@ -3865,7 +3879,7 @@ int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
 void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
 		     const struct ieee80211_mgmt *mgmt, size_t len)
 {
-	if (!wpas_nan_ready(wpa_s))
+	if (!wpas_nan_ndp_allowed(wpa_s))
 		return;
 
 	nan_action_rx(wpa_s->nan, mgmt, len);
