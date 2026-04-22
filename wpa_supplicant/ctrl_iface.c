@@ -12779,6 +12779,7 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	enum nan_service_protocol_type srv_proto_type = 0;
 	int *freq_list = NULL;
 	int *cipher_list = NULL;
+	u8 nd_pmk[PMK_LEN];
 	bool p2p = false;
 
 	os_memset(&params, 0, sizeof(params));
@@ -12904,6 +12905,23 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "nd_pmk=", 7) == 0) {
+			if (params.nd_pmk) {
+				wpa_printf(MSG_INFO,
+					   "CTRL: Duplicate nd_pmk parameter");
+				goto fail;
+			}
+
+			if (hexstr2bin(token + 7, nd_pmk, PMK_LEN) < 0) {
+				wpa_printf(MSG_INFO,
+					   "CTRL: Invalid nd_pmk value");
+				goto fail;
+			}
+
+			params.nd_pmk = nd_pmk;
+			continue;
+		}
+
 		wpa_printf(MSG_INFO, "CTRL: Invalid NAN_PUBLISH parameter: %s",
 			   token);
 		goto fail;
@@ -12914,6 +12932,9 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	if (publish_id > 0)
 		ret = os_snprintf(buf, buflen, "%d", publish_id);
 fail:
+	if (params.nd_pmk)
+		forced_memzero(nd_pmk, PMK_LEN);
+
 	wpabuf_free(ssi);
 	os_free(freq_list);
 	os_free(cipher_list);
