@@ -667,3 +667,72 @@ struct wpabuf * nan_crypto_decrypt_key_data(const u8 *kek, size_t kek_len,
 
 	return decrypted;
 }
+
+
+/**
+ * nan_crypto_clear_pmkid_list - Clear and free all entries in a PMKID list
+ * @pmkid_list: List of PMKIDs to clear
+ *
+ * This function removes and frees all PMKID entries from the provided list.
+ */
+void nan_crypto_clear_pmkid_list(struct dl_list *pmkid_list)
+{
+	struct nan_de_pmkid *p, *n;
+
+	dl_list_for_each_safe(p, n, pmkid_list, struct nan_de_pmkid, list) {
+		dl_list_del(&p->list);
+		os_free(p);
+	}
+}
+
+
+/**
+ * nan_crypto_pmkid_list - Generate PMKIDs for multiple cipher suites
+ * @pmkid_list: List to which the generated PMKIDs are appended
+ * @raddr: Responder MAC address
+ * @srv_id: Service ID (6 bytes)
+ * @cipher_suites: Array of cipher suite identifiers (int_array)
+ * @pmk: PMK for which the PMKIDs are generated
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function generates a PMKID for each cipher suite in the provided array
+ * and adds them to the pmkid_list.
+ */
+int nan_crypto_pmkid_list(struct dl_list *pmkid_list, const u8 *raddr,
+			  const u8 *srv_id, const int *cipher_suites,
+			  const u8 *pmk)
+{
+	size_t cs_num = int_array_len(cipher_suites);
+	size_t i;
+
+	if (!cs_num || !pmk)
+		return 0;
+
+	for (i = 0; i < cs_num; i++) {
+		struct nan_de_pmkid *p;
+		int ret;
+		static const u8 iaddr[ETH_ALEN] = {
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+		};
+		enum nan_cipher_suite_id csid =
+			(enum nan_cipher_suite_id) cipher_suites[i];
+
+		p = os_zalloc(sizeof(*p));
+		if (!p)
+			return -1;
+
+		ret = nan_crypto_calc_pmkid(pmk, iaddr, raddr, srv_id, csid,
+					    p->pmkid);
+		if (ret < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to derive PMKID for cipher suite %d",
+				   cipher_suites[i]);
+			nan_crypto_clear_pmkid_list(pmkid_list);
+			return ret;
+		}
+
+		dl_list_add(pmkid_list, &p->list);
+	}
+
+	return 0;
+}

@@ -11,10 +11,16 @@
 
 #include "common/nan_defs.h"
 #include "common/wpa_common.h"
+#include "utils/list.h"
 
 struct nan_cluster_config;
 enum nan_reason;
 struct ieee80211_mgmt;
+
+struct nan_de_pmkid {
+	struct dl_list list;
+	u8 pmkid[PMKID_LEN];
+};
 
 /*
  * struct nan_device_capabilities - NAN device capabilities
@@ -708,6 +714,10 @@ int nan_get_peer_ndc_freq(struct nan_data *nan,
 int nan_crypto_derive_nd_pmk(const char *pwd, const u8 *service_id,
 			     enum nan_cipher_suite_id csid,
 			     const u8 *peer_nmi, u8 *nd_pmk);
+int nan_crypto_pmkid_list(struct dl_list *pmkid_list, const u8 *raddr,
+			  const u8 *srv_id, const int *cipher_suites_list,
+			  const u8 *pmk);
+void nan_crypto_clear_pmkid_list(struct dl_list *pmkid_list);
 void nan_add_dev_capa_attr(struct nan_data *nan, struct wpabuf *buf);
 int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr);
 int nan_get_chan_entry(struct nan_data *nan, const struct nan_sched_chan *chan,
