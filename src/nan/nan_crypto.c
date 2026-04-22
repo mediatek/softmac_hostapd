@@ -42,8 +42,10 @@ static size_t nan_crypto_cipher_kek_len(enum nan_cipher_suite_id cipher)
 {
 	switch (cipher) {
 	case NAN_CS_SK_CCM_128:
+	case NAN_CS_PK_PASN_128:
 		return 16;
 	case NAN_CS_SK_GCM_256:
+	case NAN_CS_PK_PASN_256:
 		return 32;
 	default:
 		return 0;
@@ -368,4 +370,154 @@ struct wpabuf * nan_crypto_derive_nira_tag(const u8 *nik, size_t nik_len,
 
 	forced_memzero(tag, sizeof(tag));
 	return tag_buf;
+}
+
+
+/**
+ * nan_crypto_derive_from_kdk - Derive a key from KDK using KDF-HASH-NNN
+ * @kdk: Key Derivation Key
+ * @kdk_len: Length of KDK in bytes
+ * @cipher: Cipher suite identifier (NAN_CS_PK_PASN_128 or NAN_CS_PK_PASN_256)
+ * @label: Label string for the key derivation
+ * @initiator_nmi: Pairing Initiator NMI address (6 bytes)
+ * @responder_nmi: Pairing Responder NMI address (6 bytes)
+ * @key: Buffer for the derived key
+ * @key_len: number of bytes to derive
+ * Returns: 0 on success, -1 on failure
+ *
+ * Generic function to derive a key from KDK using:
+ * KEY = KDF-HASH-NNN(KDK, label, Initiator NMI || Responder NMI)
+ */
+static int nan_crypto_derive_from_kdk(const u8 *kdk, size_t kdk_len,
+				      enum nan_cipher_suite_id cipher,
+				      const char *label,
+				      const u8 *initiator_nmi,
+				      const u8 *responder_nmi,
+				      u8 *key, size_t key_len)
+{
+	u8 data[ETH_ALEN * 2];
+	int ret = 0;
+
+	if (!kdk || !kdk_len || !label || !initiator_nmi || !responder_nmi ||
+	    !key || !key_len) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Invalid parameters for NPK/KEK derivation");
+		return -1;
+	}
+
+	/* Concatenate: Pairing Initiator NMI || Pairing Responder NMI */
+	os_memcpy(data, initiator_nmi, ETH_ALEN);
+	os_memcpy(data + ETH_ALEN, responder_nmi, ETH_ALEN);
+
+	if (cipher == NAN_CS_PK_PASN_128) {
+		ret = sha256_prf(kdk, kdk_len, label, data, sizeof(data), key,
+				 key_len);
+	} else if (cipher == NAN_CS_PK_PASN_256) {
+		ret = sha384_prf(kdk, kdk_len, label, data, sizeof(data), key,
+				 key_len);
+	} else {
+		wpa_printf(MSG_INFO,
+			   "NAN: Unsupported cipher suite for key derivation: %d",
+			   cipher);
+		return -1;
+	}
+
+	if (ret) {
+		wpa_printf(MSG_INFO,
+			   "NAN: NPK/KEK derivation failed (ret=%d)", ret);
+		return ret;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: KDK", kdk, kdk_len);
+	wpa_printf(MSG_DEBUG, "NAN: Label: %s", label);
+	wpa_printf(MSG_DEBUG, "NAN: Initiator NMI " MACSTR,
+		   MAC2STR(initiator_nmi));
+	wpa_printf(MSG_DEBUG, "NAN: Responder NMI " MACSTR,
+		   MAC2STR(responder_nmi));
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Derived key", key, key_len);
+
+	return 0;
+}
+
+
+/**
+ * nan_crypto_derive_npk - Derive NPK from NM-KDK for opportunistic pairing
+ * @kdk: NM-KDK (NAN Master Key Derivation Key)
+ * @kdk_len: Length of KDK in bytes
+ * @cipher: Cipher suite identifier (NAN_CS_PK_PASN_128 or NAN_CS_PK_PASN_256)
+ * @initiator_nmi: Pairing Initiator NMI address (6 bytes)
+ * @responder_nmi: Pairing Responder NMI address (6 bytes)
+ * @buf: Buffer for the derived NPK
+ * @buf_len: Length of the buffer  (must be 32 bytes)
+ * Returns: 0 on success, -1 on failure
+ *
+ * NPK = KDF-HASH-256(NM-KDK, "NAN Opportunistic NPK Derivation",
+ *                    Pairing Initiator NMI || Pairing Responder NMI)
+ *
+ * Note: It is unclear whether KDF-HASH-256 means that SHA-256 must be used as
+ * the hash algorithm, or the hash algorithm is determined by the cipher suite.
+ * Usually, NCS-PK-PASN-128 cipher comes with SHA-256 and NCS-PK-PASN-256 with
+ * SHA-384 as defined in Wi-Fi Aware Specification v4.0, section 7.1.2. But for
+ * opportunistic pairing, section 7.6.4.3 specifies KDF-HASH-256 only for NPK
+ * derivation. Does this mean that SHA-256 must be used? In IEEE 802.11-2024,
+ * 12.13.8, where KDF-HASH-NNN is defined, NNN is the number of bits to derive,
+ * not the hash function. Therefore, we follow the latter interpretation and use
+ * the hash function corresponding to the cipher suite.
+ */
+int nan_crypto_derive_npk(const u8 *kdk, size_t kdk_len,
+			  enum nan_cipher_suite_id cipher,
+			  const u8 *initiator_nmi, const u8 *responder_nmi,
+			  u8 *buf, size_t buf_len)
+{
+	const char *label = "NAN Opportunistic NPK Derivation";
+
+	wpa_printf(MSG_DEBUG, "NAN: Deriving NPK from NM-KDK");
+
+	if (buf_len < NAN_NPK_LEN) {
+		wpa_printf(MSG_INFO, "NAN: NPK buffer too small: %zu bytes",
+			   buf_len);
+		return -1;
+	}
+
+	return nan_crypto_derive_from_kdk(kdk, kdk_len, cipher, label,
+					  initiator_nmi, responder_nmi,
+					  buf, buf_len);
+}
+
+
+/**
+ * nan_crypto_derive_kek - Derive KEK from NM-KDK
+ * @kdk: NM-KDK (NAN Master Key Derivation Key)
+ * @kdk_len: Length of KDK in bytes
+ * @cipher: Cipher suite identifier (NAN_CS_PK_PASN_128 or NAN_CS_PK_PASN_256)
+ * @initiator_nmi: Pairing Initiator NMI address (6 bytes)
+ * @responder_nmi: Pairing Responder NMI address (6 bytes)
+ * @ptk: Buffer for the derived KEK
+ * Returns: 0 on success, -1 on failure
+ *
+ * NM-KEK = KDF-HASH-MMM(NM-KDK, "NAN Management KEK Derivation",
+ *                       Pairing Initiator NMI || Pairing Responder NMI)
+ */
+int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
+			  enum nan_cipher_suite_id cipher,
+			  const u8 *initiator_nmi, const u8 *responder_nmi,
+			  struct wpa_ptk *ptk)
+{
+	const char *label = "NAN Management KEK Derivation";
+
+	wpa_printf(MSG_DEBUG, "NAN: Deriving KEK from NM-KDK");
+
+	if (cipher != NAN_CS_PK_PASN_128 &&
+	    cipher != NAN_CS_PK_PASN_256) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Unsupported cipher suite for KEK derivation: %d",
+			   cipher);
+		return -1;
+	}
+
+	ptk->kek_len = nan_crypto_cipher_kek_len(cipher);
+
+	return nan_crypto_derive_from_kdk(kdk, kdk_len, cipher, label,
+					  initiator_nmi, responder_nmi,
+					  ptk->kek, ptk->kek_len);
 }

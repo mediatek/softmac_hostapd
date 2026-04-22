@@ -23,6 +23,7 @@ struct nan_config;
 #define NAN_KCK_MAX_LEN 24
 #define NAN_KEK_MAX_LEN 32
 #define NAN_TK_MAX_LEN  32
+#define NAN_NPK_LEN  32
 
 #define NAN_ELEMENT_MAX_SIZE 1024
 
@@ -715,6 +716,14 @@ int nan_crypto_calc_auth_token(enum nan_cipher_suite_id cipher,
 			       const u8 *buf, size_t len, u8 *token);
 int nan_crypto_key_mic(const u8 *buf, size_t len, const u8 *kck,
 		       size_t kck_len, u8 cipher, u8 *mic);
+int nan_crypto_derive_npk(const u8 *kdk, size_t kdk_len,
+			  enum nan_cipher_suite_id cipher,
+			  const u8 *initiator_nmi, const u8 *responder_nmi,
+			  u8 *buf, size_t buf_len);
+int nan_crypto_derive_kek(const u8 *kdk, size_t kdk_len,
+			  enum nan_cipher_suite_id cipher,
+			  const u8 *initiator_nmi, const u8 *responder_nmi,
+			  struct wpa_ptk *ptk);
 void nan_sec_reset(struct nan_data *nan, struct nan_ndp_sec *ndp_sec);
 int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	       struct nan_msg *msg);
