@@ -2770,6 +2770,19 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 		return -1;
 	}
 
+#ifdef CONFIG_PASN
+	/* Register for PASN Authentication frames */
+	if (nl80211_register_frame(bss, bss->nl_mgmt,
+				   (WLAN_FC_TYPE_MGMT << 2) |
+				   (WLAN_FC_STYPE_AUTH << 4),
+				   (u8 *) "\x07\x00", 2, false)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to subscribe to NAN PASN Authentication frames");
+		nl_destroy_handles(&bss->nl_mgmt);
+		return -1;
+	}
+#endif /* CONFIG_PASN */
+
 	nl80211_mgmt_handle_register_eloop(bss);
 
 #endif /* CONFIG_NAN */
