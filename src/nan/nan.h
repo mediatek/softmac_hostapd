@@ -664,6 +664,16 @@ struct nan_config {
 	const struct wpabuf * (*get_npk_akmp)(void *ctx, const u8 *peer_nmi,
 					      const u8 *nonce, const u8 *tag,
 					      int *akmp);
+
+	/**
+	 * pairing_request - Notify about received pairing request
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 * @csid: Cipher suite ID requested by the peer
+	 * @instance_id: Service instance ID for which the pairing is requested
+	 */
+	void (*pairing_request)(void *ctx, const u8 *peer_nmi, u8 csid,
+				u8 instance_id);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);

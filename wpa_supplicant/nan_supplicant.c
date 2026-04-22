@@ -1061,6 +1061,16 @@ static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
 	return NULL;
 }
 
+
+static void
+wpas_nan_pasn_pairing_request_cb(void *ctx, const u8 *peer_nmi, u8 csid,
+				 u8 instance_id)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpas_notify_nan_pairing_request(wpa_s, peer_nmi, csid, instance_id);
+}
+
 #endif /* CONFIG_PASN */
 
 
@@ -1092,6 +1102,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.update_pairing_credentials =
 			wpas_nan_update_pairing_credentials_cb;
 		nan.get_npk_akmp = wpas_nan_get_npk_akmp_cb;
+		nan.pairing_request = wpas_nan_pasn_pairing_request_cb;
 		nan.pairing_cfg.pairing_setup = true;
 		nan.pairing_cfg.npk_caching = true;
 		nan.pairing_cfg.pairing_verification = true;

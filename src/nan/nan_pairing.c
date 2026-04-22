@@ -80,6 +80,9 @@ int nan_pairing_add_attrs(struct nan_data *nan, struct wpabuf *buf)
 
 void nan_pairing_deinit_peer(struct nan_peer *peer)
 {
+	wpabuf_free(peer->pairing.pending_auth1);
+	peer->pairing.pending_auth1 = NULL;
+
 	if (!peer->pairing.pasn)
 		return;
 
@@ -102,7 +105,7 @@ int nan_pairing_abort(struct nan_data *nan_data, const u8 *peer_addr)
 		return -1;
 	}
 
-	if (!peer->pairing.pasn) {
+	if (!peer->pairing.pasn && !peer->pairing.pending_auth1) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Pairing abort: No PASN in progress with peer "
 			   MACSTR, MAC2STR(peer_addr));
@@ -546,8 +549,21 @@ int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,
 	if (nan_configure_peer_schedule(nan_data, peer, sched))
 		wpa_printf(MSG_DEBUG, "NAN: Could not configure peer schedule");
 
-	if (responder)
+	if (responder) {
+		if (peer->pairing.pending_auth1) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: Responder - process pending Auth1");
+			ret = nan_pairing_auth_rx(
+				nan_data,
+				wpabuf_head(peer->pairing.pending_auth1),
+				wpabuf_len(peer->pairing.pending_auth1));
+			wpabuf_free(peer->pairing.pending_auth1);
+			peer->pairing.pending_auth1 = NULL;
+
+			return ret;
+		}
 		return 0;
+	}
 
 	if (auth_mode == NAN_PASN_AUTH_MODE_PMK) {
 		peer->pairing.flags |= NAN_PAIRING_FLAG_NPK_VERIFICATION;
@@ -1189,6 +1205,29 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 	}
 
 	if (!peer->pairing.pasn) {
+		if (status_code == WLAN_STATUS_SUCCESS &&
+		    auth_transaction == 1) {
+			struct nan_cipher_suite cs;
+
+			if (nan_pairing_process_elems(nan_data, peer, mgmt, len,
+						      &cs)) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Pairing: Handle Auth1 NAN attributes failed");
+				return -1;
+			}
+
+			wpabuf_free(peer->pairing.pending_auth1);
+			peer->pairing.pending_auth1 =
+				wpabuf_alloc_copy(mgmt, len);
+			if (!peer->pairing.pending_auth1)
+				return -1;
+
+			nan_data->cfg->pairing_request(nan_data->cfg->cb_ctx,
+						       peer->nmi_addr, cs.csid,
+						       cs.instance_id);
+			return 0;
+		}
+
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Pairing: PASN data not initialized for peer");
 		return -1;

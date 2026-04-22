@@ -1305,6 +1305,7 @@ void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
 
 
 #ifdef CONFIG_PASN
+
 void wpas_notify_nan_nik_received(struct wpa_supplicant *wpa_s,
 				  const u8 *nik, size_t nik_len,
 				  int cipher_ver, int akmp,
@@ -1336,6 +1337,17 @@ out:
 	bin_clear_free(nik_hex, nik_hex_len);
 	bin_clear_free(npk_hex, npk_hex_len);
 }
+
+
+void wpas_notify_nan_pairing_request(struct wpa_supplicant *wpa_s,
+				     const u8 *peer_nmi, u8 csid,
+				     u8 instance_id)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_PAIRING_REQUEST
+		       "peer_nmi=" MACSTR " csid=%u instance_id=%u",
+		       MAC2STR(peer_nmi), csid, instance_id);
+}
+
 #endif /* CONFIG_PASN */
 
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */

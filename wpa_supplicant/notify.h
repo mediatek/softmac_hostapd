@@ -231,5 +231,8 @@ void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
 				       const u8 *peer_addr, u16 pbm,
 				       u8 reason, int handle,
 				       u8 requestor_instance_id);
+void wpas_notify_nan_pairing_request(struct wpa_supplicant *wpa_s,
+				     const u8 *peer_nmi, u8 csid,
+				     u8 instance_id);
 
 #endif /* NOTIFY_H */
