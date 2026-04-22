@@ -498,6 +498,146 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 }
 
 
+static void nan_add_kde_hdr(struct wpabuf *buf, u32 kde, size_t data_len)
+{
+	wpabuf_put_u8(buf, WLAN_EID_VENDOR_SPECIFIC);
+	wpabuf_put_u8(buf, RSN_SELECTOR_LEN + data_len);
+	RSN_SELECTOR_PUT(wpabuf_put(buf, RSN_SELECTOR_LEN), kde);
+}
+
+
+/**
+ * nan_nik_build_key_data - Build NAN Identity Key (NIK) key data buffer
+ * @nan_data: Pointer to NAN data structure containing configuration
+ * Returns: Pointer to allocated wpabuf containing the key data, or NULL
+ *	on failure.
+ *
+ * This function constructs a buffer containing NAN key data elements including:
+ * - NIK KDE (Key Data Encapsulation) with cipher version and NIK value
+ * - Key Lifetime KDE indicating the NIK key lifetime
+ *
+ * Note: Caller is responsible for freeing the returned buffer.
+ */
+static struct wpabuf * nan_nik_build_key_data(struct nan_data *nan_data)
+{
+	struct wpabuf *buf;
+
+	buf = wpabuf_alloc(KDE_HDR_LEN + sizeof(struct nan_nik_kde) +
+			   KDE_HDR_LEN + sizeof(struct nan_key_lifetime_kde));
+	if (!buf)
+		return NULL;
+
+	nan_add_kde_hdr(buf, NAN_KEY_DATA_NIK, sizeof(struct nan_nik_kde));
+	wpabuf_put_u8(buf, NAN_NIRA_CIPHER_VER_128);
+	wpabuf_put_data(buf, nan_data->cfg->nik, sizeof(nan_data->cfg->nik));
+
+	nan_add_kde_hdr(buf, NAN_KEY_DATA_LIFETIME,
+			sizeof(struct nan_key_lifetime_kde));
+	wpabuf_put_le16(buf, NAN_KEY_LIFETIME_NIK);
+	wpabuf_put_be32(buf, nan_data->cfg->nik_lifetime);
+
+	return buf;
+}
+
+
+/**
+ * nan_send_nik - Send NAN Identity Key (NIK) to a peer
+ * @nan_data: Pointer to NAN data structure containing configuration and state
+ * @peer: Pointer to the NAN peer structure to send the NIK to
+ * Returns: 0 on success, -1 in case of an error
+ *
+ * This function sends the NAN Identity Key (NIK) and the NIK lifetime to a peer
+ * device as part of the NAN pairing process. The NIK is encrypted using the KEK
+ * (Key Encryption Key) derived from PASN and sent in a Shared Key Descriptor
+ * Attribute (SKDA) within a follow-up message.
+ */
+static int nan_send_nik(struct nan_data *nan_data, struct nan_peer *peer)
+{
+	struct wpabuf *skda, *key_data;
+	struct wpa_eapol_key *key_desc;
+	u16 info, key_len;
+	int ret;
+	struct wpabuf *encrypted_key_data = NULL;
+	size_t skda_len;
+
+	if (!nan_data->cfg->pairing_cfg.npk_caching) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Local NPK caching not enabled, don't send NIK");
+		return 0;
+	}
+
+	if (!peer->pairing.pairing_cfg.npk_caching) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Peer NPK caching not enabled, don't send NIK");
+		return 0;
+	}
+
+	if (!peer->pairing.pasn || !peer->pairing.pasn->ptk.kek_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: KEK not available for NIK encryption");
+		return -1;
+	}
+
+	key_data = nan_nik_build_key_data(nan_data);
+	if (!key_data) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to build NIK key data");
+		return -1;
+	}
+
+	/* Encrypt the key data using the KEK from the PASN data */
+	encrypted_key_data = nan_crypto_encrypt_key_data(
+		key_data, peer->pairing.pasn->ptk.kek,
+		peer->pairing.pasn->ptk.kek_len);
+	wpabuf_clear_free(key_data);
+	if (!encrypted_key_data) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing: Failed to encrypt NIK key data");
+		return -1;
+	}
+
+	skda_len = sizeof(struct nan_shared_key) +
+		sizeof(struct wpa_eapol_key) + 2 +
+		wpabuf_len(encrypted_key_data);
+
+	skda = wpabuf_alloc(NAN_ATTR_HDR_LEN + skda_len);
+	if (!skda) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Failed to allocate SKDA buffer");
+		wpabuf_free(encrypted_key_data);
+		return -1;
+	}
+
+	wpabuf_put_u8(skda, NAN_ATTR_SHARED_KEY_DESCR);
+	wpabuf_put_le16(skda, skda_len);
+	wpabuf_put_u8(skda, peer->pairing.handle);
+
+	key_desc = wpabuf_put(skda, sizeof(*key_desc));
+	os_memset(key_desc, 0, sizeof(*key_desc));
+
+	key_desc->type = NAN_KEY_DESC;
+	info = WPA_KEY_INFO_TYPE_AKM_DEFINED | WPA_KEY_INFO_KEY_TYPE |
+		WPA_KEY_INFO_ACK | WPA_KEY_INFO_ENCR_KEY_DATA;
+	WPA_PUT_BE16(key_desc->key_info, info);
+
+	key_len = wpa_cipher_key_len(peer->pairing.pasn->cipher);
+	WPA_PUT_BE16(key_desc->key_length, key_len);
+
+	wpabuf_put_be16(skda, wpabuf_len(encrypted_key_data));
+	wpabuf_put_buf(skda, encrypted_key_data);
+
+	ret = nan_data->cfg->transmit_followup(nan_data->cfg->cb_ctx,
+					       peer->nmi_addr, skda,
+					       peer->pairing.handle,
+					       peer->pairing.peer_instance_id);
+
+	wpabuf_free(encrypted_key_data);
+	wpabuf_free(skda);
+
+	return ret;
+}
+
+
 /**
  * nan_pairing_pasn_auth_tx_status - Handle PASN Authentication frame TX status
  * @nan: Pointer to NAN data structure
@@ -544,6 +684,22 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 		}
 
 		nan_pairing_done(nan, peer);
+
+		/*
+		 * Allow the peer to install the keys before transmitting the
+		 * follow-up.
+		 */
+		/* FIX: A blocking sleep should not really be used here, i.e.,
+		 * this needs to be removed or replace with a registered eloop
+		 * timeout to avoid blocking the process. */
+		os_sleep(0, 30000);
+
+		if (nan_send_nik(nan, peer) < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Pairing: Failed to send NIK");
+			nan_pairing_deinit_peer(peer);
+			return -1;
+		}
 	}
 
 	wpabuf_free(pasn->frame);
