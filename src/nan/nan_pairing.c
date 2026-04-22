@@ -136,15 +136,6 @@ static int nan_pairing_set_password(struct pasn_data *pasn,
 #ifdef CONFIG_SAE
 	struct sae_pt *pt;
 
-	pasn->pasn_groups = os_calloc(2, sizeof(*pasn->pasn_groups));
-	if (!pasn->pasn_groups) {
-		wpa_printf(MSG_INFO,
-			   "NAN: Pairing: Failed to allocate PASN groups");
-		return -1;
-	}
-
-	pasn->pasn_groups[0] = pasn->group;
-
 	pt = sae_derive_pt(pasn->pasn_groups, (const u8 *) NAN_PASN_SSID,
 			   os_strlen(NAN_PASN_SSID), (const u8 *) passphrase,
 			   os_strlen(passphrase), NULL, 0);
@@ -213,10 +204,8 @@ static int nan_pasn_verification_init(struct nan_data *nan_data,
 	const struct wpabuf *npk;
 	int akmp;
 	u8 npkid[NAN_NIRA_NONCE_LEN + NAN_NIRA_TAG_LEN];
-	struct pasn_data *pasn;
 
 	pairing_data = &peer->pairing;
-	pasn = pairing_data->pasn;
 
 	if (!pairing_data->nonce_tag_valid) {
 		wpa_printf(MSG_DEBUG,
@@ -234,16 +223,6 @@ static int nan_pasn_verification_init(struct nan_data *nan_data,
 	}
 
 	pasn_set_akmp(pairing_data->pasn, akmp);
-
-	os_free(pasn->pasn_groups);
-	pasn->pasn_groups = os_calloc(2, sizeof(int));
-	if (!pasn->pasn_groups) {
-		wpa_printf(MSG_INFO,
-			   "NAN: Pairing: Failed to allocate PASN groups");
-		return -1;
-	}
-
-	pasn->pasn_groups[0] = pasn->group;
 
 	if (pairing_data->self_pairing_role == NAN_PAIRING_ROLE_INITIATOR)
 		pasn_initiator_pmksa_cache_add(nan_data->initiator_pmksa,
@@ -335,6 +314,16 @@ static int nan_pairing_pasn_initialize(struct nan_data *nan_data,
 
 	pasn_enable_kdk_derivation(pasn);
 
+	/* Set allowed PASN groups. This is needed for all modes */
+	os_free(pasn->pasn_groups);
+	pasn->pasn_groups = os_calloc(2, sizeof(*pasn->pasn_groups));
+	if (!pasn->pasn_groups) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Failed to allocate PASN groups");
+		goto fail;
+	}
+	pasn->pasn_groups[0] = pasn->group;
+
 	if (auth_mode == NAN_PASN_AUTH_MODE_SAE) {
 		pasn_set_akmp(pasn, WPA_KEY_MGMT_SAE);
 		if (!password) {
@@ -351,15 +340,6 @@ static int nan_pairing_pasn_initialize(struct nan_data *nan_data,
 	} else if (auth_mode == NAN_PASN_AUTH_MODE_PASN) {
 		pasn_set_akmp(pasn, WPA_KEY_MGMT_PASN);
 		pasn_set_noauth(pasn, true);
-
-		/* Set allowed PASN groups for the responder to validate */
-		pasn->pasn_groups = os_calloc(2, sizeof(*pasn->pasn_groups));
-		if (!pasn->pasn_groups) {
-			wpa_printf(MSG_INFO,
-				   "NAN: Pairing: Failed to allocate PASN groups");
-			goto fail;
-		}
-		pasn->pasn_groups[0] = pasn->group;
 	} else if (auth_mode == NAN_PASN_AUTH_MODE_PMK) {
 		if (nan_pasn_verification_init(nan_data, peer)) {
 			wpa_printf(MSG_DEBUG,
