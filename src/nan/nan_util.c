@@ -413,6 +413,35 @@ void nan_add_dev_capa_ext_attr(struct nan_data *nan, struct wpabuf *buf)
 
 
 /**
+ * nan_add_nira - Add NIRA (NAN Identity Resolution Attribute) to a buffer
+ * @buf: Buffer to which the NIRA is appended
+ * @tag: Pointer to NIRA tag data (NAN_NIRA_TAG_LEN bytes)
+ * @nonce: Pointer to NIRA nonce data (NAN_NIRA_NONCE_LEN bytes)
+ * Returns: 0 on success, -1 if there is insufficient space in the buffer
+ *
+ * This function constructs and appends a NAN Identity Resolution Attribute
+ * (NIRA) to the provided buffer.
+ */
+int nan_add_nira(struct wpabuf *buf, const u8 *tag, const u8 *nonce)
+{
+	u16 attr_len = 1 + NAN_NIRA_NONCE_LEN + NAN_NIRA_TAG_LEN;
+
+	if (wpabuf_tailroom(buf) < (size_t) (NAN_ATTR_HDR_LEN + attr_len)) {
+		wpa_printf(MSG_INFO, "NAN: Not enough space to add NIRA");
+		return -1;
+	}
+
+	wpabuf_put_u8(buf, NAN_ATTR_NIRA);
+	wpabuf_put_le16(buf, attr_len);
+	wpabuf_put_u8(buf, NAN_NIRA_CIPHER_VER_128);
+	wpabuf_put_data(buf, nonce, NAN_NIRA_NONCE_LEN);
+	wpabuf_put_data(buf, tag, NAN_NIRA_TAG_LEN);
+
+	return 0;
+}
+
+
+/**
  * nan_chan_to_chan_idx_map - Convert an op_class and chan to channel bitmap
  * @nan: NAN module context from nan_init()
  * @op_class: the operating class

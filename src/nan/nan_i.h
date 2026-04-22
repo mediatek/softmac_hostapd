@@ -482,6 +482,8 @@ struct nan_peer {
  * @next_dialog_token: Dialog token for NDP and NDL negotiations. Incremented
  *     for each NDP and NDL request.
  * @cluster_id: Current cluster ID
+ * @nira_nonce: Nonce for NAN Identity Resolution attribute (NIRA)
+ * @nira_tag: Tag for NAN Identity Resolution attribute (NIRA)
  */
 struct nan_data {
 	struct nan_config *cfg;
@@ -492,6 +494,9 @@ struct nan_data {
 	u8 next_dialog_token;
 
 	u8 cluster_id[ETH_ALEN];
+
+	u8 nira_nonce[NAN_NIRA_NONCE_LEN];
+	u8 nira_tag[NAN_NIRA_TAG_LEN];
 };
 
 struct nan_attrs_entry {
@@ -684,5 +689,15 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 			     const u8 *npba, u16 npba_len,
 			     const u8 *buf, size_t len,
 			     int handle, u8 req_instance_id);
+int nan_add_nira(struct wpabuf *buf, const u8 *tag, const u8 *nonce);
+#ifdef CONFIG_PASN
+int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag);
+#else /* CONFIG_PASN */
+static inline
+int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag)
+{
+	return -1;
+}
+#endif /* CONFIG_PASN */
 
 #endif /* NAN_I_H */

@@ -35,6 +35,13 @@ struct nan_data * nan_init(const struct nan_config *cfg)
 	if (!nan)
 		return NULL;
 
+	if (cfg->pairing_cfg.pairing_verification &&
+	    nan_nira_get_tag_nonce(cfg, nan->nira_nonce, nan->nira_tag) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to get NIRA tag and nonce");
+		os_free(nan);
+		return NULL;
+	}
+
 	nan->cfg = os_memdup(cfg, sizeof(*cfg));
 	if (!nan->cfg) {
 		os_free(nan);
