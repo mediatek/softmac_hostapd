@@ -23,10 +23,10 @@
 #define NAN_TEST_MAX_LATENCY     3
 #define NAN_TEST_PUBLISH_INST_ID 12
 
-static const u8 pub_nmi[] = { 0x00, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA };
-static const u8 pub_ndi[] = { 0x00, 0xAA, 0xAA, 0x00, 0x00, 0x00 };
-static const u8 sub_nmi[] = { 0x00, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB };
-static const u8 sub_ndi[] = { 0x00, 0xBB, 0xBB, 0xBB, 0x00, 0x00 };
+static const u8 g_pub_nmi[] = { 0x00, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA };
+static const u8 g_pub_ndi[] = { 0x00, 0xAA, 0xAA, 0x00, 0x00, 0x00 };
+static const u8 g_sub_nmi[] = { 0x00, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB };
+static const u8 g_sub_ndi[] = { 0x00, 0xBB, 0xBB, 0xBB, 0x00, 0x00 };
 
 /**
  * struct nan_test_action - NAN test action context
@@ -375,7 +375,7 @@ static int nan_ndp_notify_action(struct nan_device *dev, void *ctx)
 			wpa_printf(MSG_INFO, "%s: Accepting request",
 				   dev->name);
 
-			os_memcpy(params->u.resp.resp_ndi, pub_ndi, ETH_ALEN);
+			os_memcpy(params->u.resp.resp_ndi, dev->ndi, ETH_ALEN);
 			params->u.resp.status = NAN_NDP_STATUS_ACCEPTED;
 			dev->conf->schedule_cb(&params->sched);
 			params->sched.elems = dev->global->elems;
@@ -421,7 +421,7 @@ static int nan_ndp_notify_action(struct nan_device *dev, void *ctx)
 			wpa_printf(MSG_INFO, "%s: Accepting response",
 				   dev->name);
 
-			os_memcpy(params->u.resp.resp_ndi, sub_ndi, ETH_ALEN);
+			os_memcpy(params->u.resp.resp_ndi, dev->ndi, ETH_ALEN);
 			params->u.resp.status = NAN_NDP_STATUS_ACCEPTED;
 
 			if (!dev->conf->schedule_conf_cb) {
@@ -739,7 +739,8 @@ static int nan_test_send_naf_cb(void *ctx, const u8 *dst, const u8 *src,
 		   MAC2STR(dst));
 
 	dl_list_for_each(curd, &dev->global->devs, struct nan_device, list) {
-		if (ether_addr_equal(curd->nmi, dst)) {
+		if (ether_addr_equal(curd->nmi, dst) ||
+		    ether_addr_equal(curd->ndi, dst)) {
 			found = true;
 			break;
 		}
@@ -931,12 +932,14 @@ static int nan_test_dev_init(struct nan_device *dev)
  * @global: NAN test global data structure
  * @name: Name of the device
  * @nmi: NAN Management interface address
+ * @ndi: NAN Data interface address
  * @cconf: NAN cluster configuration
  * @dconf: Test device configuration
  */
 static struct nan_device *
 nan_test_start_dev(struct nan_test_global *global,
 		   const char *name, const u8 *nmi,
+		   const u8 *ndi,
 		   struct nan_cluster_config *conf,
 		   const struct nan_test_dev_conf *dconf)
 {
@@ -953,6 +956,7 @@ nan_test_start_dev(struct nan_test_global *global,
 		nlen = sizeof(dev->name) - 1;
 	os_memcpy(dev->name, name, nlen);
 	os_memcpy(dev->nmi, nmi, sizeof(dev->nmi));
+	os_memcpy(dev->ndi, ndi, sizeof(dev->ndi));
 	dl_list_init(&dev->list);
 	dev->global = global;
 
@@ -1023,18 +1027,18 @@ nan_test_setup_devices(struct nan_test_global *global,
 
 	wpa_printf(MSG_INFO, "%s: Enter\n", __func__);
 
-	pub = nan_test_start_dev(global, "publisher", pub_nmi, &cconf,
-				 pub_conf);
+	pub = nan_test_start_dev(global, "publisher", g_pub_nmi, g_pub_ndi,
+				 &cconf, pub_conf);
 	if (!pub)
 		goto fail;
 
-	sub = nan_test_start_dev(global, "subscriber", sub_nmi, &cconf,
-				 sub_conf);
+	sub = nan_test_start_dev(global, "subscriber", g_sub_nmi, g_sub_ndi,
+				 &cconf, sub_conf);
 	if (!sub)
 		goto fail;
 
-	nan_add_peer(pub->nan, sub_nmi, attrs, sizeof(attrs));
-	nan_add_peer(sub->nan, pub_nmi, attrs, sizeof(attrs));
+	nan_add_peer(pub->nan, g_sub_nmi, attrs, sizeof(attrs));
+	nan_add_peer(sub->nan, g_pub_nmi, attrs, sizeof(attrs));
 
 	wpa_printf(MSG_INFO, "\n%s: Done\n", __func__);
 	return sub;
@@ -1045,7 +1049,7 @@ fail:
 }
 
 
-static int nan_test_ndp_request(struct nan_device *sub)
+static int nan_test_ndp_request(struct nan_device *sub, const u8 *pub_nmi)
 {
 	struct nan_ndp_params *params;
 	struct nan_test_action *action;
@@ -1060,7 +1064,7 @@ static int nan_test_ndp_request(struct nan_device *sub)
 
 	params->type = NAN_NDP_ACTION_REQ;
 	os_memcpy(params->ndp_id.peer_nmi, pub_nmi, ETH_ALEN);
-	os_memcpy(params->ndp_id.init_ndi, sub_ndi, ETH_ALEN);
+	os_memcpy(params->ndp_id.init_ndi, sub->ndi, ETH_ALEN);
 	params->ndp_id.id = ++sub->counter;
 	params->qos.min_slots = NAN_TEST_MIN_SLOTS;
 	params->qos.max_latency = NAN_TEST_MAX_LATENCY;
@@ -1219,7 +1223,7 @@ static int nan_test_run(void)
 		}
 
 		for (i = 0; i < sub->conf->n_ndps; i++) {
-			int ret = nan_test_ndp_request(sub);
+			int ret = nan_test_ndp_request(sub, g_pub_nmi);
 
 			if (!ret)
 				ret = nan_test_run_actions(&global);
