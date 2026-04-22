@@ -39,6 +39,7 @@ struct nan_discovery_result {
 	unsigned int n_cipher_suites;
 	bool pairing_setup_supp;
 	bool npk_nik_caching_supp;
+	u16 pbm;
 };
 
 struct nan_callbacks {

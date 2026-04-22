@@ -1319,6 +1319,30 @@ static void nan_de_parse_dcea(const u8 *buf, size_t len, bool *pairing_setup,
 }
 
 
+static u16 nan_de_get_advertise_pbm(const u8 *buf, size_t len)
+{
+	const u8 *npba;
+	u16 npba_len;
+
+	npba = nan_de_get_attr(buf, len, NAN_ATTR_NPBA, 0);
+	if (!npba)
+		return 0;
+
+	npba_len = WPA_GET_LE16(npba + 1);
+	if (npba_len < 5) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid NPBA length %u", npba_len);
+		return 0;
+	}
+
+	/* Skip the attribute ID and length */
+	npba += NAN_ATTR_HDR_LEN;
+	if ((npba[1] & NAN_PBA_TYPE_MASK) != NAN_PBA_TYPE_ADVERTISE)
+		return 0;
+
+	return WPA_GET_LE16(npba + 3);
+}
+
+
 static bool nan_de_filter_match(struct nan_de_service *srv,
 				const u8 *matching_filter,
 				size_t matching_filter_len)
@@ -1495,6 +1519,9 @@ send_event:
 		nan_de_parse_dcea(buf, buf_len,
 				  &res.pairing_setup_supp,
 				  &res.npk_nik_caching_supp);
+
+		/* Get the bootstrapping methods */
+		res.pbm = nan_de_get_advertise_pbm(buf, buf_len);
 	}
 
 	os_memset(&res, 0, sizeof(res));
