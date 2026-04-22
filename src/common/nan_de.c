@@ -1133,6 +1133,72 @@ static void nan_de_get_sdea(const u8 *buf, size_t len, u8 instance_id,
 }
 
 
+static unsigned int nan_de_parse_csia(const u8 *buf, size_t len, u8 instance_id,
+				      u8 *cipher_suites,
+				      unsigned int max_cipher_suites,
+				      u8 *capabilities)
+{
+	const u8 *csia, *pos, *end;
+	u16 csia_len;
+	unsigned int cs_count = 0;
+	const struct nan_cipher_suite_info *cs_info;
+
+	csia = nan_de_get_attr(buf, len, NAN_ATTR_CSIA, 0);
+	if (!csia)
+		return 0;
+
+	csia++;
+	csia_len = WPA_GET_LE16(csia);
+	csia += 2;
+
+	if (csia_len < 1)
+		return 0;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Parsing Cipher Suite Information attribute (len=%u)",
+		   csia_len);
+
+	cs_info = (const struct nan_cipher_suite_info *) csia;
+
+	if (capabilities)
+		*capabilities = cs_info->capab;
+
+	pos = cs_info->cs;
+	end = csia + csia_len;
+
+	/* Parse cipher suite list. Each entry is 2 bytes (csid + publish_id) */
+	while (end - pos >= 2 && cs_count < max_cipher_suites) {
+		u8 csid = *pos++;
+		u8 publish_id = *pos++;
+
+		if (csid == NAN_CS_NONE || csid >= NAN_CS_MAX) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Invalid cipher suite ID %u for publish ID %u",
+				   csid, publish_id);
+			continue;
+		}
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cipher suite ID %u for publish ID %u",
+			   csid, publish_id);
+
+		/* Only include cipher suites for the matching publish ID */
+		if (publish_id == instance_id) {
+			cipher_suites[cs_count++] = csid;
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Added cipher suite %u for matching publish ID %u",
+				   csid, instance_id);
+		}
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Parsed %u cipher suites from CSIA for publish ID %u",
+		   cs_count, instance_id);
+
+	return cs_count;
+}
+
+
 static unsigned int nan_de_parse_scia(const u8 *buf, size_t len, u8 instance_id,
 				      u8 *pmkid_list, unsigned int max_pmkids)
 {
@@ -1336,6 +1402,9 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 	/* The SCIA can potentially contain a PMKID for each cipher suite */
 	u8 pmkid_list[(NAN_CS_MAX - 1) * PMKID_LEN];
 	unsigned int pmkid_count = 0;
+	/* Cipher suites from CSIA */
+	u8 cipher_suites[NAN_CS_MAX - 1];
+	unsigned int cipher_suite_count = 0;
 
 	if (!nan_de_filter_match(srv, matching_filter, matching_filter_len))
 		return false;
@@ -1377,6 +1446,11 @@ static bool nan_de_rx_publish(struct nan_de *de, struct nan_de_service *srv,
 
 send_event:
 	if (buf && buf_len > 0) {
+		/* Parse Cipher Suite Information Attribute */
+		cipher_suite_count = nan_de_parse_csia(
+			buf, buf_len, instance_id, cipher_suites,
+			ARRAY_SIZE(cipher_suites), NULL);
+
 		/* Parse Security Context Information attribute */
 		pmkid_count = nan_de_parse_scia(buf, buf_len, instance_id,
 						pmkid_list,
@@ -1391,7 +1465,9 @@ send_event:
 			sdea_control & NAN_SDEA_CTRL_FSD_REQ,
 			sdea_control & NAN_SDEA_CTRL_FSD_GAS,
 			pmkid_count > 0 ? pmkid_list : NULL,
-			pmkid_count);
+			pmkid_count,
+			cipher_suite_count > 0 ? cipher_suites : NULL,
+			cipher_suite_count);
 
 	return true;
 }
