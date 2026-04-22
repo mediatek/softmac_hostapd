@@ -960,6 +960,76 @@ fail:
 	return -1;
 }
 
+
+static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
+						      const u8 *peer_nmi,
+						      const u8 *nonce,
+						      const u8 *tag, int *akmp)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	struct wpa_dev_ik *ik;
+	struct wpabuf *derived_tag;
+
+	if (!akmp) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid akmp pointer");
+		return NULL;
+	}
+
+	if (!nonce || !tag) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid nonce or tag");
+		return NULL;
+	}
+
+	wpa_hexdump(MSG_DEBUG, "NAN: Looking up NPK and AKMP for nonce",
+		    nonce, NAN_NIRA_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "NAN: Looking up NPK and AKMP for tag",
+		    tag, NAN_NIRA_TAG_LEN);
+
+	/* Iterate over all saved NIKs (stored as device identities) */
+	for (ik = wpa_s->conf->identity; ik; ik = ik->next) {
+		/* The device identities saved in the interface configuration
+		 * are not checked to match NIK length and to have a PMK.
+		 * Although other identities are not expected since this is the
+		 * NAN management interface, verify that the DIK matches NIK
+		 * length, that a PMK is stored, and the stored AKMP is valid
+		 * for NAN pairing.
+		 */
+		if (!ik->dik || wpabuf_len(ik->dik) != NAN_NIK_LEN ||
+		    !ik->pmk ||
+		    (ik->akmp != WPA_KEY_MGMT_SAE &&
+		     ik->akmp != WPA_KEY_MGMT_PASN))
+			continue;
+
+		/* Derive tag from this NIK */
+		derived_tag =
+			nan_crypto_derive_nira_tag(wpabuf_head_u8(ik->dik),
+						   NAN_NIK_LEN, peer_nmi,
+						   nonce);
+		if (!derived_tag)
+			continue;
+
+		/* Compare derived tag with received tag */
+		if (os_memcmp(wpabuf_head(derived_tag), tag,
+			      NAN_NIRA_TAG_LEN) != 0) {
+			wpabuf_free(derived_tag);
+			continue;
+		}
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NIRA validation succeeded with NIK id=%d",
+			   ik->id);
+		wpabuf_free(derived_tag);
+
+		*akmp = ik->akmp;
+		wpa_printf(MSG_DEBUG, "NAN: Found NPK for NIK id=%d, akmp=%d",
+			   ik->id, *akmp);
+		return ik->pmk;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: No matching NIK found");
+	return NULL;
+}
+
 #endif /* CONFIG_PASN */
 
 
@@ -985,6 +1055,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	nan.send_pasn = wpas_nan_pasn_send_cb;
 	nan.pairing_result_cb = wpas_nan_pasn_auth_status_cb;
 	nan.update_pairing_credentials = wpas_nan_update_pairing_credentials_cb;
+	nan.get_npk_akmp = wpas_nan_get_npk_akmp_cb;
 #endif /* CONFIG_PASN */
 
 	/* NDP */
