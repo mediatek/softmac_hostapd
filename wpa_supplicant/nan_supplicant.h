@@ -38,6 +38,7 @@ int wpas_nan_bootstrap_reset(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 		  u8 auth_mode, int cipher, int handle, u8 peer_instance_id,
 		  bool responder, const char *password);
+int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd);
 
 #else /* CONFIG_NAN */
 

@@ -3469,6 +3469,14 @@ static int wpa_cli_cmd_nan_bootstrap_reset(struct wpa_ctrl *ctrl,
 	return wpa_cli_cmd(ctrl, "NAN_BOOTSTRAP_RESET", 1, argc, argv);
 }
 
+
+#ifdef CONFIG_PASN
+static int wpa_cli_cmd_nan_pair(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_cli_cmd(ctrl, "NAN_PAIR", 5, argc, argv);
+}
+#endif /* CONFIG_PASN */
+
 #endif /* CONFIG_NAN */
 
 
@@ -4281,6 +4289,11 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "nan_bootstrap_reset", wpa_cli_cmd_nan_bootstrap_reset, NULL,
 	  cli_cmd_flag_none,
 	  " = <peer_mac> = Reset NAN boostrapping with peer" },
+#ifdef CONFIG_PASN
+	{ "nan_pair", wpa_cli_cmd_nan_pair, NULL,
+	  cli_cmd_flag_sensitive,
+	  " = <peer_mac> <handle=<service handle>> <peer_instance_id=<peer requestor id>> <auth=<0|1|2>> <cipher=<CCMP|GCMP-256>> [password=<password>] [responder] = Request or authorize NAN pairing with peer" },
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 	{ "new_random_mac_address", wpa_cli_cmd_generate_new_mac, NULL,
 	  cli_cmd_flag_none, "= Generate new random MAC address" },

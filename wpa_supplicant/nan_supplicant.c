@@ -2544,6 +2544,7 @@ void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 
 
 #ifdef CONFIG_PASN
+
 /**
  * wpas_nan_pair - Initiate NAN pairing with a peer device
  * @wpa_s: Pointer to wpa_supplicant data structure
@@ -2574,6 +2575,96 @@ int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 
 	return ret;
 }
+
+
+/*
+ * Format: NAN_PAIR <peer_nmi> <handle=<id>>
+ *	<peer_instance_id=<id>> <auth=<0|1|2>> <cipher=<CCMP|GCMP-256>>
+ *	[responder] [password=<password>]
+ */
+int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd)
+{
+	char *token, *context = NULL;
+	u8 addr[ETH_ALEN];
+	u8 auth_mode = 0;
+	u8 peer_instance_id = 0;
+	int handle = 0;
+	int cipher = WPA_CIPHER_NONE;
+	char *password = NULL;
+	bool responder = false;
+	char *pos;
+
+	/* Parse peer address first */
+	if (hwaddr_aton(cmd, addr) < 0)
+		return -1;
+
+	/* Move past the peer_mac address */
+	pos = os_strchr(cmd, ' ');
+	if (!pos)
+		return -1;
+	pos++;
+
+	while ((token = str_token(pos, " ", &context))) {
+		if (os_strncmp(token, "auth=", 5) == 0) {
+			auth_mode = atoi(token + 5);
+			if (auth_mode > 2) {
+				wpa_printf(MSG_INFO,
+					   "NAN_PAIR: Invalid auth mode: %u",
+					   auth_mode);
+				return -1;
+			}
+		} else if (os_strncmp(token, "handle=", 7) == 0) {
+			handle = atoi(token + 7);
+		} else if (os_strncmp(token, "peer_instance_id=", 17) == 0) {
+			peer_instance_id = atoi(token + 17);
+		} else if (os_strncmp(token, "cipher=", 7) == 0) {
+			if (os_strcmp(token + 7, "CCMP") == 0) {
+				cipher = WPA_CIPHER_CCMP;
+			} else if (os_strcmp(token + 7, "GCMP-256") == 0) {
+				cipher = WPA_CIPHER_GCMP_256;
+			} else {
+				wpa_printf(MSG_INFO,
+					   "NAN_PAIR: Invalid cipher: '%s'",
+					   token + 7);
+				return -1;
+			}
+		} else if (os_strncmp(token, "responder", 9) == 0) {
+			responder = true;
+		} else if (os_strncmp(token, "password=", 9) == 0) {
+			password = token + 9;
+		} else {
+			wpa_printf(MSG_INFO,
+				   "NAN_PAIR: Invalid parameter: '%s'",
+				   token);
+			return -1;
+		}
+	}
+
+	if (handle <= 0) {
+		wpa_printf(MSG_INFO, "NAN_PAIR: missing or invalid handle");
+		return -1;
+	}
+
+	if (!peer_instance_id) {
+		wpa_printf(MSG_INFO,
+			   "NAN_PAIR: missing or invalid peer_instance_id");
+		return -1;
+	}
+
+	if (cipher == WPA_CIPHER_NONE) {
+		wpa_printf(MSG_INFO, "NAN_PAIR: missing cipher");
+		return -1;
+	}
+
+	if (wpas_nan_pair(wpa_s, addr, auth_mode, cipher, handle,
+			  peer_instance_id, responder, password) < 0) {
+		wpa_printf(MSG_INFO, "NAN_PAIR: Pairing initiation failed");
+		return -1;
+	}
+
+	return 0;
+}
+
 #endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 

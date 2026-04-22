@@ -14430,6 +14430,11 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	} else if (os_strncmp(buf, "NAN_BOOTSTRAP_RESET ", 20) == 0) {
 		if (wpas_nan_bootstrap_reset(wpa_s, buf + 20) < 0)
 			reply_len = -1;
+#ifdef CONFIG_PASN
+	} else if (os_strncmp(buf, "NAN_PAIR ", 9) == 0) {
+		if (wpas_nan_pairing_start(wpa_s, buf + 9) < 0)
+			reply_len = -1;
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_NAN */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
