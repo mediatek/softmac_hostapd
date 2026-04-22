@@ -812,25 +812,30 @@ static bool wpas_nan_is_valid_publish_id_cb(void *ctx, u8 instance_id,
 
 
 static void wpas_nan_bootstrap_request_cb(void *ctx, const u8 *peer_nmi,
-					  u16 pbm)
+					  u16 pbm, int handle,
+					  u8 requestor_instance_id)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	wpas_notify_nan_bootstrap_request(wpa_s, peer_nmi, pbm);
+	wpas_notify_nan_bootstrap_request(wpa_s, peer_nmi, pbm, handle,
+					  requestor_instance_id);
 }
 
 
 static void wpas_nan_bootstrap_completed_cb(void *ctx, const u8 *peer_nmi,
 					    u16 pbm, bool success,
-					    u8 reason_code)
+					    u8 reason_code, int handle,
+					    u8 requestor_instance_id)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
 	if (success)
-		wpas_notify_nan_bootstrap_success(wpa_s, peer_nmi, pbm);
+		wpas_notify_nan_bootstrap_success(wpa_s, peer_nmi, pbm, handle,
+						  requestor_instance_id);
 	else
 		wpas_notify_nan_bootstrap_failure(wpa_s, peer_nmi, pbm,
-						  reason_code);
+						  reason_code, handle,
+						  requestor_instance_id);
 }
 
 

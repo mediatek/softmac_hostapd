@@ -567,8 +567,11 @@ struct nan_config {
 	 * @peer_nmi: Peer NMI address
 	 * @pbm: Pairing Bootstrapping Methods from the request. As defined in
 	 *     Wi-Fi Aware spec v4.0, Table 128 (NPBA format).
+	 * @handle: Service handle
+	 * @requestor_instance_id: Requestor instance ID
 	 */
-	void (*bootstrap_request)(void *ctx, const u8 *peer_nmi, u16 pbm);
+	void (*bootstrap_request)(void *ctx, const u8 *peer_nmi, u16 pbm,
+				  int handle, u8 requestor_instance_id);
 
 	/**
 	 * bootstrap_completed - Notify about completed bootstrap
@@ -578,9 +581,12 @@ struct nan_config {
 	 *     spec v4.0, Table 128 (NPBA format).
 	 * @success: Whether bootstrap was successful
 	 * @reason_code: Reason code for failure (0 if success is true)
+	 * @handle: Service handle
+	 * @requestor_instance_id: Requestor instance ID
 	 */
 	void (*bootstrap_completed)(void *ctx, const u8 *peer_nmi, u16 pbm,
-				    bool success, u8 reason_code);
+				    bool success, u8 reason_code,
+				    int handle, u8 requestor_instance_id);
 
 	/**
 	 * transmit_followup - Transmit Follow-up message to the peer

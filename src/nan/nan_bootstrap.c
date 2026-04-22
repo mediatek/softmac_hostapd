@@ -163,7 +163,8 @@ static void nan_bootstrap_timeout(void *eloop_data, void *user_ctx)
 
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
 					      0, false,
-					      NAN_REASON_UNSPECIFIED_REASON);
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      -1, 0);
 		return;
 	}
 
@@ -177,7 +178,9 @@ static void nan_bootstrap_timeout(void *eloop_data, void *user_ctx)
 
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
 					      0, false,
-					      NAN_REASON_UNSPECIFIED_REASON);
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      peer->bootstrap.handle,
+					      peer->bootstrap.req_instance_id);
 	}
 
 	wpabuf_free(attr);
@@ -309,7 +312,8 @@ static void nan_bootstrap_handle_rx_request(struct nan_data *nan,
 
 	if (nan->cfg->bootstrap_request)
 		nan->cfg->bootstrap_request(nan->cfg->cb_ctx, peer->nmi_addr,
-					    peer->bootstrap.requested_pbm);
+					    peer->bootstrap.requested_pbm,
+					    handle, req_instance_id);
 
 send_response:
 	attr = nan_bootstrap_build_npba(nan, peer);
@@ -326,7 +330,8 @@ send_response:
 
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
 					      0, false,
-					      NAN_REASON_UNSPECIFIED_REASON);
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      handle, req_instance_id);
 		goto done;
 	}
 
@@ -356,7 +361,9 @@ send_response:
 				      peer->bootstrap.requested_pbm,
 				      peer->bootstrap.status ==
 				      NAN_PBA_STATUS_ACCEPTED,
-				      peer->bootstrap.reason_code);
+				      peer->bootstrap.reason_code,
+				      peer->bootstrap.handle,
+				      peer->bootstrap.req_instance_id);
 done:
 	wpabuf_free(attr);
 	nan_bootstrap_reset(nan, peer);
@@ -532,13 +539,17 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx,
 					      peer->nmi_addr,
 					      peer->bootstrap.requested_pbm,
-					      true, 0);
+					      true, 0,
+					      peer->bootstrap.handle,
+					      peer->bootstrap.req_instance_id);
 		nan_bootstrap_reset(nan, peer);
 	} else if (status == NAN_PBA_STATUS_REJECTED) {
 		wpa_printf(MSG_DEBUG, "NAN: Bootstrap: Rejected. Complete");
 
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
-					      0, false, reason_code);
+					      0, false, reason_code,
+					      peer->bootstrap.handle,
+					      peer->bootstrap.req_instance_id);
 		nan_bootstrap_reset(nan, peer);
 	} else if (status == NAN_PBA_STATUS_COMEBACK) {
 		wpa_printf(MSG_DEBUG,
@@ -557,7 +568,9 @@ bool nan_bootstrap_handle_rx(struct nan_data *nan, const u8 *peer_nmi,
 
 		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
 					      0, false,
-					      NAN_REASON_UNSPECIFIED_REASON);
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      peer->bootstrap.handle,
+					      peer->bootstrap.req_instance_id);
 		nan_bootstrap_reset(nan, peer);
 	}
 

@@ -222,11 +222,14 @@ void wpas_notify_pr_ranging_params(struct wpa_supplicant *wpa_s,
 				   u8 role, u8 protocol, int freq, int channel,
 				   int bw, int format_bw);
 void wpas_notify_nan_bootstrap_request(struct wpa_supplicant *wpa_s,
-				       const u8 *peer_addr, u16 pbm);
+				       const u8 *peer_addr, u16 pbm,
+				       int handle, u8 requestor_instance_id);
 void wpas_notify_nan_bootstrap_success(struct wpa_supplicant *wpa_s,
-				       const u8 *peer_addr, u16 pbm);
+				       const u8 *peer_addr, u16 pbm,
+				       int handle, u8 requestor_instance_id);
 void wpas_notify_nan_bootstrap_failure(struct wpa_supplicant *wpa_s,
 				       const u8 *peer_addr, u16 pbm,
-				       u8 reason);
+				       u8 reason, int handle,
+				       u8 requestor_instance_id);
 
 #endif /* NOTIFY_H */
