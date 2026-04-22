@@ -90,6 +90,32 @@ void nan_pairing_deinit_peer(struct nan_peer *peer)
 }
 
 
+int nan_pairing_abort(struct nan_data *nan_data, const u8 *peer_addr)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan_data, peer_addr);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing abort: Peer " MACSTR " not found",
+			   MAC2STR(peer_addr));
+		return -1;
+	}
+
+	if (!peer->pairing.pasn) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing abort: No PASN in progress with peer "
+			   MACSTR, MAC2STR(peer_addr));
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: Aborting pairing with peer " MACSTR,
+		   MAC2STR(peer_addr));
+	nan_pairing_deinit_peer(peer);
+	return 0;
+}
+
+
 static bool nan_pairing_is_supported(struct nan_data *nan_data,
 				     struct nan_peer *peer, u8 auth_mode)
 {

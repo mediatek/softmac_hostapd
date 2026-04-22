@@ -2999,6 +2999,33 @@ int wpas_nan_pasn_auth_tx_status(struct wpa_supplicant *wpa_s, const u8 *data,
 }
 
 
+int wpas_nan_pairing_abort(struct wpa_supplicant *wpa_s, const char *cmd)
+{
+	u8 addr[ETH_ALEN];
+	struct nan_data *nan = wpa_s->nan;
+
+	if (!nan) {
+		wpa_printf(MSG_INFO, "NAN_PAIR_ABORT: NAN not initialized");
+		return -1;
+	}
+
+	if (hwaddr_aton(cmd, addr)) {
+		wpa_printf(MSG_INFO,
+			   "NAN_PAIR_ABORT: Invalid peer address: '%s'", cmd);
+		return -1;
+	}
+
+	if (nan_pairing_abort(nan, addr) < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN_PAIR_ABORT: Abort failed for peer " MACSTR,
+			   MAC2STR(addr));
+		return -1;
+	}
+
+	return 0;
+}
+
+
 int wpas_nan_pasn_auth_rx(struct wpa_supplicant *wpa_s,
 			  const struct ieee80211_mgmt *mgmt, size_t len)
 {
