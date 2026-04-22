@@ -2732,8 +2732,10 @@ static int nl80211_register_action_frame(struct i802_bss *bss,
 #define NAN_SDF_ACTION ((const u8 *) "\x04\x09\x50\x6f\x9a\x13")
 #define NAN_PROTECTED_SDF_ACTION ((const u8 *) "\x09\x09\x50\x6f\x9a\x13")
 #define NAN_NAF_ACTION ((const u8 *) "\x04\x09\x50\x6f\x9a\x18")
+#define NAN_PROTECTED_NAF_ACTION ((const u8 *) "\x09\x09\x50\x6f\x9a\x18")
 
-static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
+static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss,
+				      enum nl80211_iftype nlmode)
 {
 #ifdef CONFIG_NAN
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -2749,11 +2751,12 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 		return -1;
 
 	wpa_printf(MSG_DEBUG,
-		   "nl80211: Subscribe to mgmt frames for NAN with handle %p",
-		   bss->nl_mgmt);
+		   "nl80211: Subscribe to mgmt frames for NAN with handle %p: nlmode=%u",
+		   bss->nl_mgmt, nlmode);
 
 	/* NAN SDF Public Action */
-	if (nl80211_register_action_frame2(bss, NAN_SDF_ACTION, 6, true) < 0) {
+	if (nlmode == NL80211_IFTYPE_NAN &&
+	    nl80211_register_action_frame2(bss, NAN_SDF_ACTION, 6, true) < 0) {
 		/* fallback to non-multicast */
 		if (nl80211_register_action_frame2(bss, NAN_SDF_ACTION, 6,
 						   false) < 0) {
@@ -2773,7 +2776,8 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 
 #ifdef CONFIG_PASN
 	/* NAN Protected SDF Public Action */
-	if (nl80211_register_action_frame2(bss, NAN_PROTECTED_SDF_ACTION, 6,
+	if (nlmode == NL80211_IFTYPE_NAN &&
+	    nl80211_register_action_frame2(bss, NAN_PROTECTED_SDF_ACTION, 6,
 					   true)) {
 		wpa_printf(MSG_INFO,
 			   "nl80211: Failed to subscribe to NAN protected SDFs");
@@ -2782,7 +2786,8 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 	}
 
 	/* Register for PASN Authentication frames */
-	if (nl80211_register_frame(bss, bss->nl_mgmt,
+	if (nlmode == NL80211_IFTYPE_NAN &&
+	    nl80211_register_frame(bss, bss->nl_mgmt,
 				   (WLAN_FC_TYPE_MGMT << 2) |
 				   (WLAN_FC_STYPE_AUTH << 4),
 				   (u8 *) "\x07\x00", 2, false)) {
@@ -2792,6 +2797,15 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 		return -1;
 	}
 #endif /* CONFIG_PASN */
+
+	/* NAF in Protected Dual of Public Action frame */
+	if (nl80211_register_action_frame2(bss, NAN_PROTECTED_NAF_ACTION, 6,
+					   true)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to subscribe to protected NAFs");
+		nl_destroy_handles(&bss->nl_mgmt);
+		return -1;
+	}
 
 	nl80211_mgmt_handle_register_eloop(bss);
 
@@ -8190,8 +8204,9 @@ done:
 	    nl80211_mgmt_subscribe_mesh(bss))
 		return -1;
 
-	if (nlmode == NL80211_IFTYPE_NAN)
-		return nl80211_mgmt_subscribe_nan(bss);
+	if (nlmode == NL80211_IFTYPE_NAN ||
+	    nlmode == NL80211_IFTYPE_NAN_DATA)
+		return nl80211_mgmt_subscribe_nan(bss, nlmode);
 
 	if (!bss->in_deinit && !is_ap_interface(nlmode) &&
 	    !is_mesh_interface(nlmode) &&
@@ -9864,7 +9879,8 @@ static int wpa_driver_nl80211_send_action(struct i802_bss *bss,
 		offchanok = 0;
 
 	if (!freq && (is_sta_interface(drv->nlmode) ||
-		      drv->nlmode == NL80211_IFTYPE_NAN))
+		      drv->nlmode == NL80211_IFTYPE_NAN ||
+		      drv->nlmode == NL80211_IFTYPE_NAN_DATA))
 		offchanok = 0;
 
 	wpa_printf(MSG_DEBUG,
