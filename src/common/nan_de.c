@@ -11,9 +11,11 @@
 #include "utils/common.h"
 #include "utils/eloop.h"
 #include "utils/crc32.h"
+#include "utils/list.h"
 #include "crypto/crypto.h"
 #include "crypto/sha256.h"
 #include "ieee802_11_defs.h"
+#include "nan/nan.h"
 #include "nan_defs.h"
 #include "nan_de.h"
 
@@ -91,6 +93,9 @@ struct nan_de_service {
 
 	/* Bitmap of NAN_CS_INFO_CAPA_* */
 	u8 security_capab;
+
+	/* PMKID list for this service */
+	struct dl_list pmkid_list;
 };
 
 #define NAN_DE_N_MIN 5
@@ -174,6 +179,9 @@ static void nan_de_service_free(struct nan_de_service *srv)
 	wpabuf_free(srv->srf);
 	os_free(srv->freq_list);
 	os_free(srv->cipher_suites_list);
+#ifdef CONFIG_NAN
+	nan_crypto_clear_pmkid_list(&srv->pmkid_list);
+#endif /* CONFIG_NAN */
 	os_free(srv);
 }
 
@@ -356,6 +364,15 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			cs_num * sizeof(struct nan_cipher_suite);
 	}
 
+	/* Security Context Information Attribute */
+	if (srv->type == NAN_DE_PUBLISH && !dl_list_empty(&srv->pmkid_list)) {
+		unsigned int list_len = dl_list_len(&srv->pmkid_list);
+
+		/* Each entry: sizeof(nan_sec_ctxt) + PMKID_LEN */
+		len += NAN_ATTR_HDR_LEN +
+			list_len * (sizeof(struct nan_sec_ctxt) + PMKID_LEN);
+	}
+
 	buf = nan_de_alloc_sdf(len);
 	if (!buf)
 		return;
@@ -445,6 +462,24 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			wpabuf_put_u8(buf, (u8) srv->cipher_suites_list[i]);
 			wpabuf_put_u8(buf, srv->id);
 		}
+	}
+
+	if (srv->type == NAN_DE_PUBLISH && !dl_list_empty(&srv->pmkid_list)) {
+		struct nan_de_pmkid *pmkid;
+		u8 *len_ptr;
+
+		wpabuf_put_u8(buf, NAN_ATTR_SCIA);
+		len_ptr = wpabuf_put(buf, 2); /* length filled later */
+
+		dl_list_for_each(pmkid, &srv->pmkid_list, struct nan_de_pmkid,
+				 list) {
+			wpabuf_put_le16(buf, PMKID_LEN);
+			wpabuf_put_u8(buf, NAN_SEC_CTX_TYPE_ND_PMKID);
+			wpabuf_put_u8(buf, srv->id);
+			wpabuf_put_data(buf, pmkid->pmkid, PMKID_LEN);
+		}
+
+		WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
 	}
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
@@ -1845,6 +1880,13 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 			goto fail;
 	}
 
+	dl_list_init(&srv->pmkid_list);
+#ifdef CONFIG_NAN
+	if (nan_crypto_pmkid_list(&srv->pmkid_list, de->nmi, srv->service_id,
+				  srv->cipher_suites_list, params->nd_pmk) < 0)
+		goto fail;
+#endif /* CONFIG_NAN */
+
 	/* Prepare for single and multi-channel states; starting with
 	 * single channel */
 	srv->first_multi_chan = true;
@@ -2123,6 +2165,8 @@ int nan_de_subscribe(struct nan_de *de, const char *service_name,
 		wpa_printf(MSG_DEBUG, "NAN: Using source address " MACSTR
 			   " for subscribe service", MAC2STR(srv->forced_addr));
 	}
+
+	dl_list_init(&srv->pmkid_list);
 
 	wpa_printf(MSG_DEBUG, "NAN: Assigned new subscribe handle %d for %s",
 		   subscribe_id, service_name ? service_name : "Ranging");

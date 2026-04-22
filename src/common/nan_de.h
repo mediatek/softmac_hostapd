@@ -148,6 +148,9 @@ struct nan_publish_params {
 
 	/* Bitmap of NAN_CS_INFO_CAPA_* */
 	u8 security_capab;
+
+	/* ND-PMK to use for creating a list of PMKIDs for the service */
+	const u8 *nd_pmk;
 };
 
 /* Returns -1 on failure or >0 publish_id */
