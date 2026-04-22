@@ -2730,6 +2730,7 @@ static int nl80211_register_action_frame(struct i802_bss *bss,
 
 
 #define NAN_SDF_ACTION ((const u8 *) "\x04\x09\x50\x6f\x9a\x13")
+#define NAN_PROTECTED_SDF_ACTION ((const u8 *) "\x09\x09\x50\x6f\x9a\x13")
 #define NAN_NAF_ACTION ((const u8 *) "\x04\x09\x50\x6f\x9a\x18")
 
 static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
@@ -2771,6 +2772,15 @@ static int nl80211_mgmt_subscribe_nan(struct i802_bss *bss)
 	}
 
 #ifdef CONFIG_PASN
+	/* NAN Protected SDF Public Action */
+	if (nl80211_register_action_frame2(bss, NAN_PROTECTED_SDF_ACTION, 6,
+					   true)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: Failed to subscribe to NAN protected SDFs");
+		nl_destroy_handles(&bss->nl_mgmt);
+		return -1;
+	}
+
 	/* Register for PASN Authentication frames */
 	if (nl80211_register_frame(bss, bss->nl_mgmt,
 				   (WLAN_FC_TYPE_MGMT << 2) |
