@@ -3921,8 +3921,7 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 		pasn_enable_kdk_derivation(pasn);
 #endif /* CONFIG_TESTING_OPTIONS */
 	pasn->use_anti_clogging = use_anti_clogging(hapd);
-	pasn_set_password(pasn, sae_get_password(hapd, sta, NULL, 0, NULL,
-						 &pasn->pt, NULL));
+	sae_get_password(hapd, sta, NULL, 0, NULL, &pasn->pt, NULL);
 #ifdef CONFIG_SAE
 	/* Register a callback so the PASN responder can look up the correct
 	 * SAE PT when the STA's commit frame contains a password identifier

@@ -64,7 +64,6 @@ struct pasn_data {
 #endif /* CONFIG_SAE */
 
 	/* Responder */
-	const char *password;
 	int wpa_key_mgmt;
 	int rsn_pairwise;
 	u64 rsnxe_capab;
@@ -327,7 +326,6 @@ void pasn_initiator_pmksa_cache_flush(struct rsn_pmksa_cache *pmksa);
 
 /* Responder */
 void pasn_set_noauth(struct pasn_data *pasn, bool noauth);
-void pasn_set_password(struct pasn_data *pasn, const char *password);
 void pasn_set_wpa_key_mgmt(struct pasn_data *pasn, int key_mgmt);
 void pasn_set_rsn_pairwise(struct pasn_data *pasn, int rsn_pairwise);
 void pasn_set_rsne(struct pasn_data *pasn, const u8 *rsne);

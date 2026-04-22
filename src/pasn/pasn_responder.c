@@ -187,11 +187,9 @@ static int pasn_wd_handle_sae_commit(struct pasn_data *pasn,
 		os_free(pasn->dec_pw_id);
 		pasn->dec_pw_id = dec_pw_id;
 		pasn->dec_pw_id_len = dec_pw_id_len;
-		if (pw)
-			pasn_set_password(pasn, pw);
 	}
 
-	if (!pasn->password || (!pt && !pasn->pt)) {
+	if (!pt && !pasn->pt) {
 		wpa_printf(MSG_DEBUG, "PASN: No SAE PT found");
 		return -1;
 	}
