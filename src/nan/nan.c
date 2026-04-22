@@ -2094,6 +2094,33 @@ int nan_peer_get_tk(struct nan_data *nan, const u8 *addr,
 }
 
 
+const struct nan_pairing_cfg * nan_peer_get_pairing_cfg(struct nan_data *nan,
+							const u8 *addr,
+							const u8 **nonce,
+							const u8 **tag)
+{
+	struct nan_peer *peer;
+
+	if (!nan || !addr || !nonce || !tag)
+		return NULL;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer)
+		return NULL;
+
+	/* Return nonce and tag pointers if valid, NULL otherwise */
+	if (peer->pairing.nonce_tag_valid) {
+		*nonce = peer->pairing.nonce;
+		*tag = peer->pairing.tag;
+	} else {
+		*nonce = NULL;
+		*tag = NULL;
+	}
+
+	return &peer->pairing.pairing_cfg;
+}
+
+
 static bool
 nan_peer_channel_in_local_sched(const struct nan_data *nan,
 				int peer_ctrl_freq,

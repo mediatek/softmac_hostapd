@@ -945,29 +945,21 @@ fail:
 }
 
 
-static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
-						      const u8 *peer_nmi,
-						      const u8 *nonce,
-						      const u8 *tag, int *akmp)
+static const struct wpa_dev_ik *
+wpas_nan_find_ik_by_nonce_tag(struct wpa_supplicant *wpa_s, const u8 *peer_nmi,
+			      const u8 *nonce, const u8 *tag)
 {
-	struct wpa_supplicant *wpa_s = ctx;
 	struct wpa_dev_ik *ik;
 	struct wpabuf *derived_tag;
-
-	if (!akmp) {
-		wpa_printf(MSG_DEBUG, "NAN: Invalid akmp pointer");
-		return NULL;
-	}
 
 	if (!nonce || !tag) {
 		wpa_printf(MSG_DEBUG, "NAN: Invalid nonce or tag");
 		return NULL;
 	}
 
-	wpa_hexdump(MSG_DEBUG, "NAN: Looking up NPK and AKMP for nonce",
-		    nonce, NAN_NIRA_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "NAN: Looking up NPK and AKMP for tag",
-		    tag, NAN_NIRA_TAG_LEN);
+	wpa_printf(MSG_DEBUG, "NAN: Looking up device identity");
+	wpa_hexdump(MSG_DEBUG, "NAN: NIRA nonce", nonce, NAN_NIRA_NONCE_LEN);
+	wpa_hexdump(MSG_DEBUG, "NAN: NIRA tag", tag, NAN_NIRA_TAG_LEN);
 
 	/* Iterate over all saved NIKs (stored as device identities) */
 	for (ik = wpa_s->conf->identity; ik; ik = ik->next) {
@@ -1003,7 +995,28 @@ static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
 			   "NAN: NIRA validation succeeded with NIK id=%d",
 			   ik->id);
 		wpabuf_free(derived_tag);
+		return ik;
+	}
 
+	return NULL;
+}
+
+
+static const struct wpabuf * wpas_nan_get_npk_akmp_cb(void *ctx,
+						      const u8 *peer_nmi,
+						      const u8 *nonce,
+						      const u8 *tag, int *akmp)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	const struct wpa_dev_ik *ik;
+
+	if (!akmp) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid akmp pointer");
+		return NULL;
+	}
+
+	ik = wpas_nan_find_ik_by_nonce_tag(wpa_s, peer_nmi, nonce, tag);
+	if (ik) {
 		*akmp = ik->akmp;
 		wpa_printf(MSG_DEBUG, "NAN: Found NPK for NIK id=%d, akmp=%d",
 			   ik->id, *akmp);
@@ -2577,7 +2590,33 @@ int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
 }
 
 
-/* Format: NAN_PEER_INFO <addr> <schedule|potential|capa> [map_id] */
+static int wpas_nan_append_ik_info(char *reply, size_t reply_size,
+				   const struct wpa_dev_ik *ik)
+{
+	char *pos = reply;
+	char *end = reply + reply_size;
+
+	pos += wpa_scnprintf(pos, end - pos, "nik_cipher=%d\n", ik->dik_cipher);
+	pos += wpa_scnprintf(pos, end - pos, "nik=");
+	pos += wpa_snprintf_hex(pos, end - pos, wpabuf_head(ik->dik),
+				wpabuf_len(ik->dik));
+	pos += wpa_scnprintf(pos, end - pos, "\n");
+
+	if (ik->pmk) {
+		pos += wpa_scnprintf(pos, end - pos, "akmp=%s\n",
+				     wpa_key_mgmt_txt(ik->akmp, WPA_PROTO_RSN));
+		pos += wpa_scnprintf(pos, end - pos, "npk=");
+		pos += wpa_snprintf_hex(pos, end - pos, wpabuf_head(ik->pmk),
+					wpabuf_len(ik->pmk));
+		pos += wpa_scnprintf(pos, end - pos, "\n");
+	}
+
+	return pos - reply;
+}
+
+
+/* Format: NAN_PEER_INFO <addr>
+ * <schedule|potential|capa|bootstrap|pairing> [map_id] */
 int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		       char *reply, size_t reply_size)
 {
@@ -2672,6 +2711,39 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		ret = wpa_scnprintf(reply, reply_size,
 				    "supported_methods=0x%04x\n",
 				    supported_methods);
+	} else if (os_strncmp(pos + 1, "pairing", 7) == 0) {
+		const struct nan_pairing_cfg *pairing_cfg;
+		const struct wpa_dev_ik *ik = NULL;
+		const u8 *nonce = NULL;
+		const u8 *tag = NULL;
+
+		pairing_cfg = nan_peer_get_pairing_cfg(wpa_s->nan, addr,
+						       &nonce, &tag);
+		if (!pairing_cfg) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to get pairing config for peer "
+				   MACSTR, MAC2STR(addr));
+			return -1;
+		}
+
+		ret = wpa_scnprintf(reply, reply_size,
+				    "pairing_setup=%d\n"
+				    "npk_caching=%d\n"
+				    "pairing_verification=%d\n"
+				    "cipher_suites=0x%08x\n",
+				    pairing_cfg->pairing_setup,
+				    pairing_cfg->npk_caching,
+				    pairing_cfg->pairing_verification,
+				    pairing_cfg->cipher_suites);
+
+		/* Try to find matching NIK if nonce and tag are available */
+		if (nonce && tag)
+			ik = wpas_nan_find_ik_by_nonce_tag(wpa_s, addr, nonce,
+							   tag);
+
+		if (ik)
+			ret += wpas_nan_append_ik_info(reply + ret,
+						       reply_size - ret, ik);
 	} else {
 		wpa_printf(MSG_INFO, "NAN: Unknown info type: %s", pos + 1);
 		ret = -1;

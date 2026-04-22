@@ -718,6 +718,10 @@ int nan_peer_get_pot_avail(struct nan_data *nan, const u8 *addr,
 			   struct nan_peer_potential_avail *pot_avail);
 int nan_peer_dump_pot_avail_to_buf(struct nan_peer_potential_avail *pot_avail,
 				   char *buf, size_t buflen);
+const struct nan_pairing_cfg * nan_peer_get_pairing_cfg(struct nan_data *nan,
+							const u8 *addr,
+							const u8 **nonce,
+							const u8 **tag);
 int nan_convert_sched_to_avail_attrs(struct nan_data *nan, u8 sequence_id,
 				     u32 map_ids_bitmap,
 				     size_t n_chans,
