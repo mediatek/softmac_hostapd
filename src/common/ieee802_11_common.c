@@ -1646,7 +1646,11 @@ ieee80211_freq_to_channel_ext(unsigned int freq, int sec_channel,
 		if ((freq - 5000) % 5)
 			return NUM_HOSTAPD_MODES;
 		*channel = (freq - 5000) / 5;
-		*op_class = 0; /* TODO */
+		if (vht_opclass)
+			*op_class = vht_opclass;
+		else
+			*op_class = 0;
+
 		return HOSTAPD_MODE_IEEE80211A;
 	}
 
