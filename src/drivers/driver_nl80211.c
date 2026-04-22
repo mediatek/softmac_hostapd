@@ -3985,7 +3985,11 @@ static int wpa_driver_nl80211_set_key(struct i802_bss *bss,
 		goto fail2;
 	} else if (alg == WPA_ALG_NONE) {
 		wpa_printf(MSG_DEBUG, "nl80211: DEL_KEY");
-		msg = nl80211_ifindex_msg(drv, ifindex, 0, NL80211_CMD_DEL_KEY);
+		if (!nl80211_is_netdev_iftype(drv->nlmode))
+			msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_DEL_KEY);
+		else
+			msg = nl80211_ifindex_msg(drv, ifindex, 0,
+						  NL80211_CMD_DEL_KEY);
 		if (!msg)
 			goto fail2;
 	} else {
@@ -3997,7 +4001,12 @@ static int wpa_driver_nl80211_set_key(struct i802_bss *bss,
 			goto fail2;
 		}
 		wpa_printf(MSG_DEBUG, "nl80211: NEW_KEY");
-		msg = nl80211_ifindex_msg(drv, ifindex, 0, NL80211_CMD_NEW_KEY);
+		if (!nl80211_is_netdev_iftype(drv->nlmode))
+			msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_NEW_KEY);
+		else
+			msg = nl80211_ifindex_msg(drv, ifindex, 0,
+						  NL80211_CMD_NEW_KEY);
+
 		if (!msg)
 			goto fail2;
 		if (nla_put(key_msg, NL80211_KEY_DATA, key_len, key) ||
@@ -4094,7 +4103,10 @@ static int wpa_driver_nl80211_set_key(struct i802_bss *bss,
 	if (!key_msg)
 		return ret;
 
-	msg = nl80211_ifindex_msg(drv, ifindex, 0, NL80211_CMD_SET_KEY);
+	if (!nl80211_is_netdev_iftype(drv->nlmode))
+		msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_SET_KEY);
+	else
+		msg = nl80211_ifindex_msg(drv, ifindex, 0, NL80211_CMD_SET_KEY);
 	if (!msg)
 		goto fail2;
 	if (!key_msg ||
@@ -8348,8 +8360,12 @@ static int i802_get_seqnum(const char *iface, void *priv, const u8 *addr,
 	struct nl_msg *msg;
 	int res;
 
-	msg = nl80211_ifindex_msg(drv, if_nametoindex(iface), 0,
-				  NL80211_CMD_GET_KEY);
+	if (!nl80211_is_netdev_iftype(drv->nlmode))
+		msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_GET_KEY);
+	else
+		msg = nl80211_ifindex_msg(drv, if_nametoindex(iface), 0,
+					  NL80211_CMD_GET_KEY);
+
 	if (!msg ||
 	    (addr && nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr)) ||
 	    (link_id != NL80211_DRV_LINK_ID_NA &&
