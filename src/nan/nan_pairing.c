@@ -1297,3 +1297,57 @@ fail:
 	wpabuf_free(key_data);
 	return ret;
 }
+
+
+int nan_pairing_set_pairing_setup(struct nan_data *nan, bool value)
+{
+	wpa_printf(MSG_DEBUG, "NAN: SET: Pairing setup: %d -> %d",
+		   nan->cfg->pairing_cfg.pairing_setup, value);
+	nan->cfg->pairing_cfg.pairing_setup = value;
+	return 0;
+}
+
+
+int nan_pairing_set_npk_caching(struct nan_data *nan, bool value)
+{
+	wpa_printf(MSG_DEBUG, "NAN: SET: NPK caching: %d -> %d",
+		   nan->cfg->pairing_cfg.npk_caching, value);
+	nan->cfg->pairing_cfg.npk_caching = value;
+	return 0;
+}
+
+
+int nan_pairing_set_pairing_verification(struct nan_data *nan, bool value)
+{
+	wpa_printf(MSG_DEBUG, "NAN: SET: Pairing verification: %d -> %d",
+		   nan->cfg->pairing_cfg.pairing_verification, value);
+
+	if (!nan->cfg->pairing_cfg.pairing_verification && value &&
+	    nan_nira_get_tag_nonce(nan->cfg, nan->nira_nonce,
+				   nan->nira_tag) < 0) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to enable pairing verification");
+		return -1;
+	}
+
+	nan->cfg->pairing_cfg.pairing_verification = value;
+
+	return 0;
+}
+
+
+int nan_pairing_set_cipher_suites(struct nan_data *nan, u32 value)
+{
+	if (value & ~(NAN_PAIRING_PASN_128 | NAN_PAIRING_PASN_256)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Invalid cipher suites 0x%08x", value);
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: SET: Pairing cipher suites: 0x%08x -> 0x%08x",
+		   nan->cfg->pairing_cfg.cipher_suites, value);
+
+	nan->cfg->pairing_cfg.cipher_suites = value;
+	return 0;
+}
