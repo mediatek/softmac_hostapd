@@ -3276,6 +3276,19 @@ pmk_r1_derived:
 	os_memcpy(sm->pmk_r1_name, pmk_r1_name, WPA_PMK_NAME_LEN);
 	os_memcpy(sm->pmk_r1, pmk_r1, pmk_r1_len);
 	sm->pmk_r1_len = pmk_r1_len;
+
+	/*
+	 * Make sure the pairwise suite indicate by the STA matches the one that
+	 * was used during initial mobility domain association.
+	 */
+	if (!(parse.pairwise_cipher & pairwise)) {
+		wpa_printf(MSG_ERROR,
+			   "FT: Pairwise cipher from PMK-R1 cache (0x%x) not used in the RSNE (0x%x) - reject",
+			   pairwise, parse.pairwise_cipher);
+		retval = WLAN_STATUS_PAIRWISE_CIPHER_NOT_VALID;
+		goto out;
+	}
+
 	if (sm->pmk_r1_len == SHA512_MAC_LEN)
 		sm->hash_alg = RSN_HASH_SHA512;
 	else if (sm->pmk_r1_len == SHA384_MAC_LEN)
