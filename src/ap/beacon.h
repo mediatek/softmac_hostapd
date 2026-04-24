@@ -12,35 +12,7 @@
 
 struct ieee80211_mgmt;
 
-enum bss_crit_update_event {
-	BSS_CRIT_UPDATE_EVENT_CSA,
-	BSS_CRIT_UPDATE_EVENT_ECSA,
-	BSS_CRIT_UPDATE_EVENT_EDCA,
-	BSS_CRIT_UPDATE_EVENT_QUIET,
-	BSS_CRIT_UPDATE_EVENT_DSSS,
-	BSS_CRIT_UPDATE_EVENT_HT_OPERATION,
-	BSS_CRIT_UPDATE_EVENT_WBCS,
-	BSS_CRIT_UPDATE_EVENT_CS_WRAP,
-	BSS_CRIT_UPDATE_EVENT_OP_MODE_NOTIF,
-	BSS_CRIT_UPDATE_EVENT_QUIET_CH,
-	BSS_CRIT_UPDATE_EVENT_VHT_OPERATION,
-	BSS_CRIT_UPDATE_EVENT_HE_OPERATION,
-	BSS_CRIT_UPDATE_EVENT_BCAST_TWT,
-	BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET,
-	BSS_CRIT_UPDATE_EVENT_CCA,
-	BSS_CRIT_UPDATE_EVENT_MU_EDCA,
-	BSS_CRIT_UPDATE_EVENT_SR,
-	BSS_CRIT_UPDATE_EVENT_UORA,
-	BSS_CRIT_UPDATE_EVENT_IDX_ADJUST_FACTOR,
-	BSS_CRIT_UPDATE_EVENT_EHT_OPERATION,
-	BSS_CRIT_UPDATE_EVENT_TPE,
-	BSS_CRIT_UPDATE_EVENT_CH_CHANGED,
-	BSS_CRIT_UPDATE_EVENT_RECONFIG,
-	BSS_CRIT_UPDATE_EVENT_ADD_LINK,
-	BSS_CRIT_UPDATE_EVENT_ATTLM
-};
-
-enum {
+enum bss_crit_update_type {
 	BSS_CRIT_UPDATE_NONE,
 	BSS_CRIT_UPDATE_SINGLE,
 	BSS_CRIT_UPDATE_ALL,
@@ -56,9 +28,13 @@ int ieee802_11_set_beacon_for_colocat(struct hostapd_data *hapd);
 int ieee802_11_set_beacon(struct hostapd_data *hapd);
 int ieee802_11_set_beacons(struct hostapd_iface *iface);
 #ifdef CONFIG_IEEE80211BE
-int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
-				       enum bss_crit_update_event event);
+void ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
+					enum bss_crit_update_type type,
+					bool per_bss_only);
+void ieee802_11_update_bpcc(struct hostapd_data *hapd, bool success);
 #endif /* CONFIG_IEEE80211BE */
+int ieee802_11_set_critical_update_beacon(struct hostapd_data *hapd,
+					  enum bss_crit_update_type type);
 int ieee802_11_update_beacons(struct hostapd_iface *iface);
 int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 			       struct wpa_driver_ap_params *params);

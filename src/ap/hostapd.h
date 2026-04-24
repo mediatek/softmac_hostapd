@@ -542,6 +542,7 @@ struct hostapd_data {
 #ifdef CONFIG_IEEE80211BE
 	u8 eht_mld_bss_param_change;
 	u8 eht_mld_bss_critical_update;
+	bool eht_mld_bss_param_changed;
 	struct hostapd_mld *mld;
 	struct dl_list link;
 	u8 mld_link_id;

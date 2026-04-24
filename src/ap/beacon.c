@@ -2358,7 +2358,7 @@ static void hostapd_fill_bcn_sta_profile(struct hostapd_data *hapd,
 		link->valid = true;
 		os_memcpy(link->local_addr, h->own_addr, ETH_ALEN);
 
-		/* Build per-STA profile */
+		/* Build partial per-STA profile */
 		epos = buf;
 		/* Capabilities */
 		WPA_PUT_LE16(epos, hostapd_own_capab_info(h));
@@ -2387,12 +2387,6 @@ static void hostapd_fill_bcn_sta_profile(struct hostapd_data *hapd,
 
 		link->resp_sta_profile_len = epos - buf;
 		link->resp_sta_profile = os_memdup(buf, link->resp_sta_profile_len);
-
-		/* TODO:
-		 * 1. add other IEs
-		 * 2. handle per-STA profile inheritance
-		 * 3. handle csa offset if fragmentation is required
-		 */
 	}
 }
 #endif /* CONFIG_IEEE80211BE */
@@ -3009,7 +3003,7 @@ static int __ieee802_11_set_beacon(struct hostapd_data *hapd)
 #ifdef CONFIG_TESTING_OPTIONS
 	if (hapd->conf->mld_ap && hapd->mld &&
 	    (hapd->mld->link_reconf_in_progress & BIT(hapd->mld_link_id)))
-		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_ADD_LINK);
+		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_FLAG, true);
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
 
@@ -3739,74 +3733,100 @@ int ieee802_11_update_beacons(struct hostapd_iface *iface)
 
 
 #ifdef CONFIG_IEEE80211BE
-int ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
-				       enum bss_crit_update_event event)
+void ieee802_11_set_bss_critical_update(struct hostapd_data *hapd,
+					enum bss_crit_update_type type,
+					bool per_bss_only)
 {
 	struct hostapd_data *h;
-	bool update_txbss_beacon = false;
 
 	if (!hapd->conf->mld_ap)
-		return 0;
+		return;
 
-	switch (event) {
-	case BSS_CRIT_UPDATE_EVENT_CSA:
-	case BSS_CRIT_UPDATE_EVENT_ECSA:
-	case BSS_CRIT_UPDATE_EVENT_QUIET:
-	case BSS_CRIT_UPDATE_EVENT_WBCS:
-	case BSS_CRIT_UPDATE_EVENT_CS_WRAP:
-	case BSS_CRIT_UPDATE_EVENT_OP_MODE_NOTIF:
-	case BSS_CRIT_UPDATE_EVENT_QUIET_CH:
-	case BSS_CRIT_UPDATE_EVENT_CCA:
-	case BSS_CRIT_UPDATE_EVENT_BCAST_TWT:
-	case BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET:
-	case BSS_CRIT_UPDATE_EVENT_IDX_ADJUST_FACTOR:
-	case BSS_CRIT_UPDATE_EVENT_TPE:
-		hapd->eht_mld_bss_param_change += 1;
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_ALL;
-		break;
-	case BSS_CRIT_UPDATE_EVENT_EDCA:
-	case BSS_CRIT_UPDATE_EVENT_DSSS:
-	case BSS_CRIT_UPDATE_EVENT_HT_OPERATION:
-	case BSS_CRIT_UPDATE_EVENT_VHT_OPERATION:
-	case BSS_CRIT_UPDATE_EVENT_HE_OPERATION:
-	case BSS_CRIT_UPDATE_EVENT_MU_EDCA:
-	case BSS_CRIT_UPDATE_EVENT_SR:
-	case BSS_CRIT_UPDATE_EVENT_UORA:
-	case BSS_CRIT_UPDATE_EVENT_EHT_OPERATION:
-		hapd->eht_mld_bss_param_change += 1;
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_SINGLE;
+	/*
+	 * Update All: CSA, ECSA, MCST, QUIET, QUIET_CH
+	 * Update Single: EDCA, DSSS, HT_OPERATION, VHT_OPERATION, HE_OPERATION,
+	 *		  MU_EDCA, SR, UORA, EHT_OPERATION, WBCS, CS_WRAP, OP_MODE_NOTIF,
+	 *		  CCA, BCAST_TWT, BCAST_TWT_PARAM_SET, IDX_ADJUST_FACTOR, TPE
+	 * Update Flag: RECONFIG, ATTLM, ADD_LINK
+	 */
+	hapd->eht_mld_bss_critical_update = type;
+	if (per_bss_only)
+		return;
 
-		if (hapd != hostapd_mbssid_get_tx_bss(hapd))
-			update_txbss_beacon = true;
-		break;
-	case BSS_CRIT_UPDATE_EVENT_RECONFIG:
-	case BSS_CRIT_UPDATE_EVENT_ATTLM:
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
-		if (hapd != hostapd_mbssid_get_tx_bss(hapd))
-			update_txbss_beacon = true;
-		break;
-	case BSS_CRIT_UPDATE_EVENT_ADD_LINK:
-		/* only set the CU flag for the links in link_reconf_in_progress */
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
-		return 0;
-	default:
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_NONE;
-		return -1;
-	}
-
-	/* only set the CU flag for the non-CU links */
 	for_each_mld_link(h, hapd) {
 		if (h == hapd)
 			continue;
 
-		h->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
+		/* only set the CU flag for the non-CU links */
+		if (type != BSS_CRIT_UPDATE_NONE)
+			h->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
+		else
+			h->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_NONE;
 	}
+}
 
-	if (update_txbss_beacon)
-		ieee802_11_set_beacon(hostapd_mbssid_get_tx_bss(hapd));
 
-	return 0;
+void ieee802_11_update_bpcc(struct hostapd_data *hapd, bool success)
+{
+	if (!hapd->conf->mld_ap)
+		return;
+
+	switch (hapd->eht_mld_bss_critical_update) {
+	case BSS_CRIT_UPDATE_ALL:
+	case BSS_CRIT_UPDATE_SINGLE:
+		if (success) {
+			hapd->eht_mld_bss_param_change++;
+			hapd->eht_mld_bss_param_changed = true;
+		} else {
+			if (!hapd->eht_mld_bss_param_change &&
+			    !hapd->eht_mld_bss_param_changed)
+				return;
+
+			if (!hapd->eht_mld_bss_param_change)
+				hapd->eht_mld_bss_param_change = 254;
+			else
+				hapd->eht_mld_bss_param_change--;
+		}
+
+		hapd->eht_mld_bss_param_change %= 255;
+		break;
+	case BSS_CRIT_UPDATE_FLAG:
+	default:
+		break;
+	}
 }
 #endif /* CONFIG_IEEE80211BE */
+
+int ieee802_11_set_critical_update_beacon(struct hostapd_data *hapd,
+					  enum bss_crit_update_type type)
+{
+#ifdef CONFIG_IEEE80211BE
+	int ret = 0;
+
+	if (!hapd->conf->mld_ap)
+		return ieee802_11_set_beacon(hapd);
+
+	ieee802_11_set_bss_critical_update(hapd, type, false);
+	ieee802_11_update_bpcc(hapd, true);
+	ret = ieee802_11_set_beacon(hapd);
+	if (ret)
+		goto fail;
+
+	if (hapd != hostapd_mbssid_get_tx_bss(hapd))
+		ret = ieee802_11_set_beacon(hostapd_mbssid_get_tx_bss(hapd));
+	if (ret)
+		goto fail;
+
+	return 0;
+
+fail:
+	/* restore critical update flag and bpcc */
+	ieee802_11_update_bpcc(hapd, false);
+	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_NONE, false);
+	return ret;
+#else
+	return ieee802_11_set_beacon(hapd);
+#endif /* CONFIG_IEEE80211BE */
+}
 
 #endif /* CONFIG_NATIVE_WINDOWS */

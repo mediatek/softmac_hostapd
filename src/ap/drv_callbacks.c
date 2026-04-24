@@ -1527,6 +1527,7 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
 	struct hostapd_mld *mld = hapd->mld;
 	struct hostapd_data *p_hapd;
 	bool mld_indicate_disabled = false;
+	enum bss_crit_update_type type;
 
 	if (!hapd->conf->mld_ap || !mld)
 		return;
@@ -1539,8 +1540,7 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
 	 */
 	switch (attlm_event->event) {
 		case EVENT_ATTLM_STARTED:
-			ieee802_11_set_bss_critical_update(hapd,
-						BSS_CRIT_UPDATE_EVENT_ATTLM);
+			type = BSS_CRIT_UPDATE_FLAG;
 			mld->new_attlm.switch_time_tsf_tu =
 						attlm_event->switch_time_tsf_tu;
 
@@ -1557,13 +1557,13 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
 			}
 			break;
 		case EVENT_ATTLM_SWITCH_TIME_EXPIRED:
+			type = BSS_CRIT_UPDATE_NONE;
 			mld_indicate_disabled = true;
 			mld->new_attlm.switch_time_tsf_tu = 0;
 			os_get_reltime(&mld->new_attlm.start_time);
 			break;
 		case EVENT_ATTLM_END:
-			ieee802_11_set_bss_critical_update(hapd,
-						BSS_CRIT_UPDATE_EVENT_ATTLM);
+			type = BSS_CRIT_UPDATE_FLAG;
 			mld->new_attlm.valid = false;
 			break;
 		default:
@@ -1579,44 +1579,46 @@ void hostapd_event_attlm(struct hostapd_data *hapd, struct attlm_event *attlm_ev
 	}
 #endif /* CONFIG_TESTING_OPTIONS */
 
-	ieee802_11_set_beacon(hapd);
+	ieee802_11_set_critical_update_beacon(hapd, type);
 }
 
 
 static void hostapd_event_update_crit_update_flag(struct hostapd_data *hapd, u8 flag)
 {
-	const char *type;
+	enum bss_crit_update_type type;
+	const char *type_str;
 
 	if (!hapd->conf->mld_ap || !hapd->mld)
 		return;
 
 	switch (flag) {
 	case CRIT_UPDATE_NONE:
-		hapd->eht_mld_bss_critical_update = 0;
-		type = "UPDATE_NONE";
+		type = BSS_CRIT_UPDATE_NONE;
+		type_str = "UPDATE_NONE";
 		break;
 	case CRIT_UPDATE_SINGLE:
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_SINGLE;
-		hapd->eht_mld_bss_param_change += 1;
-		type = "UPDATE_SINGLE";
+		type = BSS_CRIT_UPDATE_SINGLE;
+		type_str = "UPDATE_SINGLE";
 		break;
 	case CRIT_UPDATE_ALL:
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_ALL;
-		hapd->eht_mld_bss_param_change += 1;
-		type = "UPDATE_ALL";
+		type = BSS_CRIT_UPDATE_ALL;
+		type_str = "UPDATE_ALL";
 		break;
 	case CRIT_UPDATE_FLAG:
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_FLAG;
-		type = "UPDATE_FLAG";
+		type = BSS_CRIT_UPDATE_FLAG;
+		type_str = "UPDATE_FLAG";
 		break;
 	default:
 		wpa_printf(MSG_DEBUG, "Unknown critical update type");
 		return;
 	}
 
+	ieee802_11_set_bss_critical_update(hapd, type, true);
+	ieee802_11_update_bpcc(hapd, true);
+
 	wpa_printf(MSG_DEBUG,
 		   "MLD: set critical update flag to %s (bpcc=%d) for %s link %d",
-		   type, hapd->eht_mld_bss_param_change, hapd->mld->name,
+		   type_str, hapd->eht_mld_bss_param_change, hapd->mld->name,
 		   hapd->mld_link_id);
 }
 
@@ -2873,11 +2875,7 @@ static int hostapd_event_btwt_add(struct hostapd_data *hapd,
 	}
 	os_memcpy(&entry->btwt, &data->btwt, sizeof(struct broadcast_twt_param));
 
-#ifdef CONFIG_IEEE80211BE
-	ieee802_11_set_bss_critical_update(hapd,
-					   BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET);
-#endif /* CONFIG_IEEE80211BE */
-	ieee802_11_set_beacon(hapd);
+	ieee802_11_set_critical_update_beacon(hapd, BSS_CRIT_UPDATE_SINGLE);
 
 	return 0;
 }

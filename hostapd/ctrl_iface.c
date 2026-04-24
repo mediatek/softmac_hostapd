@@ -6791,9 +6791,7 @@ hostapd_ctrl_iface_wmm(struct hostapd_data *hapd, char *cmd, char *buf,
 	if (acp->cwmin > acp->cwmax)
 		return -1;
 
-	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EDCA);
-
-	if (ieee802_11_set_beacon(hapd))
+	if (ieee802_11_set_critical_update_beacon(hapd, BSS_CRIT_UPDATE_SINGLE))
 		return -1;
 
 	return os_snprintf(buf, buflen, "OK\n");

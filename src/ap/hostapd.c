@@ -538,9 +538,8 @@ int hostapd_link_remove(struct hostapd_data *hapd, u32 count)
 		   hapd->mld_link_id, count);
 
 	hapd->eht_mld_link_removal_count = count;
-	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_RECONFIG);
 
-	ieee802_11_set_beacon(hapd);
+	ieee802_11_set_critical_update_beacon(hapd, BSS_CRIT_UPDATE_FLAG);
 
 	hapd->eht_mld_link_removal_count = 0;
 	hapd->mld->removed_links |= BIT(hapd->mld_link_id);
@@ -5502,9 +5501,16 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 
 #ifdef CONFIG_IEEE80211BE
 	/* Another CU in the new channel due to OP element modification */
-	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
+	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_SINGLE, false);
+	ieee802_11_update_bpcc(hapd, true);
 #endif /* CONFIG_IEEE80211BE */
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_after);
+
+#ifdef CONFIG_IEEE80211BE
+	/* Restore BPCC to build the CSA beacon */
+	ieee802_11_update_bpcc(hapd, false);
+	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_ALL, true);
+#endif /* CONFIG_IEEE80211BE */
 
 	/* change back the configuration */
 	if (hostapd_change_config_freq(iface->bss[0], iface->conf,
@@ -5519,12 +5525,6 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	hapd->cs_freq_params = settings->freq_params;
 	hapd->cs_count = settings->cs_count;
 	hapd->cs_block_tx = settings->block_tx;
-
-#ifdef CONFIG_IEEE80211BE
-	/* Restore BPCC to build the CSA beacon */
-	hapd->eht_mld_bss_param_change--;
-	hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_ALL;
-#endif /* CONFIG_IEEE80211BE */
 
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_csa);
 	if (ret) {
@@ -5609,8 +5609,8 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 	}
 
 #ifdef CONFIG_IEEE80211BE
-	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_CSA);
-
+	ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_ALL, false);
+	ieee802_11_update_bpcc(hapd, true);
 	if (hapd->conf->mld_ap) {
 		/* Generate per STA profiles for each affiliated APs */
 		for_each_mld_link(link_bss, hapd)
@@ -5697,17 +5697,19 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 			return ret;
 
 		hapd->cs_freq_params.channel = 0;
-		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
+		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_SINGLE, false);
+		ieee802_11_update_bpcc(hapd, true);
 		ret = hostapd_build_beacon_data(h, &settings.beacon_after);
+		/* Restore BPCC to build the RNR for the CS link */
+		ieee802_11_update_bpcc(hapd, false);
+		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_ALL, true);
+
 		hostapd_change_config_freq(hapd, hapd->iconf,
 					   &old_freq, NULL);
 		if (ret)
 			return ret;
 
 		hapd->cs_freq_params.channel = cs_channel;
-		/* Restore BPCC to build the RNR for the CS link */
-		hapd->eht_mld_bss_param_change--;
-		hapd->eht_mld_bss_critical_update = BSS_CRIT_UPDATE_ALL;
 		ret = hostapd_build_beacon_data(h, &settings.beacon_csa);
 		if (ret) {
 			free_beacon_data(&settings.beacon_after);
@@ -5778,8 +5780,13 @@ err:
 	iface->conf->ch_switch_vht_config = 0;
 	iface->conf->ch_switch_he_config = 0;
 	iface->conf->ch_switch_eht_config = 0;
-	for (i = 0; i < iface->num_bss; i++)
+	for (; i >= 0; i--) {
 		hostapd_cleanup_cs_params(iface->bss[i]);
+#ifdef CONFIG_IEEE80211BE
+		ieee802_11_update_bpcc(iface->bss[i], false);
+		ieee802_11_set_bss_critical_update(iface->bss[i], BSS_CRIT_UPDATE_NONE, false);
+#endif /* CONFIG_IEEE80211BE */
+	}
 
 	return err;
 }
