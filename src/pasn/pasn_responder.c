@@ -870,7 +870,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 
 	if (!elems.rsn_ie) {
 		wpa_printf(MSG_DEBUG, "PASN: No RSNE");
-		status = WLAN_STATUS_INVALID_RSNIE;
+		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
 	}
 
@@ -878,7 +878,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 				   &rsn_data);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed parsing RSNE");
-		status = WLAN_STATUS_INVALID_RSNIE;
+		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
 	}
 
@@ -886,7 +886,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 				     pasn->auth_alg == WLAN_AUTH_EPPKE);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "PASN: Failed validating RSNE");
-		status = WLAN_STATUS_INVALID_RSNIE;
+		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
 	}
 
@@ -900,7 +900,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 	    !wpa_key_mgmt_sae_ext_key(rsn_data.key_mgmt) &&
 	    rsn_data.key_mgmt != WPA_KEY_MGMT_EPPKE) {
 		wpa_printf(MSG_DEBUG, "EPPKE: Invalid base AKM");
-		status = WLAN_STATUS_INVALID_RSNIE;
+		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
 	}
 #endif /* CONFIG_ENC_ASSOC */
@@ -908,7 +908,7 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 	if (!(rsn_data.key_mgmt & pasn->wpa_key_mgmt) ||
 	    !(rsn_data.pairwise_cipher & pasn->rsn_pairwise)) {
 		wpa_printf(MSG_DEBUG, "PASN: Mismatch in AKMP/cipher");
-		status = WLAN_STATUS_INVALID_RSNIE;
+		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
 	}
 

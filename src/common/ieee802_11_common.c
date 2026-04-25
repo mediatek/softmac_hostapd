@@ -2371,13 +2371,13 @@ const char * status2str(u16 status)
 	S2S(REQUEST_DECLINED)
 	S2S(INVALID_PARAMETERS)
 	S2S(REJECTED_WITH_SUGGESTED_CHANGES)
-	S2S(INVALID_IE)
-	S2S(GROUP_CIPHER_NOT_VALID)
-	S2S(PAIRWISE_CIPHER_NOT_VALID)
-	S2S(AKMP_NOT_VALID)
-	S2S(UNSUPPORTED_RSN_IE_VERSION)
-	S2S(INVALID_RSN_IE_CAPAB)
-	S2S(CIPHER_REJECTED_PER_POLICY)
+	S2S(INVALID_ELEMENT)
+	S2S(INVALID_GROUP_CIPHER)
+	S2S(INVALID_PAIRWISE_CIPHER)
+	S2S(INVALID_AKMP)
+	S2S(UNSUPPORTED_RSNE_VERSION)
+	S2S(INVALID_RSNE_CAPABILITIES)
+	S2S(CIPHER_OUT_OF_POLICY)
 	S2S(TS_NOT_CREATED)
 	S2S(DIRECT_LINK_NOT_ALLOWED)
 	S2S(DEST_STA_NOT_PRESENT)
@@ -2385,8 +2385,8 @@ const char * status2str(u16 status)
 	S2S(ASSOC_DENIED_LISTEN_INT_TOO_LARGE)
 	S2S(INVALID_FT_ACTION_FRAME_COUNT)
 	S2S(INVALID_PMKID)
-	S2S(INVALID_MDIE)
-	S2S(INVALID_FTIE)
+	S2S(INVALID_MDE)
+	S2S(INVALID_FTE)
 	S2S(REQUESTED_TCLAS_NOT_SUPPORTED)
 	S2S(INSUFFICIENT_TCLAS_PROCESSING_RESOURCES)
 	S2S(TRY_ANOTHER_BSS)
@@ -2399,7 +2399,7 @@ const char * status2str(u16 status)
 	S2S(ADV_SRV_UNREACHABLE)
 	S2S(REQ_REFUSED_SSPN)
 	S2S(REQ_REFUSED_UNAUTH_ACCESS)
-	S2S(INVALID_RSNIE)
+	S2S(INVALID_RSNE)
 	S2S(U_APSD_COEX_NOT_SUPPORTED)
 	S2S(U_APSD_COEX_MODE_NOT_SUPPORTED)
 	S2S(BAD_INTERVAL_WITH_U_APSD_COEX)
@@ -2727,14 +2727,14 @@ u16 check_multi_ap_ie(const u8 *multi_ap_ie, size_t multi_ap_len,
 			} else {
 				wpa_printf(MSG_DEBUG,
 					   "Multi-AP invalid Multi-AP subelement");
-				return WLAN_STATUS_INVALID_IE;
+				return WLAN_STATUS_INVALID_ELEMENT;
 			}
 			break;
 		case MULTI_AP_PROFILE_SUB_ELEM_TYPE:
 			if (elen < 1) {
 				wpa_printf(MSG_DEBUG,
 					   "Multi-AP IE invalid Multi-AP profile subelement");
-				return WLAN_STATUS_INVALID_IE;
+				return WLAN_STATUS_INVALID_ELEMENT;
 			}
 
 			multi_ap->profile = *pos;
@@ -2749,12 +2749,12 @@ u16 check_multi_ap_ie(const u8 *multi_ap_ie, size_t multi_ap_len,
 			if (multi_ap->profile < MULTI_AP_PROFILE_2) {
 				wpa_printf(MSG_DEBUG,
 					   "Multi-AP IE invalid profile to read VLAN IE");
-				return WLAN_STATUS_INVALID_IE;
+				return WLAN_STATUS_INVALID_ELEMENT;
 			}
 			if (elen < 2) {
 				wpa_printf(MSG_DEBUG,
 					   "Multi-AP IE invalid Multi-AP VLAN subelement");
-				return WLAN_STATUS_INVALID_IE;
+				return WLAN_STATUS_INVALID_ELEMENT;
 			}
 
 			vlan_id = WPA_GET_LE16(pos);
@@ -2762,7 +2762,7 @@ u16 check_multi_ap_ie(const u8 *multi_ap_ie, size_t multi_ap_len,
 				wpa_printf(MSG_INFO,
 					   "Multi-AP IE invalid Multi-AP VLAN ID %d",
 					   vlan_id);
-				return WLAN_STATUS_INVALID_IE;
+				return WLAN_STATUS_INVALID_ELEMENT;
 			}
 			multi_ap->vlanid = vlan_id;
 			break;
@@ -2784,7 +2784,7 @@ u16 check_multi_ap_ie(const u8 *multi_ap_ie, size_t multi_ap_len,
 	if (!ext_present) {
 		wpa_printf(MSG_DEBUG,
 			   "Multi-AP element without Multi-AP Extension subelement");
-		return WLAN_STATUS_INVALID_IE;
+		return WLAN_STATUS_INVALID_ELEMENT;
 	}
 
 	return WLAN_STATUS_SUCCESS;

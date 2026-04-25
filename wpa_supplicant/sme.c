@@ -3237,7 +3237,7 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 			   wpa_akm_to_suite(wpa_s->key_mgmt)) {
 			wpa_msg(wpa_s, MSG_INFO,
 				"IEEE 802.1X: Invalid/missing AKM Suite Selector");
-			wpa_s->auth_1x->status = WLAN_STATUS_AKMP_NOT_VALID;
+			wpa_s->auth_1x->status = WLAN_STATUS_INVALID_AKMP;
 			sme_send_authentication(wpa_s, wpa_s->current_bss,
 						wpa_s->current_ssid, 0);
 			goto cleanup;

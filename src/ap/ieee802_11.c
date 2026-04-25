@@ -2228,31 +2228,31 @@ static u16 wpa_res_to_status_code(enum wpa_validate_result res)
 	case WPA_IE_OK:
 		return WLAN_STATUS_SUCCESS;
 	case WPA_INVALID_IE:
-		return WLAN_STATUS_INVALID_IE;
+		return WLAN_STATUS_INVALID_ELEMENT;
 	case WPA_INVALID_GROUP:
-		return WLAN_STATUS_GROUP_CIPHER_NOT_VALID;
+		return WLAN_STATUS_INVALID_GROUP_CIPHER;
 	case WPA_INVALID_PAIRWISE:
-		return WLAN_STATUS_PAIRWISE_CIPHER_NOT_VALID;
+		return WLAN_STATUS_INVALID_PAIRWISE_CIPHER;
 	case WPA_INVALID_AKMP:
-		return WLAN_STATUS_AKMP_NOT_VALID;
+		return WLAN_STATUS_INVALID_AKMP;
 	case WPA_NOT_ENABLED:
-		return WLAN_STATUS_INVALID_IE;
+		return WLAN_STATUS_INVALID_ELEMENT;
 	case WPA_ALLOC_FAIL:
 		return WLAN_STATUS_UNSPECIFIED_FAILURE;
 	case WPA_MGMT_FRAME_PROTECTION_VIOLATION:
 		return WLAN_STATUS_ROBUST_MGMT_FRAME_POLICY_VIOLATION;
 	case WPA_INVALID_MGMT_GROUP_CIPHER:
-		return WLAN_STATUS_CIPHER_REJECTED_PER_POLICY;
+		return WLAN_STATUS_CIPHER_OUT_OF_POLICY;
 	case WPA_INVALID_MDIE:
-		return WLAN_STATUS_INVALID_MDIE;
+		return WLAN_STATUS_INVALID_MDE;
 	case WPA_INVALID_PROTO:
-		return WLAN_STATUS_INVALID_IE;
+		return WLAN_STATUS_INVALID_ELEMENT;
 	case WPA_INVALID_PMKID:
 		return WLAN_STATUS_INVALID_PMKID;
 	case WPA_DENIED_OTHER_REASON:
 		return WLAN_STATUS_ASSOC_DENIED_UNSPEC;
 	}
-	return WLAN_STATUS_INVALID_IE;
+	return WLAN_STATUS_INVALID_ELEMENT;
 }
 
 
@@ -5192,7 +5192,7 @@ u16 owe_validate_request(struct hostapd_data *hapd, const u8 *peer,
 	if (!rsn_ie || rsn_ie_len < 2) {
 		wpa_printf(MSG_DEBUG, "OWE: Invalid RSNE from " MACSTR,
 			   MAC2STR(peer));
-		return WLAN_STATUS_INVALID_IE;
+		return WLAN_STATUS_INVALID_ELEMENT;
 	}
 	rsn_ie -= 2;
 	rsn_ie_len += 2;
@@ -5208,13 +5208,13 @@ u16 owe_validate_request(struct hostapd_data *hapd, const u8 *peer,
 		wpa_printf(MSG_DEBUG,
 			   "OWE: Unexpected key mgmt 0x%x from " MACSTR,
 			   (unsigned int) data.key_mgmt, MAC2STR(peer));
-		return WLAN_STATUS_AKMP_NOT_VALID;
+		return WLAN_STATUS_INVALID_AKMP;
 	}
 	if (!owe_dh) {
 		wpa_printf(MSG_DEBUG,
 			   "OWE: No Diffie-Hellman Parameter element from "
 			   MACSTR, MAC2STR(peer));
-		return WLAN_STATUS_AKMP_NOT_VALID;
+		return WLAN_STATUS_INVALID_AKMP;
 	}
 
 	return WLAN_STATUS_SUCCESS;
@@ -5234,7 +5234,7 @@ u16 owe_process_rsn_ie(struct hostapd_data *hapd,
 
 	if (!rsn_ie || rsn_ie_len < 2) {
 		wpa_printf(MSG_DEBUG, "OWE: No RSNE in (Re)AssocReq");
-		status = WLAN_STATUS_INVALID_IE;
+		status = WLAN_STATUS_INVALID_ELEMENT;
 		goto end;
 	}
 
@@ -5661,7 +5661,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 		if (sta->wps_ie && wps_validate_assoc_req(sta->wps_ie) < 0) {
 			wpa_printf(MSG_DEBUG, "WPS: Invalid WPS IE in "
 				   "(Re)Association Request - reject");
-			resp = WLAN_STATUS_INVALID_IE;
+			resp = WLAN_STATUS_INVALID_ELEMENT;
 			goto out;
 		}
 	} else if (hapd->conf->wps_state && wpa_ie == NULL) {
@@ -5674,7 +5674,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_INFO,
 			       "No WPA/RSN IE in association request");
-		resp = WLAN_STATUS_INVALID_IE;
+		resp = WLAN_STATUS_INVALID_ELEMENT;
 		goto out;
 	}
 
@@ -5958,7 +5958,7 @@ skip_pmkid_update:
 				       HOSTAPD_LEVEL_INFO,
 				       "Station tried to use TKIP with HT "
 				       "association");
-			resp = WLAN_STATUS_CIPHER_REJECTED_PER_POLICY;
+			resp = WLAN_STATUS_CIPHER_OUT_OF_POLICY;
 			goto out;
 		}
 
