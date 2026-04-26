@@ -1360,11 +1360,13 @@ bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
 		ret = nan_bootstrap_handle_rx(nan, addr, attrs.npba,
 					      attrs.npba_len, buf, len, handle,
 					      req_instance_id);
+#ifdef CONFIG_PASN
 	else if (attrs.shared_key_desc)
 		ret = nan_pairing_followup_rx(nan, addr,
 					      (const struct nan_shared_key *)
 					      attrs.shared_key_desc,
 					      attrs.shared_key_desc_len);
+#endif /* CONFIG_PASN */
 
 	nan_attrs_clear(nan, &attrs);
 	return ret;

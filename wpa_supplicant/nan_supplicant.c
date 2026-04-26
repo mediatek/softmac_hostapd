@@ -1361,6 +1361,7 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 #undef NAN_PARSE_INT
 #undef NAN_PARSE_BAND
 
+#ifdef CONFIG_PASN
 #define NAN_PARSE_PAIRING_BOOL(_str)                                 \
 	if (os_strcmp(#_str, cmd) == 0) {                            \
 		int val = atoi(param);                               \
@@ -1418,6 +1419,7 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 
 		return nan_pairing_set_nik_lifetime(wpa_s->nan, lifetime);
 	}
+#endif /* CONFIG_PASN */
 
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
@@ -2614,6 +2616,7 @@ int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
 }
 
 
+#ifdef CONFIG_PASN
 static int wpas_nan_append_ik_info(char *reply, size_t reply_size,
 				   const struct wpa_dev_ik *ik)
 {
@@ -2637,6 +2640,7 @@ static int wpas_nan_append_ik_info(char *reply, size_t reply_size,
 
 	return pos - reply;
 }
+#endif /* CONFIG_PASN */
 
 
 /* Format: NAN_PEER_INFO <addr>
@@ -2735,6 +2739,7 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		ret = wpa_scnprintf(reply, reply_size,
 				    "supported_methods=0x%04x\n",
 				    supported_methods);
+#ifdef CONFIG_PASN
 	} else if (os_strncmp(pos + 1, "pairing", 7) == 0) {
 		const struct nan_pairing_cfg *pairing_cfg;
 		const struct wpa_dev_ik *ik = NULL;
@@ -2768,6 +2773,7 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		if (ik)
 			ret += wpas_nan_append_ik_info(reply + ret,
 						       reply_size - ret, ik);
+#endif /* CONFIG_PASN */
 	} else {
 		wpa_printf(MSG_INFO, "NAN: Unknown info type: %s", pos + 1);
 		ret = -1;
