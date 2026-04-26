@@ -1387,7 +1387,7 @@ static bool nan_de_filter_match(struct nan_de_service *srv,
 	spos_end = subscribe_filter + subscribe_filter_len;
 
 	ppos = publish_filter;
-	ppos_end = publish_filter + publish_filter_len;
+	ppos_end = publish_filter ? publish_filter + publish_filter_len : NULL;
 
 	wpa_hexdump(MSG_DEBUG, "NAN: subscribe filter",
 		    spos, spos_end - spos);
