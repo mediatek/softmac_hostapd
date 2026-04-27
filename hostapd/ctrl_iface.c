@@ -4007,9 +4007,10 @@ static int hostapd_ctrl_iface_set_attlm(struct hostapd_data *hapd, char *cmd,
 	struct attlm_settings *attlm;
 	struct hostapd_data *h;
 	char *token, *context = NULL;
-	u16 switch_time, disabled_links, valid_links;
-	u32 duration;
-	int ret, i, link_mapping_size;
+	u16 switch_time = MAX_SWITCH_TIME_MS + 1;
+	u16 disabled_links = BIT(MAX_NUM_MLD_LINKS) + 1, valid_links;
+	u32 duration = MAX_DURATION_MS + 1;
+	int ret, i, link_mapping_size = 0;
 
 	if (!hapd->conf->mld_ap || !hapd->mld)
 		return -1;
@@ -4072,8 +4073,23 @@ static int hostapd_ctrl_iface_set_attlm(struct hostapd_data *hapd, char *cmd,
 				continue;
 		}
 
-		wpa_printf(MSG_INFO, "CTRL: Invalid SET_ATTLM parameter: %s",
+		wpa_printf(MSG_ERROR, "CTRL: Invalid SET_ATTLM parameter: %s",
 			   token);
+		return -1;
+	}
+
+	if (switch_time == MAX_SWITCH_TIME_MS + 1) {
+		wpa_printf(MSG_ERROR, "CTRL: switch time is not set");
+		return -1;
+	}
+
+	if (duration == MAX_DURATION_MS + 1) {
+		wpa_printf(MSG_ERROR, "CTRL: duration is not set");
+		return -1;
+	}
+
+	if (disabled_links == BIT(MAX_NUM_MLD_LINKS) + 1) {
+		wpa_printf(MSG_ERROR, "CTRL: disabled links is not set");
 		return -1;
 	}
 
