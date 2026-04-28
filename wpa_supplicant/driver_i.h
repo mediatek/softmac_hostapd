@@ -1329,6 +1329,15 @@ wpa_drv_nan_config_peer_schedule(struct wpa_supplicant *wpa_s, const u8 *peer,
 						       ulw, sched);
 }
 
+static inline int wpa_drv_get_inact_sec(struct wpa_supplicant *wpa_s,
+					const u8 *addr)
+{
+	if (!wpa_s->driver->get_inact_sec)
+		return -1;
+
+	return wpa_s->driver->get_inact_sec(wpa_s->drv_priv, addr);
+}
+
 #endif /* CONFIG_NAN */
 
 #endif /* DRIVER_I_H */

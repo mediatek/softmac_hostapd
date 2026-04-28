@@ -57,6 +57,9 @@
 /* Default NAN NIK lifetime in seconds - 12 hours */
 #define NAN_NIK_LIFETIME_DEFAULT 43200
 
+/* Default NAN idle period in seconds */
+#define DEFAULT_NAN_MAX_NDL_IDLE_PERIOD 25
+
 #ifdef CONFIG_NAN
 
 static int get_center(u8 channel, const u8 *center_channels,
@@ -1249,6 +1252,23 @@ wpas_nan_pasn_pairing_request_cb(void *ctx, const u8 *peer_nmi, u8 csid,
 #endif /* CONFIG_PASN */
 
 
+static int wpas_nan_get_peer_inactivity(void *ctx, const u8 *local_ndi,
+					const u8 *peer_ndi)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpa_s = wpas_nan_get_ndi_iface(wpa_s, local_ndi);
+	if (!wpa_s) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: No NDI interface found for address " MACSTR,
+			   MAC2STR(local_ndi));
+		return -1;
+	}
+
+	return wpa_drv_get_inact_sec(wpa_s, peer_ndi);
+}
+
+
 int wpas_nan_init(struct wpa_supplicant *wpa_s)
 {
 	struct nan_config nan;
@@ -1303,6 +1323,13 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.transmit_followup = wpas_nan_transmit_followup_cb;
 		nan.get_supported_bootstrap_methods =
 			wpas_nan_get_service_bootstrap_methods;
+
+		if (wpa_s->driver->get_inact_sec)
+			nan.get_peer_inactivity = wpas_nan_get_peer_inactivity;
+		else
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Driver does not support getting peer inactivity");
+
 		/*
 		 * Set the group security capabilities based on driver support
 		 */
@@ -1363,6 +1390,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 	}
 
 	nan.nik_lifetime = NAN_NIK_LIFETIME_DEFAULT;
+	nan.max_ndl_idle_period = DEFAULT_NAN_MAX_NDL_IDLE_PERIOD;
 
 	wpa_s->nan = nan_init(&nan);
 	if (!wpa_s->nan) {
@@ -1704,6 +1732,13 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		return 0;
 	}
 #endif /* CONFIG_TESTING_OPTIONS */
+
+	if (os_strcmp("max_ndl_idle_period", cmd) == 0) {
+		u16 max_ndl_idle_period = atoi(param) & 0xffff;
+
+		return nan_set_max_ndl_idle_period(wpa_s->nan,
+						   max_ndl_idle_period);
+	}
 
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
