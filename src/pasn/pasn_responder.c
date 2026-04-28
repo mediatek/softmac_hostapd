@@ -608,8 +608,11 @@ int handle_auth_pasn_resp(struct pasn_data *pasn, const u8 *own_addr,
 
 		wpa_add_supported_groups(buf, groups);
 	}
-	if (status != WLAN_STATUS_SUCCESS)
+	if (status != WLAN_STATUS_SUCCESS) {
+		wpa_pasn_add_extra_ies(buf, pasn->extra_ies,
+				       pasn->extra_ies_len);
 		goto done;
+	}
 
 	if (pmksa && pasn->custom_pmkid_valid)
 		pmkid = pasn->custom_pmkid;
