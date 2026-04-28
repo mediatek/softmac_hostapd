@@ -2238,9 +2238,52 @@ static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 }
 
 
+static int wpas_nan_set_gtk(struct wpa_supplicant *ndi_wpa_s,
+			    struct nan_ndp_params *ndp, int gtk_csid)
+{
+	if (ndi_wpa_s->ndi_gtk.gtk.gtk_len) {
+		if (ndi_wpa_s->ndi_gtk.csid != gtk_csid) {
+			wpa_printf(MSG_INFO,
+				   "NAN: NDI GTK CSID mismatch (expected %d, got %d)",
+				   gtk_csid, ndi_wpa_s->ndi_gtk.csid);
+			return -1;
+		}
+
+		os_memcpy(&ndp->sec.gtk, &ndi_wpa_s->ndi_gtk,
+			  sizeof(ndp->sec.gtk));
+		return 0;
+	}
+
+	ndp->sec.gtk.csid = gtk_csid;
+	if (gtk_csid == NAN_CS_GTK_GCMP_256 &&
+	    (ndi_wpa_s->drv_enc & WPA_DRIVER_CAPA_ENC_GCMP_256)) {
+		ndp->sec.gtk.gtk.gtk_len = 32;
+	} else if (gtk_csid == NAN_CS_GTK_CCMP_128 &&
+		   (ndi_wpa_s->drv_enc & WPA_DRIVER_CAPA_ENC_CCMP)) {
+		ndp->sec.gtk.gtk.gtk_len = 16;
+	} else {
+		wpa_printf(MSG_INFO,
+			   "NAN: NDI does not support GTK cipher suites");
+		return -1;
+	}
+
+	if (os_get_random(ndp->sec.gtk.gtk.gtk, ndp->sec.gtk.gtk.gtk_len) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to generate GTK");
+		return -1;
+	}
+
+	ndp->sec.gtk.id = 1;
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: Generated new GTK",
+			ndp->sec.gtk.gtk.gtk, ndp->sec.gtk.gtk.gtk_len);
+	return 0;
+}
+
+
 /* Command format NAN_NDP_REQUEST handle=<id> ndi=<ifname> peer_nmi=<nmi>
    peer_id=<peer_instance_id> ssi=<hexdata> qos=<slots:latency>
-   [csid = <cipher_suite> <password=<string>|pmk=<hex>>] [interface_id=<hex>]*/
+   [csid = <cipher_suite> <password=<string>|pmk=<hex>>
+   [gtk_csid=<cipher_suite>]] [interface_id=<hex>] */
 int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	struct nan_ndp_params ndp;
@@ -2251,6 +2294,8 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 	int handle = -1;
 	int ret = -1;
 	u8 *interface_id = NULL;
+	struct wpa_supplicant *ndi_wpa_s = NULL;
+	int gtk_csid = 0;
 
 	os_memset(&ndp, 0, sizeof(ndp));
 
@@ -2286,8 +2331,6 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 				goto fail;
 			}
 		} else if (os_strcmp(token, "ndi") == 0) {
-			struct wpa_supplicant *ndi_wpa_s;
-
 			ndi_wpa_s = wpa_supplicant_get_iface(wpa_s->global,
 							     pos);
 			if (!ndi_wpa_s) {
@@ -2357,6 +2400,15 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 			}
 
 			ndp.interface_id = interface_id;
+		} else if (os_strcmp(token, "gtk_csid") == 0) {
+			gtk_csid = atoi(pos);
+			if (gtk_csid != NAN_CS_GTK_CCMP_128 &&
+			    gtk_csid != NAN_CS_GTK_GCMP_256) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid GTK CSID value: %d",
+					   gtk_csid);
+				goto fail;
+			}
 		} else {
 			wpa_printf(MSG_INFO, "NAN: Unknown parameter: %s",
 				   token);
@@ -2403,6 +2455,19 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 	if (wpas_nan_set_ndp_schedule(wpa_s, &ndp)) {
 		wpa_printf(MSG_INFO, "NAN: Failed to set NDP schedule");
 		goto fail;
+	}
+
+	if (gtk_csid) {
+		if (ndp.sec.csid == NAN_CS_NONE || !ndi_wpa_s) {
+			wpa_printf(MSG_INFO,
+				   "NAN: GTK CSID specified without a valid NDP CSID");
+			goto fail;
+		}
+
+		if (wpas_nan_set_gtk(ndi_wpa_s, &ndp, gtk_csid) < 0) {
+			wpa_printf(MSG_DEBUG, "NAN: Failed to set NDP GTK");
+			goto fail;
+		}
 	}
 
 	wpa_printf(MSG_DEBUG, "NAN: Requesting NDP with peer " MACSTR

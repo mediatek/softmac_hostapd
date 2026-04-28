@@ -21,6 +21,7 @@
 #include "config_ssid.h"
 #include "wmm_ac.h"
 #include "pasn/pasn_common.h"
+#include "nan/nan.h"
 
 extern const char *const wpa_supplicant_version;
 extern const char *const wpa_supplicant_license;
@@ -1738,6 +1739,7 @@ struct wpa_supplicant {
 	struct wpa_freq_range_list nan_disallowed_freqs;
 	u16 nan_max_bw;
 	unsigned int nan_ndi_ndp_refcount; /* Active NDP count on this NDI */
+	struct nan_gtk ndi_gtk;
 #endif /* CONFIG_NAN */
 #ifdef CONFIG_ENC_ASSOC
 	bool assoc_resp_encrypted; /* Whether (Re)Association Response frame
