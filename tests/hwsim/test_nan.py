@@ -1201,6 +1201,78 @@ def test_nan_dp_open(dev, apdev, params):
     """NAN DP open"""
     run_nan_dp()
 
+def test_nan_dp_open_2_ndps(dev, apdev, params):
+    """NAN DP open - 2 NDPs with same peer"""
+    set_country("US")
+    try:
+        _run_nan_dp_2_ndps(secure_ndp2=False)
+    finally:
+        set_country("00")
+
+def test_nan_dp_open_2_ndps_security_upgrade(dev, apdev, params):
+    """NAN DP - 2 NDPs with same peer, second with security upgrade"""
+    set_country("US")
+    try:
+        _run_nan_dp_2_ndps(secure_ndp2=True)
+    finally:
+        set_country("00")
+
+def _run_nan_dp_2_ndps(secure_ndp2=False):
+    """
+    Test 2 NDPs with the same peer.
+
+    @secure_ndp2: If True, NDP2 uses SK CCMP-128 security (security upgrade).
+                  If False, both NDPs are open.
+    """
+    pwd2 = "NAN" if secure_ndp2 else None
+    csid2 = 1 if secure_ndp2 else None  # SK CCMP-128
+
+    with hwsim_nan_radios() as (wpas1, wpas2), \
+        NanDevice(wpas1, "nan0", "ndi0") as pub, \
+        NanDevice(wpas2, "nan1", "ndi1") as sub:
+
+        pssi = "aabbccdd001122334455667788"
+        sssi = "ddbbccaa001122334455667788"
+
+        # First NDP (always open)
+        pid1, sid1, paddr, saddr = _nan_discover_service(pub, sub,
+                                                         "test_service1", pssi, sssi)
+
+        ndp_id1, init_ndi1 = _nan_ndp_request_and_accept(pub, sub, pid1, sid1,
+                                                         paddr, saddr,
+                                                         req_ssi="aabbcc",
+                                                         resp_ssi="ddeeff",
+                                                         configure_schedule=True)
+
+        logger.info("NDP1 (open) connection established successfully")
+
+        # Second NDP (open or secure based on secure_ndp2)
+        pid2, sid2, _, _ = _nan_discover_service(pub, sub, "test_service2",
+                                                 pssi, sssi)
+
+        # Schedule already configured
+        ndp_id2, init_ndi2 = _nan_ndp_request_and_accept(pub, sub, pid2, sid2,
+                                                         paddr, saddr,
+                                                         req_ssi="112233",
+                                                         resp_ssi="445566",
+                                                         csid=csid2,
+                                                         password=pwd2,
+                                                         configure_schedule=False)
+
+        if secure_ndp2:
+            logger.info("NDP2 (secure) connection established successfully")
+            logger.info("Security upgrade test: open NDP1 + secure NDP2 with same peer")
+        else:
+            logger.info("NDP2 (open) connection established successfully")
+            logger.info("Both open NDPs with same peer established successfully")
+
+        _nan_test_connectivity(pub, sub)
+        _nan_ndp_terminate(pub, sub, paddr, init_ndi1, ndp_id1)
+
+        # Test connectivity again to ensure NDP2 is still functional
+        _nan_test_connectivity(pub, sub)
+        _nan_ndp_terminate(pub, sub, paddr, init_ndi2, ndp_id2)
+
 def test_nan_dp_open_counter(dev, apdev, params):
     """NAN DP open with counter proposal"""
     run_nan_dp(counter=True)
