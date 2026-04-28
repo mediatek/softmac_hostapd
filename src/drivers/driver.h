@@ -6499,6 +6499,14 @@ enum wpa_event_type {
 	 * interference detection.
 	 */
 	EVENT_INCUMBT_SIG_INTF_DETECTED,
+
+	/**
+	 * EVENT_NAN_SCHED_UPDATE_DONE - NAN schedule update completed
+	 *
+	 * This event is used to notify wpa_supplicant that a NAN schedule
+	 * update has been completed by the driver/firmware.
+	 */
+	EVENT_NAN_SCHED_UPDATE_DONE,
 };
 
 
@@ -7521,6 +7529,14 @@ union wpa_event_data {
 		u32 chan_bw_interference_bitmap;
 		int link_id;
 	} incumbt_sig_intf_event;
+
+	/**
+	 * struct nan_sched_update_done_info - Data for EVENT_NAN_SCHED_UPDATE_DONE
+	 * @success: Indicates whether the NAN schedule update was successful
+	 */
+	struct nan_sched_update_done_info {
+		bool success;
+	} nan_sched_update_done_info;
 };
 
 /**

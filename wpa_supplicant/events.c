@@ -7652,6 +7652,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 	case EVENT_NAN_NEXT_DW:
 		wpas_nan_next_dw(wpa_s, data->nan_next_dw_info.freq);
 		break;
+	case EVENT_NAN_SCHED_UPDATE_DONE:
+		wpas_nan_sched_update_done(wpa_s, data);
+		break;
 #endif /* CONFIG_NAN */
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);

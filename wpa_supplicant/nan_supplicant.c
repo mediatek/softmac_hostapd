@@ -3408,6 +3408,40 @@ void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 }
 
 
+void wpas_nan_sched_update_done(struct wpa_supplicant *wpa_s,
+				const union wpa_event_data *data)
+{
+	u8 map_id = wpa_s->nan_sched_update.map_id;
+	bool success = data->nan_sched_update_done_info.success;
+
+	if (!wpas_nan_ready(wpa_s))
+		return;
+
+	if (!wpa_s->nan_sched_update.sched.deferred) {
+		wpa_printf(MSG_DEBUG, "NAN: Schedule update not in progress");
+		return;
+	}
+
+	wpas_notify_nan_sched_update_done(wpa_s, success);
+
+	if (!success) {
+		clear_sched_config(&wpa_s->nan_sched_update.sched);
+		wpa_printf(MSG_DEBUG, "NAN: Schedule update failed");
+		return;
+	}
+
+	clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
+	os_memcpy(&wpa_s->nan_sched[map_id - 1],
+		  &wpa_s->nan_sched_update.sched,
+		  sizeof(wpa_s->nan_sched_update.sched));
+	os_memset(&wpa_s->nan_sched_update.sched, 0,
+		  sizeof(wpa_s->nan_sched_update.sched));
+	wpa_s->schedule_sequence_id++;
+
+	wpas_nan_update_local_schedule(wpa_s);
+}
+
+
 #ifdef CONFIG_PASN
 
 static int wpas_nan_pasn_update_station(struct wpa_supplicant *wpa_s,

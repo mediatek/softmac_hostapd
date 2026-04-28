@@ -1482,6 +1482,14 @@ void wpas_notify_nan_schedule_changed(struct wpa_supplicant *wpa_s,
 }
 
 
+void wpas_notify_nan_sched_update_done(struct wpa_supplicant *wpa_s,
+				       bool success)
+{
+	wpa_msg_global(wpa_s, MSG_INFO, NAN_SCHEDULE_UPDATE_DONE "status=%s",
+		       success ? "success" : "failure");
+}
+
+
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 				    const u8 *peer_addr, int akmp,
 				    int cipher, u16 status,
