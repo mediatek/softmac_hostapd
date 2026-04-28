@@ -422,6 +422,95 @@ static int nan_sec_rx_m4(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+static int nan_sec_rx_key_data(struct nan_data *nan,
+			       struct nan_peer *peer, u8 peer_capab,
+			       const u8 *enc_key_data, size_t key_data_len)
+{
+	struct wpabuf *key_data = NULL;
+	struct wpa_eapol_ie_parse ie;
+	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
+	int ret = -1;
+	int cipher;
+	unsigned int key_len;
+	enum wpa_alg alg;
+
+	if (((peer_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) == NAN_CS_INFO_CAPA_GTK_SUPP_NONE) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: Peer does not support IGTK/BIGTK, ignore key data");
+		return 0;
+	}
+
+	if (peer_capab & NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256) {
+		cipher = WPA_CIPHER_BIP_GMAC_256;
+		alg = WPA_ALG_BIP_GMAC_256;
+	} else {
+		cipher = WPA_CIPHER_AES_128_CMAC;
+		alg = WPA_ALG_BIP_CMAC_128;
+	}
+
+	key_len = wpa_cipher_key_len(cipher);
+
+	key_data = nan_crypto_decrypt_key_data(ndp_sec->ptk.kek,
+					       ndp_sec->ptk.kek_len,
+					       enc_key_data, key_data_len);
+	if (!key_data) {
+		wpa_printf(MSG_DEBUG, "NAN: SEC: Failed to decrypt key data");
+		return -1;
+	}
+
+	if (wpa_parse_kde_ies(wpabuf_head(key_data), wpabuf_len(key_data),
+			      &ie) < 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: Failed to parse decrypted key data");
+		goto fail;
+	}
+
+	if (ie.igtk && ie.igtk_len) {
+		const struct wpa_igtk_kde *igtk_kde =
+			(const struct wpa_igtk_kde *) ie.igtk;
+		u16 key_idx;
+
+		if (ie.igtk_len != WPA_IGTK_KDE_PREFIX_LEN + key_len) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid IGTK KDE length: %zu (expected %u)",
+				   ie.igtk_len,
+				   WPA_IGTK_KDE_PREFIX_LEN + key_len);
+			goto fail;
+		}
+
+		/* Key ID must be 4 or 5, see Wi-Fi Aware Specification v4.0,
+		 * section 7.1.3.3
+		 */
+		key_idx = WPA_GET_LE16(igtk_kde->keyid);
+		if (key_idx < 4 || key_idx > 5) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid IGTK key index: %u",
+				   key_idx);
+			goto fail;
+		}
+
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, alg,
+					    peer->nmi_addr, key_idx,
+					    igtk_kde->pn, igtk_kde->igtk,
+					    key_len, KEY_FLAG_GROUP_RX) < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Failed to install IGTK");
+			goto fail;
+		}
+
+		peer->igtk_id = key_idx;
+		wpa_hexdump_key(MSG_DEBUG, "NAN: SEC: Received IGTK",
+				igtk_kde->igtk, key_len);
+	}
+
+	ret = 0;
+fail:
+	wpabuf_clear_free(key_data);
+	return ret;
+}
+
+
 /**
  * nan_sec_rx - Handle security context for Rx frames
  * @nan: NAN module context from nan_init()
@@ -437,7 +526,7 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	struct wpa_eapol_key *key;
 	struct nan_shared_key *shared_key_desc;
 	size_t shared_key_desc_len;
-	u16 info, desc;
+	u16 info, desc, key_data_len;
 	size_t total_len;
 	u8 instance_id, cipher, capab, gtk_csid;
 	u8 *pos;
@@ -498,8 +587,9 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 			return -1;
 		}
 
-		total_len += NAN_KEY_MIC_LEN +
-			WPA_GET_BE16(pos + NAN_KEY_MIC_LEN);
+		key_data_len = WPA_GET_BE16(pos + NAN_KEY_MIC_LEN);
+		total_len += NAN_KEY_MIC_LEN + key_data_len;
+		pos += NAN_KEY_MIC_LEN + 2;
 
 		if (total_len >
 		    (shared_key_desc_len - sizeof(struct nan_shared_key))) {
@@ -516,8 +606,9 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 			return -1;
 		}
 
-		total_len += NAN_KEY_MIC_24_LEN +
-			WPA_GET_BE16(pos + NAN_KEY_MIC_24_LEN);
+		key_data_len = WPA_GET_BE16(pos + NAN_KEY_MIC_24_LEN);
+		total_len += NAN_KEY_MIC_24_LEN + key_data_len;
+		pos += NAN_KEY_MIC_24_LEN + 2;
 
 		if (total_len >
 		    (shared_key_desc_len - sizeof(struct nan_shared_key))) {
@@ -601,12 +692,26 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 		    !(info & WPA_KEY_INFO_SECURE))
 			return -1;
 		ret = nan_sec_rx_m3(nan, peer, msg, key);
+
+		/* Ignore unencrypted key data */
+		if (!ret && key_data_len > 0 &&
+		    (info & WPA_KEY_INFO_ENCR_KEY_DATA))
+			ret = nan_sec_rx_key_data(nan, peer,
+						  ndp_sec->i_capab, pos,
+						  key_data_len);
 		break;
 	case NAN_SUBTYPE_DATA_PATH_KEY_INSTALL:
 		if (!(info & WPA_KEY_INFO_MIC) ||
 		    !(info & WPA_KEY_INFO_SECURE))
 			return -1;
 		ret = nan_sec_rx_m4(nan, peer, msg, key);
+
+		/* Ignore unencrypted key data */
+		if (!ret && key_data_len > 0 &&
+		    (info & WPA_KEY_INFO_ENCR_KEY_DATA))
+			ret = nan_sec_rx_key_data(nan, peer,
+						  ndp_sec->r_capab, pos,
+						  key_data_len);
 		break;
 	default:
 		wpa_printf(MSG_DEBUG, "NAN: SEC: Invalid frame OUI subtype");
