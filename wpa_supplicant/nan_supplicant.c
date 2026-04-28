@@ -3661,7 +3661,7 @@ int wpas_nan_pair(struct wpa_supplicant *wpa_s, const u8 *peer_addr,
 /*
  * Format: NAN_PAIR <peer_nmi> <handle=<id>>
  *	<peer_instance_id=<id>> <auth=<0|1|2>> <cipher=<CCMP|GCMP-256>>
- *	[responder] [password=<password>]
+ *	[responder] [password=<password>|pwd_hex=<hex>]
  */
 int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -3671,7 +3671,8 @@ int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd)
 	u8 peer_instance_id = 0;
 	int handle = 0;
 	int cipher = WPA_CIPHER_NONE;
-	char *password = NULL;
+	char *password = NULL, *password_hex = NULL;
+	char *password_decoded = NULL;
 	bool responder = false;
 	char *pos;
 
@@ -3713,6 +3714,8 @@ int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd)
 			responder = true;
 		} else if (os_strncmp(token, "password=", 9) == 0) {
 			password = token + 9;
+		} else if (os_strncmp(token, "pwd_hex=", 8) == 0) {
+			password_hex = token + 8;
 		} else {
 			wpa_printf(MSG_INFO,
 				   "NAN_PAIR: Invalid parameter: '%s'",
@@ -3737,11 +3740,27 @@ int wpas_nan_pairing_start(struct wpa_supplicant *wpa_s, char *cmd)
 		return -1;
 	}
 
+	if (password && password_hex) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN_PAIR: Specify only one of password or pwd_hex");
+		return -1;
+	}
+
+	if (password_hex) {
+		password_decoded = wpas_nan_parse_password_hex(password_hex);
+		if (!password_decoded)
+			return -1;
+	}
+
 	if (wpas_nan_pair(wpa_s, addr, auth_mode, cipher, handle,
-			  peer_instance_id, responder, password) < 0) {
+			  peer_instance_id, responder,
+			  password_decoded ? password_decoded : password) < 0) {
+		str_clear_free(password_decoded);
 		wpa_printf(MSG_INFO, "NAN_PAIR: Pairing initiation failed");
 		return -1;
 	}
+
+	str_clear_free(password_decoded);
 
 	return 0;
 }
