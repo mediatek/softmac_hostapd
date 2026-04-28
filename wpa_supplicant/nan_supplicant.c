@@ -932,9 +932,26 @@ static int wpas_nan_set_group_key_cb(void *ctx, enum wpa_alg alg,
 }
 
 
-static int wpas_nan_get_seqnum_cb(void *ctx, int key_idx, u8 *seq)
+static int wpas_nan_get_seqnum_cb(void *ctx, int key_idx, u8 *seq,
+				  const u8 *ndi_addr)
 {
 	struct wpa_supplicant *wpa_s = ctx;
+
+	if (ndi_addr) {
+		wpa_s = wpas_nan_get_ndi_iface(wpa_s, ndi_addr);
+		if (!wpa_s) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: No NDI interface found for address "
+				   MACSTR, MAC2STR(ndi_addr));
+			return -1;
+		}
+
+		/* If the NDI GTK is not installed yet, RSC is 0 */
+		if (!wpa_s->ndi_gtk.id) {
+			os_memset(seq, 0, WPA_KEY_RSC_LEN);
+			return 0;
+		}
+	}
 
 	return wpa_drv_get_seqnum(wpa_s, NULL, key_idx, seq);
 }

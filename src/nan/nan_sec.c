@@ -951,7 +951,8 @@ static int nan_sec_igtk_kde(struct nan_data *nan, struct wpabuf *buf)
 {
 	u8 tsc[RSN_PN_LEN];
 
-	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->igtk_id, tsc) < 0) {
+	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->igtk_id, tsc,
+				 NULL) < 0) {
 		wpa_printf(MSG_INFO, "NAN: Failed to get IGTK seqnum");
 		return -1;
 	}
@@ -984,7 +985,8 @@ static int nan_sec_bigtk_kde(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 		return 0;
 	}
 
-	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->bigtk_id, tsc) < 0) {
+	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->bigtk_id, tsc,
+				 NULL) < 0) {
 		wpa_printf(MSG_DEBUG, "NAN: Failed to get BIGTK seqnum");
 		return -1;
 	}

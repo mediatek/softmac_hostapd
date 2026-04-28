@@ -741,9 +741,11 @@ struct nan_config {
 	 * @ctx: Callback context from cb_ctx
 	 * @key_idx: Key index
 	 * @seq: Buffer for returning the latest used PN value
+	 * @ndi_addr: For NDI group keys, the NDI MAC address; %NULL for
+	 *	NMI group keys
 	 * Returns: 0 on success, -1 on failure
 	 */
-	int (*get_seqnum)(void *ctx, int key_idx, u8 *seq);
+	int (*get_seqnum)(void *ctx, int key_idx, u8 *seq, const u8 *ndi_addr);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
