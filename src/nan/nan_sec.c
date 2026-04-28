@@ -789,7 +789,8 @@ static int nan_sec_add_m1_attrs(struct nan_data *nan, struct nan_peer *peer,
 {
 	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
 	struct wpa_eapol_key *key;
-	struct nan_cipher_suite cs;
+	struct nan_cipher_suite cs[2];
+	size_t cs_len = 1;
 	u16 info;
 	size_t key_len = sizeof(struct wpa_eapol_key) + 2;
 	int ret;
@@ -818,9 +819,16 @@ static int nan_sec_add_m1_attrs(struct nan_data *nan, struct nan_peer *peer,
 	}
 
 	/* Cipher suite information */
-	cs.csid = ndp_sec->i_csid;
-	cs.instance_id = ndp_sec->i_instance_id;
-	nan_add_csia(buf, ndp_sec->i_capab, 1, &cs);
+	cs[0].csid = ndp_sec->i_csid;
+	cs[0].instance_id = ndp_sec->i_instance_id;
+
+	if (ndp_sec->local_gtk.csid != NAN_CS_NONE) {
+		cs[1].csid = ndp_sec->local_gtk.csid;
+		cs[1].instance_id = ndp_sec->i_instance_id;
+		cs_len++;
+	}
+
+	nan_add_csia(buf, ndp_sec->i_capab, cs_len, cs);
 
 	/* Security context information */
 	wpabuf_put_u8(buf, NAN_ATTR_SCIA);
@@ -872,7 +880,9 @@ static int nan_sec_add_m2_attrs(struct nan_data *nan, struct nan_peer *peer,
 {
 	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
 	struct wpa_eapol_key *key;
-	struct nan_cipher_suite cs;
+	struct nan_cipher_suite cs[2];
+	size_t cs_len = 1;
+
 	u16 info;
 	size_t key_len;
 
@@ -885,9 +895,15 @@ static int nan_sec_add_m2_attrs(struct nan_data *nan, struct nan_peer *peer,
 		return -1;
 
 	/* Cipher suite information */
-	cs.csid = ndp_sec->r_csid;
-	cs.instance_id = ndp_sec->r_instance_id;
-	nan_add_csia(buf, ndp_sec->r_capab, 1, &cs);
+	cs[0].csid = ndp_sec->r_csid;
+	cs[0].instance_id = ndp_sec->r_instance_id;
+
+	if (ndp_sec->local_gtk.csid != NAN_CS_NONE) {
+		cs[1].csid = ndp_sec->local_gtk.csid;
+		cs[1].instance_id = ndp_sec->r_instance_id;
+		cs_len++;
+	}
+	nan_add_csia(buf, ndp_sec->r_capab, cs_len, cs);
 
 	/* Security context information */
 	wpabuf_put_u8(buf, NAN_ATTR_SCIA);
