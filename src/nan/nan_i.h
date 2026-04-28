@@ -561,6 +561,8 @@ struct nan_peer {
  * @responder_pmksa: PMKSA cache for PASN-PMK authentication as a responder
  * @igtk: IGTK for NAN secure NDP
  * @igtk_id: Key ID of the IGTK
+ * @bigtk: BIGTK for NAN secure NDP
+ * @bigtk_id: Key ID of the BIGTK
  */
 struct nan_data {
 	struct nan_config *cfg;
@@ -580,6 +582,9 @@ struct nan_data {
 
 	struct wpa_igtk igtk;
 	u8 igtk_id;
+
+	struct wpa_bigtk bigtk;
+	u8 bigtk_id;
 };
 
 struct nan_attrs_entry {

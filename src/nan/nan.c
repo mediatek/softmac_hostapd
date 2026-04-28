@@ -229,6 +229,46 @@ static int nan_gen_igtk(struct nan_data *nan)
 }
 
 
+static int nan_gen_bigtk(struct nan_data *nan)
+{
+	u8 tsc[RSN_PN_LEN];
+	enum wpa_alg alg;
+	int cipher;
+
+	if (((nan->cfg->security_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) != NAN_CS_INFO_CAPA_GTK_SUPP_ALL) {
+		wpa_printf(MSG_DEBUG, "NAN: BIGTK not supported");
+		return 0;
+	}
+
+	if (nan->cfg->security_capab &
+	    NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256) {
+		alg = WPA_ALG_BIP_GMAC_256;
+		cipher = WPA_CIPHER_BIP_GMAC_256;
+	} else {
+		alg = WPA_ALG_BIP_CMAC_128;
+		cipher = WPA_CIPHER_AES_128_CMAC;
+	}
+
+	nan->bigtk.bigtk_len = wpa_cipher_key_len(cipher);
+	nan->bigtk_id = 6;
+	if (os_get_random(nan->bigtk.bigtk, nan->bigtk.bigtk_len) < 0)
+		return -1;
+	os_memset(tsc, 0, sizeof(tsc));
+	if (nan->cfg->set_group_key(nan->cfg->cb_ctx, alg, broadcast_ether_addr,
+				    nan->bigtk_id, tsc, nan->bigtk.bigtk,
+				    nan->bigtk.bigtk_len,
+				    KEY_FLAG_GROUP_TX_DEFAULT) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to install own BIGTK");
+		return -1;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: New own BIGTK", nan->bigtk.bigtk,
+			nan->bigtk.bigtk_len);
+	return 0;
+}
+
+
 int nan_start(struct nan_data *nan, const struct nan_cluster_config *config)
 {
 	int ret;
@@ -247,7 +287,7 @@ int nan_start(struct nan_data *nan, const struct nan_cluster_config *config)
 	}
 	nan->nan_started = 1;
 
-	if (nan_gen_igtk(nan) < 0) {
+	if (nan_gen_igtk(nan) < 0 || nan_gen_bigtk(nan) < 0) {
 		nan_stop(nan);
 		return -1;
 	}
@@ -308,6 +348,16 @@ void nan_stop(struct nan_data *nan)
 
 		nan->igtk.igtk_len = 0;
 		nan->igtk_id = 0;
+	}
+
+	if (nan->bigtk.bigtk_len) {
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, WPA_ALG_NONE,
+					    NULL, nan->bigtk_id, NULL, NULL,
+					    0, KEY_FLAG_GROUP))
+			wpa_printf(MSG_DEBUG, "NAN: Failed to clear own BIGTK");
+
+		nan->bigtk.bigtk_len = 0;
+		nan->bigtk_id = 0;
 	}
 
 	nan_flush(nan);

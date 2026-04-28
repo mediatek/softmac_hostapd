@@ -809,6 +809,39 @@ static int nan_sec_igtk_kde(struct nan_data *nan, struct wpabuf *buf)
 }
 
 
+static int nan_sec_bigtk_kde(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
+			     struct wpabuf *buf)
+{
+	u8 tsc[RSN_PN_LEN];
+
+	if (((ndp_sec->i_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) != NAN_CS_INFO_CAPA_GTK_SUPP_ALL) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: BIGTK not supported by initiator");
+		return 0;
+	}
+
+	if (((ndp_sec->r_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) != NAN_CS_INFO_CAPA_GTK_SUPP_ALL) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: BIGTK not supported by responder");
+		return 0;
+	}
+
+	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->bigtk_id, tsc) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to get BIGTK seqnum");
+		return -1;
+	}
+
+	nan_add_kde_hdr(buf, RSN_KEY_DATA_BIGTK,
+			WPA_BIGTK_KDE_PREFIX_LEN + nan->bigtk.bigtk_len);
+	wpabuf_put_le16(buf, nan->bigtk_id);
+	wpabuf_put_data(buf, tsc, sizeof(tsc));
+	wpabuf_put_data(buf, nan->bigtk.bigtk, nan->bigtk.bigtk_len);
+	return 0;
+}
+
+
 static bool nan_sec_igtk_supported(struct nan_ndp_sec *ndp_sec)
 {
 	return ((ndp_sec->i_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
@@ -820,7 +853,9 @@ static bool nan_sec_igtk_supported(struct nan_ndp_sec *ndp_sec)
 }
 
 
-#define NAN_KDES_MAX_LEN	(KDE_HDR_LEN + sizeof(struct wpa_igtk_kde))
+#define NAN_KDES_MAX_LEN                                           \
+	(KDE_HDR_LEN + sizeof(struct wpa_igtk_kde) + KDE_HDR_LEN + \
+	 sizeof(struct wpa_bigtk_kde))
 
 static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 			    struct wpabuf *buf)
@@ -847,6 +882,9 @@ static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 	}
 
 	if (nan_sec_igtk_kde(nan, kde_buf) < 0)
+		goto fail;
+
+	if (nan_sec_bigtk_kde(nan, ndp_sec, kde_buf) < 0)
 		goto fail;
 
 	enc_kde = nan_crypto_encrypt_key_data(kde_buf, ndp_sec->ptk.kek,
