@@ -95,7 +95,8 @@ void nan_de_listen_started(struct nan_de *de, unsigned int freq,
 			   unsigned int duration);
 void nan_de_listen_ended(struct nan_de *de, unsigned int freq);
 void nan_de_update_nmi(struct nan_de *de, const u8 *nmi);
-void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst);
+void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst,
+		      const u8 *data, size_t data_len, bool ack);
 void nan_de_tx_wait_ended(struct nan_de *de);
 
 bool nan_de_rx_sdf(struct nan_de *de, const u8 *peer_addr, const u8 *a3,

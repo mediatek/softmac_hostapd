@@ -3719,7 +3719,8 @@ static void wpas_nan_de_tx_status(struct wpa_supplicant *wpa_s,
 		   MAC2STR(dst), MAC2STR(src), MAC2STR(bssid), freq,
 		   data_len, tx_status_result_txt(result));
 
-	nan_de_tx_status(wpa_s->nan_de, freq, dst);
+	nan_de_tx_status(wpa_s->nan_de, freq, dst, data, data_len,
+			 result == OFFCHANNEL_SEND_ACTION_SUCCESS);
 }
 
 

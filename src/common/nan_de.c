@@ -1050,7 +1050,8 @@ void nan_de_update_nmi(struct nan_de *de, const u8 *nmi)
 }
 
 
-void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst)
+void nan_de_tx_status(struct nan_de *de, unsigned int freq, const u8 *dst,
+		      const u8 *data, size_t data_len, bool ack)
 {
 	if (freq == de->tx_wait_status_freq)
 		de->tx_wait_status_freq = 0;
