@@ -837,6 +837,7 @@ struct wpabuf * nan_crypto_derive_nira_tag(const u8 *nik, size_t nik_len,
 int nan_ndp_requested_gtk_csid(struct nan_data *nan,
 			       const struct nan_ndp_id *ndp_id);
 int nan_set_mgmt_group_cipher(struct nan_data *nan, int cipher);
+int nan_set_beacon_prot(struct nan_data *nan, bool enable);
 #ifdef CONFIG_PASN
 int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,

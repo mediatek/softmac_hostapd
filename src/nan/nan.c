@@ -3007,3 +3007,48 @@ int nan_set_mgmt_group_cipher(struct nan_data *nan, int cipher)
 			~NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256;
 	return 0;
 }
+
+
+/**
+ * nan_set_beacon_prot - Enable or disable NAN beacon protection
+ * @nan: Pointer to NAN data structure
+ * @enable: true to enable beacon protection, false to disable
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function enables or disables NAN beacon protection. Beacon protection
+ * can only be changed when NAN is not started. Additionally, the device must
+ * support management frame protection for beacon protection to be enabled.
+ */
+int nan_set_beacon_prot(struct nan_data *nan, bool enable)
+{
+	u8 gtk_supp;
+
+	if (!nan)
+		return -1;
+
+	if (nan->nan_started) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot change beacon protection setting while NAN is started");
+		return -1;
+	}
+
+	if (((nan->cfg->security_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) == NAN_CS_INFO_CAPA_GTK_SUPP_NONE) {
+		if (enable) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Management frame protection is not supported by the device");
+			return -1;
+		}
+		return 0;
+	}
+
+	if (enable)
+		gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_ALL;
+	else
+		gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_NO_BIGTK;
+
+	nan->cfg->security_capab &= ~NAN_CS_INFO_CAPA_GTK_SUPP_MASK;
+	nan->cfg->security_capab |= gtk_supp << NAN_CS_INFO_CAPA_GTK_SUPP_POS;
+
+	return 0;
+}

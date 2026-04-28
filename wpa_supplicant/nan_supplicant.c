@@ -1302,8 +1302,6 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 				       WPA_DRIVER_CAPA_ENC_GCMP_256)) &&
 		    (wpa_s->drv_enc & (WPA_DRIVER_CAPA_ENC_BIP |
 				       WPA_DRIVER_CAPA_ENC_BIP_GMAC_256))) {
-			u8 gtk_supp;
-
 			/*
 			 * By default, use BIP-CMAC-128 cipher suite for
 			 * group keys for maximum compatibility.
@@ -1312,14 +1310,13 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 				nan.security_capab |=
 					NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256;
 
-			if (wpa_s->nan_capa.drv_flags &
-			    WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT)
-				gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_ALL;
-			else
-				gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_NO_BIGTK;
-
+			/*
+			 * By default enable only GTK/IGTK support. Beacon
+			 * protection support can be enabled separately
+			 */
 			nan.security_capab |=
-				gtk_supp << NAN_CS_INFO_CAPA_GTK_SUPP_POS;
+				NAN_CS_INFO_CAPA_GTK_SUPP_NO_BIGTK <<
+				NAN_CS_INFO_CAPA_GTK_SUPP_POS;
 		}
 
 		wpa_printf(MSG_DEBUG, "NAN: security capabilities=0x%02x",
@@ -1673,6 +1670,22 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		}
 
 		return nan_set_mgmt_group_cipher(wpa_s->nan, cipher);
+	}
+
+	if (os_strcmp("beacon_prot", cmd) == 0) {
+		bool val = !!atoi(param);
+
+		if (val && !(wpa_s->nan_capa.drv_flags &
+			     WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Beacon protection not supported by the driver");
+			return -1;
+		}
+
+		if (nan_set_beacon_prot(wpa_s->nan, val) < 0)
+			return -1;
+
+		return 0;
 	}
 
 #ifdef CONFIG_TESTING_OPTIONS
