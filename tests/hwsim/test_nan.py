@@ -1194,7 +1194,7 @@ def _nan_test_connectivity(pub, sub):
                                   max_tries=3, timeout=5, broadcast=False)
 
 def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
-                use_interface_id=False):
+                use_interface_id=False, verify_max_idle_period=False):
     if use_pmk:
         pmk = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         pwd = None
@@ -1224,6 +1224,10 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
         capa = pub.wpas.request("NAN_PEER_INFO " + saddr + " capa")
         logger.info("\n" + capa)
 
+        if verify_max_idle_period:
+            pub.set("max_ndl_idle_period", "10")
+            sub.set("max_ndl_idle_period", "10")
+
         result = _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr,
                                              req_ssi="aabbcc",
                                              resp_ssi="ddeeff", csid=csid,
@@ -1239,14 +1243,47 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
         ndp_id, init_ndi = result
 
         _nan_test_connectivity(pub, sub)
-        _nan_ndp_terminate(pub, sub, paddr, init_ndi, ndp_id)
+
+        if not verify_max_idle_period:
+            _nan_ndp_terminate(pub, sub, paddr, init_ndi, ndp_id)
+            return
+
+        sub_sched = pub.wpas.request("NAN_PEER_INFO " + saddr + " schedule")
+        m = re.search(r'\bmax_idle_period\s*=\s*(\d+)', sub_sched)
+        if not m:
+            raise Exception("max_idle_period not found in peer schedule")
+
+        if int(m.group(1)) != 10:
+            raise Exception(f"Unexpected max_idle_period value in peer schedule: {m.group(1)}")
+
+        pub_sched = sub.wpas.request("NAN_PEER_INFO " + paddr + " schedule")
+        m = re.search(r'\bmax_idle_period\s*=\s*(\d+)', pub_sched)
+        if not m:
+            raise Exception("max_idle_period not found in peer schedule")
+
+        if int(m.group(1)) != 10:
+            raise Exception(f"Unexpected max_idle_period value in peer schedule: {m.group(1)}")
+
+        # Verify that the NDP is terminated due to max idle period (no traffic).
+        # While the max idle period is set to 10 seconds, wait longer as there
+        # is traffic generated internally by the kernel, e.g., IPv6 router
+        # solicitation messages.
+        ev = pub.wpas.wait_event(["NAN-NDP-DISCONNECTED"], timeout=30)
+        if ev is None or "locally_generated=1" not in ev or "reason=1" not in ev:
+            raise Exception(f"NAN-NDP-DISCONNECTED event not seen on publisher or invalid data")
+
+        ev = sub.wpas.wait_event(["NAN-NDP-DISCONNECTED"], timeout=30)
+        if ev is None or "locally_generated=1" not in ev or "reason=1" not in ev:
+            raise Exception(f"NAN-NDP-DISCONNECTED event not seen on subscriber or invalid data")
 
 def run_nan_dp(country="US", counter=False, csid=None, wrong_pwd=False,
-               use_pmk=False, use_interface_id=False):
+               use_pmk=False, use_interface_id=False,
+               verify_max_idle_period=False):
     set_country(country)
     try:
         _run_nan_dp(counter=counter, csid=csid, wrong_pwd=wrong_pwd,
-                    use_pmk=use_pmk, use_interface_id=use_interface_id)
+                    use_pmk=use_pmk, use_interface_id=use_interface_id,
+                    verify_max_idle_period=verify_max_idle_period)
     finally:
         set_country("00")
 
@@ -1833,3 +1870,8 @@ def test_nan_ndp_reconnect_after_terminate(dev, apdev, params):
         _run_nan_ndp_reconnect_after_terminate()
     finally:
         set_country("00")
+
+@long_duration_test
+def test_nan_dp_max_idle_period(dev, apdev, params):
+    """NAN DP open with max idle period verification"""
+    run_nan_dp(use_interface_id=True, verify_max_idle_period=True)
