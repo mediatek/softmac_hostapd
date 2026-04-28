@@ -33,6 +33,7 @@ struct nan_discovery_result {
 	const u8 *peer_addr;
 	bool fsd;
 	bool fsd_gas;
+	bool data_path;
 	const u8 *pmkid_list;
 	unsigned int pmkid_count;
 	const u8 *cipher_suites;
@@ -173,6 +174,9 @@ struct nan_publish_params {
 	 * and received for the service
 	 */
 	bool gtk_required;
+
+	/* Request NAN Data Path */
+	bool data_path;
 };
 
 /* Returns -1 on failure or >0 publish_id */
