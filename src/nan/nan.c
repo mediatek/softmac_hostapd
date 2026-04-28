@@ -124,6 +124,26 @@ static void nan_peer_flush_sec(struct nan_peer_info *info)
 }
 
 
+static void nan_peer_del_sec_entry(struct nan_peer_info *info,
+				   const u8 *peer_ndi)
+{
+	struct nan_peer_sec_info_entry *cur, *next;
+
+	dl_list_for_each_safe(cur, next, &info->sec,
+			      struct nan_peer_sec_info_entry, list) {
+		if (!ether_addr_equal(cur->peer_ndi, peer_ndi))
+			continue;
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Removing sec entry for peer_ndi=" MACSTR
+			   " local_ndi=" MACSTR,
+			   MAC2STR(peer_ndi), MAC2STR(cur->local_ndi));
+		dl_list_del(&cur->list);
+		bin_clear_free(cur, sizeof(*cur));
+	}
+}
+
+
 static void nan_remove_group_keys(struct nan_data *nan, struct nan_peer *peer)
 {
 	if (peer->igtk_id) {
@@ -1715,6 +1735,10 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 	 */
 	remove_sta = !nan_peer_ndi_in_use(peer, peer_ndi);
 
+	/* Remove sec entry if no other NDP is using this peer NDI */
+	if (remove_sta)
+		nan_peer_del_sec_entry(&peer->info, peer_ndi);
+
 	/*
 	 * NAN_NDP_STATE_NONE means the NDP was not in progress, thus
 	 * the failure flag should be false.
@@ -2305,6 +2329,10 @@ void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 	 * from peer->ndps before this function is called.
 	 */
 	bool remove_sta = !nan_peer_ndi_in_use(peer, peer_ndi);
+
+	/* Remove sec entry if no other NDP is using this peer NDI */
+	if (remove_sta)
+		nan_peer_del_sec_entry(&peer->info, peer_ndi);
 
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, ndp_id, local_ndi,
