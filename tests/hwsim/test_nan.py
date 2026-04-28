@@ -95,7 +95,8 @@ class NanDevice:
 
     def publish(self, service_name, ssi=None, unsolicited=1, solicited=1,
                 sync=1, match_filter_rx=None, match_filter_tx=None,
-                close_proximity=0, pbm=0, nd_pmk=None, cipher_suites=None):
+                close_proximity=0, pbm=0, nd_pmk=None, cipher_suites=None,
+                ttl=None):
 
         cmd = f"NAN_PUBLISH service_name={service_name} sync={sync} srv_proto_type=2 fsd=0"
 
@@ -122,6 +123,9 @@ class NanDevice:
 
         if nd_pmk is not None:
             cmd += f" nd_pmk={nd_pmk}"
+
+        if ttl is not None:
+            cmd += f" ttl={ttl}"
 
         return self.wpas.request(cmd)
 
@@ -1017,11 +1021,11 @@ def test_nan_sched(dev, apdev, params):
     finally:
         set_country("00")
 
-def _nan_discover_service(pub, sub, service_name, pssi, sssi):
+def _nan_discover_service(pub, sub, service_name, pssi, sssi, ttl=None):
     paddr = pub.wpas.own_addr()
     saddr = sub.wpas.own_addr()
 
-    pid = pub.publish(service_name, ssi=pssi)
+    pid = pub.publish(service_name, ssi=pssi, ttl=ttl)
     sid = sub.subscribe(service_name, ssi=sssi, active=0)
 
     logger.info(f"Publish ID: {pid}, Subscribe ID: {sid}")
