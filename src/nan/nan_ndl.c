@@ -1200,6 +1200,7 @@ int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
 
 	params.status = BITS(ndl_attr->type_and_status, NAN_NDL_STATUS_MASK,
 			     NAN_NDL_STATUS_POS);
+	params.reason = ndl_attr->reason_code;
 	control = le_to_host16(ndl_attr->ctrl);
 
 	if (peer->ndl)
@@ -1267,7 +1268,7 @@ int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
 		ndc_ok = 0;
 	}
 
-	if (!ndc_ok) {
+	if (!ndc_ok && params.status != NAN_NDL_STATUS_REJECTED) {
 		wpa_printf(MSG_DEBUG, "NAN: NDL: Missing valid selected NDC");
 		return -1;
 	}
