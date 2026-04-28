@@ -14525,11 +14525,12 @@ static int wpa_supplicant_global_iface_add(struct wpa_global *global,
 	struct wpa_supplicant *wpa_s;
 	unsigned int create_iface = 0;
 	u8 mac_addr[ETH_ALEN];
+	const u8 *addr_ptr = NULL;
 	enum wpa_driver_if_type type = WPA_IF_STATION;
 
 	/*
 	 * <ifname>TAB<confname>TAB<driver>TAB<ctrl_interface>TAB<driver_param>
-	 * TAB<bridge_ifname>[TAB<create>[TAB<interface_type>]]
+	 * TAB<bridge_ifname>[TAB<create>[TAB<interface_type>][TAB<addr>]]
 	 */
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE GLOBAL INTERFACE_ADD '%s'", cmd);
 
@@ -14602,6 +14603,10 @@ static int wpa_supplicant_global_iface_add(struct wpa_global *global,
 			if (!pos)
 				break;
 
+			extra = os_strchr(pos, '\t');
+			if (extra)
+				*extra++ = '\0';
+
 			if (os_strcmp(pos, "sta") == 0) {
 				type = WPA_IF_STATION;
 			} else if (os_strcmp(pos, "ap") == 0) {
@@ -14618,6 +14623,19 @@ static int wpa_supplicant_global_iface_add(struct wpa_global *global,
 					   pos);
 				return -1;
 			}
+
+			pos = extra;
+			if (!pos || !pos[0])
+				break;
+
+			if (hwaddr_aton(pos, mac_addr)) {
+				wpa_printf(MSG_DEBUG,
+					   "INTERFACE_ADD invalid MAC address: '%s'",
+					   pos);
+				return -1;
+			}
+
+			addr_ptr = mac_addr;
 		} else {
 			wpa_printf(MSG_DEBUG,
 				   "INTERFACE_ADD unsupported extra parameter: '%s'",
@@ -14632,7 +14650,7 @@ static int wpa_supplicant_global_iface_add(struct wpa_global *global,
 		if (!global->ifaces)
 			return -1;
 		if (wpa_drv_if_add(global->ifaces, type, iface.ifname,
-				   NULL, NULL, NULL, mac_addr, NULL) < 0) {
+				   addr_ptr, NULL, NULL, mac_addr, NULL) < 0) {
 			wpa_printf(MSG_ERROR,
 				   "CTRL_IFACE interface creation failed");
 			return -1;
