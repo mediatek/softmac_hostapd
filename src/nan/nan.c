@@ -1508,6 +1508,13 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 	params.ssi = peer->ndp_setup.ssi;
 	params.ssi_len = peer->ndp_setup.ssi_len;
 
+	if (peer->ndp_setup.peer_interface_id_valid) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP connected with peer interface id");
+
+		params.interface_id = peer->ndp_setup.peer_interface_id;
+	}
+
 	if (peer->ndp_setup.ndp->initiator) {
 		params.local_ndi = peer->ndp_setup.ndp->init_ndi;
 		params.peer_ndi = peer->ndp_setup.ndp->resp_ndi;

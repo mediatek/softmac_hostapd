@@ -223,6 +223,9 @@ struct nan_ndp_sec_params {
  * @reason_code: In case of rejected response, the rejection reason.
  * @sched_valid: Indicates whether the schedule field is valid
  * @sched: The NAN schedule associated with the NDP parameters
+ * @interface_id: The interface identifier to be used for the NDP. The interface
+ *    identifier is used to derive the IPv6 link-local address as specified in
+ *    Wi-Fi Aware specification v4.0, Table 90 (IPv6 Link Local TLV format).
  */
 struct nan_ndp_params {
 	enum nan_ndp_action type;
@@ -253,6 +256,7 @@ struct nan_ndp_params {
 
 	bool sched_valid;
 	struct nan_schedule sched;
+	const u8 *interface_id;
 };
 
 /**
@@ -289,6 +293,7 @@ struct nan_channels {
  * @first_ndp: Whether this is the first NDP with the peer
  * @new_ndi_sta: Whether a new NDI station needs to be added (peer_ndi not
  * 	already used by another NDP with this peer)
+ * @interface_id: The interface identifier to be used by the peer for the NDP
  */
 struct nan_ndp_connection_params {
 	struct nan_ndp_id ndp_id;
@@ -299,6 +304,7 @@ struct nan_ndp_connection_params {
 	bool install_keys;
 	bool first_ndp;
 	bool new_ndi_sta;
+	const u8 *interface_id;
 };
 
 /**

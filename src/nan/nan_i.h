@@ -163,6 +163,12 @@ struct nan_ndp {
  * @ssi_len: Service specific information length
  * @service_id: Service ID of the service used for NDP setup
  * @sec: NDP security data
+ * @local_interface_id_valid: Indicates whether the &local_interface_id
+ *      field is valid.
+ * @local_interface_id: The local interface identifier to be used for the NDP
+ * @peer_interface_id_valid: Indicates whether the &peer_interface_id
+ *      field is valid.
+ * @peer_interface_id: The peer interface identifier to be used for the NDP
  */
 struct nan_ndp_setup {
 	struct nan_ndp *ndp;
@@ -177,6 +183,11 @@ struct nan_ndp_setup {
 
 	u8 service_id[NAN_SERVICE_ID_LEN];
 	struct nan_ndp_sec sec;
+
+	bool local_interface_id_valid;
+	u8 local_interface_id[NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN];
+	bool peer_interface_id_valid;
+	u8 peer_interface_id[NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN];
 };
 
 /**

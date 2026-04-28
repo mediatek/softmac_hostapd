@@ -147,6 +147,17 @@ int nan_ndp_setup_req(struct nan_data *nan, struct nan_peer *peer,
 			peer->ndp_setup.publish_inst_id;
 	}
 
+	if (params->interface_id) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP setup request with local interface id");
+
+		os_memcpy(peer->ndp_setup.local_interface_id,
+			  params->interface_id,
+			  NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
+
+		peer->ndp_setup.local_interface_id_valid = true;
+	}
+
 	nan_ndp_set_state(nan, &peer->ndp_setup, NAN_NDP_STATE_START);
 	peer->ndp_setup.status = NAN_NDP_STATUS_CONTINUED;
 	return 0;
@@ -240,6 +251,17 @@ int nan_ndp_setup_resp(struct nan_data *nan, struct nan_peer *peer,
 	if (ret)
 		return ret;
 
+	if (params->interface_id) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP setup response with local interface id");
+
+		os_memcpy(peer->ndp_setup.local_interface_id,
+			  params->interface_id,
+			  NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
+
+		peer->ndp_setup.local_interface_id_valid = true;
+	}
+
 	return 0;
 }
 
@@ -264,6 +286,18 @@ static int nan_ndp_attr_handle_tlvs(struct nan_data *nan,
 		}
 
 		switch (tlv_type) {
+		case NAN_NDPE_TLV_IPV6_LINK_LOCAL:
+			if (tlv_len != NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: NDP: req: Invalid interface ID tlv len=%u",
+					   tlv_len);
+				break;
+			}
+
+			peer->ndp_setup.peer_interface_id_valid = true;
+			os_memcpy(peer->ndp_setup.peer_interface_id, tlv_data,
+				  NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
+			break;
 		case NAN_NDPE_TLV_SRV_INFO:
 			wpa_printf(MSG_DEBUG,
 				   "NAN: NDP: Handle NDP service specific information");
@@ -951,6 +985,13 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 			wpabuf_put_data(buf, ndp_setup->ssi,
 					ndp_setup->ssi_len);
 		}
+	}
+
+	if (ndpe_supported && ndp_setup->local_interface_id_valid) {
+		wpabuf_put_u8(buf, NAN_NDPE_TLV_IPV6_LINK_LOCAL);
+		wpabuf_put_le16(buf, NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
+		wpabuf_put_data(buf, ndp_setup->local_interface_id,
+				NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
 	}
 
 	WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
