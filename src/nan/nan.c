@@ -24,6 +24,8 @@ static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx);
 static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 				 enum nan_reason reason,
 				 bool locally_generated);
+static void nan_set_peer_timeout(struct nan_data *nan, struct nan_peer *peer,
+				 unsigned int sec, unsigned int usec);
 
 
 struct nan_data * nan_init(const struct nan_config *cfg)
@@ -1379,7 +1381,42 @@ static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx)
 	if (!peer->ndp_setup.ndp)
 		return;
 
-	nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON, true);
+	/* If we already sent termination just disconnect */
+	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
+	    peer->ndp_setup.status == NAN_NDP_STATUS_REJECTED) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Timeout (NDP setup is done), disconnecting");
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     true);
+		return;
+	}
+
+	/*
+	 * Send NDP Termination to notify the peer about the timeout.
+	 * Prepare the state for building a termination frame.
+	 */
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP: state: %u --> %u (timeout termination)",
+		   peer->ndp_setup.state, NAN_NDP_STATE_DONE);
+
+	peer->ndp_setup.state = NAN_NDP_STATE_DONE;
+	peer->ndp_setup.status = NAN_NDP_STATUS_REJECTED;
+	peer->ndp_setup.reason = NAN_REASON_UNSPECIFIED_REASON;
+
+	if (nan_action_send(nan, peer, NAN_SUBTYPE_DATA_PATH_TERMINATION)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Failed to send termination on timeout");
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     true);
+		return;
+	}
+
+	/*
+	 * Termination frame sent successfully. Set a short timeout to wait
+	 * for TX status. The TX status handler (nan_tx_status) will call
+	 * nan_ndp_disconnected().
+	 */
+	nan_set_peer_timeout(nan, peer, NAN_NDP_SETUP_TIMEOUT_SHORT, 0);
 }
 
 
