@@ -1409,9 +1409,10 @@ void wpas_notify_nan_ndp_connected(struct wpa_supplicant *wpa_s,
 				   const u8 *peer_nmi, u32 ndp_id,
 				   const u8 *local_ndi,
 				   const u8 *peer_ndi,
-				   const u8 *ssi, size_t ssi_len)
+				   const u8 *ssi, size_t ssi_len,
+				   const u8 *interface_id)
 {
-	char *ssi_hex = NULL;
+	char *ssi_hex = NULL, *interface_id_hex = NULL;
 
 	if (ssi) {
 		ssi_hex = os_zalloc(2 * ssi_len + 1);
@@ -1421,13 +1422,28 @@ void wpas_notify_nan_ndp_connected(struct wpa_supplicant *wpa_s,
 		wpa_snprintf_hex(ssi_hex, 2 * ssi_len + 1, ssi, ssi_len);
 	}
 
+	if (interface_id) {
+		interface_id_hex =
+			os_zalloc(2 * NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN + 1);
+		if (!interface_id_hex)
+			return;
+
+		wpa_snprintf_hex(interface_id_hex,
+				 2 * NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN + 1,
+				 interface_id,
+				 NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN);
+	}
+
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_CONNECTED "peer=" MACSTR
 		       " ndp_id=%u local_ndi=" MACSTR
-		       " peer_ndi=" MACSTR " ssi=%s",
-		       MAC2STR(peer_nmi), ndp_id, MAC2STR(local_ndi),
-		       MAC2STR(peer_ndi), ssi_hex ? ssi_hex : "");
+		       " peer_ndi=" MACSTR " ssi=%s interface_id=%s",
+		       MAC2STR(peer_nmi), ndp_id,
+		       MAC2STR(local_ndi), MAC2STR(peer_ndi),
+		       ssi_hex ? ssi_hex : "",
+		       interface_id ? interface_id_hex : "");
 
 	os_free(ssi_hex);
+	os_free(interface_id_hex);
 }
 
 

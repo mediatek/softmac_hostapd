@@ -238,7 +238,8 @@ void wpas_notify_nan_ndp_counter_request(struct wpa_supplicant *wpa_s,
 void wpas_notify_nan_ndp_connected(struct wpa_supplicant *wpa_s,
 				   const u8 *peer_nmi, u32 ndp_id,
 				   const u8 *local_ndi, const u8 *peer_ndi,
-				   const u8 *ssi, size_t ssi_len);
+				   const u8 *ssi, size_t ssi_len,
+				   const u8 *interface_id);
 void wpas_notify_nan_ndp_disconnected(struct wpa_supplicant *wpa_s,
 				      const u8 *peer_nmi, u32 ndp_id,
 				      const u8 *local_ndi, const u8 *peer_ndi,
