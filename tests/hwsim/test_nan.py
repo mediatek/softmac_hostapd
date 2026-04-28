@@ -102,7 +102,7 @@ class NanDevice:
     def publish(self, service_name, ssi=None, unsolicited=1, solicited=1,
                 sync=1, match_filter_rx=None, match_filter_tx=None,
                 close_proximity=0, pbm=0, nd_pmk=None, cipher_suites=None,
-                ttl=None):
+                ttl=None, data_path=False):
 
         cmd = f"NAN_PUBLISH service_name={service_name} sync={sync} srv_proto_type=2 fsd=0"
 
@@ -132,6 +132,9 @@ class NanDevice:
 
         if ttl is not None:
             cmd += f" ttl={ttl}"
+
+        if data_path:
+            cmd += " data_path=1"
 
         return self.wpas.request(cmd)
 
@@ -314,7 +317,7 @@ def split_nan_event(ev):
             vals[name] = val
     return vals
 
-def nan_sync_verify_event(ev, addr, pid, sid, ssi):
+def nan_sync_verify_event(ev, addr, pid, sid, ssi, data_path=None):
     data = split_nan_event(ev)
 
     if data['srv_proto_type'] != '2':
@@ -331,6 +334,9 @@ def nan_sync_verify_event(ev, addr, pid, sid, ssi):
 
     if data['address'] != addr:
         raise Exception("Unexpected peer_addr: " + ev)
+
+    if data_path is not None and int(data.get('data_path', 0)) != int(data_path):
+        raise Exception(f"Unexpected data_path: got {data.get('data_path')}, expected {int(data_path)} in event: " + ev)
 
 def nan_ndp_verify_event(ev, peer_nmi, publish_inst_id=None, init_ndi=None,
                          ssi=None, csid=None):
@@ -1055,7 +1061,7 @@ def test_nan_sched(dev, apdev, params):
         set_country("00")
 
 def _nan_discover_service(pub, sub, service_name, pssi, sssi, ttl=None,
-                          csid=None, gtk_csid=None):
+                          csid=None, gtk_csid=None, data_path=False):
     paddr = pub.wpas.own_addr()
     saddr = sub.wpas.own_addr()
 
@@ -1066,7 +1072,8 @@ def _nan_discover_service(pub, sub, service_name, pssi, sssi, ttl=None,
             cipher_suites += f",{gtk_csid}"
 
     pid = pub.publish(service_name, ssi=pssi, ttl=ttl,
-                      cipher_suites=cipher_suites)
+                      cipher_suites=cipher_suites,
+                      data_path=data_path)
     sid = sub.subscribe(service_name, ssi=sssi, active=0)
 
     logger.info(f"Publish ID: {pid}, Subscribe ID: {sid}")
@@ -1075,7 +1082,7 @@ def _nan_discover_service(pub, sub, service_name, pssi, sssi, ttl=None,
     if ev is None:
         raise Exception(f"NAN-DISCOVERY-RESULT event not seen for {service_name}")
 
-    nan_sync_verify_event(ev, paddr, pid, sid, pssi)
+    nan_sync_verify_event(ev, paddr, pid, sid, pssi, data_path=data_path)
 
     return pid, sid, paddr, saddr
 
@@ -1247,7 +1254,8 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
         pid, sid, paddr, saddr= _nan_discover_service(pub, sub, "test_service",
                                                       pssi, sssi,
                                                       csid=csid,
-                                                      gtk_csid=gtk_csid)
+                                                      gtk_csid=gtk_csid,
+                                                      data_path=True)
 
         # Log peer info (specific to this test)
         peer_schedule = pub.wpas.request("NAN_PEER_INFO " + saddr + " schedule")
@@ -1364,7 +1372,8 @@ def _run_nan_dp_2_ndps(secure_ndp2=False):
 
         # First NDP (always open)
         pid1, sid1, paddr, saddr = _nan_discover_service(pub, sub,
-                                                         "test_service1", pssi, sssi)
+                                                         "test_service1", pssi,
+                                                         sssi, data_path=True)
 
         ndp_id1, init_ndi1 = _nan_ndp_request_and_accept(pub, sub, pid1, sid1,
                                                          paddr, saddr,
@@ -1376,7 +1385,7 @@ def _run_nan_dp_2_ndps(secure_ndp2=False):
 
         # Second NDP (open or secure based on secure_ndp2)
         pid2, sid2, _, _ = _nan_discover_service(pub, sub, "test_service2",
-                                                 pssi, sssi)
+                                                 pssi, sssi, data_path=True)
 
         # Schedule already configured
         ndp_id2, init_ndi2 = _nan_ndp_request_and_accept(pub, sub, pid2, sid2,
@@ -1789,7 +1798,8 @@ def _run_nan_pairing_bootstrap_ndp(pairing_type, password=None, csid=1):
         pssi = "aabbccdd"
         sssi = "ddbbccaa"
 
-        pid = pub.publish("test_service", ssi=pssi, unsolicited=0, pbm=0x1)
+        pid = pub.publish("test_service", ssi=pssi, unsolicited=0, pbm=0x1,
+                          data_path=True)
         sid = sub.subscribe("test_service", ssi=sssi)
 
         logger.info(f"Publish ID: {pid}, Subscribe ID: {sid}")
@@ -1798,7 +1808,7 @@ def _run_nan_pairing_bootstrap_ndp(pairing_type, password=None, csid=1):
         if ev is None:
             raise Exception("NAN-DISCOVERY-RESULT event not seen")
 
-        nan_sync_verify_event(ev, paddr, pid, sid, pssi)
+        nan_sync_verify_event(ev, paddr, pid, sid, pssi, data_path=True)
 
         ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
         if ev is None:
@@ -1841,7 +1851,7 @@ def _run_nan_pairing_bootstrap_ndp(pairing_type, password=None, csid=1):
         if ev is None:
             raise Exception("NAN-DISCOVERY-RESULT event not seen")
 
-        nan_sync_verify_event(ev, paddr, pid, sid, pssi)
+        nan_sync_verify_event(ev, paddr, pid, sid, pssi, data_path=True)
 
         ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
         if ev is None:
@@ -1871,7 +1881,8 @@ def _run_nan_ndp_reconnect_after_terminate():
 
         # First service discovery and NDP
         pid, sid, paddr, saddr = _nan_discover_service(pub, sub, "test_service",
-                                                       pssi, sssi, ttl=10)
+                                                       pssi, sssi, ttl=10,
+                                                       data_path=True)
 
         logger.info("Starting first NDP connection...")
         ndp_id1, init_ndi1 = _nan_ndp_request_and_accept(pub, sub, pid, sid,
