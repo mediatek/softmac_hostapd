@@ -1177,3 +1177,38 @@ int nan_ndp_term_req(struct nan_data *nan, struct nan_peer *peer,
 	peer->ndp_setup.reason = NAN_REASON_UNSPECIFIED_REASON;
 	return 0;
 }
+
+
+/**
+ * nan_ndp_requested_gtk_csid - Get the GTK CSID requested by peer for NDP setup
+ * @nan: NAN module context from nan_init()
+ * @ndp_id: NDP identifier
+ * Returns: The GTK CSID requested by peer, or NAN_CS_NONE if no matching NDP is
+ *	found or GTK is not requested by peer.
+ */
+int nan_ndp_requested_gtk_csid(struct nan_data *nan,
+			       const struct nan_ndp_id *ndp_id)
+{
+	struct nan_peer *peer;
+
+	peer = nan_get_peer(nan, ndp_id->peer_nmi);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP: No matching peer found for GTK CSID request");
+		return NAN_CS_NONE;
+	}
+
+	if (!peer->ndp_setup.ndp ||
+	    peer->ndp_setup.ndp->ndp_id != ndp_id->id ||
+	    !ether_addr_equal(peer->ndp_setup.ndp->init_ndi,
+			      ndp_id->init_ndi)) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP: No matching NDP found for GTK CSID request");
+		return NAN_CS_NONE;
+	}
+
+	if (peer->ndp_setup.state != NAN_NDP_STATE_REQ_RECV)
+		return NAN_CS_NONE;
+
+	return peer->ndp_setup.sec.peer_gtk.csid;
+}
