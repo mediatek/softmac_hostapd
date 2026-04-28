@@ -119,7 +119,7 @@ static void nan_peer_flush_sec(struct nan_peer_info *info)
 	dl_list_for_each_safe(cur, next, &info->sec,
 			      struct nan_peer_sec_info_entry, list) {
 		dl_list_del(&cur->list);
-		os_free(cur);
+		bin_clear_free(cur, sizeof(*cur));
 	}
 }
 
