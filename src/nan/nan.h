@@ -493,6 +493,8 @@ struct nan_config {
 	 * @reason: Disconnection reason
 	 * @locally_generated: true if the disconnection was locally generated,
 	 *     false if triggered by the peer
+	 * @remove_sta: true if the NDI station should be removed (no other NDPs
+	 *     using the same peer NDI)
 	 *
 	 * This callback notifies that an NDP has been disconnected. It can be
 	 * called both during NDP establishment (indicating failure) or after
@@ -501,7 +503,7 @@ struct nan_config {
 	void (*ndp_disconnected)(void *ctx, struct nan_ndp_id *ndp_id,
 				 const u8 *local_ndi, const u8 *peer_ndi,
 				 enum nan_reason reason,
-				 bool locally_generated);
+				 bool locally_generated, bool remove_sta);
 
 	/**
 	 * get_chans - Get the prioritized allowed channel information to be

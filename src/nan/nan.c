@@ -1506,6 +1506,7 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 {
 	const u8 *local_ndi, *peer_ndi;
 	struct nan_ndp_id ndp_id;
+	bool remove_sta;
 
 	os_memset(&ndp_id, 0, sizeof(ndp_id));
 
@@ -1525,10 +1526,17 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 		peer_ndi = peer->ndp_setup.ndp->init_ndi;
 	}
 
+	/*
+	 * Remove the NDI station only if no other NDP is using the same
+	 * peer NDI address. The disconnecting NDP is in ndp_setup.ndp
+	 * (not in peer->ndps), so checking peer->ndps is sufficient.
+	 */
+	remove_sta = !nan_peer_ndi_in_use(peer, peer_ndi);
+
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
 					   local_ndi, peer_ndi, reason,
-					   locally_generated);
+					   locally_generated, remove_sta);
 
 	nan_ndp_setup_stop(nan, peer);
 }
@@ -2094,9 +2102,16 @@ void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 			struct nan_ndp_id *ndp_id, const u8 *local_ndi,
 			const u8 *peer_ndi, enum nan_reason reason)
 {
+	/*
+	 * Remove the NDI station only if no other NDP is using the same
+	 * peer NDI address. The terminated NDP has already been removed
+	 * from peer->ndps before this function is called.
+	 */
+	bool remove_sta = !nan_peer_ndi_in_use(peer, peer_ndi);
+
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, ndp_id, local_ndi,
-					   peer_ndi, reason, false);
+					   peer_ndi, reason, false, remove_sta);
 
 	/* Need to also remove the NDL if it is not needed */
 	if (dl_list_empty(&peer->ndps) && !peer->ndp_setup.ndp)

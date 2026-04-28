@@ -572,7 +572,8 @@ remove_sta:
 
 static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 				    const u8 *local_ndi,
-				    const u8 *peer_ndi)
+				    const u8 *peer_ndi,
+				    bool remove_sta)
 {
 	struct wpa_supplicant *ndi_wpa_s;
 
@@ -584,14 +585,6 @@ static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 		return;
 	}
 
-	if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
-				  0, ~WPA_STA_AUTHORIZED))
-		wpa_printf(MSG_DEBUG,
-			   "NAN: Failed to clear authorized flag for NDI station");
-
-	wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
-	wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
-
 	if (!ndi_wpa_s->nan_ndi_ndp_refcount)
 		return;
 
@@ -599,6 +592,20 @@ static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 	wpa_printf(MSG_DEBUG, "NAN: NDP refcount decremented to %u (peer_ndi="
 		   MACSTR ")", ndi_wpa_s->nan_ndi_ndp_refcount,
 		   MAC2STR(peer_ndi));
+
+	/* Only remove the NDI station if no other NDP is using the same
+	 * peer NDI address
+	 */
+	if (remove_sta) {
+		if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi,
+					  WPA_STA_AUTHORIZED, 0,
+					  ~WPA_STA_AUTHORIZED))
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to clear authorized flag for NDI station");
+
+		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+	}
 
 	/* Set operstate DORMANT only when the last NDP is removed from this NDI
 	 */
@@ -634,11 +641,12 @@ static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 					 const u8 *local_ndi,
 					 const u8 *peer_ndi,
 					 enum nan_reason reason,
-					 bool locally_generated)
+					 bool locally_generated,
+					 bool remove_sta)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi);
+	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi, remove_sta);
 	wpas_notify_nan_ndp_disconnected(wpa_s, ndp_id->peer_nmi,
 					 ndp_id->id, local_ndi, peer_ndi,
 					 reason, locally_generated);
