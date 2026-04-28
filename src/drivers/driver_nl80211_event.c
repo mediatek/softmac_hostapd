@@ -4359,6 +4359,26 @@ nl80211_nan_sched_update_done_event(struct wpa_driver_nl80211_data *drv,
 	wpa_supplicant_event(drv->ctx, EVENT_NAN_SCHED_UPDATE_DONE, &data);
 }
 
+
+static void nl80211_nan_ulw_update_event(struct wpa_driver_nl80211_data *drv,
+					 struct nlattr **tb)
+{
+	union wpa_event_data data;
+
+	wpa_printf(MSG_DEBUG, "nl80211: NAN ULW update event");
+
+	os_memset(&data, 0, sizeof(data));
+
+	if (tb[NL80211_ATTR_NAN_ULW]) {
+		data.nan_ulw_update_info.ulw =
+			nla_data(tb[NL80211_ATTR_NAN_ULW]);
+		data.nan_ulw_update_info.ulw_len =
+			nla_len(tb[NL80211_ATTR_NAN_ULW]);
+	}
+
+	wpa_supplicant_event(drv->ctx, EVENT_NAN_ULW_UPDATE, &data);
+}
+
 #endif /* CONFIG_NAN */
 
 
@@ -4732,6 +4752,9 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		break;
 	case NL80211_CMD_NAN_SCHED_UPDATE_DONE:
 		nl80211_nan_sched_update_done_event(drv, tb);
+		break;
+	case NL80211_CMD_NAN_ULW_UPDATE:
+		nl80211_nan_ulw_update_event(drv, tb);
 		break;
 #endif /* CONFIG_NAN */
 	case NL80211_CMD_INCUMBENT_SIGNAL_DETECT:
