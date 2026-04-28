@@ -144,6 +144,7 @@ enum nan_ndp_state {
  * @resp_ndi: Responder NDI. Might not always be set (as this depends on the
  *     state of NDP establishment and the status).
  * @qos: QoS requirements for this NDP
+ * @gtk_id: GTK key ID used for this NDP; 0 if GTK is not used
  */
 struct nan_ndp {
 	/* for nan_peer ndps list */
@@ -155,6 +156,7 @@ struct nan_ndp {
 	u8 resp_ndi[ETH_ALEN];
 
 	struct nan_qos qos;
+	u8 gtk_id;
 };
 
 /*
@@ -764,7 +766,7 @@ struct bitfield * nan_avail_entries_to_bf(struct nan_data *nan,
 					  u8 op_class, u16 cbm, u16 pri_cbm);
 void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 			struct nan_ndp_id *ndp_id, const u8 *local_ndi,
-			const u8 *peer_ndi, enum nan_reason reason);
+			const u8 *peer_ndi, enum nan_reason reason, u8 gtk_id);
 int nan_crypto_pmk_to_ptk(const u8 *pmk, const u8 *iaddr, const u8 *raddr,
 			  const u8 *inonce, const u8 *rnonce,
 			  struct nan_ptk *ptk,

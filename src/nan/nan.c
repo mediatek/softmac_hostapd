@@ -1659,7 +1659,8 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 	if (peer->ndp_setup.sec.local_gtk.csid != NAN_CS_NONE)
 		params.local_gtk = &peer->ndp_setup.sec.local_gtk;
 
-	if (peer->ndp_setup.sec.peer_gtk.csid != NAN_CS_NONE) {
+	peer->ndp_setup.ndp->gtk_id = peer->ndp_setup.sec.peer_gtk.id;
+	if (peer->ndp_setup.sec.peer_gtk.id) {
 		params.peer_gtk = &peer->ndp_setup.sec.peer_gtk;
 		params.peer_gtk_rsc = peer->ndp_setup.sec.peer_gtk_rsc;
 	}
@@ -1724,7 +1725,7 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
 					   local_ndi, peer_ndi, reason,
 					   locally_generated, remove_sta,
-					   fail);
+					   fail, peer->ndp_setup.ndp->gtk_id);
 
 	nan_ndp_setup_stop(nan, peer);
 }
@@ -2296,7 +2297,7 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 
 void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 			struct nan_ndp_id *ndp_id, const u8 *local_ndi,
-			const u8 *peer_ndi, enum nan_reason reason)
+			const u8 *peer_ndi, enum nan_reason reason, u8 gtk_id)
 {
 	/*
 	 * Remove the NDI station only if no other NDP is using the same
@@ -2308,7 +2309,7 @@ void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, ndp_id, local_ndi,
 					   peer_ndi, reason, false, remove_sta,
-					   false);
+					   false, gtk_id);
 
 	/* Need to also remove the NDL if it is not needed */
 	if (dl_list_empty(&peer->ndps) && !peer->ndp_setup.ndp)

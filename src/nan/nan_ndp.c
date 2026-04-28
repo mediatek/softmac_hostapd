@@ -770,7 +770,7 @@ static int nan_ndp_attr_handle_term(struct nan_data *nan, struct nan_peer *peer,
 	dl_list_del(&pndp->list);
 
 	nan_ndp_terminated(nan, peer, &ndp_id, local_ndi, peer_ndi,
-			   ndp_attr->reason_code);
+			   ndp_attr->reason_code, pndp->gtk_id);
 
 	os_free(pndp);
 

@@ -532,6 +532,7 @@ struct nan_config {
 	 *     using the same peer NDI)
 	 * @failure: true if NDP setup failed (before connected), false if
 	 *     graceful disconnection after NDP was established
+	 * @gtk_id: GTK key ID used for the NDP; 0 if no GTK should be removed
 	 *
 	 * This callback notifies that an NDP has been disconnected. When
 	 * @failure is true, NDP setup failed before connection was established.
@@ -542,7 +543,7 @@ struct nan_config {
 				 const u8 *local_ndi, const u8 *peer_ndi,
 				 enum nan_reason reason,
 				 bool locally_generated, bool remove_sta,
-				 bool failure);
+				 bool failure, u8 gtk_id);
 
 	/**
 	 * get_chans - Get the prioritized allowed channel information to be

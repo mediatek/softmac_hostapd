@@ -641,7 +641,7 @@ static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 					 enum nan_reason reason,
 					 bool locally_generated,
 					 bool remove_sta,
-					 bool failure)
+					 bool failure, u8 gtk_id)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 

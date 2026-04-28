@@ -642,6 +642,7 @@ static int nan_test_ndp_connected_cb(void *ctx,
  * @locally_generated: true if locally generated, false if triggered by peer
  * @remove_sta: true if the NDI station should be removed
  * @failure: true if NDP setup failed, false if graceful disconnection
+ * @gtk_id: GTK key ID used for the NDP; 0 if no GTK was used
  *
  * The handling of the event is done asynchronously through the NAN test actions
  * processing.
@@ -652,7 +653,8 @@ static void nan_test_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 					 enum nan_reason reason,
 					 bool locally_generated,
 					 bool remove_sta,
-					 bool failure)
+					 bool failure,
+					 u8 gtk_id)
 {
 	struct nan_device *dev = ctx;
 
