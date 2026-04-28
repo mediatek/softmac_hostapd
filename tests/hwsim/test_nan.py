@@ -1534,10 +1534,15 @@ def test_nan_pair_abort(dev, apdev, params):
         if ev_pub is None:
             raise Exception("PASN pairing request not seen on publisher")
 
-        if "OK" not in sub.pair_abort(paddr):
-            raise Exception("NAN_PAIR_ABORT failed on subscriber")
         if "OK" not in pub.pair_abort(saddr):
             raise Exception("NAN_PAIR_ABORT failed on publisher")
+
+        # The subscriber should get a failure result
+        ev_sub = sub.wpas.wait_event(["NAN-PAIRING-STATUS"], timeout=5)
+        if ev_sub is None:
+            raise Exception("PASN result not seen on subscriber")
+        if "status=failure" not in ev_sub:
+            raise Exception("NAN pairing failed status not seen on subscriber after abort")
 
         # After abort, we should be able to restart pairing successfully
         sub.pairing_request(pub, sid, pid, "SAE", responder=False,

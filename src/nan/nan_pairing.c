@@ -13,6 +13,15 @@
 #include "pasn/pasn_common.h"
 #include "nan/nan_i.h"
 
+static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
+					   struct nan_peer *peer,
+					   struct wpabuf *extra_ies,
+					   int publish_id, int auth_mode);
+static int nan_pairing_pasn_initialize(struct nan_data *nan_data,
+				       struct nan_peer *peer, u8 auth_mode,
+				       int cipher, const char *password,
+				       enum nan_pairing_role self_role);
+
 /**
  * nan_nira_get_tag_nonce - Generate NIRA nonce and compute NIRA tag
  * @nan: Pointer to NAN configuration structure
@@ -96,6 +105,9 @@ void nan_pairing_deinit_peer(struct nan_peer *peer)
 int nan_pairing_abort(struct nan_data *nan_data, const u8 *peer_addr)
 {
 	struct nan_peer *peer;
+	int cipher;
+	struct wpabuf *extra_ies;
+	int ret = -1;
 
 	peer = nan_get_peer(nan_data, peer_addr);
 	if (!peer) {
@@ -114,8 +126,57 @@ int nan_pairing_abort(struct nan_data *nan_data, const u8 *peer_addr)
 
 	wpa_printf(MSG_DEBUG, "NAN: Aborting pairing with peer " MACSTR,
 		   MAC2STR(peer_addr));
+
+	if (!peer->pairing.pending_auth1) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing abort: No pending Auth1 frame for peer "
+			   MACSTR, MAC2STR(peer_addr));
+		ret = 0;
+		goto done;
+	}
+
+	/* The auth mode and cipher are not important when rejecting.
+	 * Just make sure to use a supported cipher so
+	 * nan_pairing_pasn_initialize() won't fail.
+	 */
+	cipher = (nan_data->cfg->pairing_cfg.cipher_suites &
+		  NAN_PAIRING_PASN_128) ? WPA_CIPHER_CCMP : WPA_CIPHER_GCMP_256;
+
+	if (nan_pairing_pasn_initialize(nan_data, peer, NAN_PASN_AUTH_MODE_PASN,
+					cipher, "",
+					NAN_PAIRING_ROLE_RESPONDER)) {
+		wpa_printf(MSG_DEBUG, "NAN: Pairing: Initialize failed");
+		goto done;
+	}
+
+	extra_ies = wpabuf_alloc(NAN_ELEMENT_MAX_SIZE);
+	if (!extra_ies) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Pairing: Failed to allocate buffer for extra elements");
+		goto done;
+	}
+
+	nan_pairing_prepare_pasn_elems(nan_data, peer, extra_ies,
+				       peer->pairing.peer_instance_id,
+				       NAN_PASN_AUTH_MODE_PASN);
+	pasn_set_extra_ies(peer->pairing.pasn, wpabuf_head_u8(extra_ies),
+			   wpabuf_len(extra_ies));
+	wpabuf_free(extra_ies);
+
+	nan_configure_peer_schedule(nan_data, peer, &nan_data->sched);
+
+	ret = handle_auth_pasn_resp(peer->pairing.pasn, nan_data->cfg->nmi_addr,
+				    peer_addr, NULL,
+				    WLAN_STATUS_UNSPECIFIED_FAILURE);
+	if (ret < 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pairing abort: Failed to send response");
+		nan_clear_peer_schedule(nan_data, peer);
+	}
+
+done:
 	nan_pairing_deinit_peer(peer);
-	return 0;
+	return ret;
 }
 
 
@@ -846,10 +907,18 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 		return -1;
 
 	peer = nan_get_peer(nan, mgmt->da);
-	if (!peer || !peer->pairing.pasn) {
+	if (!peer) {
 		wpa_printf(MSG_DEBUG, "NAN: Pairing: Peer not found " MACSTR,
 			   MAC2STR(mgmt->da));
 		return -1;
+	}
+
+	/* Pairing was rejected. Clear peer schedule if no active NDPs */
+	if (!peer->pairing.pasn) {
+		if (dl_list_empty(&peer->ndps) && !peer->ndp_setup.ndp)
+			nan_clear_peer_schedule(nan, peer);
+
+		return 0;
 	}
 
 	pasn = peer->pairing.pasn;
