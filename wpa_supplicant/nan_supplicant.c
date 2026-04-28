@@ -1617,6 +1617,35 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 	}
 #endif /* CONFIG_PASN */
 
+	if (os_strcmp("mgmt_group_cipher", cmd) == 0) {
+		int cipher;
+
+		if (os_strcmp(param, "BIP-CMAC-128") == 0) {
+			if (!(wpa_s->drv_enc & WPA_DRIVER_CAPA_ENC_BIP)) {
+				wpa_printf(MSG_INFO,
+					   "NAN: BIP-CMAC-128 not supported by the driver");
+				return -1;
+			}
+
+			cipher = WPA_CIPHER_AES_128_CMAC;
+		} else if (os_strcmp(param, "BIP-GMAC-256") == 0) {
+			if (!(wpa_s->drv_enc &
+			      WPA_DRIVER_CAPA_ENC_BIP_GMAC_256)) {
+				wpa_printf(MSG_INFO,
+					   "NAN: BIP-CMAC-256 not supported by the driver");
+				return -1;
+			}
+
+			cipher = WPA_CIPHER_BIP_GMAC_256;
+		} else {
+			wpa_printf(MSG_INFO,
+				   "NAN: Unsupported mgmt_group_cipher value");
+			return -1;
+		}
+
+		return nan_set_mgmt_group_cipher(wpa_s->nan, cipher);
+	}
+
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
 }
