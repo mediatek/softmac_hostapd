@@ -1000,6 +1000,30 @@ static int nan_sec_bigtk_kde(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 }
 
 
+static int nan_sec_gtk_kde(struct nan_data *nan, struct wpabuf *buf,
+			   struct nan_ndp_sec *ndp_sec)
+{
+	if (!ndp_sec->local_gtk.gtk.gtk_len)
+		return 0;
+
+	if (ndp_sec->local_gtk.id > 3) {
+		wpa_printf(MSG_DEBUG, "NAN: Invalid GTK Key ID %u",
+			   ndp_sec->local_gtk.id);
+		return -1;
+	}
+
+	nan_add_kde_hdr(buf, RSN_KEY_DATA_GROUPKEY,
+			WPA_GTK_KDE_PREFIX_LEN +
+			ndp_sec->local_gtk.gtk.gtk_len);
+	wpabuf_put_u8(buf, ndp_sec->local_gtk.id);
+	wpabuf_put_u8(buf, 0);
+	wpabuf_put_data(buf, ndp_sec->local_gtk.gtk.gtk,
+			ndp_sec->local_gtk.gtk.gtk_len);
+
+	return 0;
+}
+
+
 static bool nan_sec_igtk_supported(struct nan_ndp_sec *ndp_sec)
 {
 	return ((ndp_sec->i_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
@@ -1013,7 +1037,8 @@ static bool nan_sec_igtk_supported(struct nan_ndp_sec *ndp_sec)
 
 #define NAN_KDES_MAX_LEN                                           \
 	(KDE_HDR_LEN + sizeof(struct wpa_igtk_kde) + KDE_HDR_LEN + \
-	 sizeof(struct wpa_bigtk_kde))
+	 sizeof(struct wpa_bigtk_kde) + KDE_HDR_LEN +              \
+	 sizeof(struct wpa_gtk_kde))
 
 static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 			    struct wpabuf *buf)
@@ -1022,8 +1047,10 @@ static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 	struct wpabuf *enc_kde;
 	int ret = -1;
 
-	if (!nan_sec_igtk_supported(ndp_sec)) {
-		wpa_printf(MSG_DEBUG, "NAN: IGTK not supported for this NDP");
+	if (!nan_sec_igtk_supported(ndp_sec) &&
+	    ndp_sec->local_gtk.gtk.gtk_len == 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: GTK/IGTK not supported for this NDP");
 		return 0;
 	}
 
@@ -1043,6 +1070,9 @@ static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
 		goto fail;
 
 	if (nan_sec_bigtk_kde(nan, ndp_sec, kde_buf) < 0)
+		goto fail;
+
+	if (nan_sec_gtk_kde(nan, kde_buf, ndp_sec) < 0)
 		goto fail;
 
 	enc_kde = nan_crypto_encrypt_key_data(kde_buf, ndp_sec->ptk.kek,
@@ -1117,6 +1147,25 @@ static int nan_sec_add_key_attrs(struct nan_data *nan, struct nan_peer *peer,
 		wpa_printf(MSG_DEBUG,
 			   "NAN: SEC: Failed to add KDEs to m3");
 		return -1;
+	}
+
+	/* When GTK is present, the Key RSC field is set to the GTK RSC */
+	if (ndp_sec->local_gtk.gtk.gtk_len) {
+		const u8 *local_ndi;
+		struct nan_ndp *pndp = peer->ndp_setup.ndp;
+
+		if (pndp->initiator)
+			local_ndi = pndp->init_ndi;
+		else
+			local_ndi = pndp->resp_ndi;
+
+		if (nan->cfg->get_seqnum(nan->cfg->cb_ctx,
+					 ndp_sec->local_gtk.id, key->key_rsc,
+					 local_ndi) < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Failed to get GTK seqnum");
+			return -1;
+		}
 	}
 
 	info = WPA_KEY_INFO_TYPE_AKM_DEFINED | WPA_KEY_INFO_KEY_TYPE |
