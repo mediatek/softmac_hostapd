@@ -1640,9 +1640,38 @@ static bool nan_peer_ndi_in_use(struct nan_peer *peer, const u8 *peer_ndi)
 }
 
 
+static void nan_terminate_ndps_for_ndi(struct nan_data *nan,
+				       struct nan_peer *peer,
+				       const u8 *peer_ndi)
+{
+	struct nan_ndp *ndp, *tndp, *curr_ndp;
+
+	curr_ndp = peer->ndp_setup.ndp;
+
+	dl_list_for_each_safe(ndp, tndp, &peer->ndps, struct nan_ndp, list) {
+		const u8 *ndp_peer_ndi = ndp->initiator ?
+			ndp->resp_ndi : ndp->init_ndi;
+
+		if (!ether_addr_equal(ndp_peer_ndi, peer_ndi))
+			continue;
+
+		dl_list_del(&ndp->list);
+
+		/* Temporarily set the NDP being disconnected */
+		peer->ndp_setup.ndp = ndp;
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     true);
+	}
+
+	/* Restore the current NDP */
+	peer->ndp_setup.ndp = curr_ndp;
+}
+
+
 static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndp_connection_params params;
+	int ret;
 
 	os_memset(&params, 0, sizeof(params));
 
@@ -1686,10 +1715,18 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 	}
 
 	params.new_ndi_sta = !nan_peer_ndi_in_use(peer, params.peer_ndi);
-	if (nan->cfg->ndp_connected &&
-	    nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params)) {
-		wpa_printf(MSG_DEBUG, "NAN: NDP connected notification failed");
-		return -1;
+	if (nan->cfg->ndp_connected) {
+		ret = nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params);
+		if (ret) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDP connected notification failed ret=%d",
+				   ret);
+			if (ret == -2)
+				nan_terminate_ndps_for_ndi(nan, peer,
+							   params.peer_ndi);
+
+			return ret;
+		}
 	}
 
 	/* Move the NDP to the list of tracked NDPs */

@@ -679,9 +679,15 @@ out_success:
 	return 0;
 
 remove_sta:
+	/*
+	 * Clean up the NDI station if it was newly added for this NDP. For
+	 * existing stations, we assume that the caller will tear down other
+	 * NDPs with this station on failure as it may be now in some
+	 * inconsistent state that is too hard to rollback here.
+	 */
 	if (params->new_ndi_sta)
 		wpa_drv_sta_remove(ndi_wpa_s, params->peer_ndi);
-	return -1;
+	return -2;
 }
 
 
@@ -738,11 +744,13 @@ static int wpas_nan_ndp_connected_cb(void *ctx,
 				     struct nan_ndp_connection_params *params)
 {
 	struct wpa_supplicant *wpa_s = ctx;
+	int ret;
 
-	if (wpas_nan_add_ndi_sta(wpa_s, params) < 0) {
+	ret = wpas_nan_add_ndi_sta(wpa_s, params);
+	if (ret) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to add NDI station for NDP connection");
-		return -1;
+		return ret;
 	}
 
 	wpas_notify_nan_ndp_connected(wpa_s, params->ndp_id.peer_nmi,
