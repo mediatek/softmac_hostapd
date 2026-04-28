@@ -244,9 +244,65 @@ int nan_ndp_setup_resp(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+static int nan_ndp_attr_handle_tlvs(struct nan_data *nan,
+				    struct nan_peer *peer,
+				    const u8 *tlvs, u16 tlvs_len)
+{
+	wpa_printf(MSG_DEBUG, "NAN: NDP: Handle NDPE TLVs len=%u", tlvs_len);
+
+	while (tlvs_len > 3) {
+		u8 tlv_type = tlvs[0];
+		u16 tlv_len = WPA_GET_LE16(tlvs + 1);
+		const u8 *tlv_data = tlvs + 3;
+		int ret;
+
+		if (tlv_len + 3 > tlvs_len) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDP: Invalid TLV len=%u for type=%u",
+				   tlv_len, tlv_type);
+			return -1;
+		}
+
+		switch (tlv_type) {
+		case NAN_NDPE_TLV_SRV_INFO:
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDP: Handle NDP service specific information");
+
+			if (tlv_len >= 4 && WPA_GET_BE24(tlv_data) == OUI_WFA &&
+			    tlv_data[3] == NAN_SRV_PROTO_GENERIC)
+				ret = nan_ndp_ssi(nan, &peer->ndp_setup,
+						  tlv_data + 4, tlv_len - 4);
+			else
+				ret = nan_ndp_ssi(nan, &peer->ndp_setup,
+						  tlv_data, tlv_len);
+			if (ret)
+				wpa_printf(MSG_DEBUG,
+					   "NAN: NDP: Failed to save ssi - continue");
+			break;
+		default:
+			wpa_printf(MSG_DEBUG, "NAN: NDP: unknown TLV type=%u",
+				   tlv_type);
+			break;
+		}
+
+		tlvs += 3 + tlv_len;
+		tlvs_len -= 3 + tlv_len;
+	}
+
+	if (tlvs_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDP: TLV parsing ended with %u left octets",
+			   tlvs_len);
+		return -1;
+	}
+
+	return 0;
+}
+
+
 static int nan_ndp_attr_handle_req(struct nan_data *nan, struct nan_peer *peer,
 				   struct ieee80211_ndp *ndp_attr, u16 ndp_len,
-				   u8 status)
+				   u8 status, bool ndpe)
 {
 	struct nan_ndp_setup *ndp_setup = &peer->ndp_setup;
 	u16 exp_len = sizeof(struct ieee80211_ndp);
@@ -304,7 +360,8 @@ static int nan_ndp_attr_handle_req(struct nan_data *nan, struct nan_peer *peer,
 	/* Handle service specific information */
 	ndp_len -= exp_len;
 
-	if (ndp_attr->ndp_ctrl & NAN_NDP_CTRL_SPEC_INFO_PRESENT && ndp_len) {
+	if (!ndpe && (ndp_attr->ndp_ctrl & NAN_NDP_CTRL_SPEC_INFO_PRESENT) &&
+	    ndp_len) {
 		int ret;
 
 		wpa_printf(MSG_DEBUG,
@@ -316,7 +373,13 @@ static int nan_ndp_attr_handle_req(struct nan_data *nan, struct nan_peer *peer,
 		if (ret)
 			wpa_printf(MSG_DEBUG,
 				   "NAN: NDP: req: Failed to save ssi. continue");
+		return ret;
 	}
+
+	if (ndpe)
+		return nan_ndp_attr_handle_tlvs(nan, peer,
+						ndp_attr->optional + 1,
+						ndp_len);
 
 	return 0;
 }
@@ -324,7 +387,7 @@ static int nan_ndp_attr_handle_req(struct nan_data *nan, struct nan_peer *peer,
 
 static int nan_ndp_attr_handle_res(struct nan_data *nan, struct nan_peer *peer,
 				   struct ieee80211_ndp *ndp_attr, u16 ndp_len,
-				   u8 status)
+				   u8 status, bool ndpe)
 {
 	struct nan_ndp_setup *ndp_setup = &peer->ndp_setup;
 	u16 opt_len;
@@ -437,7 +500,8 @@ static int nan_ndp_attr_handle_res(struct nan_data *nan, struct nan_peer *peer,
 store_ssi:
 	/* Handle service specific information */
 	ndp_len -= sizeof(struct ieee80211_ndp) + opt_len;
-	if (ndp_attr->ndp_ctrl & NAN_NDP_CTRL_SPEC_INFO_PRESENT && ndp_len) {
+	if (!ndpe && (ndp_attr->ndp_ctrl & NAN_NDP_CTRL_SPEC_INFO_PRESENT) &&
+	    ndp_len) {
 		int ret;
 
 		wpa_printf(MSG_DEBUG, "NAN: NDP: resp: Handle NDP ssi");
@@ -446,7 +510,13 @@ store_ssi:
 		if (ret)
 			wpa_printf(MSG_DEBUG,
 				   "NAN: NDP: resp: Failed to save ssi. continue");
+		return ret;
 	}
+
+	if (ndpe)
+		return nan_ndp_attr_handle_tlvs(nan, peer,
+						ndp_attr->optional + opt_len,
+						ndp_len);
 
 	return 0;
 }
@@ -681,14 +751,37 @@ static int nan_ndp_attr_handle_term(struct nan_data *nan, struct nan_peer *peer,
 int nan_ndp_handle_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 			    struct nan_msg *msg)
 {
-	struct ieee80211_ndp *ndp_attr;
+	struct ieee80211_ndp *ndp_attr = NULL;
+	size_t ndp_attr_len = 0;
+	bool ndpe_supported;
 	u8 type, status;
 	int ret;
 
-	if (!msg || !peer || !msg->attrs.ndp)
+	if (!msg || !peer || (!msg->attrs.ndp && !msg->attrs.ndpe))
 		return -1;
 
-	ndp_attr = (struct ieee80211_ndp *) msg->attrs.ndp;
+	ndpe_supported = nan_is_ndpe_supported(nan, peer);
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDP: Handle NDP attribute. ndpe_supported=%u",
+		   ndpe_supported);
+
+	/*
+	 * The NDP attribute and the NDPE attribute are very similar in
+	 * structure so handle them in the same way where possible.
+	 */
+	if (ndpe_supported) {
+		ndp_attr = (struct ieee80211_ndp *) msg->attrs.ndpe;
+		ndp_attr_len = msg->attrs.ndpe_len;
+	}
+
+	if (!ndp_attr || !ndp_attr_len) {
+		ndp_attr = (struct ieee80211_ndp *) msg->attrs.ndp;
+		ndp_attr_len = msg->attrs.ndp_len;
+		ndpe_supported = false;
+		if (!ndp_attr || !ndp_attr_len)
+			return -1;
+	}
+
 	type = BITS(ndp_attr->type_and_status, NAN_NDP_TYPE_MASK,
 		    NAN_NDP_TYPE_POS);
 	status = BITS(ndp_attr->type_and_status, NAN_NDP_STATUS_MASK,
@@ -710,13 +803,13 @@ int nan_ndp_handle_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 	switch (type) {
 	case NAN_NDP_TYPE_REQUEST:
 		ret = nan_ndp_attr_handle_req(nan, peer, ndp_attr,
-					      msg->attrs.ndp_len,
-					      status);
+					      ndp_attr_len, status,
+					      ndpe_supported);
 		break;
 	case NAN_NDP_TYPE_RESPONSE:
 		ret = nan_ndp_attr_handle_res(nan, peer, ndp_attr,
-					      msg->attrs.ndp_len,
-					      status);
+					      ndp_attr_len, status,
+					      ndpe_supported);
 		break;
 	case NAN_NDP_TYPE_CONFIRM:
 		ret = nan_ndp_attr_handle_confirm(nan, peer, ndp_attr, status);
@@ -761,10 +854,13 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_ndp_setup *ndp_setup;
 	u8 type, ndp_ctrl = 0;
 	u8 *len_ptr;
+	bool ndpe_supported;
+	bool add_srv_info = false;
 
 	if (!peer || !peer->ndp_setup.ndp)
 		return -1;
 
+	ndpe_supported = nan_is_ndpe_supported(nan, peer);
 	ndp_setup = &peer->ndp_setup;
 
 	switch (ndp_setup->state) {
@@ -773,15 +869,21 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 		ndp_ctrl = NAN_NDP_CTRL_PUBLISH_ID_PRESENT;
 		if (ndp_setup->conf_req)
 			ndp_ctrl |= NAN_NDP_CTRL_CONFIRM_REQUIRED;
-		if (ndp_setup->ssi && ndp_setup->ssi_len)
-			ndp_ctrl |= NAN_NDP_CTRL_SPEC_INFO_PRESENT;
+		if (ndp_setup->ssi && ndp_setup->ssi_len) {
+			add_srv_info = true;
+			if (!ndpe_supported)
+				ndp_ctrl |= NAN_NDP_CTRL_SPEC_INFO_PRESENT;
+		}
 		break;
 	case NAN_NDP_STATE_REQ_RECV:
 		type = NAN_NDP_TYPE_RESPONSE;
 		if (ndp_setup->status != NAN_NDP_STATUS_REJECTED)
 			ndp_ctrl |= NAN_NDP_CTRL_RESPONDER_NDI_PRESENT;
-		if (ndp_setup->ssi && ndp_setup->ssi_len)
-			ndp_ctrl |= NAN_NDP_CTRL_SPEC_INFO_PRESENT;
+		if (ndp_setup->ssi && ndp_setup->ssi_len) {
+			add_srv_info = true;
+			if (!ndpe_supported)
+				ndp_ctrl |= NAN_NDP_CTRL_SPEC_INFO_PRESENT;
+		}
 		break;
 	case NAN_NDP_STATE_RES_RECV:
 		type = NAN_NDP_TYPE_CONFIRM;
@@ -807,7 +909,15 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 	if (ndp_setup->sec.present)
 		ndp_ctrl |= NAN_NDP_CTRL_SECURITY_PRESENT;
 
-	wpabuf_put_u8(buf, NAN_ATTR_NDP);
+	/*
+	 * The NDP attribute and the NDPE attribute are very similar in
+	 * structure so handle them in the same way where possible.
+	 */
+	if (ndpe_supported)
+		wpabuf_put_u8(buf, NAN_ATTR_NDP_EXT);
+	else
+		wpabuf_put_u8(buf, NAN_ATTR_NDP);
+
 	len_ptr = wpabuf_put(buf, 2);
 
 	wpabuf_put_u8(buf, ndp_setup->dialog_token);
@@ -824,8 +934,24 @@ int nan_ndp_add_ndp_attr(struct nan_data *nan, struct nan_peer *peer,
 	if (ndp_ctrl & NAN_NDP_CTRL_RESPONDER_NDI_PRESENT)
 		wpabuf_put_data(buf, ndp_setup->ndp->resp_ndi, ETH_ALEN);
 
-	if (ndp_ctrl & NAN_NDP_CTRL_SPEC_INFO_PRESENT)
-		wpabuf_put_data(buf, ndp_setup->ssi, ndp_setup->ssi_len);
+	if (add_srv_info) {
+		if (!ndpe_supported) {
+			wpabuf_put_data(buf, ndp_setup->ssi,
+					ndp_setup->ssi_len);
+		} else {
+			/*
+			 * TODO: For the service specific info use the WFA
+			 * format. If there is a need to support other vendor
+			 * OUIs, this would need to be extended.
+			 */
+			wpabuf_put_u8(buf, NAN_NDPE_TLV_SRV_INFO);
+			wpabuf_put_le16(buf, 4 + ndp_setup->ssi_len);
+			wpabuf_put_be24(buf, OUI_WFA);
+			wpabuf_put_u8(buf, NAN_SRV_PROTO_GENERIC);
+			wpabuf_put_data(buf, ndp_setup->ssi,
+					ndp_setup->ssi_len);
+		}
+	}
 
 	WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
 	return 0;

@@ -2797,3 +2797,29 @@ int nan_set_bootstrap_configuration(struct nan_data *nan,
 
 	return 0;
 }
+
+
+/**
+ * nan_is_ndpe_supported - Check if NDPE attribute is supported with peer
+ * @nan: NAN module context from nan_init()
+ * @peer: NAN peer
+ * Returns: true if the peer supports NDPE attribute; false otherwise.
+ */
+bool nan_is_ndpe_supported(struct nan_data *nan, const struct nan_peer *peer)
+{
+	struct nan_dev_capa_entry *cur;
+
+	if (!nan || !peer)
+		return false;
+
+	dl_list_for_each(cur, &peer->info.dev_capa,
+			 struct nan_dev_capa_entry, list) {
+		/*
+		 * Take the first one, as NDPE support should be identical
+		 * across all attributes.
+		 */
+		return !!(cur->capa.capa & NAN_DEV_CAPA_NDPE_ATTR_SUPP);
+	}
+
+	return false;
+}
