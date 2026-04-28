@@ -1764,3 +1764,21 @@ class WpaSupplicant:
         if addr and addr not in ev:
             raise Exception("Unexpected STA address in disconnection event: " + ev)
         return ev
+
+    def get_iface_addr(self, ifname):
+        ifaces = self.global_request("STATUS")
+        addr = None
+        lines = ifaces.split('\n')
+        for i, line in enumerate(lines):
+            if line.startswith('ifname=' + ifname):
+                # The address should be on the next line
+                if i + 1 < len(lines):
+                    addr_line = lines[i + 1]
+                    if addr_line.startswith('address='):
+                        addr = addr_line.split('=')[1]
+                        break
+
+        if addr is None:
+            raise Exception(f"Failed to get {ifname} address from STATUS output")
+
+        return addr
