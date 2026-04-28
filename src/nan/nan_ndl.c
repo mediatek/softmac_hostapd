@@ -142,9 +142,6 @@ static void nan_ndl_clear(struct nan_data *nan, struct nan_peer *peer)
 	ndl->local_qos.max_latency = NAN_QOS_MAX_LATENCY_NO_PREF;
 
 	ndl->setup_reason = NAN_NDL_SETUP_REASON_NONE;
-
-	wpabuf_free(ndl->sched.elems);
-	os_memset(&ndl->sched, 0, sizeof(ndl->sched));
 }
 
 
@@ -345,7 +342,7 @@ static enum nan_ndl_status nan_ndl_determine_status(struct nan_data *nan,
 						    bool can_counter,
 						    enum nan_reason *reason)
 {
-	struct nan_schedule *sched = &peer->ndl->sched;
+	struct nan_schedule *sched = &nan->sched;
 	struct bitfield *common_bf = NULL, *ndc_bf = NULL, *track_ndc_bf = NULL;
 	enum nan_ndl_ver verdict;
 	size_t size, max_latency, i;
@@ -682,20 +679,22 @@ int nan_ndl_setup(struct nan_data *nan, struct nan_peer *peer,
 		goto out_fail;
 	}
 
-	wpabuf_free(ndl->sched.elems);
-	os_memcpy(&ndl->sched, &params->sched, sizeof(ndl->sched));
-	nan_ndl_sched_print(nan, &peer->ndl->sched);
+	wpabuf_free(nan->sched.elems);
+	os_memcpy(&nan->sched, &params->sched, sizeof(nan->sched));
+	nan_ndl_sched_print(nan, &nan->sched);
 
 	/* Copy elems buffer */
 	if (params->sched.elems) {
-		ndl->sched.elems =
+		nan->sched.elems =
 			wpabuf_alloc_copy(wpabuf_head(params->sched.elems),
 					  wpabuf_len(params->sched.elems));
-		if (!ndl->sched.elems) {
+		if (!nan->sched.elems) {
 			reason = NAN_REASON_UNSPECIFIED_REASON;
 			goto out_fail;
 		}
 	}
+
+	nan_ndl_sched_print(nan, &nan->sched);
 
 	if (is_zero_ether_addr(ndl->ndc_id)) {
 		os_get_random(ndl->ndc_id, ETH_ALEN);
@@ -1352,7 +1351,7 @@ int nan_ndl_add_avail_attrs(struct nan_data *nan, const struct nan_peer *peer,
 	if (!peer || !peer->ndl)
 		return -1;
 
-	sched = &peer->ndl->sched;
+	sched = &nan->sched;
 
 	wpa_printf(MSG_DEBUG,
 		   "NAN: NDL: Add Avail attribute. state=%s, status=%u",
@@ -1397,6 +1396,7 @@ int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
 			 struct wpabuf *buf)
 {
 	struct nan_ndl *ndl;
+	struct nan_schedule *sched = &nan->sched;
 	u16 ndl_ctrl = 0;
 	u8 *len_ptr;
 	u8 type;
@@ -1425,18 +1425,18 @@ int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
 		return -1;
 	case NAN_NDL_STATE_START:
 		type = NAN_NDL_TYPE_REQUEST;
-		if (ndl->sched.ndc.len)
+		if (sched->ndc.len)
 			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
 		break;
 	case NAN_NDL_STATE_REQ_RECV:
 		type = NAN_NDL_TYPE_RESPONSE;
-		if (ndl->sched.ndc.len &&
+		if (sched->ndc.len &&
 		    ndl->status != NAN_NDL_STATUS_REJECTED)
 			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
 		break;
 	case NAN_NDL_STATE_RES_RECV:
 		type = NAN_NDL_TYPE_CONFIRM;
-		if (ndl->sched.ndc.len &&
+		if (sched->ndc.len &&
 		    ndl->status != NAN_NDL_STATUS_REJECTED)
 			ndl_ctrl |= NAN_NDL_CTRL_NDC_ATTR_PRESENT;
 		break;
@@ -1479,6 +1479,7 @@ int nan_ndl_add_ndc_attr(struct nan_data *nan, const struct nan_peer *peer,
 			 struct wpabuf *buf)
 {
 	struct nan_ndl *ndl;
+	struct nan_schedule *sched = &nan->sched;
 	u8 ndc_ctrl = NAN_NDC_CTRL_SELECTED;
 	u16 sched_entry_ctrl = 0;
 
@@ -1503,7 +1504,7 @@ int nan_ndl_add_ndc_attr(struct nan_data *nan, const struct nan_peer *peer,
 	 * NDC attribute for NDP Request is optional. In all other cases it is
 	 * mandatory
 	 */
-	if (!ndl->sched.ndc.len) {
+	if (!sched->ndc.len) {
 		if (ndl->state != NAN_NDL_STATE_START) {
 			wpa_printf(MSG_DEBUG, "NAN: NDL: No NDC to add");
 			return -1;
@@ -1515,26 +1516,26 @@ int nan_ndl_add_ndc_attr(struct nan_data *nan, const struct nan_peer *peer,
 	wpabuf_put_u8(buf, NAN_ATTR_NDC);
 	wpabuf_put_le16(buf, sizeof(struct ieee80211_ndc) +
 			sizeof(struct nan_sched_entry) +
-			ndl->sched.ndc.len);
+			sched->ndc.len);
 
 	wpabuf_put_data(buf, ndl->ndc_id, sizeof(ndl->ndc_id));
 	wpabuf_put_u8(buf, ndc_ctrl);
 
 	/* Add the schedule entry */
-	wpabuf_put_u8(buf, ndl->sched.ndc_map_id);
+	wpabuf_put_u8(buf, sched->ndc_map_id);
 
-	sched_entry_ctrl |= ndl->sched.ndc.duration <<
+	sched_entry_ctrl |= sched->ndc.duration <<
 		NAN_TIME_BM_CTRL_BIT_DURATION_POS;
-	sched_entry_ctrl |= ndl->sched.ndc.period <<
+	sched_entry_ctrl |= sched->ndc.period <<
 		NAN_TIME_BM_CTRL_PERIOD_POS;
-	sched_entry_ctrl |= ndl->sched.ndc.offset <<
+	sched_entry_ctrl |= sched->ndc.offset <<
 		NAN_TIME_BM_CTRL_START_OFFSET_POS;
 
 	wpabuf_put_le16(buf, sched_entry_ctrl);
 
 	/* Add the time bitmap */
-	wpabuf_put_u8(buf, ndl->sched.ndc.len);
-	wpabuf_put_data(buf, ndl->sched.ndc.bitmap, ndl->sched.ndc.len);
+	wpabuf_put_u8(buf, sched->ndc.len);
+	wpabuf_put_data(buf, sched->ndc.bitmap, sched->ndc.len);
 
 	return 0;
 }
@@ -1691,7 +1692,7 @@ void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 {
 	const struct nan_ndl *ndl;
 
-	if (!peer || !peer->ndl || !peer->ndl->sched.elems)
+	if (!peer || !peer->ndl || !nan->sched.elems)
 		return;
 
 	ndl = peer->ndl;
@@ -1708,7 +1709,7 @@ void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 		return;
 
 	wpabuf_put_u8(buf, NAN_ATTR_ELEM_CONTAINER);
-	wpabuf_put_le16(buf, 1 + wpabuf_len(ndl->sched.elems));
+	wpabuf_put_le16(buf, 1 + wpabuf_len(nan->sched.elems));
 	wpabuf_put_u8(buf, 0);
-	wpabuf_put_buf(buf, ndl->sched.elems);
+	wpabuf_put_buf(buf, nan->sched.elems);
 }

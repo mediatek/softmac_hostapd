@@ -388,7 +388,6 @@ enum nan_ndl_setup_reason {
  *     returned an error, a NAF still needs to be sent to the peer, i.e., the
  *     error cannot be silently ignored.
  * @reason: In case of status == NAN_NDL_STATUS_REJECTED, indicates the reason.
- * @sched: Holds the local schedule.
  * @dialog_token: The dialog token for the current NDL negotiation.
  * @max_idle_period: Indicate a period of time in units of 1024 TU during which
  *     the peer device can refrain from transmitting over the NDL without
@@ -407,7 +406,6 @@ struct nan_ndl {
 	enum nan_ndl_status status;
 	u8 send_naf_on_error;
 	enum nan_reason reason;
-	struct nan_schedule sched;
 
 	u8 dialog_token;
 	u16 max_idle_period;
@@ -573,6 +571,7 @@ struct nan_peer {
  *     and is used to set ndp_id in &struct nan_ndp.
  * @next_dialog_token: Dialog token for NDP and NDL negotiations. Incremented
  *     for each NDP and NDL request.
+ * @sched: The local schedule
  * @cluster_id: Current cluster ID
  * @nira_nonce: Nonce for NAN Identity Resolution attribute (NIRA)
  * @nira_tag: Tag for NAN Identity Resolution attribute (NIRA)
@@ -590,6 +589,7 @@ struct nan_data {
 
 	u8 ndp_id_counter;
 	u8 next_dialog_token;
+	struct nan_schedule sched;
 
 	u8 cluster_id[ETH_ALEN];
 

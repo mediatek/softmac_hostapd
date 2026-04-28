@@ -233,6 +233,7 @@ void nan_deinit(struct nan_data *nan)
 	pasn_initiator_pmksa_cache_deinit(nan->initiator_pmksa);
 	pasn_responder_pmksa_cache_deinit(nan->responder_pmksa);
 #endif /* CONFIG_PASN */
+	wpabuf_free(nan->sched.elems);
 	os_free(nan->cfg);
 	os_free(nan);
 }
@@ -375,6 +376,8 @@ void nan_flush(struct nan_data *nan)
 
 	nan->nan_started = 0;
 	nan_peer_clear_all(nan);
+	wpabuf_free(nan->sched.elems);
+	os_memset(&nan->sched, 0, sizeof(nan->sched));
 }
 
 
@@ -1992,7 +1995,7 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP setup done");
-		if (nan_configure_peer_schedule(nan, peer, &peer->ndl->sched) ||
+		if (nan_configure_peer_schedule(nan, peer, &nan->sched) ||
 		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
 					     NAN_REASON_UNSPECIFIED_REASON,
@@ -2296,7 +2299,8 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 	if (peer->ndp_setup.state == NAN_NDP_STATE_DONE &&
 	    peer->ndl->state == NAN_NDL_STATE_DONE) {
 		wpa_printf(MSG_DEBUG, "NAN: TX status: NDP setup done");
-		if (nan_configure_peer_schedule(nan, peer, &peer->ndl->sched) ||
+
+		if (nan_configure_peer_schedule(nan, peer, &nan->sched) ||
 		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
 					     NAN_REASON_UNSPECIFIED_REASON,
@@ -2356,7 +2360,7 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 
 		naf_oui = NAN_SUBTYPE_DATA_PATH_REQUEST;
 		timeout = NAN_NDP_SETUP_TIMEOUT_LONG;
-		ret = nan_configure_peer_schedule(nan, peer, &peer->ndl->sched);
+		ret = nan_configure_peer_schedule(nan, peer, &nan->sched);
 		if (ret) {
 			nan_ndp_setup_stop(nan, peer);
 			return ret;
@@ -2378,8 +2382,8 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 			ret = nan_ndl_setup(nan, peer, params,
 					    peer->ndp_setup.dialog_token);
 			if (!ret) {
-				ret = nan_configure_peer_schedule(
-					nan, peer, &peer->ndl->sched);
+				ret = nan_configure_peer_schedule(nan, peer,
+								  &nan->sched);
 				if (ret)
 					peer->ndl->send_naf_on_error = 1;
 			}
@@ -2414,7 +2418,7 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 				    peer->ndp_setup.dialog_token);
 		if (!ret) {
 			ret = nan_configure_peer_schedule(nan, peer,
-							  &peer->ndl->sched);
+							  &nan->sched);
 			if (ret)
 				peer->ndl->send_naf_on_error = 1;
 		}
