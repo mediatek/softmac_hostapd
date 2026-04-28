@@ -124,6 +124,30 @@ static void nan_peer_flush_sec(struct nan_peer_info *info)
 }
 
 
+static void nan_remove_group_keys(struct nan_data *nan, struct nan_peer *peer)
+{
+	if (peer->igtk_id) {
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, WPA_ALG_NONE,
+					    peer->nmi_addr, peer->igtk_id, NULL,
+					    NULL, 0, KEY_FLAG_GROUP))
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to clear Rx IGTK for peer "
+				   MACSTR, MAC2STR(peer->nmi_addr));
+		peer->igtk_id = 0;
+	}
+
+	if (peer->bigtk_id) {
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, WPA_ALG_NONE,
+					    peer->nmi_addr, peer->bigtk_id,
+					    NULL, NULL, 0, KEY_FLAG_GROUP))
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to clear Rx BIGTK for peer "
+				   MACSTR, MAC2STR(peer->nmi_addr));
+		peer->bigtk_id = 0;
+	}
+}
+
+
 static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 {
 	if (!peer)
@@ -159,6 +183,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_peer_flush_avail(&peer->info);
 	nan_peer_flush_dev_capa(&peer->info);
 	nan_peer_flush_elem_container(&peer->info);
+	nan_remove_group_keys(nan, peer);
 
 	nan_ndl_reset(nan, peer);
 	nan_peer_flush_sec(&peer->info);
