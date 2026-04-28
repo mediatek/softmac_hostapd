@@ -3387,12 +3387,15 @@ struct nan_cluster_config {
 /**
  * struct nan_schedule_config - NAN schedule configuration
  *
+ * @deferred: true if the driver should announce the schedule update to peers
+ *	before applying it
  * @num_channels: Number of channels in the schedule
  * @channels: Channel specific schedule information
  * @avail_attr: NAN Availability attribute as defined in Wi-Fi Aware spec v4.0,
  *	Table 93
  */
 struct nan_schedule_config {
+	bool deferred;
 	u8 num_channels;
 
 	/**

@@ -15811,6 +15811,13 @@ wpa_driver_nl80211_nan_config_schedule(void *priv, u8 map_id,
 		return -ENOMEM;
 	}
 
+	if (sched->deferred &&
+	    nla_put_flag(msg, NL80211_ATTR_NAN_SCHED_DEFERRED)) {
+		wpa_printf(MSG_INFO,
+			   "nl80211: NAN: Failed to put deferred attribute");
+		goto fail;
+	}
+
 	ret = wpa_driver_nl80211_nan_set_schedule(drv, sched, msg);
 	if (ret)
 		goto fail;
