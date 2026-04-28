@@ -588,6 +588,7 @@ struct nan_attrs {
 	const u8 *dev_capa_ext;
 	const u8 *npba;
 	const u8 *nira;
+	const u8 *ndpe;
 
 	u16 ndp_len;
 	u16 ndl_len;
@@ -598,6 +599,7 @@ struct nan_attrs {
 	u16 dev_capa_ext_len;
 	u16 npba_len;
 	u16 nira_len;
+	u16 ndpe_len;
 };
 
 struct nan_msg {

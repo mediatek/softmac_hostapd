@@ -254,14 +254,21 @@ enum nan_ndp_status {
 	NAN_NDP_STATUS_REJECTED  = 2,
 };
 
-/* Wi-Fi Aware spec v4.0, Table 84 (NDP Control field) */
+/* Wi-Fi Aware spec v4.0, Table 84 (NDP Control field) and Table 87 (Subfields
+ * of NDPE Control field format).
+ * Bits 0-4 are identical for NDP and NDPE. The only differences are in
+ * Bit 5.
+ */
 #define NAN_NDP_CTRL_CONFIRM_REQUIRED       BIT(0)
 #define NAN_NDP_CTRL_SECURITY_PRESENT       BIT(2)
 #define NAN_NDP_CTRL_PUBLISH_ID_PRESENT     BIT(3)
 #define NAN_NDP_CTRL_RESPONDER_NDI_PRESENT  BIT(4)
-#define NAN_NDP_CTRL_SPEC_INFO_PRESENT      BIT(5)
 
-/* Wi-Fi Aware spec v4.0, Table 82 (NDP attribute format)
+#define NAN_NDP_CTRL_SPEC_INFO_PRESENT      BIT(5)
+#define NAN_NDPE_CTRL_GTK_REQUIRED          BIT(5)
+
+/* Wi-Fi Aware spec v4.0, Table 82 (NDP attribute format) and
+ * Table 86 (NAN Data Path Extension attribute format)
  * Note: The structure does not include the Attribute ID and Length fields. */
 struct ieee80211_ndp {
 	u8 dialog_token; /* Dialog Token */
@@ -274,6 +281,14 @@ struct ieee80211_ndp {
 	/* followed by optional fields based on ndp_ctrl */
 	u8 optional[0];
 } STRUCT_PACKED;
+
+/* Wi-Fi Aware spec v4.0, Table 89 (List of TLV types for the NDPE attribute) */
+enum nan_ndpe_tlv_type {
+	NAN_NDPE_TLV_IPV6_LINK_LOCAL = 0,
+	NAN_NDPE_TLV_SRV_INFO        = 1,
+};
+
+#define NAN_NDPE_TLV_IPV6_LINK_LOCAL_LEN 8
 
 /* Wi-Fi Aware spec v4.0, Table 97 (Time Bitmap Control field format for the
  * NAN Availability attribute) */

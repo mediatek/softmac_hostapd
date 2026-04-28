@@ -216,6 +216,19 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 			attrs->nira = pos;
 			attrs->nira_len = attr_len;
 			break;
+		case NAN_ATTR_NDP_EXT:
+			/*
+			 * Validate minimal NDPE attribute length. NDP and NDPE
+			 * attributes have the common structure and thus the
+			 * same minimal length requirement based on the common
+			 * fields (see struct ieee80211_ndp).
+			 */
+			if (attr_len < sizeof(struct ieee80211_ndp))
+				break;
+
+			attrs->ndpe = pos;
+			attrs->ndpe_len = attr_len;
+			break;
 		case NAN_ATTR_MASTER_INDICATION:
 		case NAN_ATTR_CLUSTER:
 		case NAN_ATTR_NAN_ATTR_SERVICE_ID_LIST:
@@ -240,7 +253,6 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 		case NAN_ATTR_EXT_MESH:
 		case NAN_ATTR_PUBLIC_AVAILABILITY:
 		case NAN_ATTR_SUBSC_SERVICE_ID_LIST:
-		case NAN_ATTR_NDP_EXT:
 		case NAN_ATTR_S3:
 		case NAN_ATTR_TPEA:
 		case NAN_ATTR_VENDOR_SPECIFIC:
