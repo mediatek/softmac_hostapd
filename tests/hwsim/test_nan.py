@@ -136,7 +136,7 @@ class NanDevice:
 
     def ndp_request(self, ndi, handle, peer_nmi, peer_id, ssi=None,
                     qos_slots=0, qos_latency=0xffff, csid=None, password=None,
-                    pmk=None):
+                    pmk=None, interface_id=None):
         cmd = f"NAN_NDP_REQUEST handle={handle} ndi={ndi} peer_nmi={peer_nmi} peer_id={peer_id}"
 
         params = [
@@ -144,6 +144,7 @@ class NanDevice:
             ("csid", csid),
             ("password", password),
             ("pmk", pmk),
+            ("interface_id", interface_id),
         ]
 
         cmd += "".join(f" {name}={value}" for name, value in params if value is not None)
@@ -156,7 +157,7 @@ class NanDevice:
     def ndp_response(self, action, peer_nmi, ndi=None, peer_ndi=None,
                      ndp_id=None, init_ndi=None, reason_code=None, ssi=None,
                      qos_slots=0, qos_latency=0xffff, handle=None, csid=None,
-                     password=None, pmk=None):
+                     password=None, pmk=None, interface_id=None):
         if action not in ["accept", "reject"]:
             raise Exception(f"Invalid action: {action}. Must be 'accept' or 'reject'")
 
@@ -173,6 +174,7 @@ class NanDevice:
             ("csid", csid),
             ("password", password),
             ("pmk", pmk),
+            ("interface_id", interface_id),
         ]
 
         cmd += "".join(f" {name}={value}" for name, value in params if value is not None)
@@ -1035,7 +1037,8 @@ def _nan_discover_service(pub, sub, service_name, pssi, sssi):
 def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
                                 resp_ssi, csid=None,
                                 password=None, pmk=None, counter=False,
-                                wrong_pwd=False, configure_schedule=True):
+                                wrong_pwd=False, configure_schedule=True,
+                                pub_interface_id=None, sub_interface_id=None):
     """
     Request NDP from subscriber and accept on publisher.
 
@@ -1049,7 +1052,8 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
 
     # NDP request
     if "OK" not in sub.ndp_request(sub.ndi_name, sid, paddr, pid, req_ssi,
-                                   csid=csid, password=password, pmk=pmk):
+                                   csid=csid, password=password, pmk=pmk,
+                                   interface_id=sub_interface_id):
         raise Exception("NDP request failed")
 
     ev = pub.wpas.wait_event(["NAN-NDP-REQUEST"], timeout=5)
@@ -1078,7 +1082,8 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
     if "OK" not in pub.ndp_response("accept", saddr, ndi=pub.ndi_name,
                                     ndp_id=ndp_id, init_ndi=init_ndi,
                                     handle=pid, ssi=resp_ssi, csid=csid,
-                                    password=accept_pwd, pmk=pmk):
+                                    password=accept_pwd, pmk=pmk,
+                                    interface_id=pub_interface_id):
         raise Exception("NDP response (accept) failed")
 
     # Verify disconnection on wrong password
@@ -1117,11 +1122,25 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
     if ev is None:
         raise Exception("NAN-NDP-CONNECTED event not seen on publisher")
 
+    data_pub = split_nan_event(ev)
+
     ev = sub.wpas.wait_event(["NAN-NDP-CONNECTED"], timeout=5)
     if ev is None:
         raise Exception("NAN-NDP-CONNECTED event not seen on subscriber")
 
     logger.info("NDP connection established successfully")
+
+    data_sub = split_nan_event(ev)
+
+    if (sub_interface_id):
+        interface_id = data_pub.get("interface_id")
+        if interface_id != sub_interface_id:
+            raise Exception("No or invalid subscriber interface ID")
+
+    if (pub_interface_id):
+        interface_id = data_sub.get("interface_id")
+        if interface_id != pub_interface_id:
+            raise Exception("No or invalid publisher interface ID")
 
     return ndp_id, init_ndi
 
@@ -1146,13 +1165,18 @@ def _nan_test_connectivity(pub, sub):
                                   ifname1=pub.ndi_name, ifname2=sub.ndi_name,
                                   max_tries=3, timeout=5, broadcast=False)
 
-def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False):
+def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
+                use_interface_id=False):
     if use_pmk:
         pmk = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         pwd = None
     else:
         pwd = "NAN" if csid is not None else None
         pmk = None
+
+    pub_interface_id, sub_interface_id = (
+            ("0011223344556677", "8899aabbccddeeff") if use_interface_id else (None, None)
+    )
 
     with hwsim_nan_radios() as (wpas1, wpas2), \
         NanDevice(wpas1, "nan0", "ndi0") as pub, \
@@ -1177,8 +1201,9 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False):
                                              resp_ssi="ddeeff", csid=csid,
                                              password=pwd, pmk=pmk,
                                              counter=counter,
-                                             wrong_pwd=wrong_pwd)
-
+                                             wrong_pwd=wrong_pwd,
+                                             pub_interface_id=pub_interface_id,
+                                             sub_interface_id=sub_interface_id)
         if result is None:
             # wrong_pwd test completed
             return
@@ -1189,17 +1214,17 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False):
         _nan_ndp_terminate(pub, sub, paddr, init_ndi, ndp_id)
 
 def run_nan_dp(country="US", counter=False, csid=None, wrong_pwd=False,
-               use_pmk=False):
+               use_pmk=False, use_interface_id=False):
     set_country(country)
     try:
         _run_nan_dp(counter=counter, csid=csid, wrong_pwd=wrong_pwd,
-                    use_pmk=use_pmk)
+                    use_pmk=use_pmk, use_interface_id=use_interface_id)
     finally:
         set_country("00")
 
 def test_nan_dp_open(dev, apdev, params):
     """NAN DP open"""
-    run_nan_dp()
+    run_nan_dp(use_interface_id=True)
 
 def test_nan_dp_open_2_ndps(dev, apdev, params):
     """NAN DP open - 2 NDPs with same peer"""
@@ -1275,7 +1300,7 @@ def _run_nan_dp_2_ndps(secure_ndp2=False):
 
 def test_nan_dp_open_counter(dev, apdev, params):
     """NAN DP open with counter proposal"""
-    run_nan_dp(counter=True)
+    run_nan_dp(counter=True, use_interface_id=True)
 
 def test_nan_dp_sk_ccmp128(dev, apdev, params):
     """NAN DP - 2way NDL + SK CCMP security"""
@@ -1291,7 +1316,7 @@ def test_nan_dp_wrong_pwd(dev, apdev, params):
 
 def test_nan_dp_pmk(dev, apdev, params):
     """NAN DP - 3way NDL + SK CCMP security with PMK"""
-    run_nan_dp(counter=True, csid=1, use_pmk=True)
+    run_nan_dp(counter=True, csid=1, use_pmk=True, use_interface_id=True)
 
 def nan_pre_bootstrap(pub, sub, pmb=0x1):
     paddr = pub.wpas.own_addr()
