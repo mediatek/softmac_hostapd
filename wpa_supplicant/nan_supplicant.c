@@ -1890,6 +1890,14 @@ static void nan_dump_sched_config(const char *title,
 static void wpas_nan_fill_ndp_schedule(struct wpa_supplicant *wpa_s,
 				       struct nan_schedule *sched);
 
+static void wpas_nan_update_local_schedule(struct wpa_supplicant *wpa_s)
+{
+	struct nan_schedule sched;
+
+	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
+	nan_local_sched_update(wpa_s->nan, &sched);
+}
+
 
 /* Parse format NAN_SCHED_CONFIG_MAP map_id=<id> [freq:bitmap_hex]..
  * If no bitmaps provided - clear the map */
@@ -1948,10 +1956,15 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 
 	pos = os_strchr(cmd + 7, ' ');
 	if (!pos) {
-		clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
 		wpa_printf(MSG_INFO,
 			   "NAN: Missing freq:timebitmap pairs - cleanup schedule");
-		return wpa_drv_nan_config_schedule(wpa_s, map_id, sched_cfg);
+		ret = wpa_drv_nan_config_schedule(wpa_s, map_id, sched_cfg);
+		if (!ret) {
+			clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
+			wpas_nan_update_local_schedule(wpa_s);
+		}
+
+		return ret;
 	}
 
 	shared_freqs = os_calloc(wpa_s->num_multichan_concurrent,
@@ -2152,6 +2165,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		os_memcpy(&wpa_s->nan_sched[map_id - 1], sched_cfg,
 			  sizeof(*sched_cfg));
 		os_memset(sched_cfg, 0, sizeof(*sched_cfg));
+		wpas_nan_update_local_schedule(wpa_s);
 	}
 out:
 	os_free(bf_total);

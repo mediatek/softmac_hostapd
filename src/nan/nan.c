@@ -3352,3 +3352,23 @@ bool nan_has_active_ndp(struct nan_data *nan)
 
 	return false;
 }
+
+
+void nan_local_sched_update(struct nan_data *nan, struct nan_schedule *sched)
+{
+	struct nan_peer *peer;
+
+	if (!nan || !sched)
+		return;
+
+	wpabuf_free(nan->sched.elems);
+	os_memcpy(&nan->sched, sched, sizeof(nan->sched));
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		wpa_printf(MSG_DEBUG, "NAN: Updating schedule for peer " MACSTR,
+			   MAC2STR(peer->nmi_addr));
+
+		if (peer->ndl && peer->ndl->state == NAN_NDL_STATE_DONE)
+			nan_peer_update_schedule(nan, peer, sched);
+	}
+}
