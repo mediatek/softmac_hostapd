@@ -1084,11 +1084,11 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
     # Verify disconnection on wrong password
     if wrong_pwd:
         ev = sub.wpas.wait_event(["NAN-NDP-DISCONNECTED"], timeout=5)
-        if ev is None or "reason=3" not in ev:
-            raise Exception("NAN-NDP-DISCONNECTED event not seen on subscriber")
+        if ev is None or "reason=3" not in ev or "failure=1" not in ev:
+            raise Exception("NAN-NDP-DISCONNECTED(failure) event not seen on subscriber")
         ev = pub.wpas.wait_event(["NAN-NDP-DISCONNECTED"], timeout=5)
-        if ev is None or "reason=3" not in ev:
-            raise Exception("NAN-NDP-DISCONNECTED event not seen on publisher")
+        if ev is None or "reason=3" not in ev or "failure=1" not in ev:
+            raise Exception("NAN-NDP-DISCONNECTED(failure) event not seen on publisher")
         return None
 
     # Handle counter proposal
