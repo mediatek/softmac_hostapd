@@ -4055,6 +4055,11 @@ static int wpa_driver_nl80211_set_key(struct i802_bss *bss,
 			if (nla_put_u32(key_msg, NL80211_KEY_TYPE,
 					NL80211_KEYTYPE_GROUP))
 				goto fail;
+		} else if (alg == WPA_ALG_NONE &&
+			   (key_flag & KEY_FLAG_GROUP_MASK) == KEY_FLAG_GROUP) {
+			if (nla_put_u32(key_msg, NL80211_KEY_TYPE,
+					NL80211_KEYTYPE_GROUP))
+				goto fail;
 		} else if (!(key_flag & KEY_FLAG_PAIRWISE)) {
 			wpa_printf(MSG_DEBUG,
 				   "   key_flag missing PAIRWISE when setting a pairwise key");
