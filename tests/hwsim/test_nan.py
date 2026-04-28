@@ -1748,3 +1748,64 @@ def test_nan_pairing_bootstrap_ndp_sk_ccmp128(dev, apdev, params):
         _run_nan_pairing_bootstrap_ndp("SAE", password="password123", csid=1)
     finally:
         set_country("00")
+
+def _run_nan_ndp_reconnect_after_terminate():
+    pwd = "NAN"
+    csid1 = 1  # SK CCMP-128
+    csid2 = 2  # SK GCMP-256
+
+    with hwsim_nan_radios() as (wpas1, wpas2), \
+        NanDevice(wpas1, "nan0", "ndi0") as pub, \
+        NanDevice(wpas2, "nan1", "ndi1") as sub:
+
+        pssi = "aabbccdd001122334455667788"
+        sssi = "ddbbccaa001122334455667788"
+
+        # First service discovery and NDP
+        pid, sid, paddr, saddr = _nan_discover_service(pub, sub, "test_service",
+                                                       pssi, sssi, ttl=10)
+
+        logger.info("Starting first NDP connection...")
+        ndp_id1, init_ndi1 = _nan_ndp_request_and_accept(pub, sub, pid, sid,
+                                                         paddr, saddr,
+                                                         req_ssi="aabbcc",
+                                                         resp_ssi="ddeeff",
+                                                         csid=csid1,
+                                                         password=pwd,
+                                                         configure_schedule=True)
+
+        logger.info(f"First NDP established: ndp_id={ndp_id1}, init_ndi={init_ndi1}")
+        _nan_test_connectivity(pub, sub)
+
+        # Terminate the first NDP
+        logger.info("Terminating first NDP...")
+        _nan_ndp_terminate(pub, sub, paddr, init_ndi1, ndp_id1)
+        logger.info("First NDP terminated")
+
+        # Clear any pending events
+        pub.wpas.dump_monitor()
+        sub.wpas.dump_monitor()
+
+        # Second NDP with password
+        logger.info("Starting second NDP connection (reconnect after terminate)...")
+        ndp_id2, init_ndi2 = _nan_ndp_request_and_accept(pub, sub, pid, sid,
+                                                         paddr, saddr,
+                                                         req_ssi="112233",
+                                                         resp_ssi="445566",
+                                                         csid=csid2,
+                                                         password=pwd,
+                                                         configure_schedule=False)
+
+        logger.info(f"Second NDP established: ndp_id={ndp_id2}, init_ndi={init_ndi2}")
+        _nan_test_connectivity(pub, sub)
+
+        # Cleanup
+        _nan_ndp_terminate(pub, sub, paddr, init_ndi2, ndp_id2)
+
+def test_nan_ndp_reconnect_after_terminate(dev, apdev, params):
+    """NAN NDP reconnection after termination"""
+    set_country("US")
+    try:
+        _run_nan_ndp_reconnect_after_terminate()
+    finally:
+        set_country("00")
