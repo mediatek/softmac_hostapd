@@ -504,6 +504,41 @@ static int nan_sec_rx_key_data(struct nan_data *nan,
 				igtk_kde->igtk, key_len);
 	}
 
+	if (ie.bigtk && ie.bigtk_len) {
+		const struct wpa_bigtk_kde *bigtk_kde =
+			(const struct wpa_bigtk_kde *) ie.bigtk;
+		u16 key_idx;
+
+		if (ie.bigtk_len != WPA_BIGTK_KDE_PREFIX_LEN + key_len) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid BIGTK KDE length: %zu (expected %d)",
+				   ie.bigtk_len,
+				   WPA_BIGTK_KDE_PREFIX_LEN + key_len);
+			goto fail;
+		}
+
+		key_idx = WPA_GET_LE16(bigtk_kde->keyid);
+		if (key_idx < 6 || key_idx > 7) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid BIGTK key index: %u",
+				   key_idx);
+			goto fail;
+		}
+
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, alg,
+					    peer->nmi_addr, key_idx,
+					    bigtk_kde->pn, bigtk_kde->bigtk,
+					    key_len, KEY_FLAG_GROUP_RX) < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Failed to install BIGTK");
+			goto fail;
+		}
+
+		peer->bigtk_id = key_idx;
+		wpa_hexdump_key(MSG_DEBUG, "NAN: SEC: Received BIGTK",
+				bigtk_kde->bigtk, key_len);
+	}
+
 	ret = 0;
 fail:
 	wpabuf_clear_free(key_data);

@@ -527,6 +527,7 @@ struct nan_pairing_peer_data {
  * @bootstrap: Bootstrap information of the peer
  * @pairing: Pairing data associated with this peer
  * @igtk_id: IGTK key ID used with this peer. Zero if IGTK is not used.
+ * @bigtk_id: BIGTK key ID used with this peer. Zero if BIGTK is not used.
  */
 struct nan_peer {
 	struct dl_list list;
@@ -546,6 +547,7 @@ struct nan_peer {
 	struct nan_pairing_peer_data pairing;
 
 	u8 igtk_id;
+	u8 bigtk_id;
 };
 
 /**
