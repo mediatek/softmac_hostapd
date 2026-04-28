@@ -559,6 +559,8 @@ struct nan_peer {
  * @nira_tag: Tag for NAN Identity Resolution attribute (NIRA)
  * @initiator_pmksa: PMKSA cache for PASN-PMK authentication as an initiator
  * @responder_pmksa: PMKSA cache for PASN-PMK authentication as a responder
+ * @igtk: IGTK for NAN secure NDP
+ * @igtk_id: Key ID of the IGTK
  */
 struct nan_data {
 	struct nan_config *cfg;
@@ -575,6 +577,9 @@ struct nan_data {
 
 	struct rsn_pmksa_cache *initiator_pmksa;
 	struct rsn_pmksa_cache *responder_pmksa;
+
+	struct wpa_igtk igtk;
+	u8 igtk_id;
 };
 
 struct nan_attrs_entry {

@@ -791,6 +791,80 @@ static int nan_sec_add_m2_attrs(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+static int nan_sec_igtk_kde(struct nan_data *nan, struct wpabuf *buf)
+{
+	u8 tsc[RSN_PN_LEN];
+
+	if (nan->cfg->get_seqnum(nan->cfg->cb_ctx, nan->igtk_id, tsc) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to get IGTK seqnum");
+		return -1;
+	}
+
+	nan_add_kde_hdr(buf, RSN_KEY_DATA_IGTK,
+			WPA_IGTK_KDE_PREFIX_LEN + nan->igtk.igtk_len);
+	wpabuf_put_le16(buf, nan->igtk_id);
+	wpabuf_put_data(buf, tsc, RSN_PN_LEN);
+	wpabuf_put_data(buf, nan->igtk.igtk, nan->igtk.igtk_len);
+	return 0;
+}
+
+
+static bool nan_sec_igtk_supported(struct nan_ndp_sec *ndp_sec)
+{
+	return ((ndp_sec->i_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+		NAN_CS_INFO_CAPA_GTK_SUPP_POS) !=
+		NAN_CS_INFO_CAPA_GTK_SUPP_NONE &&
+		((ndp_sec->r_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+		 NAN_CS_INFO_CAPA_GTK_SUPP_POS) !=
+		NAN_CS_INFO_CAPA_GTK_SUPP_NONE;
+}
+
+
+#define NAN_KDES_MAX_LEN	(KDE_HDR_LEN + sizeof(struct wpa_igtk_kde))
+
+static int nan_sec_add_kdes(struct nan_data *nan, struct nan_ndp_sec *ndp_sec,
+			    struct wpabuf *buf)
+{
+	struct wpabuf *kde_buf;
+	struct wpabuf *enc_kde;
+	int ret = -1;
+
+	if (!nan_sec_igtk_supported(ndp_sec)) {
+		wpa_printf(MSG_DEBUG, "NAN: IGTK not supported for this NDP");
+		return 0;
+	}
+
+	if (!ndp_sec->ptk.kek_len) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: No KEK available to encrypt KDEs");
+		return -1;
+	}
+
+	kde_buf = wpabuf_alloc(NAN_KDES_MAX_LEN);
+	if (!kde_buf) {
+		wpa_printf(MSG_INFO, "NAN: SEC: Failed to allocate KDE buffer");
+		return -1;
+	}
+
+	if (nan_sec_igtk_kde(nan, kde_buf) < 0)
+		goto fail;
+
+	enc_kde = nan_crypto_encrypt_key_data(kde_buf, ndp_sec->ptk.kek,
+					      ndp_sec->ptk.kek_len);
+	if (!enc_kde) {
+		wpa_printf(MSG_INFO, "NAN: SEC: Failed to encrypt KDEs");
+		goto fail;
+	}
+
+	wpabuf_put_buf(buf, enc_kde);
+	ret = wpabuf_len(enc_kde);
+	wpabuf_free(enc_kde);
+fail:
+	wpabuf_clear_free(kde_buf);
+	return ret;
+}
+
+
 /*
  * nan_sec_add_key_attrs - Add security key attributes to NAN message
  * @nan: NAN module context from nan_init()
@@ -808,7 +882,10 @@ static int nan_sec_add_key_attrs(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
 	struct wpa_eapol_key *key;
 	u16 info;
-	size_t key_len = sizeof(struct wpa_eapol_key) + 2;
+	size_t key_len = sizeof(struct wpa_eapol_key);
+	u8 *key_len_pos;
+	int kde_len;
+	u8 *key_data_len_pos;
 
 	if (NAN_CS_IS_128(ndp_sec->i_csid))
 		key_len += NAN_KEY_MIC_LEN;
@@ -819,7 +896,7 @@ static int nan_sec_add_key_attrs(struct nan_data *nan, struct nan_peer *peer,
 
 	/* Shared key descriptor */
 	wpabuf_put_u8(buf, NAN_ATTR_SHARED_KEY_DESCR);
-	wpabuf_put_le16(buf, sizeof(struct nan_shared_key) + key_len);
+	key_len_pos = wpabuf_put(buf, 2);
 	wpabuf_put_u8(buf, instance_id);
 
 	key = (struct wpa_eapol_key *) wpabuf_put(buf, key_len);
@@ -827,24 +904,37 @@ static int nan_sec_add_key_attrs(struct nan_data *nan, struct nan_peer *peer,
 
 	key->type = NAN_KEY_DESC;
 
-	info = WPA_KEY_INFO_TYPE_AKM_DEFINED | WPA_KEY_INFO_KEY_TYPE |
-		WPA_KEY_INFO_MIC | WPA_KEY_INFO_INSTALL | WPA_KEY_INFO_SECURE;
-	if (is_ack)
-		info |= WPA_KEY_INFO_ACK;
-
-	WPA_PUT_BE16(key->key_info, info);
-
 	os_memcpy(key->key_nonce, nonce, WPA_NONCE_LEN);
 
 	/*
-	 * Key length is zero (it can be deduced from the cipher suite).
-	 * No additional data is added.
-	 *
 	 * Copy replay counter. It was already incremented while processing m2
 	 * so no need to increment it again.
 	 */
 	os_memcpy(key->replay_counter, ndp_sec->replaycnt,
 		  sizeof(key->replay_counter));
+
+	/* Add KDEs to the key data and set key length accordingly */
+	key_data_len_pos = wpabuf_put(buf, 2);
+
+	kde_len = nan_sec_add_kdes(nan, ndp_sec, buf);
+	if (kde_len < 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: Failed to add KDEs to m3");
+		return -1;
+	}
+
+	info = WPA_KEY_INFO_TYPE_AKM_DEFINED | WPA_KEY_INFO_KEY_TYPE |
+	       WPA_KEY_INFO_MIC | WPA_KEY_INFO_INSTALL | WPA_KEY_INFO_SECURE;
+	if (is_ack)
+		info |= WPA_KEY_INFO_ACK;
+	if (kde_len)
+		info |= WPA_KEY_INFO_ENCR_KEY_DATA;
+
+	WPA_PUT_BE16(key->key_info, info);
+
+	WPA_PUT_LE16(key_len_pos,
+		     sizeof(struct nan_shared_key) + key_len + 2 + kde_len);
+	WPA_PUT_BE16(key_data_len_pos, kde_len);
 	return 0;
 }
 

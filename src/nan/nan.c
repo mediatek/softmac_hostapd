@@ -191,6 +191,44 @@ void nan_deinit(struct nan_data *nan)
 }
 
 
+static int nan_gen_igtk(struct nan_data *nan)
+{
+	u8 tsc[RSN_PN_LEN];
+	enum wpa_alg alg;
+	int cipher;
+
+	if (((nan->cfg->security_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) == NAN_CS_INFO_CAPA_GTK_SUPP_NONE)
+		return 0;
+
+	if (nan->cfg->security_capab &
+	    NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256) {
+		alg = WPA_ALG_BIP_GMAC_256;
+		cipher = WPA_CIPHER_BIP_GMAC_256;
+	} else {
+		alg = WPA_ALG_BIP_CMAC_128;
+		cipher = WPA_CIPHER_AES_128_CMAC;
+	}
+
+	nan->igtk.igtk_len = wpa_cipher_key_len(cipher);
+	nan->igtk_id = 4;
+	if (os_get_random(nan->igtk.igtk, nan->igtk.igtk_len) < 0)
+		return -1;
+	os_memset(tsc, 0, sizeof(tsc));
+	if (nan->cfg->set_group_key(nan->cfg->cb_ctx, alg, broadcast_ether_addr,
+				    nan->igtk_id, tsc, nan->igtk.igtk,
+				    nan->igtk.igtk_len,
+				    KEY_FLAG_GROUP_TX_DEFAULT) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Failed to install own IGTK");
+		return -1;
+	}
+
+	wpa_hexdump_key(MSG_DEBUG, "NAN: New own IGTK", nan->igtk.igtk,
+			nan->igtk.igtk_len);
+	return 0;
+}
+
+
 int nan_start(struct nan_data *nan, const struct nan_cluster_config *config)
 {
 	int ret;
@@ -208,6 +246,11 @@ int nan_start(struct nan_data *nan, const struct nan_cluster_config *config)
 		return ret;
 	}
 	nan->nan_started = 1;
+
+	if (nan_gen_igtk(nan) < 0) {
+		nan_stop(nan);
+		return -1;
+	}
 
 	return 0;
 }
@@ -255,6 +298,16 @@ void nan_stop(struct nan_data *nan)
 	if (!nan->nan_started) {
 		wpa_printf(MSG_DEBUG, "NAN: Already stopped");
 		return;
+	}
+
+	if (nan->igtk.igtk_len) {
+		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, WPA_ALG_NONE,
+					    NULL, nan->igtk_id, NULL, NULL,
+					    0, KEY_FLAG_GROUP))
+			wpa_printf(MSG_DEBUG, "NAN: Failed to clear own IGTK");
+
+		nan->igtk.igtk_len = 0;
+		nan->igtk_id = 0;
 	}
 
 	nan_flush(nan);
