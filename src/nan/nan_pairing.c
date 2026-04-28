@@ -651,14 +651,6 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 }
 
 
-static void nan_add_kde_hdr(struct wpabuf *buf, u32 kde, size_t data_len)
-{
-	wpabuf_put_u8(buf, WLAN_EID_VENDOR_SPECIFIC);
-	wpabuf_put_u8(buf, RSN_SELECTOR_LEN + data_len);
-	RSN_SELECTOR_PUT(wpabuf_put(buf, RSN_SELECTOR_LEN), kde);
-}
-
-
 /**
  * nan_nik_build_key_data - Build NAN Identity Key (NIK) key data buffer
  * @nan_data: Pointer to NAN data structure containing configuration

@@ -1972,3 +1972,11 @@ bool nan_peer_schedule_intersects(struct nan_data *nan,
 
 	return false;
 }
+
+
+void nan_add_kde_hdr(struct wpabuf *buf, u32 kde, size_t data_len)
+{
+	wpabuf_put_u8(buf, WLAN_EID_VENDOR_SPECIFIC);
+	wpabuf_put_u8(buf, RSN_SELECTOR_LEN + data_len);
+	RSN_SELECTOR_PUT(wpabuf_put(buf, RSN_SELECTOR_LEN), kde);
+}

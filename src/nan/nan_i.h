@@ -794,6 +794,7 @@ void nan_parse_peer_dev_capa_ext(struct nan_data *nan, struct nan_peer *peer,
 int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 				const struct nan_schedule *local_sched);
 bool nan_is_ndpe_supported(struct nan_data *nan, const struct nan_peer *peer);
+void nan_add_kde_hdr(struct wpabuf *buf, u32 kde, size_t data_len);
 #ifdef CONFIG_PASN
 int nan_nira_get_tag_nonce(const struct nan_config *nan, u8 *nonce, u8 *tag);
 void nan_pairing_deinit_peer(struct nan_peer *peer);
