@@ -406,6 +406,44 @@ struct nan_avail {
 	u8 optional[0];
 } STRUCT_PACKED;
 
+/* Wi-Fi Aware spec v4.0, Table 110 (Attribute Control field format for the
+ * Unaligned Schedule attribute)
+ */
+#define NAN_UNALIGNED_SCHED_CTRL_SCHED_ID_MASK (BIT(0) | BIT(1) | BIT(2) | \
+						BIT(3))
+
+/* Wi-Fi Aware spec v4.0, Table 111 (ULW Overwrite field format) */
+#define NAN_ULW_OVERWRITE_ALL        BIT(0)
+#define NAN_ULW_OVERWRITE_MAP_ID_POS 1
+#define NAN_ULW_OVERWRITE_MAP_ID_MASK (BIT(1) | BIT(2) | BIT(3) | BIT(4))
+
+/* Wi-Fi Aware spec v4.0, Table 112 (ULW Control field format) */
+#define NAN_ULW_CTRL_TYPE_POS                0
+#define NAN_ULW_CTRL_TYPE_MASK               (BIT(0) | BIT(1))
+#define NAN_ULW_CTRL_TYPE_BAND_ID            0
+#define NAN_ULW_CTRL_TYPE_CHAN_ENTRY         1
+#define NAN_ULW_CTRL_TYPE_CHAN_ENTRY_WITH_AUX 2
+#define NAN_ULW_CTRL_CHAN_AVAIL              BIT(2)
+#define NAN_ULW_CTRL_RX_NSS_POS              3
+#define NAN_ULW_CTRL_RX_NSS_MASK             (BIT(3) | BIT(4) | BIT(5) | BIT(6))
+
+/* Wi-Fi Aware spec v4.0, Table 109 (Unaligned Schedule attribute format).
+ * ID and length are not included.
+ */
+struct nan_unaligned_sched {
+	u8 sched_id;
+	u8 seq_id;
+	le32 start_time;
+	le32 duration;
+	le32 period;
+	u8 count_down;
+	u8 ulw_overwrite;
+
+	/* followed by optional fields (ULW Control and Band ID or Channel
+	 * Entry) */
+	u8 optional[0];
+} STRUCT_PACKED;
+
 #define NAN_SCHED_ENTRY_MAP_MASK (BIT(0) | BIT(1) | BIT(2) | BIT(3))
 
 /* Wi-Fi Aware spec v4.0, Table 104 (Schedule Entry format for the NDC

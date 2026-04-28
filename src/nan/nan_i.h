@@ -618,6 +618,7 @@ struct nan_attrs {
 	struct dl_list serv_desc_ext;
 	struct dl_list avail;
 	struct dl_list ndc;
+	struct dl_list ulw;
 	struct dl_list dev_capa;
 	struct dl_list element_container;
 

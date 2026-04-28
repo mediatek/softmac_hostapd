@@ -37,6 +37,7 @@ void nan_attrs_clear(struct nan_data *nan, struct nan_attrs *attrs)
 	nan_attrs_clear_list(nan, &attrs->serv_desc_ext);
 	nan_attrs_clear_list(nan, &attrs->avail);
 	nan_attrs_clear_list(nan, &attrs->ndc);
+	nan_attrs_clear_list(nan, &attrs->ulw);
 	nan_attrs_clear_list(nan, &attrs->dev_capa);
 	nan_attrs_clear_list(nan, &attrs->element_container);
 
@@ -67,6 +68,7 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 	dl_list_init(&attrs->serv_desc_ext);
 	dl_list_init(&attrs->avail);
 	dl_list_init(&attrs->ndc);
+	dl_list_init(&attrs->ulw);
 	dl_list_init(&attrs->dev_capa);
 	dl_list_init(&attrs->element_container);
 
@@ -134,6 +136,18 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 			entry->ptr = pos;
 			entry->len = attr_len;
 			dl_list_add_tail(&attrs->ndc, &entry->list);
+			break;
+		case NAN_ATTR_UNALIGNED_SCHEDULE:
+			if (attr_len < sizeof(struct nan_unaligned_sched))
+				break;
+
+			entry = os_malloc(sizeof(*entry));
+			if (!entry)
+				goto fail;
+
+			entry->ptr = pos;
+			entry->len = attr_len;
+			dl_list_add_tail(&attrs->ulw, &entry->list);
 			break;
 		case NAN_ATTR_NDL:
 			/* Validate minimal NDL attribute length */
@@ -243,7 +257,6 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 		case NAN_ATTR_COUNTRY_CODE:
 		case NAN_ATTR_RANGING:
 		case NAN_ATTR_CLUSTER_DISCOVERY:
-		case NAN_ATTR_UNALIGNED_SCHEDULE:
 		case NAN_ATTR_RANGING_INFO:
 		case NAN_ATTR_RANGING_SETUP:
 		case NAN_ATTR_FTM_RANGING_REPORT:
