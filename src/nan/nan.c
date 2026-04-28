@@ -1695,6 +1695,27 @@ int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+int nan_clear_peer_schedule(struct nan_data *nan, struct nan_peer *peer)
+{
+	int ret;
+
+	wpa_printf(MSG_DEBUG, "NAN: Clear peer schedule, peer->configured=%d",
+		   peer->configured);
+
+	if (!peer->configured)
+		return 0;
+
+	ret = nan->cfg->set_peer_schedule(nan->cfg->cb_ctx, peer->nmi_addr,
+					  false, 0, peer->info.seq_id, 0, NULL,
+					  NULL);
+	if (ret)
+		wpa_printf(MSG_DEBUG, "NAN: Failed to clear peer schedule");
+
+	peer->configured = false;
+	return 0;
+}
+
+
 /**
  * nan_process_followup - Process a received NAN Follow-up Action frame
  * @nan: NAN module context from nan_init()
