@@ -1592,7 +1592,9 @@ static bool nan_de_rx_subscribe(struct nan_de *de, struct nan_de_service *srv,
 	else
 		network_id = nan_network_id;
 
-	if (srv->publish.solicited_multicast || !a3)
+	if (srv->sync && de->cluster_id_set)
+		a3 = de->cluster_id;
+	else if (srv->publish.solicited_multicast || !a3)
 		a3 = network_id;
 	else if (srv->is_p2p)
 		a3 = de->nmi;
