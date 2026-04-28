@@ -978,6 +978,14 @@ static void wpas_nan_bootstrap_completed_cb(void *ctx, const u8 *peer_nmi,
 }
 
 
+static void wpas_nan_schedule_changed_cb(void *ctx, const u8 *peer_nmi)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	wpas_notify_nan_schedule_changed(wpa_s, peer_nmi);
+}
+
+
 static int wpas_nan_transmit_followup_cb(void *ctx, const u8 *peer_nmi,
 					 const struct wpabuf *attrs, int handle,
 					 u8 req_instance_id)
@@ -1316,6 +1324,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.set_peer_schedule = wpas_nan_set_peer_schedule_cb;
 		nan.set_group_key = wpas_nan_set_group_key_cb;
 		nan.get_seqnum = wpas_nan_get_seqnum_cb;
+		nan.schedule_changed = wpas_nan_schedule_changed_cb;
 
 		wpa_printf(MSG_DEBUG, "NAN: Bootstrap support enabled");
 		nan.bootstrap_request = wpas_nan_bootstrap_request_cb;

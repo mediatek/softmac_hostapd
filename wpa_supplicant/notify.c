@@ -1473,6 +1473,15 @@ void wpas_notify_nan_cluster_join(struct wpa_supplicant *wpa_s,
 }
 
 
+void wpas_notify_nan_schedule_changed(struct wpa_supplicant *wpa_s,
+				      const u8 *peer_nmi)
+{
+	wpa_msg_global(wpa_s, MSG_INFO,
+		       NAN_PEER_SCHEDULE_CHANGED "peer_nmi=" MACSTR,
+		       MAC2STR(peer_nmi));
+}
+
+
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 				    const u8 *peer_addr, int akmp,
 				    int cipher, u16 status,
