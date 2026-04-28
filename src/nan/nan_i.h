@@ -65,6 +65,7 @@ struct nan_ptk {
  * @auth_token: Authentication token
  * @pmk: PMK used for the secure NDP establishment
  * @ptk: Derived PTK
+ * @local_gtk: Group Temporal Key information of the local NDI
  */
 struct nan_ndp_sec {
 	bool present;
@@ -91,6 +92,8 @@ struct nan_ndp_sec {
 	u8 pmk[PMK_LEN];
 
 	struct nan_ptk ptk;
+
+	struct nan_gtk local_gtk;
 };
 
 /*

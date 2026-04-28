@@ -188,13 +188,28 @@ struct nan_schedule {
 };
 
 /**
+ * struct nan_gtk - NAN GTK information
+
+ * @gtk: Group Temporal Key (GTK)
+ * @id: GTK key ID
+ * @csid: GTK Cipher suite ID. See &enum nan_cipher_suite_id
+ */
+struct nan_gtk {
+	struct wpa_gtk gtk;
+	u8 id;
+	u8 csid;
+};
+
+/**
  * struct nan_ndp_sec_params - NAN NDP security parameters
  * @csid: Cipher suite ID
  * @pmk: NAN Pairwise Master Key (PMK)
+ * @gtk: Group Temporal Key (GTK) information
  */
 struct nan_ndp_sec_params {
 	enum nan_cipher_suite_id csid;
 	u8 pmk[PMK_LEN];
+	struct nan_gtk gtk;
 };
 
 /**

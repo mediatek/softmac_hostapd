@@ -145,6 +145,9 @@ int nan_ndp_setup_req(struct nan_data *nan, struct nan_peer *peer,
 
 		peer->ndp_setup.sec.i_instance_id =
 			peer->ndp_setup.publish_inst_id;
+
+		os_memcpy(&peer->ndp_setup.sec.local_gtk, &params->sec.gtk,
+			  sizeof(peer->ndp_setup.sec.local_gtk));
 	}
 
 	if (params->interface_id) {
@@ -229,6 +232,9 @@ int nan_ndp_setup_resp(struct nan_data *nan, struct nan_peer *peer,
 			peer->ndp_setup.sec.r_csid = params->sec.csid;
 			os_memcpy(peer->ndp_setup.sec.pmk, params->sec.pmk,
 				  PMK_LEN);
+			os_memcpy(&peer->ndp_setup.sec.local_gtk,
+				  &params->sec.gtk,
+				  sizeof(peer->ndp_setup.sec.local_gtk));
 
 			ret = nan_sec_init_resp(nan, peer);
 			if (ret) {
