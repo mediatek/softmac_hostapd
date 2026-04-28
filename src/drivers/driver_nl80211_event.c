@@ -4379,6 +4379,33 @@ static void nl80211_nan_ulw_update_event(struct wpa_driver_nl80211_data *drv,
 	wpa_supplicant_event(drv->ctx, EVENT_NAN_ULW_UPDATE, &data);
 }
 
+
+static void
+nl80211_nan_channel_evacuate_event(struct wpa_driver_nl80211_data *drv,
+				   struct nlattr **tb)
+{
+	union wpa_event_data data;
+	struct nlattr *attrs[NL80211_ATTR_MAX + 1];
+
+	wpa_printf(MSG_DEBUG, "nl80211: NAN channel evacuation event");
+
+	os_memset(&data, 0, sizeof(data));
+
+	if (!tb[NL80211_ATTR_NAN_CHANNEL] ||
+	    nla_parse_nested(attrs, NL80211_ATTR_MAX,
+			     tb[NL80211_ATTR_NAN_CHANNEL], NULL) ||
+	    !attrs[NL80211_ATTR_WIPHY_FREQ])
+		return;
+
+	data.nan_chan_evacuation_info.freq =
+		nla_get_u32(attrs[NL80211_ATTR_WIPHY_FREQ]);
+
+	wpa_printf(MSG_DEBUG, "nl80211: NAN channel evacuate: freq=%d",
+		   data.nan_chan_evacuation_info.freq);
+
+	wpa_supplicant_event(drv->ctx, EVENT_NAN_CHAN_EVACUATION, &data);
+}
+
 #endif /* CONFIG_NAN */
 
 
@@ -4755,6 +4782,9 @@ static void do_process_drv_event(struct i802_bss *bss, int cmd,
 		break;
 	case NL80211_CMD_NAN_ULW_UPDATE:
 		nl80211_nan_ulw_update_event(drv, tb);
+		break;
+	case NL80211_CMD_NAN_CHANNEL_EVAC:
+		nl80211_nan_channel_evacuate_event(drv, tb);
 		break;
 #endif /* CONFIG_NAN */
 	case NL80211_CMD_INCUMBENT_SIGNAL_DETECT:

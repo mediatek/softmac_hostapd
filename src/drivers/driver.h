@@ -6515,6 +6515,16 @@ enum wpa_event_type {
 	 * has changed and can be attached to outgoing NAN frames.
 	 */
 	EVENT_NAN_ULW_UPDATE,
+
+	/**
+	 * EVENT_NAN_CHAN_EVACUATION - Notification of NAN channel evacuation
+	 *
+	 * This event is used to notify wpa_supplicant that the device/driver
+	 * evacuated one of the channels used for NAN operation, e.g., due to
+	 * resource constraints (not enough resources to support NAN and other
+	 * activities).
+	 */
+	EVENT_NAN_CHAN_EVACUATION,
 };
 
 
@@ -7558,6 +7568,14 @@ union wpa_event_data {
 		const u8 *ulw;
 		size_t ulw_len;
 	} nan_ulw_update_info;
+
+	/**
+	 * struct nan_chan_evacuation_info - Data for EVENT_NAN_CHAN_EVACUATION
+	 * @freq: Control frequency of the evacuated channel in MHz
+	 */
+	struct nan_chan_evacuation_info {
+		int freq;
+	} nan_chan_evacuation_info;
 };
 
 /**
