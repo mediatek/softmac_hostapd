@@ -4297,7 +4297,7 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	  "peer_nmi=<nmi> init_ndi=<ndi> ndp_id=<id> = Terminate NAN data path" },
 	{ "nan_peer_info", wpa_cli_cmd_nan_peer_info, NULL,
 	  cli_cmd_flag_none,
-	  "<addr> <schedule|potential|capa> [map_id] = Get NAN peer information" },
+	  "<addr> <schedule|potential|capa|ndps> [map_id] = Get NAN peer information" },
 	{ "nan_status", wpa_cli_cmd_nan_status, NULL,
 	  cli_cmd_flag_none, "= Get NAN status" },
 	{ "nan_bootstrap", wpa_cli_cmd_nan_bootstrap, NULL,

@@ -874,6 +874,8 @@ int nan_set_beacon_prot(struct nan_data *nan, bool enable);
 int nan_set_max_ndl_idle_period(struct nan_data *nan, u16 max_idle_period);
 bool nan_has_active_ndp(struct nan_data *nan);
 int nan_get_status(struct nan_data *nan, char *buf, size_t buflen);
+int nan_peer_dump_ndps_to_buf(struct nan_data *nan, const u8 *addr,
+			      char *buf, size_t buflen);
 #ifdef CONFIG_PASN
 int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,

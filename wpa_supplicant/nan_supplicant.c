@@ -3294,6 +3294,15 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 			ret += wpas_nan_append_ik_info(reply + ret,
 						       reply_size - ret, ik);
 #endif /* CONFIG_PASN */
+	} else if (os_strncmp(pos + 1, "ndps", 4) == 0) {
+		ret = nan_peer_dump_ndps_to_buf(wpa_s->nan, addr, reply,
+						reply_size);
+		if (ret < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to get NDPs for peer " MACSTR,
+				   MAC2STR(addr));
+			return -1;
+		}
 	} else {
 		wpa_printf(MSG_INFO, "NAN: Unknown info type: %s", pos + 1);
 		ret = -1;

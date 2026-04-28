@@ -3583,3 +3583,43 @@ int nan_get_status(struct nan_data *nan, char *buf, size_t buflen)
 
 	return pos - buf;
 }
+
+
+int nan_peer_dump_ndps_to_buf(struct nan_data *nan, const u8 *addr,
+			      char *buf, size_t buflen)
+{
+	struct nan_peer *peer;
+	struct nan_ndp *ndp;
+	char *pos, *end;
+
+	if (!nan)
+		return -1;
+
+	peer = nan_get_peer(nan, addr);
+	if (!peer) {
+		wpa_printf(MSG_DEBUG, "NAN: Peer " MACSTR " not found",
+			   MAC2STR(addr));
+		return -1;
+	}
+
+	pos = buf;
+	end = buf + buflen;
+
+	dl_list_for_each(ndp, &peer->ndps, struct nan_ndp, list) {
+		int ret;
+
+		ret = os_snprintf(pos, end - pos,
+				  "ndp_id=%u initiator=%d "
+				  "init_ndi=" MACSTR " resp_ndi=" MACSTR
+				  " qos_min_slots=%u qos_max_latency=%u\n",
+				  ndp->ndp_id, ndp->initiator,
+				  MAC2STR(ndp->init_ndi),
+				  MAC2STR(ndp->resp_ndi),
+				  ndp->qos.min_slots, ndp->qos.max_latency);
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+
+	return pos - buf;
+}
