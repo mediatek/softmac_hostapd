@@ -287,6 +287,8 @@ struct nan_channels {
  * @ssi_len: Service specific information length
  * @install_keys: Whether the new keys should be installed
  * @first_ndp: Whether this is the first NDP with the peer
+ * @new_ndi_sta: Whether a new NDI station needs to be added (peer_ndi not
+ * 	already used by another NDP with this peer)
  */
 struct nan_ndp_connection_params {
 	struct nan_ndp_id ndp_id;
@@ -296,6 +298,7 @@ struct nan_ndp_connection_params {
 	size_t ssi_len;
 	bool install_keys;
 	bool first_ndp;
+	bool new_ndi_sta;
 };
 
 /**

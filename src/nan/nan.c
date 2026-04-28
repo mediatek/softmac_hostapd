@@ -1437,6 +1437,24 @@ static void nan_ndp_action_notif(struct nan_data *nan, struct nan_peer *peer)
 }
 
 
+static bool nan_peer_ndi_in_use(struct nan_peer *peer, const u8 *peer_ndi)
+{
+	struct nan_ndp *ndp;
+
+	dl_list_for_each(ndp, &peer->ndps, struct nan_ndp, list) {
+		if (ndp->initiator) {
+			if (ether_addr_equal(ndp->resp_ndi, peer_ndi))
+				return true;
+		} else {
+			if (ether_addr_equal(ndp->init_ndi, peer_ndi))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+
 static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndp_connection_params params;
@@ -1465,6 +1483,7 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 						     params.peer_ndi,
 						     params.local_ndi);
 	params.first_ndp = dl_list_empty(&peer->ndps);
+	params.new_ndi_sta = !nan_peer_ndi_in_use(peer, params.peer_ndi);
 	if (nan->cfg->ndp_connected &&
 	    nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params)) {
 		wpa_printf(MSG_DEBUG, "NAN: NDP connected notification failed");

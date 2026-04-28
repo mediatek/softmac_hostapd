@@ -452,7 +452,7 @@ static int wpas_nan_configure_nmi_sta_capa(struct wpa_supplicant *wpa_s,
 static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 				const u8 *peer_nmi, const u8 *local_ndi,
 				const u8 *peer_ndi, bool install_keys,
-				bool first_ndp)
+				bool first_ndp, bool new_ndi_sta)
 {
 	u8 tk[WPA_TK_MAX_LEN];
 	size_t tk_len;
@@ -479,45 +479,64 @@ static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	os_memset(&sta_params, 0, sizeof(sta_params));
-	sta_params.addr = peer_ndi;
-	sta_params.nmi_addr = peer_nmi;
-	sta_params.flags = WPA_STA_AUTHENTICATED | WPA_STA_ASSOCIATED;
+	if (new_ndi_sta) {
+		os_memset(&sta_params, 0, sizeof(sta_params));
+		sta_params.addr = peer_ndi;
+		sta_params.nmi_addr = peer_nmi;
+		sta_params.flags = WPA_STA_AUTHENTICATED | WPA_STA_ASSOCIATED;
 
-	/* Set MFP flag early, to prevent races until keys are installed */
-	if (install_keys)
-		sta_params.flags |= WPA_STA_MFP;
-	else
-		sta_params.flags |= WPA_STA_AUTHORIZED;
+		/* Set MFP flag early, to prevent races until keys are installed
+		 */
+		if (install_keys)
+			sta_params.flags |= WPA_STA_MFP;
+		else
+			sta_params.flags |= WPA_STA_AUTHORIZED;
 
-	if (wpa_drv_sta_add(ndi_wpa_s, &sta_params)) {
-		wpa_printf(MSG_INFO,
-			   "NAN: Failed to add NDI station for peer " MACSTR,
+		if (wpa_drv_sta_add(ndi_wpa_s, &sta_params)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to add NDI station for peer "
+				   MACSTR, MAC2STR(peer_ndi));
+			return -1;
+		}
+	} else {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: NDI station already exists for peer " MACSTR,
 			   MAC2STR(peer_ndi));
-		return -1;
+		/* Set MFP flag if keys will be installed (security upgrade) */
+		if (install_keys &&
+		    wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_MFP,
+					  WPA_STA_MFP, ~0)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to set MFP flag for peer "
+				   MACSTR, MAC2STR(peer_ndi));
+			return -1;
+		}
 	}
 
 	if (!install_keys) {
-		wpa_printf(MSG_DEBUG,
-			   "NAN: NDI station added without keys for peer "
-			   MACSTR, MAC2STR(peer_ndi));
+		if (new_ndi_sta)
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NDI station added without keys for peer "
+				   MACSTR, MAC2STR(peer_ndi));
+		else
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Using existing NDI station without new keys for peer "
+				   MACSTR, MAC2STR(peer_ndi));
 		goto out_success;
 	}
 
 	if (nan_peer_get_tk(wpa_s->nan, peer_nmi, peer_ndi, local_ndi, tk,
 			    &tk_len, &csid)) {
 		wpa_printf(MSG_INFO, "NAN: Failed to get TK for NDI station");
-		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
-		return -1;
+		goto remove_sta;
 	}
 
 	if (wpas_nan_set_ndi_keys(ndi_wpa_s, peer_ndi, csid, tk, tk_len)) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to set NDI keys for peer " MACSTR,
 			   MAC2STR(peer_ndi));
-		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
 		forced_memzero(tk, tk_len);
-		return -1;
+		goto remove_sta;
 	}
 	forced_memzero(tk, tk_len);
 
@@ -526,8 +545,7 @@ static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to set authorize for NDI station");
 		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
-		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
-		return -1;
+		goto remove_sta;
 	}
 
 out_success:
@@ -544,6 +562,11 @@ out_success:
 		wpa_drv_set_operstate(ndi_wpa_s, 1);
 
 	return 0;
+
+remove_sta:
+	if (new_ndi_sta)
+		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
+	return -1;
 }
 
 
@@ -592,7 +615,7 @@ static int wpas_nan_ndp_connected_cb(void *ctx,
 	if (wpas_nan_add_ndi_sta(wpa_s, params->ndp_id.peer_nmi,
 				 params->local_ndi, params->peer_ndi,
 				 params->install_keys,
-				 params->first_ndp) < 0) {
+				 params->first_ndp, params->new_ndi_sta) < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to add NDI station for NDP connection");
 		return -1;
