@@ -146,13 +146,14 @@ class NanDevice:
 
     def ndp_request(self, ndi, handle, peer_nmi, peer_id, ssi=None,
                     qos_slots=0, qos_latency=0xffff, csid=None, password=None,
-                    pmk=None, interface_id=None, gtk_csid=None):
+                    pwd_hex=None, pmk=None, interface_id=None, gtk_csid=None):
         cmd = f"NAN_NDP_REQUEST handle={handle} ndi={ndi} peer_nmi={peer_nmi} peer_id={peer_id}"
 
         params = [
             ("ssi", ssi),
             ("csid", csid),
             ("password", password),
+            ("pwd_hex", pwd_hex),
             ("pmk", pmk),
             ("interface_id", interface_id),
             ("gtk_csid", gtk_csid),
@@ -168,7 +169,7 @@ class NanDevice:
     def ndp_response(self, action, peer_nmi, ndi=None, peer_ndi=None,
                      ndp_id=None, init_ndi=None, reason_code=None, ssi=None,
                      qos_slots=0, qos_latency=0xffff, handle=None, csid=None,
-                     password=None, pmk=None, interface_id=None,
+                     password=None, pwd_hex=None, pmk=None, interface_id=None,
                      gtk_csid=None):
         if action not in ["accept", "reject"]:
             raise Exception(f"Invalid action: {action}. Must be 'accept' or 'reject'")
@@ -185,6 +186,7 @@ class NanDevice:
             ("ssi", ssi),
             ("csid", csid),
             ("password", password),
+            ("pwd_hex", pwd_hex),
             ("pmk", pmk),
             ("interface_id", interface_id),
             ("gtk_csid", gtk_csid),
@@ -1079,7 +1081,8 @@ def _nan_discover_service(pub, sub, service_name, pssi, sssi, ttl=None,
 
 def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
                                 resp_ssi, csid=None,
-                                password=None, pmk=None, counter=False,
+                                password=None, pwd_hex=None, pmk=None,
+                                counter=False,
                                 wrong_pwd=False, configure_schedule=True,
                                 pub_interface_id=None, sub_interface_id=None,
                                 gtk_csid=None):
@@ -1096,7 +1099,8 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
 
     # NDP request
     if "OK" not in sub.ndp_request(sub.ndi_name, sid, paddr, pid, req_ssi,
-                                   csid=csid, password=password, pmk=pmk,
+                                   csid=csid, password=password,
+                                   pwd_hex=pwd_hex, pmk=pmk,
                                    interface_id=sub_interface_id,
                                    gtk_csid=gtk_csid):
         raise Exception("NDP request failed")
@@ -1124,10 +1128,12 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
 
     # Accept NDP request
     accept_pwd = "WRONG_PWD" if wrong_pwd else password
+    accept_pwd_hex = None if password or wrong_pwd else pwd_hex
     if "OK" not in pub.ndp_response("accept", saddr, ndi=pub.ndi_name,
                                     ndp_id=ndp_id, init_ndi=init_ndi,
                                     handle=pid, ssi=resp_ssi, csid=csid,
-                                    password=accept_pwd, pmk=pmk,
+                                    password=accept_pwd,
+                                    pwd_hex=accept_pwd_hex, pmk=pmk,
                                     interface_id=pub_interface_id,
                                     gtk_csid=gtk_csid):
         raise Exception("NDP response (accept) failed")
@@ -1160,7 +1166,8 @@ def _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr, req_ssi,
         if "OK" not in sub.ndp_response("accept", paddr, ndi=sub.ndi_name,
                                         ndp_id=ndp_id, handle=sid,
                                         init_ndi=init_ndi, ssi="11223344",
-                                        csid=csid, password=password, pmk=pmk):
+                                        csid=csid, password=password,
+                                        pwd_hex=pwd_hex, pmk=pmk):
             raise Exception("NDP response (confirm) failed")
 
     # Wait for NDP connected events
@@ -1212,13 +1219,18 @@ def _nan_test_connectivity(pub, sub):
                                   max_tries=3, timeout=5, broadcast=True)
 
 def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
+                use_pwd_hex=False,
                 use_interface_id=False, verify_max_idle_period=False,
                 gtk_csid=None, mgmt_group_cipher=None):
     if use_pmk:
         pmk = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
         pwd = None
+        pwd_hex = None
     else:
         pwd = "NAN" if csid is not None else None
+        pwd_hex = pwd.encode().hex() if use_pwd_hex and pwd is not None else None
+        if use_pwd_hex:
+            pwd = None
         pmk = None
 
     pub_interface_id, sub_interface_id = (
@@ -1252,8 +1264,8 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
         result = _nan_ndp_request_and_accept(pub, sub, pid, sid, paddr, saddr,
                                              req_ssi="aabbcc",
                                              resp_ssi="ddeeff", csid=csid,
-                                             password=pwd, pmk=pmk,
-                                             counter=counter,
+                                             password=pwd, pwd_hex=pwd_hex,
+                                             pmk=pmk, counter=counter,
                                              wrong_pwd=wrong_pwd,
                                              pub_interface_id=pub_interface_id,
                                              sub_interface_id=sub_interface_id,
@@ -1299,13 +1311,14 @@ def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
             raise Exception(f"NAN-NDP-DISCONNECTED event not seen on subscriber or invalid data")
 
 def run_nan_dp(country="US", counter=False, csid=None, wrong_pwd=False,
-               use_pmk=False, use_interface_id=False,
+               use_pmk=False, use_pwd_hex=False, use_interface_id=False,
                verify_max_idle_period=False, gtk_csid=None,
                mgmt_group_cipher=None):
     set_country(country)
     try:
         _run_nan_dp(counter=counter, csid=csid, wrong_pwd=wrong_pwd,
-                    use_pmk=use_pmk, use_interface_id=use_interface_id,
+                    use_pmk=use_pmk, use_pwd_hex=use_pwd_hex,
+                    use_interface_id=use_interface_id,
                     verify_max_idle_period=verify_max_idle_period,
                     gtk_csid=gtk_csid,
                     mgmt_group_cipher=mgmt_group_cipher)
@@ -1592,6 +1605,10 @@ def test_nan_pair_abort(dev, apdev, params):
         # Test abort with invalid peer address
         if "FAIL" not in sub.pair_abort("02:00:00:00:00:00"):
             raise Exception("NAN_PAIR_ABORT with invalid peer address succeeded unexpectedly")
+
+def test_nan_dp_pwd_hex(dev, apdev, params):
+    """NAN DP - SK CCMP security with password specified as hex"""
+    run_nan_dp(csid=1, use_pwd_hex=True)
 
 def run_nan_pairing(sub, pub, pid, sid, pairing_type, password=None):
     if pairing_type == "SAE":
