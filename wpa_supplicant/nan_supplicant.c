@@ -397,6 +397,32 @@ static int wpas_nan_remove_ndi_keys(struct wpa_supplicant *wpa_s,
 }
 
 
+static int wpas_nan_remove_ndi_gtk(struct wpa_supplicant *wpa_s, int key_id,
+				   const u8 *ndi_addr)
+{
+	return wpa_drv_set_key(wpa_s, -1, WPA_ALG_NONE, ndi_addr, key_id, 0,
+			       NULL, 0, NULL, 0, KEY_FLAG_GROUP);
+}
+
+
+static int wpas_nan_remove_ndi_local_gtk(struct wpa_supplicant *wpa_s)
+{
+	if (!wpa_s->ndi_gtk.gtk.gtk_len)
+		return 0;
+
+	if (wpa_drv_set_key(wpa_s, -1, WPA_ALG_NONE, broadcast_ether_addr,
+			    wpa_s->ndi_gtk.id, 0, NULL, 0, NULL, 0,
+			    KEY_FLAG_GROUP_TX_DEFAULT)) {
+		wpa_printf(MSG_INFO, "NAN: Failed to remove NDI group TX key");
+		return -1;
+	}
+
+	wpa_s->ndi_gtk.id = 0;
+	os_memset(&wpa_s->ndi_gtk, 0, sizeof(wpa_s->ndi_gtk));
+	return 0;
+}
+
+
 static struct wpa_supplicant *
 wpas_nan_get_ndi_iface(struct wpa_supplicant *wpa_s, const u8 *ndi_addr)
 {
@@ -446,6 +472,85 @@ static int wpas_nan_configure_nmi_sta_capa(struct wpa_supplicant *wpa_s,
 	sta_params.vht_capabilities = ie ? (const void *) (ie + 2) : NULL;
 
 	return wpa_drv_sta_add(wpa_s, &sta_params);
+}
+
+
+static int wpas_nan_csid_to_wpa_alg(enum nan_cipher_suite_id csid,
+				    enum wpa_alg *alg)
+{
+	switch (csid) {
+	case NAN_CS_NONE:
+		*alg = WPA_ALG_NONE;
+		break;
+	case NAN_CS_SK_CCM_128:
+	case NAN_CS_GTK_CCMP_128:
+		*alg = WPA_ALG_CCMP;
+		break;
+	case NAN_CS_SK_GCM_256:
+	case NAN_CS_GTK_GCMP_256:
+		*alg = WPA_ALG_GCMP_256;
+		break;
+	default:
+		wpa_printf(MSG_INFO, "NAN: Unsupported CSID %d", csid);
+		return -1;
+	}
+
+	return 0;
+}
+
+
+static int wpas_nan_set_ndi_group_keys(struct wpa_supplicant *wpa_s,
+				       struct nan_ndp_connection_params *params)
+{
+	enum wpa_alg alg;
+
+	/* Install the local GTK only if not already installed */
+	if (!wpa_s->ndi_gtk.id && params->local_gtk && params->local_gtk->id) {
+		u8 rsc[RSN_PN_LEN];
+
+		if (wpas_nan_csid_to_wpa_alg(params->local_gtk->csid, &alg)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Unsupported CSID %u for local GTK",
+				   params->local_gtk->csid);
+			return -1;
+		}
+
+		os_memset(rsc, 0, sizeof(rsc));
+		if (wpa_drv_set_key(wpa_s, -1, alg, broadcast_ether_addr,
+				    params->local_gtk->id, 0, rsc, sizeof(rsc),
+				    params->local_gtk->gtk.gtk,
+				    params->local_gtk->gtk.gtk_len,
+				    KEY_FLAG_GROUP_TX_DEFAULT)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to set local GTK for NDI");
+			return -1;
+		}
+
+		os_memcpy(&wpa_s->ndi_gtk, params->local_gtk,
+			  sizeof(wpa_s->ndi_gtk));
+	}
+
+	if (params->peer_gtk && params->peer_gtk->id) {
+		if (wpas_nan_csid_to_wpa_alg(params->peer_gtk->csid, &alg)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Unsupported CSID %u for peer GTK",
+				   params->peer_gtk->csid);
+			return -1;
+		}
+
+		if (wpa_drv_set_key(wpa_s, -1, alg, params->peer_ndi,
+				    params->peer_gtk->id, 0,
+				    params->peer_gtk_rsc, RSN_PN_LEN,
+				    params->peer_gtk->gtk.gtk,
+				    params->peer_gtk->gtk.gtk_len,
+				    KEY_FLAG_GROUP_RX)) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to set peer GTK for NDI");
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 
@@ -540,11 +645,21 @@ static int wpas_nan_add_ndi_sta(struct wpa_supplicant *wpa_s,
 	}
 	forced_memzero(tk, tk_len);
 
+	if (wpas_nan_set_ndi_group_keys(ndi_wpa_s, params)) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to set NDI group keys for peer "
+			   MACSTR, MAC2STR(peer_ndi));
+		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+		goto remove_sta;
+	}
+
 	if (wpa_drv_sta_set_flags(ndi_wpa_s, peer_ndi, WPA_STA_AUTHORIZED,
 				  WPA_STA_AUTHORIZED, ~0)) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to set authorize for NDI station");
 		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+		wpas_nan_remove_ndi_gtk(ndi_wpa_s, params->peer_gtk->id,
+					peer_ndi);
 		goto remove_sta;
 	}
 
@@ -573,7 +688,7 @@ remove_sta:
 static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 				    const u8 *local_ndi,
 				    const u8 *peer_ndi,
-				    bool remove_sta)
+				    bool remove_sta, int gtk_id)
 {
 	struct wpa_supplicant *ndi_wpa_s;
 
@@ -604,13 +719,18 @@ static void wpas_nan_remove_ndi_sta(struct wpa_supplicant *wpa_s,
 				   "NAN: Failed to clear authorized flag for NDI station");
 
 		wpas_nan_remove_ndi_keys(ndi_wpa_s, peer_ndi);
+		if (gtk_id)
+			wpas_nan_remove_ndi_gtk(ndi_wpa_s, gtk_id, peer_ndi);
 		wpa_drv_sta_remove(ndi_wpa_s, peer_ndi);
 	}
 
-	/* Set operstate DORMANT only when the last NDP is removed from this NDI
+	/* Remove the local GTK and set operstate DORMANT only when the last NDP
+	 * is removed from this NDI
 	 */
-	if (!ndi_wpa_s->nan_ndi_ndp_refcount)
+	if (!ndi_wpa_s->nan_ndi_ndp_refcount) {
+		wpas_nan_remove_ndi_local_gtk(ndi_wpa_s);
 		wpa_drv_set_operstate(ndi_wpa_s, 0);
+	}
 }
 
 
@@ -645,7 +765,7 @@ static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
-	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi, remove_sta);
+	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi, remove_sta, gtk_id);
 	wpas_notify_nan_ndp_disconnected(wpa_s, ndp_id->peer_nmi,
 					 ndp_id->id, local_ndi, peer_ndi,
 					 reason, locally_generated, failure);
