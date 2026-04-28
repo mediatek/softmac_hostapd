@@ -449,6 +449,11 @@ struct nan_config {
 	 */
 	u16 bootstrap_comeback_timeout;
 
+	/* Security capabilities. See Wi-Fi Aware spec v4.0, Table 122 (Cipher
+	 * Suite Information attribute (CSIA) field format), Capabilities field.
+	 */
+	u8 security_capab;
+
 	/**
 	 * start - Start NAN
 	 * @ctx: Callback context from cb_ctx

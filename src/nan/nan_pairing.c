@@ -448,11 +448,7 @@ static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 
 	cs.instance_id = publish_id;
 
-	/*
-	 * TODO: Get security capabilities from somewhere. For now, it doesn't
-	 * matter as the capability field is not used in pairing anyway.
-	 */
-	nan_add_csia(extra_ies, 0, 1, &cs);
+	nan_add_csia(extra_ies, nan_data->cfg->security_capab, 1, &cs);
 
 	if (auth_mode == NAN_PASN_AUTH_MODE_SAE ||
 	    auth_mode == NAN_PASN_AUTH_MODE_PASN) {
