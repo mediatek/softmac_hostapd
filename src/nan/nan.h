@@ -770,6 +770,16 @@ struct nan_config {
 	 * Returns: 0 on success, -1 on failure
 	 */
 	int (*get_seqnum)(void *ctx, int key_idx, u8 *seq, const u8 *ndi_addr);
+
+	/**
+	 * get_peer_inactivity - Get the inactivity time for a peer
+	 * @ctx: Callback context from cb_ctx
+	 * @local_ndi: Local NDI address
+	 * @peer_ndi: Peer NDI address
+	 * Returns: Peer inactivity in seconds, negative value on failure
+	 */
+	int (*get_peer_inactivity)(void *ctx, const u8 *local_ndi,
+				   const u8 *peer_ndi);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
@@ -852,6 +862,7 @@ int nan_ndp_requested_gtk_csid(struct nan_data *nan,
 			       const struct nan_ndp_id *ndp_id);
 int nan_set_mgmt_group_cipher(struct nan_data *nan, int cipher);
 int nan_set_beacon_prot(struct nan_data *nan, bool enable);
+int nan_set_max_ndl_idle_period(struct nan_data *nan, u16 max_idle_period);
 #ifdef CONFIG_PASN
 int nan_pairing_add_attrs(struct nan_data *nan_data, struct wpabuf *buf);
 int nan_pairing_initiate_pasn_auth(struct nan_data *nan_data, const u8 *addr,

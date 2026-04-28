@@ -21,6 +21,7 @@
 #define NAN_NDP_SETUP_TIMEOUT_SHORT 2
 
 static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx);
+static void nan_idle_period_timeout(void *eloop_ctx, void *timeout_ctx);
 static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 				 enum nan_reason reason,
 				 bool locally_generated);
@@ -384,6 +385,8 @@ void nan_stop(struct nan_data *nan)
 		wpa_printf(MSG_DEBUG, "NAN: Already stopped");
 		return;
 	}
+
+	eloop_cancel_timeout(nan_idle_period_timeout, nan, NULL);
 
 	if (nan->igtk.igtk_len) {
 		if (nan->cfg->set_group_key(nan->cfg->cb_ctx, WPA_ALG_NONE,
@@ -1668,6 +1671,101 @@ static void nan_terminate_ndps_for_ndi(struct nan_data *nan,
 }
 
 
+static void nan_handle_idle_period(struct nan_data *nan)
+{
+	struct nan_peer *peer;
+	int next_timeout = 0;
+
+	eloop_cancel_timeout(nan_idle_period_timeout, nan, NULL);
+
+	if (!nan->cfg->get_peer_inactivity || !nan->cfg->max_ndl_idle_period)
+		return;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Handle idle period timeout: max_idle_period=%d sec",
+		   nan->cfg->max_ndl_idle_period);
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		int peer_inactive = -1;
+		struct nan_ndp *pndp;
+
+		if (dl_list_empty(&peer->ndps) || !peer->ndl)
+			continue;
+
+		wpa_printf(MSG_DEBUG, "NAN: Check idle period for peer=" MACSTR,
+			   MAC2STR(peer->nmi_addr));
+
+		/* Find the minimal inactive time over all NDPs */
+		dl_list_for_each(pndp, &peer->ndps, struct nan_ndp, list) {
+			const u8 *local_ndi, *peer_ndi;
+			int inactive;
+
+			if (pndp->initiator) {
+				local_ndi = pndp->init_ndi;
+				peer_ndi = pndp->resp_ndi;
+			} else {
+				local_ndi = pndp->resp_ndi;
+				peer_ndi = pndp->init_ndi;
+			}
+
+			inactive =
+				nan->cfg->get_peer_inactivity(nan->cfg->cb_ctx,
+							      local_ndi,
+							      peer_ndi);
+			wpa_printf(MSG_DEBUG,
+				   "NAN: local=" MACSTR ", peer" MACSTR
+				   " : inactivity=%d sec",
+				   MAC2STR(local_ndi), MAC2STR(peer_ndi),
+				   inactive);
+
+			if (inactive < 0)
+				continue;
+
+			/*
+			 * peer_inactive would eventually hold the minimal
+			 * inactive time over all <local NDI, peer NDI> couples
+			 */
+			if (peer_inactive == -1 || inactive < peer_inactive)
+				peer_inactive = inactive;
+		}
+
+		wpa_printf(MSG_DEBUG, "NAN: Peer " MACSTR
+			   " has been inactive for %d seconds",
+			   MAC2STR(peer->nmi_addr), peer_inactive);
+
+		if (peer_inactive >= nan->cfg->max_ndl_idle_period) {
+			wpa_printf(MSG_DEBUG, "NAN: Peer " MACSTR
+				   " has been inactive for too long, removing NDPs",
+				   MAC2STR(peer->nmi_addr));
+			nan_peer_del_all_ndps(nan, peer->nmi_addr);
+			continue;
+		}
+
+		if (peer_inactive == -1)
+			peer_inactive = 0;
+
+		if (!next_timeout ||
+		    next_timeout >
+		    nan->cfg->max_ndl_idle_period - peer_inactive)
+			next_timeout =
+				nan->cfg->max_ndl_idle_period - peer_inactive;
+	}
+
+	wpa_printf(MSG_DEBUG, "NAN: Next idle period timeout in %d seconds",
+		   next_timeout);
+
+	if (next_timeout)
+		eloop_register_timeout(next_timeout, 0,
+				       nan_idle_period_timeout, nan, NULL);
+}
+
+
+static void nan_idle_period_timeout(void *eloop_ctx, void *timeout_ctx)
+{
+	nan_handle_idle_period(eloop_ctx);
+}
+
+
 static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndp_connection_params params;
@@ -1734,6 +1832,7 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 	peer->ndp_setup.ndp = NULL;
 
 	nan_ndp_setup_stop(nan, peer);
+	nan_handle_idle_period(nan);
 
 	return 0;
 }
@@ -3117,6 +3216,45 @@ int nan_set_beacon_prot(struct nan_data *nan, bool enable)
 
 	nan->cfg->security_capab &= ~NAN_CS_INFO_CAPA_GTK_SUPP_MASK;
 	nan->cfg->security_capab |= gtk_supp << NAN_CS_INFO_CAPA_GTK_SUPP_POS;
+	return 0;
+}
 
+
+/**
+ * nan_set_max_ndl_idle_period - Set maximum NDL idle period
+ * @nan: Pointer to NAN data structure
+ * @max_idle_period: Maximum idle period in seconds
+ * Returns: 0 on success, -1 on failure
+ */
+int nan_set_max_ndl_idle_period(struct nan_data *nan, u16 max_idle_period)
+{
+	if (!nan)
+		return -1;
+
+	if (!nan->cfg->get_peer_inactivity) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot set max NDL idle period as get_peer_inactivity callback is not set");
+		return -1;
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Setting max NDL idle period to %u (prev=%u) seconds",
+		   max_idle_period, nan->cfg->max_ndl_idle_period);
+
+	nan->cfg->max_ndl_idle_period = max_idle_period;
+
+	if (!nan->nan_started)
+		return 0;
+
+	/*
+	 * Handle the current timeout. If a positive idle period is set
+	 * configure the timeout logic to run in 1 second (as calling it
+	 * immediately could cause NDP termination in the same context, and
+	 * the caller might be able to handle it).
+	 */
+	eloop_cancel_timeout(nan_idle_period_timeout, nan, NULL);
+	if (max_idle_period)
+		eloop_register_timeout(1, 0, nan_idle_period_timeout,
+				       nan, NULL);
 	return 0;
 }
