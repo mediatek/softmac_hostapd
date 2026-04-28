@@ -1736,6 +1736,10 @@ struct wpa_supplicant {
 	u8 schedule_sequence_id;
 	struct nan_schedule_config nan_sched[MAX_NAN_RADIOS];
 	u16 nan_supported_csids;
+	struct nan_schedule_update {
+		struct nan_schedule_config sched;
+		u8 map_id;
+	} nan_sched_update;
 	struct wpa_freq_range_list nan_disallowed_freqs;
 	u16 nan_max_bw;
 	unsigned int nan_ndi_ndp_refcount; /* Active NDP count on this NDI */

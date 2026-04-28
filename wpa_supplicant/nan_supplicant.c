@@ -1468,6 +1468,8 @@ void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 	os_free(wpa_s->nan_disallowed_freqs.range);
 	os_memset(&wpa_s->nan_disallowed_freqs, 0,
 		  sizeof(wpa_s->nan_disallowed_freqs));
+	clear_sched_config(&wpa_s->nan_sched_update.sched);
+
 	wpa_s->nan = NULL;
 }
 
@@ -1893,7 +1895,7 @@ static void wpas_nan_fill_ndp_schedule(struct wpa_supplicant *wpa_s,
  * If no bitmaps provided - clear the map */
 int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 {
-	struct nan_schedule_config sched_cfg;
+	struct nan_schedule_config *sched_cfg = &wpa_s->nan_sched_update.sched;
 	struct nan_schedule_config old_sched_cfg;
 	struct nan_schedule sched;
 	char *token, *context = NULL;
@@ -1906,6 +1908,12 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 
 	if (!wpas_nan_ndp_allowed(wpa_s))
 		return -1;
+
+	if (sched_cfg->deferred) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Previous schedule update is still pending");
+		return -1;
+	}
 
 	if (os_strncmp(cmd, "map_id=", 7) != 0) {
 		wpa_printf(MSG_INFO, "NAN: Invalid schedule map format");
@@ -1936,14 +1944,14 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 	expected_bitmap_len = (wpa_s->nan_capa.schedule_period /
 			       wpa_s->nan_capa.slot_duration + 7) / 8;
 
-	os_memset(&sched_cfg, 0, sizeof(sched_cfg));
+	os_memset(sched_cfg, 0, sizeof(*sched_cfg));
 
 	pos = os_strchr(cmd + 7, ' ');
 	if (!pos) {
 		clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
 		wpa_printf(MSG_INFO,
 			   "NAN: Missing freq:timebitmap pairs - cleanup schedule");
-		return wpa_drv_nan_config_schedule(wpa_s, map_id, &sched_cfg);
+		return wpa_drv_nan_config_schedule(wpa_s, map_id, sched_cfg);
 	}
 
 	shared_freqs = os_calloc(wpa_s->num_multichan_concurrent,
@@ -1972,7 +1980,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 	/* Parse freq:timebitmap pairs */
 	pos++;
 	while ((token = str_token(pos, " ", &context))) {
-		int j, i = sched_cfg.num_channels;;
+		int j, i = sched_cfg->num_channels;
 		struct bitfield *bf_chan = NULL;
 		char *colon = os_strchr(token, ':');
 		struct nan_sched_chan chan;
@@ -1991,67 +1999,68 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 			goto out;
 		}
 
-		sched_cfg.channels[i].freq = atoi(token);
-		if (sched_cfg.channels[i].freq <= 0) {
+		sched_cfg->channels[i].freq = atoi(token);
+		if (sched_cfg->channels[i].freq <= 0) {
 			wpa_printf(MSG_INFO, "NAN: Invalid frequency %d",
-				   sched_cfg.channels[i].freq);
+				   sched_cfg->channels[i].freq);
 			goto out;
 		}
 
 		for (j = 0; j < i; j++) {
-			if (sched_cfg.channels[j].freq ==
-			    sched_cfg.channels[i].freq) {
+			if (sched_cfg->channels[j].freq ==
+			    sched_cfg->channels[i].freq) {
 				wpa_printf(MSG_INFO,
 					   "NAN: Duplicate frequency %d",
-					   sched_cfg.channels[i].freq);
+					   sched_cfg->channels[i].freq);
 				goto out;
 			}
 		}
 
 		if (wpas_nan_select_channel_params(
-			    wpa_s, sched_cfg.channels[i].freq,
-			    &sched_cfg.channels[i].center_freq1,
-			    &sched_cfg.channels[i].center_freq2,
-			    &sched_cfg.channels[i].bandwidth)) {
+			    wpa_s, sched_cfg->channels[i].freq,
+			    &sched_cfg->channels[i].center_freq1,
+			    &sched_cfg->channels[i].center_freq2,
+			    &sched_cfg->channels[i].bandwidth)) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Failed to select channel params for freq %d",
-				   sched_cfg.channels[i].freq);
+				   sched_cfg->channels[i].freq);
 			goto out;
 		}
 
 		if (!int_array_includes(shared_freqs,
-					sched_cfg.channels[i].freq)) {
+					sched_cfg->channels[i].freq)) {
 			if (!unused_freqs_count) {
 				wpa_printf(MSG_INFO,
 					   "NAN: No unused radio frequency available for freq %d",
-					   sched_cfg.channels[i].freq);
+					   sched_cfg->channels[i].freq);
 				goto out;
 			}
 
 			unused_freqs_count--;
 		}
 
-		sched_cfg.channels[i].time_bitmap = wpabuf_parse_bin(colon + 1);
-		if (!sched_cfg.channels[i].time_bitmap) {
+		sched_cfg->channels[i].time_bitmap =
+			wpabuf_parse_bin(colon + 1);
+		if (!sched_cfg->channels[i].time_bitmap) {
 			wpa_printf(MSG_INFO, "NAN: Invalid time bitmap");
 			goto out;
 		}
 
-		sched_cfg.num_channels++;
+		sched_cfg->num_channels++;
 
-		if (wpabuf_len(sched_cfg.channels[i].time_bitmap) !=
+		if (wpabuf_len(sched_cfg->channels[i].time_bitmap) !=
 		    expected_bitmap_len) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Invalid bitmap length (%zu) for period=%d, slot length=%d",
-				   wpabuf_len(sched_cfg.channels[i].time_bitmap),
+				   wpabuf_len(sched_cfg->channels[i].time_bitmap),
 				   wpa_s->nan_capa.schedule_period,
 				   wpa_s->nan_capa.slot_duration);
 			goto out;
 		}
 
 		bf_chan = bitfield_alloc_data(
-			wpabuf_head(sched_cfg.channels[i].time_bitmap),
-			wpabuf_len(sched_cfg.channels[i].time_bitmap));
+			wpabuf_head(sched_cfg->channels[i].time_bitmap),
+			wpabuf_len(sched_cfg->channels[i].time_bitmap));
 		if (!bf_chan) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Failed to allocate bitfield for channel schedule");
@@ -2061,34 +2070,34 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		if (bitfield_intersects(bf_total, bf_chan)) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Overlapping time bitmap detected for freq %d",
-				   sched_cfg.channels[i].freq);
+				   sched_cfg->channels[i].freq);
 			bitfield_free(bf_chan);
 			goto out;
 		}
 
 		/* Extract RX NSS from upper nibble of num_antennas */
-		sched_cfg.channels[i].rx_nss =
+		sched_cfg->channels[i].rx_nss =
 			(wpa_s->nan_capa.num_antennas >> 4) & 0x0f;
 
 		bitfield_union_in_place(bf_total, bf_chan);
 		bitfield_free(bf_chan);
 
-		chan.freq = sched_cfg.channels[i].freq;
-		chan.center_freq1 = sched_cfg.channels[i].center_freq1;
-		chan.center_freq2 = sched_cfg.channels[i].center_freq2;
-		chan.bandwidth = sched_cfg.channels[i].bandwidth;
+		chan.freq = sched_cfg->channels[i].freq;
+		chan.center_freq1 = sched_cfg->channels[i].center_freq1;
+		chan.center_freq2 = sched_cfg->channels[i].center_freq2;
+		chan.bandwidth = sched_cfg->channels[i].bandwidth;
 		chan_entry = (struct nan_chan_entry *)
-			&sched_cfg.channels[i].chan_entry;
+			&sched_cfg->channels[i].chan_entry;
 		if (nan_get_chan_entry(wpa_s->nan, &chan, chan_entry)) {
 			wpa_printf(MSG_INFO,
 				   "NAN: Failed to get channel entry for freq %d",
-				   sched_cfg.channels[i].freq);
+				   sched_cfg->channels[i].freq);
 			goto out;
 		}
 	}
 
-	sched_cfg.avail_attr = wpabuf_alloc(NAN_AVAIL_ATTR_MAX_LEN);
-	if (!sched_cfg.avail_attr) {
+	sched_cfg->avail_attr = wpabuf_alloc(NAN_AVAIL_ATTR_MAX_LEN);
+	if (!sched_cfg->avail_attr) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to allocate memory for Availability attribute");
 		ret = -1;
@@ -2099,26 +2108,34 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 	os_memcpy(&old_sched_cfg, &wpa_s->nan_sched[map_id - 1],
 		  sizeof(old_sched_cfg));
 
-	os_memcpy(&wpa_s->nan_sched[map_id - 1], &sched_cfg, sizeof(sched_cfg));
+	os_memcpy(&wpa_s->nan_sched[map_id - 1], sched_cfg, sizeof(*sched_cfg));
 	wpas_nan_fill_ndp_schedule(wpa_s, &sched);
 
 	ret = nan_convert_sched_to_avail_attrs(wpa_s->nan,
 					       wpa_s->schedule_sequence_id + 1,
 					       BIT(map_id),
 					       sched.n_chans, sched.chans,
-					       sched_cfg.avail_attr,
+					       sched_cfg->avail_attr,
 					       false);
+
+	/* Restore previous schedule configuration */
+	os_memcpy(&wpa_s->nan_sched[map_id - 1], &old_sched_cfg,
+		  sizeof(old_sched_cfg));
 	if (ret < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to convert schedule to Availability Attributes for map_id %d",
 			   map_id);
-		os_memcpy(&wpa_s->nan_sched[map_id - 1], &old_sched_cfg,
-			  sizeof(old_sched_cfg));
 		goto out;
 	}
 
-	nan_dump_sched_config("NAN: Set schedule config", &sched_cfg);
-	ret = wpa_drv_nan_config_schedule(wpa_s, map_id, &sched_cfg);
+	if (nan_has_active_ndp(wpa_s->nan)) {
+		wpa_printf(MSG_DEBUG, "NAN: Set schedule config as deferred");
+		sched_cfg->deferred = true;
+		wpa_s->nan_sched_update.map_id = map_id;
+	}
+
+	nan_dump_sched_config("NAN: Set schedule config", sched_cfg);
+	ret = wpa_drv_nan_config_schedule(wpa_s, map_id, sched_cfg);
 	if (ret < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to configure NAN schedule map_id %d",
@@ -2128,14 +2145,19 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		goto out;
 	}
 
-	/* Free the old schedule and keep the new one (already stored) */
-	wpa_s->schedule_sequence_id++;
-	clear_sched_config(&old_sched_cfg);
+	if (!sched_cfg->deferred) {
+		/* Store the configured schedule */
+		wpa_s->schedule_sequence_id++;
+		clear_sched_config(&wpa_s->nan_sched[map_id - 1]);
+		os_memcpy(&wpa_s->nan_sched[map_id - 1], sched_cfg,
+			  sizeof(*sched_cfg));
+		os_memset(sched_cfg, 0, sizeof(*sched_cfg));
+	}
 out:
 	os_free(bf_total);
 	os_free(shared_freqs);
 	if (ret)
-		clear_sched_config(&sched_cfg);
+		clear_sched_config(sched_cfg);
 
 	return ret;
 }
