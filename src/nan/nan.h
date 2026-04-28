@@ -457,6 +457,14 @@ struct nan_config {
 	u32 nik_lifetime;
 
 	/*
+	 * The local maximal NDL idle period in seconds. This value should be
+	 * set in the NDL attribute included in NAFs to indicate to the peers
+	 * that the NDL (and all corresponding NDPs) may be terminated if there
+	 * is no data traffic with the peer for max_ndl_idle_period seconds.
+	 */
+	u16 max_ndl_idle_period;
+
+	/*
 	 * Supported Pairing Bootstrapping Methods (PBM).
 	 * See Wi-Fi Aware spec v4.0, Table 128 (NPBA format).
 	 */

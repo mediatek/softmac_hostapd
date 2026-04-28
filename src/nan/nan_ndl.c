@@ -1245,6 +1245,9 @@ int nan_ndl_handle_ndl_attr(struct nan_data *nan, struct nan_peer *peer,
 		params.max_idle_period = WPA_GET_LE16(ndl_attr_ext);
 		ndl_attr_ext += 2;
 		ndl_attr_ext_len -= 2;
+
+		wpa_printf(MSG_DEBUG, "NAN: NDL: max_idle_period=%u",
+			   params.max_idle_period);
 	}
 
 	ndc_ok = 1;
@@ -1395,6 +1398,7 @@ int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
 {
 	struct nan_ndl *ndl;
 	u16 ndl_ctrl = 0;
+	u8 *len_ptr;
 	u8 type;
 
 	if (!peer || !peer->ndl)
@@ -1404,6 +1408,13 @@ int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
 
 	wpa_printf(MSG_DEBUG, "NAN: Add NDL attribute. state=%s, status=%u",
 		   nan_ndl_state_str(ndl->state), ndl->status);
+
+	if (nan->cfg->max_ndl_idle_period) {
+		wpa_printf(MSG_DEBUG, "NAN: NDL: max idle period=%u",
+			   nan->cfg->max_ndl_idle_period);
+
+		ndl_ctrl |= NAN_NDL_CTRL_MAX_IDLE_PERIOD_PRESENT;
+	}
 
 	switch (ndl->state) {
 	case NAN_NDL_STATE_NONE:
@@ -1441,12 +1452,17 @@ int nan_ndl_add_ndl_attr(struct nan_data *nan, const struct nan_peer *peer,
 		ndl_ctrl |= NAN_NDL_CTRL_NDL_QOS_ATTR_PRESENT;
 
 	wpabuf_put_u8(buf, NAN_ATTR_NDL);
-	wpabuf_put_le16(buf, sizeof(struct ieee80211_ndl));
+	len_ptr = wpabuf_put(buf, 2);
 
 	wpabuf_put_u8(buf, ndl->dialog_token);
 	wpabuf_put_u8(buf, type | (ndl->status << NAN_NDL_STATUS_POS));
 	wpabuf_put_u8(buf, ndl->reason);
 	wpabuf_put_u8(buf, ndl_ctrl);
+
+	if (nan->cfg->max_ndl_idle_period)
+		wpabuf_put_le16(buf, nan->cfg->max_ndl_idle_period);
+
+	WPA_PUT_LE16(len_ptr, (u8 *) wpabuf_put(buf, 0) - len_ptr - 2);
 
 	return 0;
 }
