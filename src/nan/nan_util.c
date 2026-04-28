@@ -1685,6 +1685,14 @@ int nan_peer_dump_sched_to_buf(struct nan_peer_schedule *sched,
 		pos += ret;
 	}
 
+	ret = wpa_scnprintf(pos, end - pos, "max_idle_period=%u",
+			    sched->max_idle_period);
+
+	if (os_snprintf_error(end - pos, ret))
+		goto err;
+
+	pos += ret;
+
 	return pos - buf;
 
 err:

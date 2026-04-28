@@ -375,6 +375,7 @@ struct nan_ndp_action_notif_params {
  * @tbm: Time bitmap for the channel
  * @ndc: NDC time bitmap for the map
  * @immutable: Immutable time bitmap for the map
+ * @max_idle_period: Maximal NDL idle period in seconds that the peer indicated
  */
 struct nan_peer_schedule {
 	u8 n_maps;
@@ -391,6 +392,8 @@ struct nan_peer_schedule {
 		struct nan_time_bitmap ndc;
 		struct nan_time_bitmap immutable;
 	} maps[NAN_MAX_MAPS];
+
+	u16 max_idle_period;
 };
 
 /**

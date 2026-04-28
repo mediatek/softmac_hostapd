@@ -2746,6 +2746,9 @@ int nan_peer_get_schedule_info(struct nan_data *nan, const u8 *addr,
 	nan_peer_get_ndc_sched(nan, peer, sched);
 	nan_peer_get_immut_sched(nan, peer, sched);
 
+	if (peer->ndl)
+		sched->max_idle_period = peer->ndl->max_idle_period;
+
 	return 0;
 }
 
