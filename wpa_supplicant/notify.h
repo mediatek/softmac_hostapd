@@ -243,7 +243,8 @@ void wpas_notify_nan_ndp_disconnected(struct wpa_supplicant *wpa_s,
 				      const u8 *peer_nmi, u32 ndp_id,
 				      const u8 *local_ndi, const u8 *peer_ndi,
 				      enum nan_reason reason,
-				      bool locally_generated);
+				      bool locally_generated,
+				      bool failure);
 void wpas_notify_nan_cluster_join(struct wpa_supplicant *wpa_s,
 				  const u8 *cluster_id, bool new_cluster);
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,

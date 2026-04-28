@@ -1543,7 +1543,7 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 {
 	const u8 *local_ndi, *peer_ndi;
 	struct nan_ndp_id ndp_id;
-	bool remove_sta;
+	bool remove_sta, fail;
 
 	os_memset(&ndp_id, 0, sizeof(ndp_id));
 
@@ -1570,10 +1570,17 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 	 */
 	remove_sta = !nan_peer_ndi_in_use(peer, peer_ndi);
 
+	/*
+	 * NAN_NDP_STATE_NONE means the NDP was not in progress, thus
+	 * the failure flag should be false.
+	 */
+	fail = peer->ndp_setup.state != NAN_NDP_STATE_NONE;
+
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
 					   local_ndi, peer_ndi, reason,
-					   locally_generated, remove_sta);
+					   locally_generated, remove_sta,
+					   fail);
 
 	nan_ndp_setup_stop(nan, peer);
 }
@@ -2156,7 +2163,8 @@ void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, ndp_id, local_ndi,
-					   peer_ndi, reason, false, remove_sta);
+					   peer_ndi, reason, false, remove_sta,
+					   false);
 
 	/* Need to also remove the NDL if it is not needed */
 	if (dl_list_empty(&peer->ndps) && !peer->ndp_setup.ndp)

@@ -495,15 +495,19 @@ struct nan_config {
 	 *     false if triggered by the peer
 	 * @remove_sta: true if the NDI station should be removed (no other NDPs
 	 *     using the same peer NDI)
+	 * @failure: true if NDP setup failed (before connected), false if
+	 *     graceful disconnection after NDP was established
 	 *
-	 * This callback notifies that an NDP has been disconnected. It can be
-	 * called both during NDP establishment (indicating failure) or after
-	 * successful establishment (indicating termination).
+	 * This callback notifies that an NDP has been disconnected. When
+	 * @failure is true, NDP setup failed before connection was established.
+	 * When @failure is false, it indicates graceful termination after NDP
+	 * was successfully connected.
 	 */
 	void (*ndp_disconnected)(void *ctx, struct nan_ndp_id *ndp_id,
 				 const u8 *local_ndi, const u8 *peer_ndi,
 				 enum nan_reason reason,
-				 bool locally_generated, bool remove_sta);
+				 bool locally_generated, bool remove_sta,
+				 bool failure);
 
 	/**
 	 * get_chans - Get the prioritized allowed channel information to be
