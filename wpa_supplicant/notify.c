@@ -1435,13 +1435,15 @@ void wpas_notify_nan_ndp_disconnected(struct wpa_supplicant *wpa_s,
 				      const u8 *peer_nmi, u32 ndp_id,
 				      const u8 *local_ndi,
 				      const u8 *peer_ndi,
-				      enum nan_reason reason)
+				      enum nan_reason reason,
+				      bool locally_generated)
 {
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_NDP_DISCONNECTED
 		       "peer=" MACSTR " ndp_id=%u local_ndi=" MACSTR
-		       " peer_ndi=" MACSTR " reason=%u",
+		       " peer_ndi=" MACSTR " reason=%u locally_generated=%d",
 		       MAC2STR(peer_nmi), ndp_id,
-		       MAC2STR(local_ndi), MAC2STR(peer_ndi), reason);
+		       MAC2STR(local_ndi), MAC2STR(peer_ndi), reason,
+		       locally_generated);
 }
 
 

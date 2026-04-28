@@ -22,7 +22,8 @@
 
 static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx);
 static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
-				 enum nan_reason reason);
+				 enum nan_reason reason,
+				 bool locally_generated);
 
 
 struct nan_data * nan_init(const struct nan_config *cfg)
@@ -1378,7 +1379,7 @@ static void nan_peer_state_timeout(void *eloop_ctx, void *timeout_ctx)
 	if (!peer->ndp_setup.ndp)
 		return;
 
-	nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON);
+	nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON, true);
 }
 
 
@@ -1481,7 +1482,8 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 
 
 static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
-				 enum nan_reason reason)
+				 enum nan_reason reason,
+				 bool locally_generated)
 {
 	const u8 *local_ndi, *peer_ndi;
 	struct nan_ndp_id ndp_id;
@@ -1506,7 +1508,8 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, &ndp_id,
-					   local_ndi, peer_ndi, reason);
+					   local_ndi, peer_ndi, reason,
+					   locally_generated);
 
 	nan_ndp_setup_stop(nan, peer);
 }
@@ -1557,7 +1560,7 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 	if (peer->ndp_setup.status == NAN_NDP_STATUS_REJECTED) {
 		wpa_printf(MSG_DEBUG, "NAN: NAF: NDP rejected");
 
-		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason);
+		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason, false);
 		return 0;
 	}
 
@@ -1585,7 +1588,7 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 			ret = nan_action_send(nan, peer, resp_oui);
 		}
 
-		nan_ndp_disconnected(nan, peer, reason);
+		nan_ndp_disconnected(nan, peer, reason, false);
 		return 0;
 	}
 
@@ -1602,7 +1605,8 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 		if (nan_configure_peer_schedule(nan, peer, &peer->ndl->sched) ||
 		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
-					     NAN_REASON_UNSPECIFIED_REASON);
+					     NAN_REASON_UNSPECIFIED_REASON,
+					     true);
 		return 0;
 	}
 
@@ -1611,7 +1615,8 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 	if (ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: NAF: Failed to send NAF. Resetting..");
-		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON);
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     true);
 	}
 
 	nan_set_peer_timeout(nan, peer, NAN_NDP_SETUP_TIMEOUT_SHORT, 0);
@@ -1892,7 +1897,8 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 			   ret);
 
 		if (peer->ndp_setup.ndp)
-			nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason);
+			nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason,
+					     true);
 		return 0;
 	}
 
@@ -1903,7 +1909,8 @@ int nan_tx_status(struct nan_data *nan, const u8 *dst, const u8 *data,
 		if (nan_configure_peer_schedule(nan, peer, &peer->ndl->sched) ||
 		    nan_ndp_connected(nan, peer))
 			nan_ndp_disconnected(nan, peer,
-					     NAN_REASON_UNSPECIFIED_REASON);
+					     NAN_REASON_UNSPECIFIED_REASON,
+					     true);
 	}
 
 	return 0;
@@ -2046,7 +2053,7 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 	if (ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Failed sending NAF. Resetting: ret=%d", ret);
-		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason);
+		nan_ndp_disconnected(nan, peer, peer->ndp_setup.reason, true);
 		return 0;
 	}
 
@@ -2061,7 +2068,7 @@ void nan_ndp_terminated(struct nan_data *nan, struct nan_peer *peer,
 {
 	if (nan->cfg->ndp_disconnected)
 		nan->cfg->ndp_disconnected(nan->cfg->cb_ctx, ndp_id, local_ndi,
-					   peer_ndi, reason);
+					   peer_ndi, reason, false);
 
 	/* Need to also remove the NDL if it is not needed */
 	if (dl_list_empty(&peer->ndps) && !peer->ndp_setup.ndp)
@@ -2595,8 +2602,8 @@ int nan_peer_del_all_ndps(struct nan_data *nan, const u8 *addr)
 	dl_list_for_each_safe(ndp, tndp, &peer->ndps, struct nan_ndp, list) {
 		dl_list_del(&ndp->list);
 		peer->ndp_setup.ndp = ndp;
-		nan_ndp_disconnected(nan, peer,
-				     NAN_REASON_UNSPECIFIED_REASON);
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     true);
 	}
 
 	nan_ndl_reset(nan, peer);

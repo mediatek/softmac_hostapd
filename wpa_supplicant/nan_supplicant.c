@@ -610,14 +610,15 @@ static int wpas_nan_ndp_connected_cb(void *ctx,
 static void wpas_nan_ndp_disconnected_cb(void *ctx, struct nan_ndp_id *ndp_id,
 					 const u8 *local_ndi,
 					 const u8 *peer_ndi,
-					 enum nan_reason reason)
+					 enum nan_reason reason,
+					 bool locally_generated)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
 	wpas_nan_remove_ndi_sta(wpa_s, local_ndi, peer_ndi);
 	wpas_notify_nan_ndp_disconnected(wpa_s, ndp_id->peer_nmi,
 					 ndp_id->id, local_ndi, peer_ndi,
-					 reason);
+					 reason, locally_generated);
 }
 
 
