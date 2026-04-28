@@ -699,6 +699,27 @@ struct nan_config {
 	void (*pairing_request)(void *ctx, const u8 *peer_nmi, u8 csid,
 				u8 instance_id,
 				const struct wpa_ie_data *rsn_data);
+
+	/**
+	 * set_group_key - Install a group key
+	 * @ctx: Callback context from cb_ctx
+	 * @alg: Encryption algorithm (WPA_ALG_* )
+	 * @addr: Address of the peer STA for Rx group keys, ff:ff:ff:ff:ff:ff
+	 *	for Tx keys; when clearing keys, %NULL is used to indicate that
+	 *	both the broadcast-only and default key of the specified key
+	 *	index is to be cleared
+	 * @key_idx: Key index
+	 * @seq: Packet number, the next packet number to be used for in replay
+	 *	protection; %NULL if not set
+	 * @key: Key buffer
+	 * @key_len: Length of the key buffer in octets
+	 * @key_flags: bitwise OR of KEY_FLAG_*
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*set_group_key)(void *ctx, enum wpa_alg alg, const u8 *addr,
+			     int key_idx, const u8 *seq,
+			     const u8 *key, size_t key_len,
+			     enum key_flag key_flags);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
