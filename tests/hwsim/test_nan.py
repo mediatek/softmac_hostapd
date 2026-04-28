@@ -1913,3 +1913,63 @@ def test_nan_dp_sk_ccmp128_with_gtk(dev, apdev, params):
 def test_nan_dp_sk_gcmp256_with_gtk(dev, apdev, params):
     """NAN DP - 2way NDL + SK GCMP-256 security with GTK"""
     run_nan_dp(csid=2, gtk_csid=6, mgmt_group_cipher="BIP-GMAC-256")
+
+def _run_nan_prot_mcast_followup(dev, apdev, mgmt_group_cipher):
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0", "ndi0", mgmt_group_cipher=mgmt_group_cipher) as pub, \
+        NanDevice(wpas2, "nan1", "ndi1", mgmt_group_cipher=mgmt_group_cipher) as sub:
+
+        pid, sid, paddr, saddr = nan_sync_discovery(pub, sub, "test_service",
+                                                    pssi="aabbccdd",
+                                                    sssi="ddbbccaa",
+                                                    unsolicited=0)
+
+        ndp_id, init_ndi = _nan_ndp_request_and_accept(pub, sub, pid, sid,
+                                                       paddr, saddr,
+                                                       password="NAN",
+                                                       req_ssi="aabbcc",
+                                                       resp_ssi="ddeeff",
+                                                       csid=1)
+        _nan_test_connectivity(pub, sub)
+
+        # Configure the NAN DE to send multicast followup frames as Protected
+        # Dual of Public Action frames and send a multicast follow-up frame. The
+        # follow-up frame should be protected with the group key and accepted by
+        # the peer.
+        sub.set("tx_mcast_follow_up_prot", "1")
+        pub.set("tx_mcast_follow_up_prot", "1")
+        sub.transmit(handle=sid, req_instance_id=pid,
+                     address="ff:ff:ff:ff:ff:ff",
+                     ssi="aabbccddeeff")
+
+        ev = pub.wpas.wait_event(["NAN-RECEIVE"], timeout=2)
+        if ev is None or f"address={saddr}" not in ev or "ssi=aabbccddeeff" not in ev :
+            raise Exception("NAN-RECEIVE followup event not seen or invalid format")
+
+        pub.transmit(handle=pid, req_instance_id=sid,
+                     address="ff:ff:ff:ff:ff:ff",
+                     ssi="ffeeddccbbaa")
+
+        ev = sub.wpas.wait_event(["NAN-RECEIVE"], timeout=2)
+        if ev is None or f"address={paddr}" not in ev or "ssi=ffeeddccbbaa" not in ev:
+            raise Exception("NAN-RECEIVE followup event not seen or invalid format")
+
+        _nan_ndp_terminate(pub, sub, paddr, init_ndi, ndp_id)
+
+def test_nan_prot_mcast_followup_bip_cmac128(dev, apdev, params):
+    """NAN NDP with multicast management frame protection using BIP-CMAC-128"""
+    set_country("US")
+    try:
+        _run_nan_prot_mcast_followup(dev, apdev,
+                                     mgmt_group_cipher="BIP-CMAC-128")
+    finally:
+        set_country("00")
+
+def test_nan_prot_mcast_followup_bip_gmac256(dev, apdev, params):
+    """NAN NDP with multicast management frame protection using BIP-GMAC-256"""
+    set_country("US")
+    try:
+        _run_nan_prot_mcast_followup(dev, apdev,
+                                     mgmt_group_cipher="BIP-GMAC-256")
+    finally:
+        set_country("00")
