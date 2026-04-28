@@ -270,15 +270,13 @@ static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
 		wpa_printf(MSG_DEBUG, "NAN: Peer schedule info:");
 		wpa_printf(MSG_DEBUG, "  n_maps=%u", sched->n_maps);
 
-		peer_sched.n_maps = sched->n_maps;
 		for (i = 0; i < sched->n_maps && i < MAX_NUM_NAN_MAPS; i++) {
 			struct nan_schedule_config *sched_cfg =
-				&peer_sched.maps[i].sched;
+				&peer_sched.maps[peer_sched.n_maps].sched;
 
 			wpa_printf(MSG_DEBUG, "  Map %d: map_id=%u",
 				   i, sched->maps[i].map_id);
 
-			peer_sched.maps[i].map_id = sched->maps[i].map_id;
 			sched_cfg->num_channels = 0;
 
 			for (j = 0; j < sched->maps[i].n_chans &&
@@ -288,6 +286,13 @@ static int wpas_nan_set_peer_schedule_cb(void *ctx, const u8 *nmi_addr,
 								 i, j,
 								 sched_cfg) < 0)
 					goto out;
+			}
+
+			/* Only add map if it has channels after filtering */
+			if (sched_cfg->num_channels > 0) {
+				peer_sched.maps[peer_sched.n_maps].map_id =
+					sched->maps[i].map_id;
+				peer_sched.n_maps++;
 			}
 		}
 	}
