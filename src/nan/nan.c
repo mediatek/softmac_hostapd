@@ -3258,3 +3258,19 @@ int nan_set_max_ndl_idle_period(struct nan_data *nan, u16 max_idle_period)
 				       nan, NULL);
 	return 0;
 }
+
+
+bool nan_has_active_ndp(struct nan_data *nan)
+{
+	struct nan_peer *peer;
+
+	if (!nan)
+		return false;
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		if (!dl_list_empty(&peer->ndps))
+			return true;
+	}
+
+	return false;
+}
