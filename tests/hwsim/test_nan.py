@@ -43,11 +43,12 @@ def check_nan_capab(dev):
         raise HwsimSkip(f"NAN not supported: {capa}")
 
 class NanDevice:
-    def __init__(self, dev, ifname, ndi_name=None):
+    def __init__(self, dev, ifname, ndi_name=None, nmi_addr=None):
         self.dev = dev
         self.ifname = ifname
         self.wpas = None
         self.ndi_name = ndi_name
+        self.nmi_addr = nmi_addr
 
     def __enter__(self):
         self.start()
@@ -60,7 +61,8 @@ class NanDevice:
         check_nan_capab(self.dev)
 
         logger.info(f"NAN device starting on {self.ifname}")
-        self.dev.interface_add(self.ifname, if_type="nan", create=True)
+        self.dev.interface_add(self.ifname, if_type="nan", create=True,
+                               addr=self.nmi_addr)
         self.wpas = WpaSupplicant(ifname=self.ifname)
         self.set("master_pref", "10")
         self.set("dual_band", "0")
@@ -392,6 +394,28 @@ def test_nan_sync_active_subscribe(dev, apdev, params):
     """NAN synchronized active subscribe and solicited publish"""
     with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
         NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        nan_sync_discovery(pub, sub, "test_service",
+                           pssi="aabbccdd", sssi="ddbbccaa",
+                           unsolicited=0)
+
+def test_nan_sync_with_nmi_addresses(dev, apdev, params):
+    """NAN synchronized active subscribe and solicited publish with NMI addresses"""
+    pnmi_addr = "40:00:00:00:17:00"
+    snmi_addr = "40:00:00:00:18:00"
+
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+            NanDevice(wpas1, "nan0", nmi_addr=pnmi_addr) as pub, \
+            NanDevice(wpas2, "nan1", nmi_addr=snmi_addr) as sub:
+
+        paddr = pub.wpas.own_addr()
+        saddr = sub.wpas.own_addr()
+
+        if paddr != pnmi_addr:
+            raise Exception(f"Publisher NMI address mismatch: got {paddr}, expected {pnmi_addr}")
+
+        if saddr != snmi_addr:
+            raise Exception(f"Subscriber NMI address mismatch: got {saddr}, expected {snmi_addr}")
+
         nan_sync_discovery(pub, sub, "test_service",
                            pssi="aabbccdd", sssi="ddbbccaa",
                            unsolicited=0)

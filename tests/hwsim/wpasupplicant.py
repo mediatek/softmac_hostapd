@@ -222,7 +222,8 @@ class WpaSupplicant:
 
     def interface_add(self, ifname, config="", driver="nl80211",
                       drv_params=None, br_ifname=None, create=False,
-                      set_ifname=True, all_params=False, if_type=None):
+                      set_ifname=True, all_params=False, if_type=None,
+                      addr=None):
         status, groups = self.host.execute(["id"])
         if status != 0:
             group = "admin"
@@ -242,6 +243,8 @@ class WpaSupplicant:
             cmd += '\tcreate'
             if if_type:
                 cmd += '\t' + if_type
+                if addr is not None:
+                    cmd += '\t' + addr
         if all_params and not create:
             if not br_ifname:
                 cmd += '\t'
