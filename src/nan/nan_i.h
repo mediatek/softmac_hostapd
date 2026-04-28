@@ -732,6 +732,8 @@ void nan_ndl_add_elem_container_attr(const struct nan_data *nan,
 struct bitfield * nan_peer_schedule_intersection(
 	struct nan_data *nan, const struct nan_peer *peer,
 	const struct nan_schedule *sched);
+bool nan_ndl_meets_qos(struct nan_data *nan, const struct nan_peer *peer,
+		       const struct bitfield *common_bf);
 int nan_convert_chan_sched_to_bf(struct nan_data *nan,
 				 const struct nan_chan_schedule *chan,
 				 struct bitfield **avail_bf, u8 *map_id,

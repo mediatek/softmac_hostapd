@@ -337,6 +337,52 @@ nan_ndl_match_sched_vs_common(struct nan_data *nan,
 }
 
 
+bool nan_ndl_meets_qos(struct nan_data *nan, const struct nan_peer *peer,
+		       const struct bitfield *common_bf)
+{
+	size_t size, max_latency, i;
+	u16 crbs;
+
+	/* No QoS requirements */
+	if (peer->ndl->peer_qos.min_slots == NAN_QOS_MIN_SLOTS_NO_PREF &&
+	    peer->ndl->peer_qos.max_latency == NAN_QOS_MAX_LATENCY_NO_PREF) {
+		wpa_printf(MSG_DEBUG, "NAN: No QoS requirements from peer");
+		return true;
+	}
+
+	size = bitfield_size(common_bf);
+
+	/*
+	 * The common map covers an entire 8192 period with 16 TU slots. For
+	 * minimal time slots need to only consider the first 32 slots
+	 */
+	for (i = 0, crbs = 0, max_latency = 0; i < size; i++) {
+		if (bitfield_is_set(common_bf, i)) {
+			if (i < 32)
+				crbs++;
+
+			max_latency = 0;
+		} else if (peer->ndl->peer_qos.max_latency !=
+			   NAN_QOS_MAX_LATENCY_NO_PREF) {
+			max_latency++;
+			if (max_latency > peer->ndl->peer_qos.max_latency) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to meet max latency");
+				return false;
+			}
+		}
+	}
+
+	if (peer->ndl->peer_qos.min_slots != NAN_QOS_MIN_SLOTS_NO_PREF &&
+	    peer->ndl->peer_qos.min_slots >= crbs) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to meet min slots");
+		return false;
+	}
+
+	return true;
+}
+
+
 static enum nan_ndl_status nan_ndl_determine_status(struct nan_data *nan,
 						    struct nan_peer *peer,
 						    bool can_counter,
@@ -345,8 +391,7 @@ static enum nan_ndl_status nan_ndl_determine_status(struct nan_data *nan,
 	struct nan_schedule *sched = &nan->sched;
 	struct bitfield *common_bf = NULL, *ndc_bf = NULL, *track_ndc_bf = NULL;
 	enum nan_ndl_ver verdict;
-	size_t size, max_latency, i;
-	u16 crbs;
+	size_t i;
 	int ret;
 
 	*reason = NAN_REASON_RESERVED;
@@ -538,54 +583,15 @@ static enum nan_ndl_status nan_ndl_determine_status(struct nan_data *nan,
 		goto out;
 	}
 
-	/* No QoS requirements. Accept */
-	if (peer->ndl->peer_qos.min_slots == NAN_QOS_MIN_SLOTS_NO_PREF &&
-	    peer->ndl->peer_qos.max_latency == NAN_QOS_MAX_LATENCY_NO_PREF) {
-		wpa_printf(MSG_DEBUG,
-			   "NAN: No QoS requirements from Peer. Accept");
-
+	if (nan_ndl_meets_qos(nan, peer, common_bf)) {
+		wpa_printf(MSG_DEBUG, "NAN: NDL QoS requirements met. Accept");
 		ret = NAN_NDL_STATUS_ACCEPTED;
-		goto out;
-	}
-
-	size = bitfield_size(common_bf);
-	wpa_printf(MSG_DEBUG, "NAN: size of avail intersection map=%zu", size);
-
-	/*
-	 * The common map covers an entire 8192 TU period with 16 TU slots. For
-	 * minimal time slots need to only consider the first 32 slots.
-	 */
-	for (i = 0, crbs = 0, max_latency = 0; i < size; i++) {
-		if (bitfield_is_set(common_bf, i)) {
-			if (i < 32)
-				crbs++;
-
-			max_latency = 0;
-		} else if (peer->ndl->peer_qos.max_latency !=
-			   NAN_QOS_MAX_LATENCY_NO_PREF) {
-			max_latency++;
-			if (max_latency > peer->ndl->peer_qos.max_latency) {
-				wpa_printf(MSG_DEBUG,
-					   "NAN: Failed to meet max latency");
-
-				*reason = NAN_REASON_QOS_UNACCEPTABLE;
-				ret = NAN_NDL_STATUS_CONTINUED;
-				goto out;
-			}
-		}
-	}
-
-	if (peer->ndl->peer_qos.min_slots != NAN_QOS_MIN_SLOTS_NO_PREF &&
-	    peer->ndl->peer_qos.min_slots >= crbs) {
-		wpa_printf(MSG_DEBUG,
-			   "NAN: Failed to meet min slots");
-
+	} else {
+		wpa_printf(MSG_DEBUG, "NAN: NDL QoS requirements not met");
 		*reason = NAN_REASON_QOS_UNACCEPTABLE;
 		ret = NAN_NDL_STATUS_CONTINUED;
-		goto out;
 	}
 
-	ret = NAN_NDL_STATUS_ACCEPTED;
 out:
 	bitfield_free(common_bf);
 	bitfield_free(ndc_bf);
