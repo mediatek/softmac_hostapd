@@ -166,6 +166,12 @@ struct nan_publish_params {
 
 	/* ND-PMK to use for creating a list of PMKIDs for the service */
 	const u8 *nd_pmk;
+
+	/*
+	 * GTK protection required for group-addressed Data frames transmitted
+	 * and received for the service
+	 */
+	bool gtk_required;
 };
 
 /* Returns -1 on failure or >0 publish_id */
@@ -237,6 +243,12 @@ struct nan_subscribe_params {
 	 * Table 128
 	 */
 	u16 pbm;
+
+	/*
+	 * GTK protection required for group-addressed Data frames transmitted
+	 * and received for the service
+	 */
+	bool gtk_required;
 };
 
 /* Returns -1 on failure or >0 subscribe_id */

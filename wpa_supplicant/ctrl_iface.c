@@ -12767,6 +12767,20 @@ static int wpas_ctrl_ml_probe(struct wpa_supplicant *wpa_s, char *cmd)
 
 #if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
 
+static bool wpas_nan_gtk_cs_supported(const int *cipher_list)
+{
+	unsigned int i;
+
+	for (i = 0; cipher_list && cipher_list[i]; i++) {
+		if (cipher_list[i] == NAN_CS_GTK_CCMP_128 ||
+		    cipher_list[i] == NAN_CS_GTK_GCMP_256)
+			return true;
+	}
+
+	return false;
+}
+
+
 static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 				 char *buf, size_t buflen)
 {
@@ -12922,8 +12936,20 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strcmp(token, "gtk_required=1") == 0) {
+			params.gtk_required = true;
+			continue;
+		}
+
 		wpa_printf(MSG_INFO, "CTRL: Invalid NAN_PUBLISH parameter: %s",
 			   token);
+		goto fail;
+	}
+
+	if (params.gtk_required &&
+	    !wpas_nan_gtk_cs_supported(params.cipher_suites_list)) {
+		wpa_printf(MSG_INFO,
+			   "CTRL: GTK required but no GTK cipher suite configured");
 		goto fail;
 	}
 

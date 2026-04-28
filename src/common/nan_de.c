@@ -84,6 +84,7 @@ struct nan_de_service {
 	u8 srf_bf_idx;
 	struct wpabuf *srf;
 	bool close_proximity;
+	bool gtk_required;
 
 	/* Bootstrapping methods */
 	u16 pbm;
@@ -417,6 +418,8 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 				sdea_ctrl |= NAN_SDEA_CTRL_FSD_REQ;
 			if (srv->publish.fsd_gas)
 				sdea_ctrl |= NAN_SDEA_CTRL_FSD_GAS;
+			if (srv->gtk_required)
+				sdea_ctrl |= NAN_SDEA_CTRL_GTK_REQ;
 		}
 
 		if (sdea_ctrl || ssi) {
@@ -2122,6 +2125,7 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 	srv->is_pr = params->proximity_ranging && params->solicited;
 	srv->close_proximity = params->close_proximity;
 	srv->pbm = params->pbm;
+	srv->gtk_required = params->gtk_required;
 
 	nan_de_add_srv(de, srv);
 	nan_de_run_timer(de);
@@ -2399,6 +2403,7 @@ int nan_de_subscribe(struct nan_de *de, const char *service_name,
 	srv->sync = params->sync;
 	srv->close_proximity = params->close_proximity;
 	srv->pbm = params->pbm;
+	srv->gtk_required = params->gtk_required;
 
 	nan_de_add_srv(de, srv);
 	nan_de_run_timer(de);
