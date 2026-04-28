@@ -1990,3 +1990,94 @@ def test_nan_prot_mcast_followup_bip_gmac256(dev, apdev, params):
                                      mgmt_group_cipher="BIP-GMAC-256")
     finally:
         set_country("00")
+
+def verify_potential_availability(potential, expected_entries):
+        lines = potential.strip().split('\n')
+        entries = []
+        current_entry = None
+
+        for line in lines:
+            line = line.strip()
+            if line.startswith('entry['):
+                # Parse entry line: "entry[0]: rx_nss=2 pref=3 util=7"
+                pref = None
+                for part in line.split():
+                    if part.startswith('pref='):
+                        pref = int(part.split('=')[1])
+                        break
+                current_entry = {'pref': pref, 'chans': []}
+                entries.append(current_entry)
+            elif line.startswith('chan[') and current_entry is not None:
+                # Parse chan line: "chan[0]: op_class=81 chan_bitmap=0x0020"
+                op_class = None
+                chan_bitmap = None
+                for part in line.split():
+                    if part.startswith('op_class='):
+                        op_class = int(part.split('=')[1])
+                    elif part.startswith('chan_bitmap='):
+                        chan_bitmap = part.split('=')[1]
+                current_entry['chans'].append((op_class, chan_bitmap))
+
+        # Verify number of entries
+        if len(entries) != len(expected_entries):
+            raise Exception(f"Expected {len(expected_entries)} entries, got {len(entries)}")
+
+        # Verify each entry
+        for i, (exp_pref, exp_op_class, exp_bitmap) in enumerate(expected_entries):
+            entry = entries[i]
+            if entry['pref'] != exp_pref:
+                raise Exception(f"Entry {i}: expected pref={exp_pref}, got pref={entry['pref']}")
+            if len(entry['chans']) != 1:
+                raise Exception(f"Entry {i}: expected 1 channel, got {len(entry['chans'])}")
+            op_class, bitmap = entry['chans'][0]
+            if op_class != exp_op_class:
+                raise Exception(f"Entry {i}: expected op_class={exp_op_class}, got op_class={op_class}")
+            if bitmap != exp_bitmap:
+                raise Exception(f"Entry {i}: expected chan_bitmap={exp_bitmap}, got chan_bitmap={bitmap}")
+
+def test_nan_override_potential_availability(dev, apdev, params):
+    """NAN override potential availability configuration"""
+    with hwsim_nan_radios() as (wpas1, wpas2), \
+        NanDevice(wpas1, "nan0", "ndi0") as pub, \
+        NanDevice(wpas2, "nan1", "ndi1") as sub:
+        pssi = "aabbccdd"
+        sssi = "ddbbccaa"
+
+        # Test invalid formats
+        pub.set("override_potential_availability", "81:0x20", ok=False)
+        pub.set("override_potential_availability", "81-0x20-3", ok=False)
+        pub.set("override_potential_availability", "81:0x20:5", ok=False)
+        pub.set("override_potential_availability", "256:0x20:3", ok=False)
+        pub.set("override_potential_availability", "81:6:3", ok=False)
+
+        # Discover service - this should trigger potential availability exchange
+        pid, sid, paddr, _ = nan_sync_discovery(pub, sub, "test_service",
+                                                pssi=pssi, sssi=sssi,
+                                                unsolicited=0)
+        old_potential = sub.wpas.request("NAN_PEER_INFO " + paddr + " potential")
+        logger.info("Publisher potential availability before override:\n" + old_potential)
+
+        pub.set("override_potential_availability", "81:0x20:3,115:0x04:0")
+        # Wait a bit to ensure new availability is populated and processed
+        time.sleep(2)
+        expected = [
+            (3, 81, "0x0020"),
+            (0, 115, "0x0004"),
+        ]
+
+        potential = sub.wpas.request("NAN_PEER_INFO " + paddr + " potential")
+        logger.info("Publisher potential availability:\n" + potential)
+        verify_potential_availability(potential, expected)
+
+        # Clear override and verify it accepts empty string
+        pub.set("override_potential_availability", "")
+        # Wait a bit to ensure new availability is populated and processed
+        time.sleep(2)
+        potential = sub.wpas.request("NAN_PEER_INFO " + paddr + " potential")
+        logger.info("Publisher potential availability after clearing override:\n" + potential)
+
+        # This check is not 100% safe (e.g., regulatory updates could change
+        # the channel set), but it is good enough for the test as we don't
+        # expect any changes during the test execution.
+        if potential != old_potential:
+            raise Exception("Potential availability did not revert to original after clearing override")
