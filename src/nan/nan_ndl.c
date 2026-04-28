@@ -195,8 +195,7 @@ static struct nan_ndl * nan_ndl_alloc(struct nan_data *nan)
 }
 
 
-static bool nan_ndl_validate_peer_avail(struct nan_data *nan,
-					struct nan_peer *peer)
+bool nan_ndl_validate_peer_avail(struct nan_data *nan, struct nan_peer *peer)
 {
 	struct nan_ndl *ndl = peer->ndl;
 	bool ret;

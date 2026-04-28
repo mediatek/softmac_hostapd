@@ -28,6 +28,8 @@ static void nan_ndp_disconnected(struct nan_data *nan, struct nan_peer *peer,
 				 bool locally_generated);
 static void nan_set_peer_timeout(struct nan_data *nan, struct nan_peer *peer,
 				 unsigned int sec, unsigned int usec);
+static int nan_action_send(struct nan_data *nan, struct nan_peer *peer,
+			   enum nan_subtype subtype);
 
 
 struct nan_data * nan_init(const struct nan_config *cfg)
@@ -948,12 +950,76 @@ static void nan_peer_dump(struct nan_data *nan, struct nan_peer *peer)
 }
 
 
+static void nan_peer_disconnect_all_ndps(struct nan_data *nan,
+					 struct nan_peer *peer)
+{
+	struct nan_ndp *ndp, *tmp;
+	u8 *local_ndi = NULL, *peer_ndi = NULL;
+	struct nan_ndp_id ndp_id;
+
+	if (peer->ndp_setup.ndp)
+		nan_ndp_disconnected(nan, peer, NAN_REASON_UNSPECIFIED_REASON,
+				     false);
+
+	dl_list_for_each_safe(ndp, tmp, &peer->ndps, struct nan_ndp, list) {
+		if (ndp->initiator) {
+			local_ndi = ndp->init_ndi;
+			peer_ndi = ndp->resp_ndi;
+		} else {
+			local_ndi = ndp->resp_ndi;
+			peer_ndi = ndp->init_ndi;
+		}
+
+		os_memcpy(&ndp_id.peer_nmi, peer->nmi_addr, ETH_ALEN);
+		os_memcpy(ndp_id.init_ndi, ndp->init_ndi, ETH_ALEN);
+		ndp_id.id = ndp->ndp_id;
+
+		peer->ndp_setup.ndp = ndp;
+		peer->ndp_setup.state = NAN_NDP_STATE_DONE;
+		peer->ndp_setup.status = NAN_NDP_STATUS_REJECTED;
+		peer->ndp_setup.reason = NAN_REASON_UNSPECIFIED_REASON;
+		nan_action_send(nan, peer, NAN_SUBTYPE_DATA_PATH_TERMINATION);
+		peer->ndp_setup.ndp = NULL;
+
+		dl_list_del(&ndp->list);
+		nan_ndp_terminated(nan, peer, &ndp_id, local_ndi, peer_ndi,
+				   NAN_REASON_UNSPECIFIED_REASON,
+				   ndp->gtk_id);
+		os_free(ndp);
+	}
+}
+
+
+static void nan_peer_update_schedule(struct nan_data *nan,
+				     struct nan_peer *peer,
+				     struct nan_schedule *sched)
+{
+	struct bitfield *common_bf;
+	int ret = -1;
+
+	common_bf = nan_peer_schedule_intersection(nan, peer, sched);
+	if (common_bf && nan_ndl_meets_qos(nan, peer, common_bf) &&
+	    nan_ndl_validate_peer_avail(nan, peer))
+		ret = nan_configure_peer_schedule(nan, peer, sched);
+	else
+		wpa_printf(MSG_DEBUG, "NAN: New peer schedule breaks NDL");
+
+	if (ret)
+		nan_peer_disconnect_all_ndps(nan, peer);
+	else if (nan->cfg->schedule_changed)
+		nan->cfg->schedule_changed(nan->cfg->cb_ctx, peer->nmi_addr);
+
+	bitfield_free(common_bf);
+}
+
+
 /*
  * Update the old peer info with information from the new peer info.
  * Information that is available in the old peer info but is not available
  * in the new peer info will not be changed.
  */
-static void nan_merge_peer_info(struct nan_peer_info *old,
+static void nan_merge_peer_info(struct nan_data *nan, struct nan_peer *peer,
+				struct nan_peer_info *old,
 				struct nan_peer_info *new)
 {
 	if (!dl_list_empty(&new->avail_entries)) {
@@ -968,6 +1034,9 @@ static void nan_merge_peer_info(struct nan_peer_info *old,
 			dl_list_add(&old->avail_entries, &avail->list);
 		}
 		old->seq_id = new->seq_id;
+
+		if (peer->ndl && peer->ndl->state == NAN_NDL_STATE_DONE)
+			nan_peer_update_schedule(nan, peer, &nan->sched);
 	}
 
 	old->last_seen = new->last_seen;
@@ -1212,7 +1281,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 		goto out;
 	}
 
-	nan_merge_peer_info(&peer->info, &info);
+	nan_merge_peer_info(nan, peer, &peer->info, &info);
 	nan_parse_peer_device_capa(nan, peer, &attrs);
 	nan_parse_peer_elem_container(nan, peer, &attrs);
 	nan_parse_peer_dev_capa_ext(nan, peer, &attrs);

@@ -734,6 +734,7 @@ struct bitfield * nan_peer_schedule_intersection(
 	const struct nan_schedule *sched);
 bool nan_ndl_meets_qos(struct nan_data *nan, const struct nan_peer *peer,
 		       const struct bitfield *common_bf);
+bool nan_ndl_validate_peer_avail(struct nan_data *nan, struct nan_peer *peer);
 int nan_convert_chan_sched_to_bf(struct nan_data *nan,
 				 const struct nan_chan_schedule *chan,
 				 struct bitfield **avail_bf, u8 *map_id,

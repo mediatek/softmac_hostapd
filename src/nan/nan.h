@@ -780,6 +780,13 @@ struct nan_config {
 	 */
 	int (*get_peer_inactivity)(void *ctx, const u8 *local_ndi,
 				   const u8 *peer_ndi);
+
+	/**
+	 * schedule_changed - Notify about peer schedule change
+	 * @ctx: Callback context from cb_ctx
+	 * @peer_nmi: Peer NMI address
+	 */
+	void (*schedule_changed)(void *ctx, const u8 *peer_nmi);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
