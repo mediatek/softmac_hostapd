@@ -932,6 +932,14 @@ static int wpas_nan_set_group_key_cb(void *ctx, enum wpa_alg alg,
 }
 
 
+static int wpas_nan_get_seqnum_cb(void *ctx, int key_idx, u8 *seq)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	return wpa_drv_get_seqnum(wpa_s, NULL, key_idx, seq);
+}
+
+
 static int wpas_nan_update_pairing_credentials_cb(void *ctx, const u8 *nik,
 						  size_t nik_len,
 						  int cipher_ver,
@@ -1145,6 +1153,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.is_valid_publish_id = wpas_nan_is_valid_publish_id_cb;
 		nan.set_peer_schedule = wpas_nan_set_peer_schedule_cb;
 		nan.set_group_key = wpas_nan_set_group_key_cb;
+		nan.get_seqnum = wpas_nan_get_seqnum_cb;
 
 		wpa_printf(MSG_DEBUG, "NAN: Bootstrap support enabled");
 		nan.bootstrap_request = wpas_nan_bootstrap_request_cb;

@@ -720,6 +720,15 @@ struct nan_config {
 			     int key_idx, const u8 *seq,
 			     const u8 *key, size_t key_len,
 			     enum key_flag key_flags);
+
+	/**
+	 * get_seqnum - Get the current PN for a group key
+	 * @ctx: Callback context from cb_ctx
+	 * @key_idx: Key index
+	 * @seq: Buffer for returning the latest used PN value
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*get_seqnum)(void *ctx, int key_idx, u8 *seq);
 };
 
 struct nan_data * nan_init(const struct nan_config *cfg);
