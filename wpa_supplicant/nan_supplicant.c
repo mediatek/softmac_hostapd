@@ -1675,6 +1675,15 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		return nan_set_mgmt_group_cipher(wpa_s->nan, cipher);
 	}
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (os_strcmp("tx_mcast_follow_up_prot", cmd) == 0) {
+		bool val = !!atoi(param);
+
+		nan_de_set_tx_mcast_follow_up_prot(wpa_s->nan_de, val);
+		return 0;
+	}
+#endif /* CONFIG_TESTING_OPTIONS */
+
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
 }
