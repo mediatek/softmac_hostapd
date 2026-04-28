@@ -1191,7 +1191,7 @@ def _nan_test_connectivity(pub, sub):
     wpas_ndi_sub = WpaSupplicant(ifname=sub.ndi_name)
     hwsim_utils.test_connectivity(wpas_ndi_pub, wpas_ndi_sub, tos=0,
                                   ifname1=pub.ndi_name, ifname2=sub.ndi_name,
-                                  max_tries=3, timeout=5, broadcast=False)
+                                  max_tries=3, timeout=5, broadcast=True)
 
 def _run_nan_dp(counter=False, csid=None, wrong_pwd=False, use_pmk=False,
                 use_interface_id=False, verify_max_idle_period=False):
