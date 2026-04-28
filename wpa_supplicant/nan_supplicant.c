@@ -2462,6 +2462,46 @@ static int wpas_nan_set_ndp_schedule(struct wpa_supplicant *wpa_s,
 }
 
 
+static char * wpas_nan_parse_password_hex(const char *hexstr)
+{
+	size_t len = os_strlen(hexstr);
+	size_t pwd_len;
+	char *pwd;
+	size_t i;
+
+	if (!len || len % 2 != 0) {
+		wpa_printf(MSG_INFO, "NAN: Invalid password hex length: %zu",
+			   len);
+		return NULL;
+	}
+
+	pwd_len = len / 2;
+	pwd = os_malloc(pwd_len + 1);
+	if (!pwd)
+		return NULL;
+
+	if (hexstr2bin(hexstr, (u8 *) pwd, pwd_len) < 0) {
+		wpa_printf(MSG_INFO, "NAN: Invalid password hex data");
+		os_free(pwd);
+		return NULL;
+	}
+
+	/* Reject passwords containing NULL bytes (except the terminator) */
+	for (i = 0; i < pwd_len; i++) {
+		if (pwd[i] == '\0') {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Decoded password contains embedded NUL byte at offset %zu",
+				   i);
+			os_free(pwd);
+			return NULL;
+		}
+	}
+
+	pwd[pwd_len] = '\0';
+	return pwd;
+}
+
+
 static int wpas_nan_fill_nd_pmk(struct wpa_supplicant *wpa_s,
 				struct nan_ndp_params *ndp,
 				int handle,
@@ -2588,7 +2628,7 @@ static int wpas_nan_set_gtk(struct wpa_supplicant *ndi_wpa_s,
 
 /* Command format NAN_NDP_REQUEST handle=<id> ndi=<ifname> peer_nmi=<nmi>
    peer_id=<peer_instance_id> ssi=<hexdata> qos=<slots:latency>
-   [csid = <cipher_suite> <password=<string>|pmk=<hex>>
+   [csid = <cipher_suite> <password=<string>|pwd_hex=<hex>|pmk=<hex>>
    [gtk_csid=<cipher_suite>]] [interface_id=<hex>] */
 int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -2596,7 +2636,8 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 	struct wpabuf *ssi_buf = NULL;
 	char *token, *context = NULL;
 	char *pos;
-	const char *pwd = NULL, *pmk = NULL;
+	const char *pwd = NULL, *pmk = NULL, *pwd_hex = NULL;
+	char *pwd_decoded = NULL;
 	int handle = -1;
 	int ret = -1;
 	u8 *interface_id = NULL;
@@ -2688,6 +2729,8 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 			ndp.sec.csid = atoi(pos);
 		} else if (os_strcmp(token, "password") == 0) {
 			pwd = pos;
+		} else if (os_strcmp(token, "pwd_hex") == 0) {
+			pwd_hex = pos;
 		} else if (os_strcmp(token, "pmk") == 0) {
 			pmk = pos;
 		} else if (os_strcmp(token, "interface_id") == 0) {
@@ -2745,14 +2788,20 @@ int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd)
 		goto fail;
 	}
 
-	if (pmk && pwd) {
+	if ((pmk && pwd) || (pmk && pwd_hex) || (pwd && pwd_hex)) {
 		wpa_printf(MSG_INFO,
-			   "NAN: Specify only one of password or pmk");
+			   "NAN: Specify only one of password, pwd_hex, or pmk");
 		goto fail;
 	}
 
-	if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle,
-				 ndp.ndp_id.peer_nmi, pwd, pmk) < 0) {
+	if (pwd_hex) {
+		pwd_decoded = wpas_nan_parse_password_hex(pwd_hex);
+		if (!pwd_decoded)
+			goto fail;
+	}
+
+	if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle, ndp.ndp_id.peer_nmi,
+				 pwd_decoded ? pwd_decoded : pwd, pmk) < 0) {
 		wpa_printf(MSG_INFO,
 			   "NAN: Failed to derive NDP PMK");
 		goto fail;
@@ -2784,6 +2833,7 @@ fail:
 	wpabuf_free(ndp.sched.elems);
 	wpabuf_free(ssi_buf);
 	os_free(interface_id);
+	str_clear_free(pwd_decoded);
 
 	return ret;
 }
@@ -2816,14 +2866,16 @@ int wpas_nan_ndp_response_set_gtk(struct wpa_supplicant *wpa_s,
    [reason_code=<reject_reason>]
    [ndi=<ifname> handle=<service_handle> init_ndi=<ndi>
    ndp_id=<id> [ssi=<hexdata>] [qos=<slots:latency>]
-   [csid=<csid> <password=<string>|pmk=<hex>]] [interface_id=<hex>] */
+   [csid=<csid> <password=<string>|pwd_hex=<hex>|pmk=<hex>>]]
+   [interface_id=<hex>] */
 int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	struct nan_ndp_params ndp;
 	struct wpabuf *ssi_buf = NULL;
 	char *token, *context = NULL;
 	char *pos;
-	const char *pwd = NULL, *pmk = NULL;
+	const char *pwd = NULL, *pmk = NULL, *pwd_hex = NULL;
+	char *pwd_decoded = NULL;
 	int handle = -1;
 	int ret = -1;
 	u8 *interface_id = NULL;
@@ -2927,6 +2979,8 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 			ndp.sec.csid = atoi(pos);
 		} else if (os_strcmp(token, "password") == 0) {
 			pwd = pos;
+		} else if (os_strcmp(token, "pwd_hex") == 0) {
+			pwd_hex = pos;
 		} else if (os_strcmp(token, "pmk") == 0) {
 			pmk = pos;
 		} else if (os_strcmp(token, "interface_id") == 0) {
@@ -2976,14 +3030,21 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd)
 			goto fail;
 		}
 
-		if (pmk && pwd) {
+		if ((pmk && pwd) || (pmk && pwd_hex) || (pwd && pwd_hex)) {
 			wpa_printf(MSG_INFO,
-				   "NAN: Specify only one of password or pmk");
+				   "NAN: Specify only one of password, pwd_hex, or pmk");
 			goto fail;
 		}
 
-		if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle,
-					 publisher_nmi, pwd, pmk) < 0) {
+		if (pwd_hex) {
+			pwd_decoded = wpas_nan_parse_password_hex(pwd_hex);
+			if (!pwd_decoded)
+				goto fail;
+		}
+
+		if (wpas_nan_fill_nd_pmk(wpa_s, &ndp, handle, publisher_nmi,
+					 pwd_decoded ? pwd_decoded : pwd, pmk)
+		    < 0) {
 			wpa_printf(MSG_INFO, "NAN: Failed to derive NDP PMK");
 			goto fail;
 		}
@@ -3035,6 +3096,7 @@ fail:
 	wpabuf_free(ndp.sched.elems);
 	wpabuf_free(ssi_buf);
 	os_free(interface_id);
+	str_clear_free(pwd_decoded);
 
 	return ret;
 }
