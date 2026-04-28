@@ -1295,6 +1295,35 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.transmit_followup = wpas_nan_transmit_followup_cb;
 		nan.get_supported_bootstrap_methods =
 			wpas_nan_get_service_bootstrap_methods;
+		/*
+		 * Set the group security capabilities based on driver support
+		 */
+		if ((wpa_s->drv_enc & (WPA_DRIVER_CAPA_ENC_CCMP |
+				       WPA_DRIVER_CAPA_ENC_GCMP_256)) &&
+		    (wpa_s->drv_enc & (WPA_DRIVER_CAPA_ENC_BIP |
+				       WPA_DRIVER_CAPA_ENC_BIP_GMAC_256))) {
+			u8 gtk_supp;
+
+			/*
+			 * By default, use BIP-CMAC-128 cipher suite for
+			 * group keys for maximum compatibility.
+			 */
+			if (!(wpa_s->drv_enc & WPA_DRIVER_CAPA_ENC_BIP))
+				nan.security_capab |=
+					NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256;
+
+			if (wpa_s->nan_capa.drv_flags &
+			    WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT)
+				gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_ALL;
+			else
+				gtk_supp = NAN_CS_INFO_CAPA_GTK_SUPP_NO_BIGTK;
+
+			nan.security_capab |=
+				gtk_supp << NAN_CS_INFO_CAPA_GTK_SUPP_POS;
+		}
+
+		wpa_printf(MSG_DEBUG, "NAN: security capabilities=0x%02x",
+			   nan.security_capab);
 	}
 
 	/*
