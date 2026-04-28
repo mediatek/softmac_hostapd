@@ -66,6 +66,8 @@ struct nan_ptk {
  * @pmk: PMK used for the secure NDP establishment
  * @ptk: Derived PTK
  * @local_gtk: Group Temporal Key information of the local NDI
+ * @peer_gtk: Group Temporal Key information of the peer NDI
+ * @peer_gtk_rsc: Receive sequence counter of the peer NDI GTK
  */
 struct nan_ndp_sec {
 	bool present;
@@ -94,6 +96,8 @@ struct nan_ndp_sec {
 	struct nan_ptk ptk;
 
 	struct nan_gtk local_gtk;
+	struct nan_gtk peer_gtk;
+	u8 peer_gtk_rsc[WPA_KEY_RSC_LEN];
 };
 
 /*

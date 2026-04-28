@@ -435,9 +435,10 @@ static int nan_sec_rx_key_data(struct nan_data *nan,
 	enum wpa_alg alg;
 
 	if (((peer_capab & NAN_CS_INFO_CAPA_GTK_SUPP_MASK) >>
-	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) == NAN_CS_INFO_CAPA_GTK_SUPP_NONE) {
+	     NAN_CS_INFO_CAPA_GTK_SUPP_POS) == NAN_CS_INFO_CAPA_GTK_SUPP_NONE &&
+	    ndp_sec->peer_gtk.csid == NAN_CS_NONE) {
 		wpa_printf(MSG_DEBUG,
-			   "NAN: SEC: Peer does not support IGTK/BIGTK, ignore key data");
+			   "NAN: SEC: Peer does not support GTK/IGTK/BIGTK, ignore key data");
 		return 0;
 	}
 
@@ -539,6 +540,38 @@ static int nan_sec_rx_key_data(struct nan_data *nan,
 				bigtk_kde->bigtk, key_len);
 	}
 
+	if (ie.gtk && ie.gtk_len) {
+		const struct wpa_gtk_kde *gtk_kde =
+			(const struct wpa_gtk_kde *) ie.gtk;
+		int gtk_cipher = ndp_sec->peer_gtk.csid == NAN_CS_GTK_GCMP_256 ?
+			WPA_CIPHER_GCMP_256 : WPA_CIPHER_CCMP;
+		size_t gtk_len = wpa_cipher_key_len(gtk_cipher);
+
+		if (ie.gtk_len != WPA_GTK_KDE_PREFIX_LEN + gtk_len) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid GTK KDE length: %zu (expected %zu)",
+				   ie.gtk_len,
+				   WPA_GTK_KDE_PREFIX_LEN + gtk_len);
+			goto fail;
+		}
+
+		/* GTK key ID must be 1 or 2, see Wi-Fi Aware Specification
+		 * v4.0, section 7.1.3.2.
+		 */
+		if (gtk_kde->keyid < 1 || gtk_kde->keyid > 2) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: SEC: Invalid GTK key index: %u",
+				   gtk_kde->keyid);
+			goto fail;
+		}
+
+		ndp_sec->peer_gtk.id = gtk_kde->keyid;
+		os_memcpy(ndp_sec->peer_gtk.gtk.gtk, gtk_kde->gtk, gtk_len);
+		ndp_sec->peer_gtk.gtk.gtk_len = gtk_len;
+		wpa_hexdump_key(MSG_DEBUG, "NAN: SEC: Received GTK",
+				gtk_kde->gtk, gtk_len);
+	}
+
 	ret = 0;
 fail:
 	wpabuf_clear_free(key_data);
@@ -563,7 +596,7 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	size_t shared_key_desc_len;
 	u16 info, desc, key_data_len;
 	size_t total_len;
-	u8 instance_id, cipher, capab, gtk_csid;
+	u8 instance_id, cipher, capab, gtk_csid = NAN_CS_NONE;
 	u8 *pos;
 	int ret;
 
@@ -662,7 +695,6 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	 * be ignored:
 	 * key->len: as the key length is derived from the cipher suite.
 	 * key->iv: not needed for AES Key WRAP
-	 * key->rsc: to avoid implicit assumption of a single GTK.
 	 */
 	if (key->type != NAN_KEY_DESC) {
 		wpa_printf(MSG_DEBUG,
@@ -700,6 +732,14 @@ int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 		wpa_printf(MSG_DEBUG,
 			   "NAN: SEC: Invalid shared key: group handshake not supported");
 		return -1;
+	}
+
+	if (gtk_csid != NAN_CS_NONE) {
+		wpa_printf(MSG_DEBUG, "NAN: SEC: Peer GTK CSID=%u", gtk_csid);
+
+		os_memcpy(ndp_sec->peer_gtk_rsc, key->key_rsc,
+			  sizeof(key->key_rsc));
+		ndp_sec->peer_gtk.csid = gtk_csid;
 	}
 
 	switch (msg->oui_subtype) {
