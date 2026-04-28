@@ -1743,6 +1743,7 @@ struct wpa_supplicant {
 	struct wpabuf *nan_ulw_attr;
 	struct wpa_freq_range_list nan_disallowed_freqs;
 	u16 nan_max_bw;
+	struct nan_channels nan_override_potential_avail;
 	unsigned int nan_ndi_ndp_refcount; /* Active NDP count on this NDI */
 	struct nan_gtk ndi_gtk;
 #endif /* CONFIG_NAN */

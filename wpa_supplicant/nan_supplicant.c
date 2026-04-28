@@ -78,45 +78,49 @@ static int get_center(u8 channel, const u8 *center_channels,
 }
 
 
-static bool wpas_nan_valid_chan(struct wpa_supplicant *wpa_s,
-				enum hostapd_hw_mode mode,
-				u8 channel, int bw, u8 op_class, u8 *cf1)
+static u8 get_center_and_width(int bw, u8 channel, int *width)
 {
 	static const u8 nan_160mhz_5ghz_chans[] = { 50, 114, 163 };
 	static const u8 nan_80mhz_5ghz_chans[] =
 		{ 42, 58, 106, 122, 138, 155, 171 };
+
+	switch (bw) {
+	case BW20:
+		*width = 20;
+		return channel;
+	case BW40PLUS:
+	case BW40MINUS:
+		*width = 40;
+		return bw == BW40PLUS ? channel + 2 : channel - 2;
+	case BW80:
+		*width = 80;
+		return get_center(channel, nan_80mhz_5ghz_chans,
+				  ARRAY_SIZE(nan_80mhz_5ghz_chans), *width);
+	case BW160:
+		*width = 160;
+		return get_center(channel, nan_160mhz_5ghz_chans,
+				  ARRAY_SIZE(nan_160mhz_5ghz_chans), *width);
+	default:
+		return 0;
+	}
+
+	return 0;
+}
+
+
+static bool wpas_nan_valid_chan(struct wpa_supplicant *wpa_s,
+				enum hostapd_hw_mode mode,
+				u8 channel, int bw, u8 op_class, u8 *cf1)
+{
 	struct hostapd_hw_modes *hw_mode;
 	int width, span;
-	u8 c, center = 0;
+	u8 c, center;
 
 	hw_mode = get_mode(wpa_s->hw.modes, wpa_s->hw.num_modes, mode, false);
 	if (!hw_mode)
 		return false;
 
-	switch (bw) {
-	case BW20:
-		width = 20;
-		center = channel;
-		break;
-	case BW40PLUS:
-	case BW40MINUS:
-		width = 40;
-		center = bw == BW40PLUS ? channel + 2 : channel - 2;
-		break;
-	case BW80:
-		width = 80;
-		center = get_center(channel, nan_80mhz_5ghz_chans,
-				    ARRAY_SIZE(nan_80mhz_5ghz_chans), width);
-		break;
-	case BW160:
-		width = 160;
-		center = get_center(channel, nan_160mhz_5ghz_chans,
-				    ARRAY_SIZE(nan_160mhz_5ghz_chans), width);
-		break;
-	default:
-		return false;
-	}
-
+	center = get_center_and_width(bw, channel, &width);
 	if (!center)
 		return false;
 
@@ -838,6 +842,27 @@ static int wpas_nan_get_chans_cb(void *ctx, u8 map_id,
 
 	wpa_printf(MSG_DEBUG, "NAN: Get channels - map_id=%u", map_id);
 
+	/* Check if override is configured */
+	if (wpa_s->nan_override_potential_avail.n_chans > 0) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Using override potential availability (%u channels)",
+			   wpa_s->nan_override_potential_avail.n_chans);
+
+		chans->n_chans = wpa_s->nan_override_potential_avail.n_chans;
+		chans->chans = os_memdup(
+			wpa_s->nan_override_potential_avail.chans,
+			wpa_s->nan_override_potential_avail.n_chans *
+			sizeof(struct nan_channel_info));
+		if (!chans->chans) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to allocate memory for override channels");
+			chans->n_chans = 0;
+			return -1;
+		}
+
+		return 0;
+	}
+
 	/* Allocate one extra element so it will be 0 terminated int_array */
 	shared_freqs = os_calloc(wpa_s->num_multichan_concurrent + 1,
 				 sizeof(int));
@@ -1472,6 +1497,10 @@ void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 	wpabuf_free(wpa_s->nan_ulw_attr);
 	wpa_s->nan_ulw_attr = NULL;
 
+	os_free(wpa_s->nan_override_potential_avail.chans);
+	wpa_s->nan_override_potential_avail.chans = NULL;
+	wpa_s->nan_override_potential_avail.n_chans = 0;
+
 	wpa_s->nan = NULL;
 }
 
@@ -1518,6 +1547,157 @@ void wpas_nan_flush(struct wpa_supplicant *wpa_s)
 		return;
 
 	nan_flush(wpa_s->nan);
+}
+
+
+static int wpas_nan_parse_override_potential_avail(struct wpa_supplicant *wpa_s,
+						   char *param)
+{
+	struct nan_channel_info *chans = NULL;
+	unsigned int n_chans = 0, capacity = 0;
+	char *pos, *end;
+
+	/* Empty string clears the override */
+	if (*param == '\0') {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Clearing override potential availability");
+		goto out;
+	}
+
+	/* Parse format: <op_class:0xbitmap:pref>,... */
+	pos = param;
+	while (pos && *pos) {
+		u8 op_class, pref;
+		u16 bitmap;
+		const struct oper_class_map *o = NULL;
+		int op, idx;
+
+		if (sscanf(pos, "%hhu:0x%hx:%hhu", &op_class, &bitmap, &pref) !=
+		    3) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid override_potential_availability format at '%s'",
+				   pos);
+			os_free(chans);
+			return -1;
+		}
+
+		if (!op_class || op_class > 129 || pref > 3) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid values in override_potential_availability");
+			os_free(chans);
+			return -1;
+		}
+
+		/* Find the operating class in global_op_class */
+		for (op = 0; global_op_class[op].op_class; op++) {
+			if (global_op_class[op].op_class == op_class) {
+				o = &global_op_class[op];
+				break;
+			}
+		}
+
+		if (!o) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Unknown operating class %d in override_potential_availability",
+				   op_class);
+			os_free(chans);
+			return -1;
+		}
+
+		/* Iterate through bitmap bits */
+		for (idx = 0; idx < 16 && bitmap; idx++) {
+			u8 chan, center;
+
+			if (!(bitmap & BIT(idx)))
+				continue;
+
+			chan = op_class_idx_to_chan(o, idx);
+			if (!chan) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Invalid channel index %d for op_class %d",
+					   idx, op_class);
+				os_free(chans);
+				return -1;
+			}
+
+			/*
+			 * Validate the channel. For zero preference only
+			 * check the very basic validity, but accept
+			 * "NOT ALLOWED" channels, as the user might want
+			 * to explicitly mark them as unavailable.
+			 */
+			if (pref && !wpas_nan_valid_chan(wpa_s, o->mode, chan,
+							 o->bw, o->op_class,
+							 &center)) {
+				wpa_printf(MSG_INFO,
+					   "NAN: Channel %d (op_class %d) is not a valid NAN channel",
+					   chan, op_class);
+				os_free(chans);
+				return -1;
+			}
+
+			if (!pref) {
+				int width;
+
+				center = get_center_and_width(o->bw, chan,
+							      &width);
+				if (!center) {
+					wpa_printf(MSG_INFO,
+						   "NAN: Invalid channel %d for op_class %d",
+						   chan, op_class);
+					os_free(chans);
+					return -1;
+				}
+			}
+
+			/* Expand array if needed */
+			if (n_chans >= capacity) {
+				struct nan_channel_info *new_chans;
+
+				capacity = capacity ? capacity * 2 : 4;
+				new_chans = os_realloc_array(chans, capacity,
+							     sizeof(*chans));
+				if (!new_chans) {
+					wpa_printf(MSG_INFO,
+						   "NAN: Memory allocation failed");
+					os_free(chans);
+					return -1;
+				}
+				chans = new_chans;
+			}
+
+			/* Use center for wide channels */
+			chans[n_chans].op_class = op_class;
+			chans[n_chans].channel = (o->bw == BW80 ||
+						  o->bw == BW160) ?
+				center : chan;
+			chans[n_chans].pref = pref;
+			n_chans++;
+		}
+
+		/* Move to next entry */
+		end = os_strchr(pos, ',');
+		if (end)
+			pos = end + 1;
+		else
+			break;
+	}
+
+	/* Sort channels by preference (higher preference first) */
+	if (n_chans > 1)
+		qsort(chans, n_chans, sizeof(*chans), nan_chan_info_cmp);
+
+out:
+	/* Free previous configuration */
+	os_free(wpa_s->nan_override_potential_avail.chans);
+	wpa_s->nan_override_potential_avail.chans = chans;
+	wpa_s->nan_override_potential_avail.n_chans = n_chans;
+	wpa_s->schedule_sequence_id++;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Configured %u override potential availability channels",
+		   n_chans);
+	return 0;
 }
 
 
@@ -1612,6 +1792,9 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 
 		return 0;
 	}
+
+	if (os_strcmp("override_potential_availability", cmd) == 0)
+		return wpas_nan_parse_override_potential_avail(wpa_s, param);
 
 	if (os_strcmp("bootstrap_config", cmd) == 0) {
 		u16 supported_methods, auto_accept_methods, comeback_timeout;
