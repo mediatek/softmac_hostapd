@@ -1510,6 +1510,22 @@ static int wpa_driver_nl80211_get_info(struct wpa_driver_nl80211_data *drv,
 		 */
 		drv->capa.nan_capa.slot_duration = 16;
 		drv->capa.nan_capa.schedule_period = 512;
+
+		/*
+		 * Support NAN beacon protection only if at least one of the NAN
+		 * management group ciphers is supported and the driver supports
+		 * beacon protection.
+		 */
+		if ((info->capa->enc & (WPA_DRIVER_CAPA_ENC_BIP |
+					WPA_DRIVER_CAPA_ENC_BIP_GMAC_256)) &&
+		    (drv->capa.flags & WPA_DRIVER_FLAGS_BEACON_PROTECTION))
+			drv->capa.nan_capa.drv_flags |=
+				WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT;
+
+		if (drv->capa.nan_capa.drv_flags &
+		    WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT)
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: NAN: beacon protection supported");
 	}
 #endif /* CONFIG_NAN */
 

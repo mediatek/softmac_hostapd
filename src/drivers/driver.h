@@ -2222,6 +2222,8 @@ struct nan_capa {
 #define WPA_DRIVER_FLAGS_NAN_SUPPORT_USERSPACE_DE	0x00000004
 /** Driver supports NAN Data path */
 #define WPA_DRIVER_FLAGS_NAN_SUPPORT_NDP		0x00000008
+/** Driver supports NAN beacon protection */
+#define WPA_DRIVER_FLAGS_NAN_SUPPORT_BEACON_PROT	0x00000010
 	u32 drv_flags;
 	u8 num_radios;
 	u8 sched_chans;
