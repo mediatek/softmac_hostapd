@@ -255,5 +255,7 @@ void wpas_notify_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 				    const u8 *peer_addr, int akmp, int cipher,
 				    u16 status, const u8 *nd_pmk);
+void wpas_notify_nan_chan_evacuation(struct wpa_supplicant *wpa_s,
+				     u8 map_id, int freq);
 
 #endif /* NOTIFY_H */

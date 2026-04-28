@@ -1514,6 +1514,15 @@ void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 	forced_memzero(nd_pmk_hex, sizeof(nd_pmk_hex));
 }
 
+
+void wpas_notify_nan_chan_evacuation(struct wpa_supplicant *wpa_s,
+				     u8 map_id, int freq)
+{
+	wpa_msg_global(wpa_s, MSG_INFO,
+		       NAN_CHAN_EVACUATION "map_id=%u freq=%d",
+		       map_id, freq);
+}
+
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */
 
 

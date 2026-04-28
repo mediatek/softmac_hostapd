@@ -7659,6 +7659,10 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		wpas_nan_ulw_update(wpa_s, data->nan_ulw_update_info.ulw,
 				    data->nan_ulw_update_info.ulw_len);
 		break;
+	case EVENT_NAN_CHAN_EVACUATION:
+		wpas_nan_chan_evacuation(wpa_s,
+					 &data->nan_chan_evacuation_info);
+		break;
 #endif /* CONFIG_NAN */
 	default:
 		wpa_msg(wpa_s, MSG_INFO, "Unknown event %d", event);

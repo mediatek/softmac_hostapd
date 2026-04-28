@@ -265,6 +265,11 @@ extern "C" {
  */
 #define NAN_PAIRING_STATUS "NAN-PAIRING-STATUS "
 
+/* NAN local schedule channel evacuation.
+ * parameters: map_id=<map_id> freq=<freq>
+ */
+#define NAN_CHAN_EVACUATION "NAN-CHAN-EVACUATION "
+
 /* MESH events */
 #define MESH_GROUP_STARTED "MESH-GROUP-STARTED "
 #define MESH_GROUP_REMOVED "MESH-GROUP-REMOVED "
