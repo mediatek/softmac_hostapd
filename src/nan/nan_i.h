@@ -294,6 +294,18 @@ struct nan_elem_container_entry {
 };
 
 /**
+ * struct nan_ulw_entry - NAN Unaligned Schedule attribute entry
+ * @list: Used for linking in the ULW entries list in struct nan_peer_info::ulw
+ * @len: Length of the ULW attribute payload
+ * @data: Pointer to the ULW attribute payload
+ */
+struct nan_ulw_entry {
+	struct dl_list list;
+	u16 len;
+	u8 data[];
+};
+
+/**
  * struct nan_peer_sec_info_entry - NAN peer security information entry
  *
  * Maintains the latest security information for an NDI pair.
@@ -328,6 +340,8 @@ struct nan_peer_sec_info_entry {
  * @last_seen: Timestamp of the last update of the peer info
  * @seq_id: Sequence id of the last availability update
  * @avail_entries: List of availability entries of the peer
+ * @ulw: List of Unaligned Schedule attribute payloads of the peer
+ *	(struct nan_ulw_entry::list entries)
  * @dev_capa: List of device capabilities of the peer
  *	(struct nan_dev_capa_entry::list entries)
  * @element_container: List of element container entries of the peer
@@ -339,6 +353,7 @@ struct nan_peer_info {
 	struct os_reltime last_seen;
 	u8 seq_id;
 	struct dl_list avail_entries;
+	struct dl_list ulw;
 	struct dl_list dev_capa;
 	struct dl_list element_container;
 	struct dl_list sec;

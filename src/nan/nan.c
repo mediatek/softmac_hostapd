@@ -105,6 +105,48 @@ static void nan_peer_flush_elem_container(struct nan_peer_info *info)
 }
 
 
+static void nan_peer_flush_ulw(struct nan_peer_info *info)
+{
+	struct nan_ulw_entry *cur, *next;
+
+	dl_list_for_each_safe(cur, next, &info->ulw,
+			      struct nan_ulw_entry, list) {
+		dl_list_del(&cur->list);
+		os_free(cur);
+	}
+}
+
+
+static struct wpabuf *
+nan_peer_build_ulw_attrs(const struct nan_peer_info *info)
+{
+	struct nan_ulw_entry *entry;
+	struct wpabuf *buf;
+	size_t len = 0;
+
+	if (dl_list_empty(&info->ulw))
+		return NULL;
+
+	dl_list_for_each(entry, &info->ulw, struct nan_ulw_entry, list)
+		len += NAN_ATTR_HDR_LEN + entry->len;
+
+	buf = wpabuf_alloc(len);
+	if (!buf) {
+		wpa_printf(MSG_INFO,
+			   "NAN: Failed to allocate buffer for ULW attributes");
+		return NULL;
+	}
+
+	dl_list_for_each(entry, &info->ulw, struct nan_ulw_entry, list) {
+		wpabuf_put_u8(buf, NAN_ATTR_UNALIGNED_SCHEDULE);
+		wpabuf_put_le16(buf, entry->len);
+		wpabuf_put_data(buf, entry->data, entry->len);
+	}
+
+	return buf;
+}
+
+
 static void nan_ndp_setup_stop(struct nan_data *nan, struct nan_peer *peer)
 {
 	eloop_cancel_timeout(nan_peer_state_timeout, nan, peer);
@@ -205,6 +247,7 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 	nan_bootstrap_reset(nan, peer);
 	dl_list_del(&peer->list);
 	nan_peer_flush_avail(&peer->info);
+	nan_peer_flush_ulw(&peer->info);
 	nan_peer_flush_dev_capa(&peer->info);
 	nan_peer_flush_elem_container(&peer->info);
 	nan_remove_group_keys(nan, peer);
@@ -1017,11 +1060,14 @@ static void nan_peer_update_schedule(struct nan_data *nan,
  * Update the old peer info with information from the new peer info.
  * Information that is available in the old peer info but is not available
  * in the new peer info will not be changed.
+ * Peer schedule may be updated if the peer availabilty or ULW changed.
  */
 static void nan_merge_peer_info(struct nan_data *nan, struct nan_peer *peer,
 				struct nan_peer_info *old,
 				struct nan_peer_info *new)
 {
+	bool schedule_changed = false;
+
 	if (!dl_list_empty(&new->avail_entries)) {
 		struct nan_avail_entry *avail, *tmp;
 
@@ -1034,12 +1080,29 @@ static void nan_merge_peer_info(struct nan_data *nan, struct nan_peer *peer,
 			dl_list_add(&old->avail_entries, &avail->list);
 		}
 		old->seq_id = new->seq_id;
+		schedule_changed = true;
+	}
 
-		if (peer->ndl && peer->ndl->state == NAN_NDL_STATE_DONE)
-			nan_peer_update_schedule(nan, peer, &nan->sched);
+	if (!dl_list_empty(&new->ulw)) {
+		struct nan_ulw_entry *entry, *tmp;
+
+		nan_peer_flush_ulw(old);
+		dl_list_init(&old->ulw);
+
+		dl_list_for_each_safe(entry, tmp, &new->ulw,
+				      struct nan_ulw_entry, list) {
+			dl_list_del(&entry->list);
+			dl_list_add(&old->ulw, &entry->list);
+		}
+
+		schedule_changed = true;
 	}
 
 	old->last_seen = new->last_seen;
+
+	if (schedule_changed && peer->ndl &&
+	    peer->ndl->state == NAN_NDL_STATE_DONE)
+		nan_peer_update_schedule(nan, peer, &nan->sched);
 }
 
 
@@ -1197,6 +1260,59 @@ static void nan_parse_peer_elem_container(struct nan_data *nan,
 }
 
 
+static int nan_parse_peer_ulw(const struct nan_attrs *attrs,
+			      const struct nan_peer_info *cur_info,
+			      struct nan_peer_info *info)
+{
+	struct nan_ulw_entry *cur;
+	struct nan_attrs_entry *attr;
+	u8 max_seq_id = 0;
+	bool max_seq_id_valid = false;
+
+	if (dl_list_empty(&attrs->ulw))
+		return 0;
+
+	dl_list_for_each(cur, &cur_info->ulw, struct nan_ulw_entry, list) {
+		const struct nan_unaligned_sched *ulw;
+
+		ulw = (const struct nan_unaligned_sched *) cur->data;
+		if (!max_seq_id_valid || ulw->seq_id > max_seq_id) {
+			max_seq_id = ulw->seq_id;
+			max_seq_id_valid = true;
+		}
+	}
+
+	dl_list_for_each(attr, &attrs->ulw, struct nan_attrs_entry, list) {
+		struct nan_ulw_entry *entry;
+		const struct nan_unaligned_sched *ulw =
+			(const struct nan_unaligned_sched *) attr->ptr;
+
+		if (max_seq_id_valid && ulw->seq_id <= max_seq_id) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Skip old ULW entry with seq_id=%u",
+				   ulw->seq_id);
+			continue;
+		}
+
+		entry = os_zalloc(sizeof(*entry) + attr->len);
+		if (!entry) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to allocate ULW entry");
+			nan_peer_flush_ulw(info);
+			return -1;
+		}
+
+		dl_list_init(&entry->list);
+		dl_list_add(&info->ulw, &entry->list);
+
+		entry->len = attr->len;
+		os_memcpy(entry->data, attr->ptr, entry->len);
+	}
+
+	return 0;
+}
+
+
 void nan_parse_peer_dev_capa_ext(struct nan_data *nan, struct nan_peer *peer,
 				 struct nan_attrs *attrs)
 {
@@ -1267,6 +1383,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 
 	os_memset(&info, 0, sizeof(info));
 	dl_list_init(&info.avail_entries);
+	dl_list_init(&info.ulw);
 	os_get_reltime(&info.last_seen);
 
 	if (nan_parse_attrs(nan, attrs_data, attrs_len, &attrs)) {
@@ -1281,6 +1398,11 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 		goto out;
 	}
 
+	if (nan_parse_peer_ulw(&attrs, &peer->info, &info)) {
+		ret = -1;
+		goto out;
+	}
+
 	nan_merge_peer_info(nan, peer, &peer->info, &info);
 	nan_parse_peer_device_capa(nan, peer, &attrs);
 	nan_parse_peer_elem_container(nan, peer, &attrs);
@@ -1291,6 +1413,8 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_peer_dump(nan, peer);
 	ret = 0;
 out:
+	nan_peer_flush_avail(&info);
+	nan_peer_flush_ulw(&info);
 	nan_attrs_clear(nan, &attrs);
 	return ret;
 }
@@ -1332,6 +1456,7 @@ static struct nan_peer * nan_alloc_peer(struct nan_data *nan)
 		return NULL;
 
 	dl_list_init(&peer->info.avail_entries);
+	dl_list_init(&peer->info.ulw);
 	dl_list_init(&peer->info.dev_capa);
 	dl_list_init(&peer->info.element_container);
 	dl_list_init(&peer->info.sec);
@@ -1515,6 +1640,7 @@ int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_device_capabilities *capa = NULL;
 	struct nan_peer_schedule sched;
 	struct bitfield *common_bf;
+	struct wpabuf *ulw_elems;
 
 	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule for " MACSTR,
 		   MAC2STR(peer->nmi_addr));
@@ -1551,11 +1677,14 @@ int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 		return -1;
 	}
 
+	ulw_elems = nan_peer_build_ulw_attrs(&peer->info);
+
 	ret = nan->cfg->set_peer_schedule(nan->cfg->cb_ctx, peer->nmi_addr,
 					  !peer->configured, capa->cdw_info,
 					  peer->info.seq_id,
 					  capa->channel_switch_time, &sched,
-					  NULL);
+					  ulw_elems);
+	wpabuf_free(ulw_elems);
 	if (ret) {
 		wpa_printf(MSG_DEBUG, "NAN: Failed to set peer schedule");
 		return ret;
