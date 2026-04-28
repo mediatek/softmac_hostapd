@@ -1516,7 +1516,14 @@ int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_peer_schedule sched;
 	struct bitfield *common_bf;
 
-	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule");
+	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule for " MACSTR,
+		   MAC2STR(peer->nmi_addr));
+
+	if (nan->sched_update_pending) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Skip peer schedule config - local schedule update pending");
+		return 0;
+	}
 
 	os_memset(&sched, 0, sizeof(sched));
 	common_bf = nan_peer_schedule_intersection(nan, peer, local_sched);
@@ -3351,6 +3358,16 @@ bool nan_has_active_ndp(struct nan_data *nan)
 	}
 
 	return false;
+}
+
+
+void nan_set_sched_update_pending(struct nan_data *nan, bool pending)
+{
+	if (!nan)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Set sched_update_pending to %d", pending);
+	nan->sched_update_pending = pending;
 }
 
 

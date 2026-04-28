@@ -2145,6 +2145,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 		wpa_printf(MSG_DEBUG, "NAN: Set schedule config as deferred");
 		sched_cfg->deferred = true;
 		wpa_s->nan_sched_update.map_id = map_id;
+		nan_set_sched_update_pending(wpa_s->nan, true);
 	}
 
 	nan_dump_sched_config("NAN: Set schedule config", sched_cfg);
@@ -2155,6 +2156,7 @@ int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd)
 			   map_id);
 		os_memcpy(&wpa_s->nan_sched[map_id - 1], &old_sched_cfg,
 			  sizeof(old_sched_cfg));
+		nan_set_sched_update_pending(wpa_s->nan, false);
 		goto out;
 	}
 
@@ -3422,6 +3424,7 @@ void wpas_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 		return;
 	}
 
+	nan_set_sched_update_pending(wpa_s->nan, false);
 	wpas_notify_nan_sched_update_done(wpa_s, success);
 
 	if (!success) {

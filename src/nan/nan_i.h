@@ -566,6 +566,7 @@ struct nan_peer {
  * struct nan_data - Internal data structure for NAN
  * @cfg: Pointer to the NAN configuration structure
  * @nan_started: Flag indicating if NAN has been started
+ * @sched_update_pending: Local schedule update is pending driver confirmation
  * @peer_list: List of known peers
  * @ndp_id_counter: NDP identifier counter. Incremented for each NDP request,
  *     and is used to set ndp_id in &struct nan_ndp.
@@ -585,6 +586,7 @@ struct nan_peer {
 struct nan_data {
 	struct nan_config *cfg;
 	u8 nan_started:1;
+	u8 sched_update_pending:1;
 	struct dl_list peer_list;
 
 	u8 ndp_id_counter;
