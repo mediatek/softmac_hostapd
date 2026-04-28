@@ -602,6 +602,7 @@ static void nan_pairing_done(struct nan_data *nan_data, struct nan_peer *peer)
 
 	peer->pairing.pairing_csid = cipher == WPA_CIPHER_GCMP_256 ?
 		NAN_CS_PK_PASN_256 : NAN_CS_PK_PASN_128;
+	peer->pairing.pairing_akmp = pasn_get_akmp(pasn);
 
 	if (!nan_data->cfg->pairing_cfg.npk_caching ||
 	    !peer->pairing.pairing_cfg.npk_caching ||

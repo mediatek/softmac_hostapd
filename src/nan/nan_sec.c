@@ -1414,6 +1414,42 @@ int nan_sec_pre_tx(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+/**
+ * nan_sec_get_strength - Get security strength level for a cipher suite
+ * @csid: Cipher suite ID
+ * @pairing_akmp: AKMP used for pairing (to distinguish SAE vs opportunistic)
+ * Returns: Security strength level (higher = stronger), 0 for no security
+ *
+ * Per Wi-Fi Aware Specification v4.0 section 7.4, security strength ordering
+ * (from highest to lowest):
+ * - CSID 8 (NCS-PK-PASN-256) using a password (SAE)
+ * - CSID 7 (NCS-PK-PASN-128) using a password (SAE)
+ * - CSID 2 (NCS-SK-256) using a PSK/Passphrase
+ * - CSID 1 (NCS-SK-128) using a PSK/Passphrase
+ * - CSID 8 (NCS-PK-PASN-256) using opportunistic bootstrapping (PASN)
+ * - CSID 7 (NCS-PK-PASN-128) using opportunistic bootstrapping (PASN)
+ * - No security
+ */
+static int nan_sec_get_strength(enum nan_cipher_suite_id csid, int pairing_akmp)
+{
+	bool is_opportunistic = pairing_akmp == WPA_KEY_MGMT_PASN;
+
+	switch (csid) {
+	case NAN_CS_PK_PASN_256:
+		return is_opportunistic ? 2 : 6;
+	case NAN_CS_PK_PASN_128:
+		return is_opportunistic ? 1 : 5;
+	case NAN_CS_SK_GCM_256:
+		return 4;
+	case NAN_CS_SK_CCM_128:
+		return 3;
+	case NAN_CS_NONE:
+	default:
+		return 0;
+	}
+}
+
+
 /*
  * nan_sec_ndp_store_keys - Store the NDP keys after successful NDP
  * establishment
@@ -1431,6 +1467,8 @@ bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_ndp *ndp = peer->ndp_setup.ndp;
 	struct nan_ndp_sec *ndp_sec = &peer->ndp_setup.sec;
 	struct nan_peer_sec_info_entry *cur, *next;
+	int new_strength, cur_strength;
+	int new_akmp = 0;
 
 	if (!ndp || !ndp_sec->valid || !ndp_sec->i_csid ||
 	    peer->ndp_setup.state != NAN_NDP_STATE_DONE)
@@ -1439,6 +1477,12 @@ bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
 	if (!NAN_CS_IS_VALID_NDP(ndp_sec->i_csid))
 		return false;
 
+	/* Get AKMP for the new security association */
+	if (peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED)
+		new_akmp = peer->pairing.pairing_akmp;
+
+	new_strength = nan_sec_get_strength(ndp_sec->i_csid, new_akmp);
+
 	dl_list_for_each_safe(cur, next, &peer->info.sec,
 			      struct nan_peer_sec_info_entry, list) {
 		if (!ether_addr_equal(peer_ndi, cur->peer_ndi) ||
@@ -1446,16 +1490,26 @@ bool nan_sec_ndp_store_keys(struct nan_data *nan, struct nan_peer *peer,
 			continue;
 
 		/*
-		 * The security configuration should be updated if it is
-		 * stronger than the existing one or equal in strength. Since
-		 * GCM-256 is considered stronger than CCM-128, always update if
-		 * it is the current one. Otherwise, update only if the previous
-		 * one was CCMP-128.
+		 * Per Wi-Fi Aware Specification v4.0 section 7.4:
+		 * The security configuration should be updated if the new
+		 * security strength is same or greater than the existing SA.
+		 * Otherwise, the existing higher-strength SA continues to be
+		 * used and any key material derived for the NDP setup shall be
+		 * discarded.
 		 */
-		if (ndp_sec->i_csid == NAN_CS_SK_GCM_256 ||
-		    cur->csid == NAN_CS_SK_CCM_128)
+		cur_strength = nan_sec_get_strength(cur->csid,
+						    cur->pairing_akmp);
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: Comparing strength: new=%d (csid=%u, akmp=0x%x) vs. cur=%d (csid=%u, akmp=0x%x)",
+			   new_strength, ndp_sec->i_csid, new_akmp,
+			   cur_strength, cur->csid, cur->pairing_akmp);
+
+		if (new_strength >= cur_strength)
 			goto store;
 
+		wpa_printf(MSG_DEBUG,
+			   "NAN: SEC: New security weaker than existing, discarding keys");
 		return false;
 	}
 
@@ -1474,6 +1528,8 @@ store:
 	wpa_printf(MSG_DEBUG, "NAN: SEC: Store security information");
 
 	cur->csid = ndp_sec->i_csid;
+	if (peer->pairing.flags & NAN_PAIRING_FLAG_PAIRED)
+		cur->pairing_akmp = peer->pairing.pairing_akmp;
 	os_memcpy(cur->pmkid, ndp_sec->i_pmkid, PMKID_LEN);
 	os_memcpy(cur->pmk, ndp_sec->pmk, PMK_LEN);
 	os_memcpy(&cur->ptk, &ndp_sec->ptk, sizeof(cur->ptk));
