@@ -2045,7 +2045,15 @@ int nan_handle_ndp_setup(struct nan_data *nan, struct nan_ndp_params *params)
 		}
 
 		naf_oui = NAN_SUBTYPE_DATA_PATH_RESPONSE;
-		timeout = NAN_NDP_SETUP_TIMEOUT_SHORT;
+
+		/*
+		 * In case of counter proposal, allow the peer more time to
+		 * process the counter request.
+		 */
+		timeout = (peer->ndl &&
+			   peer->ndl->status == NAN_NDL_STATUS_CONTINUED) ?
+			NAN_NDP_SETUP_TIMEOUT_LONG :
+			NAN_NDP_SETUP_TIMEOUT_SHORT;
 		break;
 	case NAN_NDP_ACTION_CONF:
 		ret = nan_ndl_setup(nan, peer, params,
