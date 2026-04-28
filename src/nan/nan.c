@@ -1549,7 +1549,16 @@ static int nan_action_rx_ndp(struct nan_data *nan, struct nan_peer *peer,
 			return -1;
 		}
 
-		nan_ndp_action_notif(nan, peer);
+		if (peer->ndl->status == NAN_NDL_STATUS_REJECTED) {
+			nan_ndp_setup_failure(nan, peer,
+					      NAN_REASON_NDL_UNACCEPTABLE,
+					      false);
+			if (peer->ndl->send_naf_on_error)
+				nan_action_send(nan, peer, resp_oui);
+			nan_ndp_setup_stop(nan, peer);
+		} else {
+			nan_ndp_action_notif(nan, peer);
+		}
 		return 0;
 	}
 

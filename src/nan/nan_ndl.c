@@ -211,6 +211,7 @@ static bool nan_ndl_validate_peer_avail(struct nan_data *nan,
 	if (!ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Peer avail: Immutable is not covered by avail");
+		peer->ndl->reason = NAN_REASON_IMMUTABLE_UNACCEPTABLE;
 		return ret;
 	}
 
@@ -221,6 +222,7 @@ static bool nan_ndl_validate_peer_avail(struct nan_data *nan,
 	if (!ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Peer avail: NDC is not covered by avail");
+		peer->ndl->reason = NAN_REASON_NDL_UNACCEPTABLE;
 		return ret;
 	}
 
@@ -883,8 +885,10 @@ static int nan_ndl_attr_handle_req(struct nan_data *nan, struct nan_peer *peer,
 	}
 
 	ret = nan_ndl_validate_peer_avail(nan, peer);
-	if (!ret)
-		goto fail;
+	if (!ret) {
+		ndl->status = NAN_NDL_STATUS_REJECTED;
+		ndl->send_naf_on_error = 1;
+	}
 
 	nan_ndl_set_state(nan, ndl, NAN_NDL_STATE_REQ_RECV);
 
