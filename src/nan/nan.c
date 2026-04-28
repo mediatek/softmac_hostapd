@@ -2968,3 +2968,42 @@ bool nan_is_ndpe_supported(struct nan_data *nan, const struct nan_peer *peer)
 
 	return false;
 }
+
+
+/**
+ * nan_set_mgmt_group_cipher - Set NAN management group cipher
+ * @nan: Pointer to NAN data structure
+ * @cipher: Cipher suite to be set (WPA_CIPHER_AES_128_CMAC or
+ *	WPA_CIPHER_BIP_GMAC_256)
+ * Returns: 0 on success, -1 on failure
+ *
+ * This function sets the management group cipher for NAN communication.
+ * The cipher can only be changed when NAN is not started.
+ */
+int nan_set_mgmt_group_cipher(struct nan_data *nan, int cipher)
+{
+	if (!nan)
+		return -1;
+
+	if (nan->nan_started) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Cannot set NAN management group cipher while NAN is started");
+		return -1;
+	}
+
+	if (cipher != WPA_CIPHER_AES_128_CMAC &&
+	    cipher != WPA_CIPHER_BIP_GMAC_256) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Unsupported NAN management group cipher %d",
+			   cipher);
+		return -1;
+	}
+
+	if (cipher == WPA_CIPHER_BIP_GMAC_256)
+		nan->cfg->security_capab |=
+			NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256;
+	else
+		nan->cfg->security_capab &=
+			~NAN_CS_INFO_CAPA_IGTK_USE_NCS_BIP_GMAC_256;
+	return 0;
+}
