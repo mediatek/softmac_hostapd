@@ -561,12 +561,6 @@ static int nan_parse_avail_entry(struct nan_data *nan,
 
 	preference = BITS(ctrl, NAN_AVAIL_ENTRY_CTRL_USAGE_PREF_MASK,
 			  NAN_AVAIL_ENTRY_CTRL_USAGE_PREF_POS);
-	if (!preference && type == NAN_AVAIL_ENTRY_CTRL_TYPE_POTENTIAL) {
-		wpa_printf(MSG_DEBUG,
-			   "NAN: Skip potential entry with 0 usage preference");
-		return 0;
-	}
-
 	utilization = BITS(ctrl, NAN_AVAIL_ENTRY_CTRL_UTIL_MASK,
 			   NAN_AVAIL_ENTRY_CTRL_UTIL_POS);
 
