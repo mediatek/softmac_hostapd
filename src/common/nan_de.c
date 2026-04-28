@@ -2646,6 +2646,59 @@ bool nan_de_service_supports_csid(struct nan_de *de, int handle, int csid)
 	return int_array_includes(srv->cipher_suites_list, csid);
 }
 
+
+static const char * nan_de_service_type2str(enum nan_de_service_type type)
+{
+	switch (type) {
+	case NAN_DE_PUBLISH:
+		return "publish";
+	case NAN_DE_SUBSCRIBE:
+		return "subscribe";
+	}
+
+	return "unknown";
+}
+
+
+int nan_de_get_status(struct nan_de *de, char *buf, size_t buflen)
+{
+	char *pos, *end;
+	unsigned int i;
+	int ret;
+
+	if (!de)
+		return -1;
+
+	pos = buf;
+	end = buf + buflen;
+
+	ret = os_snprintf(pos, end - pos, "num_services=%u\n",
+			  de->num_service);
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	for (i = 0; i < NAN_DE_MAX_SERVICE; i++) {
+		struct nan_de_service *srv = de->service[i];
+
+		if (!srv)
+			continue;
+
+		ret = os_snprintf(pos, end - pos,
+				  "service=%u type=%s name=%s sync=%d\n",
+				  srv->id,
+				  nan_de_service_type2str(srv->type),
+				  srv->service_name ? srv->service_name : "",
+				  srv->sync);
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+
+	return pos - buf;
+}
+
+
 #ifdef CONFIG_TESTING_OPTIONS
 
 void nan_de_set_tx_mcast_follow_up_prot(struct nan_de *de, bool prot)

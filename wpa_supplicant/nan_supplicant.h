@@ -36,6 +36,8 @@ int wpas_nan_ndp_response(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 		       char *reply, size_t reply_size);
+int wpas_nan_status(struct wpa_supplicant *wpa_s, char *reply,
+		    size_t reply_size);
 int wpas_nan_bootstrap_request(struct wpa_supplicant *wpa_s, char *cmd);
 int wpas_nan_bootstrap_reset(struct wpa_supplicant *wpa_s, char *cmd);
 bool wpas_nan_is_peer_paired(struct wpa_supplicant *wpa_s, const u8 *peer_addr);

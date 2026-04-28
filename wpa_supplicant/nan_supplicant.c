@@ -3115,6 +3115,27 @@ int wpas_nan_ndp_terminate(struct wpa_supplicant *wpa_s, char *cmd)
 }
 
 
+int wpas_nan_status(struct wpa_supplicant *wpa_s, char *reply,
+		    size_t reply_size)
+{
+	char *pos = reply;
+	char *end = reply + reply_size;
+	int ret;
+
+	if (!wpas_nan_ready(wpa_s))
+		return -1;
+
+	ret = nan_get_status(wpa_s->nan, pos, end - pos);
+	if (ret > 0)
+		pos += ret;
+
+	ret = nan_de_get_status(wpa_s->nan_de, pos, end - pos);
+	if (ret > 0)
+		pos += ret;
+	return pos - reply;
+}
+
+
 #ifdef CONFIG_PASN
 static int wpas_nan_append_ik_info(char *reply, size_t reply_size,
 				   const struct wpa_dev_ik *ik)

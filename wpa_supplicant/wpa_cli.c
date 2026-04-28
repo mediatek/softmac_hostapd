@@ -3456,6 +3456,12 @@ static int wpa_cli_cmd_nan_peer_info(struct wpa_ctrl *ctrl, int argc,
 }
 
 
+static int wpa_cli_cmd_nan_status(struct wpa_ctrl *ctrl, int argc, char *argv[])
+{
+	return wpa_ctrl_command(ctrl, "NAN_STATUS");
+}
+
+
 static int wpa_cli_cmd_nan_bootstrap(struct wpa_ctrl *ctrl, int argc,
 				     char *argv[])
 {
@@ -4292,6 +4298,8 @@ static const struct wpa_cli_cmd wpa_cli_commands[] = {
 	{ "nan_peer_info", wpa_cli_cmd_nan_peer_info, NULL,
 	  cli_cmd_flag_none,
 	  "<addr> <schedule|potential|capa> [map_id] = Get NAN peer information" },
+	{ "nan_status", wpa_cli_cmd_nan_status, NULL,
+	  cli_cmd_flag_none, "= Get NAN status" },
 	{ "nan_bootstrap", wpa_cli_cmd_nan_bootstrap, NULL,
 	  cli_cmd_flag_none,
 	  " = <peer_mac> <handle=<service handle>> <req_instance_id=<peer requestor id>> <method=<Bootstrap method>> [auth] = Request or authorize NAN boostrapping with peer" },

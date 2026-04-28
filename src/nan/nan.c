@@ -3539,3 +3539,47 @@ void nan_local_sched_update(struct nan_data *nan, struct nan_schedule *sched)
 			nan_peer_update_schedule(nan, peer, sched);
 	}
 }
+
+
+int nan_get_status(struct nan_data *nan, char *buf, size_t buflen)
+{
+	char *pos, *end;
+	struct nan_peer *peer;
+	int ret;
+
+	if (!nan)
+		return -1;
+
+	pos = buf;
+	end = buf + buflen;
+
+	ret = os_snprintf(pos, end - pos,
+			  "nan_started=%d\n"
+			  "nmi=" MACSTR "\n"
+			  "cluster_id=" MACSTR "\n",
+			  nan->nan_started, MAC2STR(nan->cfg->nmi_addr),
+			  MAC2STR(nan->cluster_id));
+	if (os_snprintf_error(end - pos, ret))
+		return pos - buf;
+	pos += ret;
+
+	dl_list_for_each(peer, &nan->peer_list, struct nan_peer, list) {
+		struct nan_ndp *ndp;
+		unsigned int ndp_count = 0;
+
+		dl_list_for_each(ndp, &peer->ndps, struct nan_ndp, list)
+			ndp_count++;
+
+		ret = os_snprintf(pos, end - pos,
+				  "peer=" MACSTR " paired=%d ndp_count=%u\n",
+				  MAC2STR(peer->nmi_addr),
+				  !!(peer->pairing.flags &
+				     NAN_PAIRING_FLAG_PAIRED),
+				  ndp_count);
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+
+	return pos - buf;
+}
