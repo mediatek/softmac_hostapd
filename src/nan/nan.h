@@ -309,6 +309,11 @@ struct nan_channels {
  * @new_ndi_sta: Whether a new NDI station needs to be added (peer_ndi not
  * 	already used by another NDP with this peer)
  * @interface_id: The interface identifier to be used by the peer for the NDP
+ * @local_gtk: Pointer to local GTK info. NULL if local GTK is
+ *	not to be installed
+ * @peer_gtk: Pointer to peer GTK info. NULL if peer GTK is
+ *	not to be installed
+ * @peer_gtk_rsc: Pointer to the peer GTK receive sequence counter
  */
 struct nan_ndp_connection_params {
 	struct nan_ndp_id ndp_id;
@@ -320,6 +325,10 @@ struct nan_ndp_connection_params {
 	bool first_ndp;
 	bool new_ndi_sta;
 	const u8 *interface_id;
+
+	const struct nan_gtk *local_gtk;
+	const struct nan_gtk *peer_gtk;
+	const u8 *peer_gtk_rsc;
 };
 
 /**

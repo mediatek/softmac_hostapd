@@ -1655,6 +1655,15 @@ static int nan_ndp_connected(struct nan_data *nan, struct nan_peer *peer)
 						     params.peer_ndi,
 						     params.local_ndi);
 	params.first_ndp = dl_list_empty(&peer->ndps);
+
+	if (peer->ndp_setup.sec.local_gtk.csid != NAN_CS_NONE)
+		params.local_gtk = &peer->ndp_setup.sec.local_gtk;
+
+	if (peer->ndp_setup.sec.peer_gtk.csid != NAN_CS_NONE) {
+		params.peer_gtk = &peer->ndp_setup.sec.peer_gtk;
+		params.peer_gtk_rsc = peer->ndp_setup.sec.peer_gtk_rsc;
+	}
+
 	params.new_ndi_sta = !nan_peer_ndi_in_use(peer, params.peer_ndi);
 	if (nan->cfg->ndp_connected &&
 	    nan->cfg->ndp_connected(nan->cfg->cb_ctx, &params)) {
