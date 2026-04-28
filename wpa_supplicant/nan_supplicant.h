@@ -26,6 +26,8 @@ void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq);
 void wpas_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 				const union wpa_event_data *data);
+void wpas_nan_ulw_update(struct wpa_supplicant *wpa_s,
+			 const u8 *ulw, size_t ulw_len);
 int wpas_nan_sched_config_map(struct wpa_supplicant *wpa_s, const char *cmd);
 int wpas_nan_ndp_request(struct wpa_supplicant *wpa_s, char *cmd);
 void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,
@@ -91,6 +93,10 @@ static inline void wpas_nan_next_dw(struct wpa_supplicant *wpa_s, u32 freq)
 
 static inline void wpas_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 					      const union wpa_event_data *data)
+{}
+
+static inline void wpas_nan_ulw_update(struct wpa_supplicant *wpa_s,
+				       const u8 *ulw, size_t ulw_len)
 {}
 
 static inline void wpas_nan_rx_naf(struct wpa_supplicant *wpa_s,

@@ -1469,6 +1469,8 @@ void wpas_nan_deinit(struct wpa_supplicant *wpa_s)
 	os_memset(&wpa_s->nan_disallowed_freqs, 0,
 		  sizeof(wpa_s->nan_disallowed_freqs));
 	clear_sched_config(&wpa_s->nan_sched_update.sched);
+	wpabuf_free(wpa_s->nan_ulw_attr);
+	wpa_s->nan_ulw_attr = NULL;
 
 	wpa_s->nan = NULL;
 }
@@ -3371,6 +3373,7 @@ static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 	struct wpa_supplicant *wpa_s = ctx;
 	struct nan_schedule sched;
 	u32 map_ids = (BIT(wpa_s->nan_capa.num_radios) - 1) << 1;
+	int i;
 
 	if (!wpas_nan_ndp_allowed(wpa_s) || !map_ids)
 		return;
@@ -3381,8 +3384,18 @@ static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 					 wpa_s->schedule_sequence_id,
 					 map_ids, sched.n_chans,
 					 sched.chans, buf, true);
-
 	nan_pairing_add_attrs(wpa_s->nan, buf);
+
+	if (!wpa_s->nan_ulw_attr)
+		return;
+
+	/* Add ULW attribute only if there are committed availability entries */
+	for (i = 0; i < sched.n_chans; i++) {
+		if (sched.chans[i].committed.len) {
+			wpabuf_put_buf(buf, wpa_s->nan_ulw_attr);
+			break;
+		}
+	}
 }
 
 
@@ -3442,6 +3455,29 @@ void wpas_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 	wpa_s->schedule_sequence_id++;
 
 	wpas_nan_update_local_schedule(wpa_s);
+}
+
+
+void wpas_nan_ulw_update(struct wpa_supplicant *wpa_s,
+			 const u8 *ulw, size_t ulw_len)
+{
+	if (!wpas_nan_ready(wpa_s))
+		return;
+
+	wpabuf_free(wpa_s->nan_ulw_attr);
+	if (ulw && ulw_len) {
+		wpa_s->nan_ulw_attr = wpabuf_alloc_copy(ulw, ulw_len);
+		if (!wpa_s->nan_ulw_attr) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Failed to allocate ULW attribute buffer");
+			return;
+		}
+
+		wpa_hexdump(MSG_DEBUG, "NAN: ULW update", ulw, ulw_len);
+	} else {
+		wpa_printf(MSG_DEBUG, "NAN: ULW update cleared");
+		wpa_s->nan_ulw_attr = NULL;
+	}
 }
 
 

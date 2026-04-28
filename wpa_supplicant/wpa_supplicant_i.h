@@ -1740,6 +1740,7 @@ struct wpa_supplicant {
 		struct nan_schedule_config sched;
 		u8 map_id;
 	} nan_sched_update;
+	struct wpabuf *nan_ulw_attr;
 	struct wpa_freq_range_list nan_disallowed_freqs;
 	u16 nan_max_bw;
 	unsigned int nan_ndi_ndp_refcount; /* Active NDP count on this NDI */

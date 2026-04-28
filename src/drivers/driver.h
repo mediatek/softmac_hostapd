@@ -6507,6 +6507,14 @@ enum wpa_event_type {
 	 * update has been completed by the driver/firmware.
 	 */
 	EVENT_NAN_SCHED_UPDATE_DONE,
+
+	/**
+	 * EVENT_NAN_ULW_UPDATE - NAN ULW blob update
+	 *
+	 * This event is used to notify wpa_supplicant that the device ULW blob
+	 * has changed and can be attached to outgoing NAN frames.
+	 */
+	EVENT_NAN_ULW_UPDATE,
 };
 
 
@@ -7537,6 +7545,19 @@ union wpa_event_data {
 	struct nan_sched_update_done_info {
 		bool success;
 	} nan_sched_update_done_info;
+
+	/**
+	 * struct nan_ulw_update_info - Data for EVENT_NAN_ULW_UPDATE
+	 * @ulw: Pointer to ULW blob data, containing one or more Unaligned
+	 *	Schedule attributes as defined in the Wi-Fi Aware spec v4.0,
+	 *	Table 109 (Unaligned Schedule attribute format), including
+	 *	attribute header for each attribute.
+	 * @ulw_len: ULW blob length in bytes
+	 */
+	struct nan_ulw_update_info {
+		const u8 *ulw;
+		size_t ulw_len;
+	} nan_ulw_update_info;
 };
 
 /**
