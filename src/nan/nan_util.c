@@ -1914,22 +1914,25 @@ int nan_convert_chan_sched_to_bf(struct nan_data *nan,
 }
 
 
-/*
- * nan_peer_schedule_intersects - Check if local and peer schedules intersect
- *
+/**
+ * nan_peer_schedule_intersection - Get local and peer schedules intersection
  * @nan: NAN module context from nan_init()
  * @peer: The peer with whom to intersect the schedule
  * @sched: Local device schedule
- * Returns: true if schedules intersect, false otherwise
+ * Returns: A bitfield representing the intersection of schedules, or NULL if
+ *	no intersection
  *
  * The function checks if the local device schedule intersects with the peer
- * device schedule.
+ * device schedule and returns a bitfield representing the intersection, or
+ * NULL if no intersection.
  */
-bool nan_peer_schedule_intersects(struct nan_data *nan,
-				  const struct nan_peer *peer,
-				  const struct nan_schedule *sched)
+struct bitfield * nan_peer_schedule_intersection(
+	struct nan_data *nan, const struct nan_peer *peer,
+	const struct nan_schedule *sched)
 {
 	size_t i;
+	struct bitfield *common_bf = NULL;
+	bool intersects = false;
 
 	/*
 	 * Iterate over all the channels included in the local schedule. For
@@ -1956,7 +1959,7 @@ bool nan_peer_schedule_intersects(struct nan_data *nan,
 		if (ret) {
 			wpa_printf(MSG_DEBUG,
 				   "NAN: NDL: Failed to convert chan sched to bitfield");
-			return false;
+			return NULL;
 		}
 
 		/* Get the peer availability for the current channel */
@@ -1969,16 +1972,51 @@ bool nan_peer_schedule_intersects(struct nan_data *nan,
 			continue;
 		}
 
-		ret = bitfield_intersects(own_chan_bf, peer_chan_bf);
+		intersects |= bitfield_intersects(own_chan_bf, peer_chan_bf);
+
+		ret = bitfield_intersect_in_place(own_chan_bf, peer_chan_bf);
+		if (ret < 0) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to intersect own and peer chan bitfields");
+			bitfield_free(own_chan_bf);
+			bitfield_free(peer_chan_bf);
+			bitfield_free(common_bf);
+			return NULL;
+		}
 
 		bitfield_free(peer_chan_bf);
-		bitfield_free(own_chan_bf);
 
-		if (ret == 1)
-			return true;
+		if (common_bf) {
+			ret = bitfield_union_in_place(common_bf, own_chan_bf);
+			if (ret) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to unify own chan bitfields");
+
+				bitfield_free(own_chan_bf);
+				bitfield_free(common_bf);
+				return NULL;
+			}
+		} else {
+			common_bf = bitfield_dup(own_chan_bf);
+			if (!common_bf) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to dup own chan bitfield");
+
+				bitfield_free(own_chan_bf);
+				bitfield_free(common_bf);
+				return NULL;
+			}
+		}
+
+		bitfield_free(own_chan_bf);
 	}
 
-	return false;
+	if (!intersects) {
+		bitfield_free(common_bf);
+		return NULL;
+	}
+
+	return common_bf;
 }
 
 

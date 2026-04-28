@@ -9,6 +9,7 @@
 #include "includes.h"
 #include "common.h"
 #include "utils/eloop.h"
+#include "utils/bitfield.h"
 #include "common/ieee802_11_common.h"
 #include "pasn/pasn_common.h"
 #include "nan.h"
@@ -1441,15 +1442,19 @@ int nan_configure_peer_schedule(struct nan_data *nan, struct nan_peer *peer,
 	struct nan_dev_capa_entry *cur;
 	struct nan_device_capabilities *capa = NULL;
 	struct nan_peer_schedule sched;
+	struct bitfield *common_bf;
 
 	wpa_printf(MSG_DEBUG, "NAN: Configure peer schedule");
 
 	os_memset(&sched, 0, sizeof(sched));
-	if (nan_peer_schedule_intersects(nan, peer, local_sched))
+	common_bf = nan_peer_schedule_intersection(nan, peer, local_sched);
+	if (common_bf)
 		nan_peer_get_committed_avail(nan, peer, local_sched, &sched);
 	else
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Cannot configure peer schedule since there is no intersection");
+
+	bitfield_free(common_bf);
 
 	dl_list_for_each(cur, &peer->info.dev_capa,
 			 struct nan_dev_capa_entry, list) {
