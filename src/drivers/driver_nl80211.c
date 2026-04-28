@@ -6995,8 +6995,8 @@ static int wpa_driver_nl80211_sta_set_flags(void *priv, const u8 *addr,
 		   bss->ifname, MAC2STR(addr), total_flags, flags_or, flags_and,
 		   !!(total_flags & WPA_STA_AUTHORIZED));
 
-	if (!(msg = nl80211_bss_msg(bss, 0, NL80211_CMD_SET_STATION)) ||
-	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr))
+	msg = nl80211_cmd_msg(bss, 0, NL80211_CMD_SET_STATION);
+	if (!msg || nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr))
 		goto fail;
 
 	/*
