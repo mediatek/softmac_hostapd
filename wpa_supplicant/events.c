@@ -1874,7 +1874,7 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 	}
 
 	bssid_ignore_count = wpa_bssid_ignore_is_listed(wpa_s, bss->bssid);
-	if (bssid_ignore_count) {
+	if (bssid_ignore_count && !link) {
 		int limit = 1;
 		if (wpa_supplicant_enabled_networks(wpa_s) == 1) {
 			/*
