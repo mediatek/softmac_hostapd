@@ -5571,7 +5571,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 	if (ap_sta_is_epp(sta) && sta->auth_alg == WLAN_AUTH_802_1X &&
 	    mic_check) {
 		const u8 *data;
-		u8 mic_len, data_buf[500], mic[WPA_1X_MAX_MIC_LEN];
+		u8 mic_len, data_buf[(255 + 2) * 2], mic[WPA_1X_MAX_MIC_LEN];
 		const u8 *aa = hapd->own_addr;
 		size_t data_len = 0;
 		int ret;
