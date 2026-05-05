@@ -988,8 +988,14 @@ static int wpa_tdls_recv_teardown(struct wpa_sm *sm, const u8 *src_addr,
 		return 0;
 	}
 
+	if (len < sizeof(struct wpa_tdls_frame) + 2 /* Reason Code */) {
+		wpa_printf(MSG_INFO, "TDLS: Too short Teardown frame (len=%zu)",
+			   len);
+		return -1;
+	}
+
 	pos = buf;
-	pos += 1 /* pkt_type */ + 1 /* Category */ + 1 /* Action */;
+	pos += sizeof(struct wpa_tdls_frame);
 
 	reason_code = WPA_GET_LE16(pos);
 	pos += 2;
