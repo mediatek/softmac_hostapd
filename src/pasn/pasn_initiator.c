@@ -1527,7 +1527,9 @@ int wpas_parse_pasn_frame(struct pasn_data *pasn, u16 auth_type,
 
 	if (pasn->derive_kek) {
 		wpa_printf(MSG_DEBUG, "PASN: Derive PTK-KEK");
-		pasn->kek_len = wpa_kek_len(pasn->akmp, pasn->pmk_len);
+		if (!pasn->kek_len)
+			pasn->kek_len = wpa_kek_len(pasn->akmp,
+						    pasn->pmk_len);
 		wpa_printf(MSG_DEBUG, "PASN: kek_len=%zu", pasn->kek_len);
 	}
 

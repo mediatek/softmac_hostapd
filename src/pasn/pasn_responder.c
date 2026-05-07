@@ -485,7 +485,9 @@ pasn_derive_keys(struct pasn_data *pasn,
 		own_addr = pasn->mld_addr;
 
 	if (pasn->derive_kek) {
-		pasn->kek_len = wpa_kek_len(pasn->akmp, pasn->pmk_len);
+		if (!pasn->kek_len)
+			pasn->kek_len = wpa_kek_len(pasn->akmp,
+						    pasn->pmk_len);
 		wpa_printf(MSG_DEBUG, "PASN: kek_len=%zu", pasn->kek_len);
 	}
 #endif /* CONFIG_ENC_ASSOC */
