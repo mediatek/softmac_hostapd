@@ -2735,12 +2735,12 @@ nan_peer_get_committed_avail_add(const struct nan_data *nan,
 			freq = freq - 70 + idx * 20;
 
 		/* TODO: Missing support for 80 + 80 */
-
-		/* Skip channels that are not in local schedule */
-		if (local_sched &&
-		    !nan_peer_channel_in_local_sched(nan, freq, local_sched))
-			return;
 	}
+
+	/* Skip channels that are not in local schedule */
+	if (local_sched &&
+	    !nan_peer_channel_in_local_sched(nan, freq, local_sched))
+		return;
 
 	/* Assume committed for conditional slots if setup is done */
 	committed = (avail->type == NAN_AVAIL_ENTRY_CTRL_TYPE_COMMITTED) ||
