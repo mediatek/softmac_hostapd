@@ -3837,13 +3837,13 @@ unsigned int get_max_nss_capability(struct ieee802_11_elems *elems,
 		const u8 *optional = hecaps->optional;
 
 		if (bw == CHAN_WIDTH_160) {
-			const le16 *mcs_160 = (const le16 *) &optional[0];
-
-			mcs_map = parse_for_rx ? mcs_160[0] : mcs_160[1];
+			mcs_map = host_to_le16(
+				WPA_GET_LE16(parse_for_rx ?
+					     &optional[0] : &optional[2]));
 		} else if (bw == CHAN_WIDTH_80P80) {
-			const le16 *mcs_80p80 = (const le16 *) &optional[4];
-
-			mcs_map = parse_for_rx ? mcs_80p80[0] : mcs_80p80[1];
+			mcs_map = host_to_le16(
+				WPA_GET_LE16(parse_for_rx ?
+					     &optional[4] : &optional[6]));
 		} else {
 			mcs_map = parse_for_rx ?
 				hecaps->he_basic_supported_mcs_set.rx_map :
