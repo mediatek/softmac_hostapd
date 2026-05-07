@@ -1482,6 +1482,8 @@ int nan_pairing_set_nik(struct nan_data *nan, const u8 *nik, size_t nik_len)
 		return -1;
 	}
 
+	os_memcpy(nan->cfg->nik, nik, NAN_NIK_LEN);
+
 	if (nan->cfg->pairing_cfg.pairing_verification) {
 		if (nan_nira_get_tag_nonce(nan->cfg, nonce, tag) < 0) {
 			wpa_printf(MSG_INFO,
@@ -1498,8 +1500,6 @@ int nan_pairing_set_nik(struct nan_data *nan, const u8 *nik, size_t nik_len)
 		os_memset(nan->nira_nonce, 0, NAN_NIRA_NONCE_LEN);
 		os_memset(nan->nira_tag, 0, NAN_NIRA_TAG_LEN);
 	}
-
-	os_memcpy(nan->cfg->nik, nik, NAN_NIK_LEN);
 
 	wpa_hexdump_key(MSG_DEBUG, "NAN: New NIK", nan->cfg->nik, NAN_NIK_LEN);
 
