@@ -1315,3 +1315,33 @@ def test_eppke_mixed_concurrent(dev, apdev):
         dev[0].set("sae_pwe", "0")
         dev[1].set("pasn_groups", "")
         dev[1].set("sae_pwe", "0")
+
+def test_eppke_mld_two_links_different_security(dev, apdev):
+    """AP MLD links configured in different AKMs"""
+    with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
+        HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
+
+        wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
+        wpas.interface_add(wpas_iface)
+
+        passphrase = '1234567890'
+        ssid = "test-eppke-authentication"
+        link_params = eht_mld_ap_wpa2_params(ssid, passphrase,
+                                             key_mgmt=None, mfp="2", pwe='1',
+                                             beacon_prot=1)
+        link_params['wpa_key_mgmt'] = 'WPA-PSK EPPKE'
+        link_params['assoc_frame_encryption'] = '1'
+        link_params['pmksa_caching_privacy'] = '1'
+        link_params['eap_using_authentication_frames'] = '1'
+        link_params['rsn_pairwise'] = "CCMP GCMP-256"
+        link_params['eppke_unauth'] = '1'
+        hapd0 = eht_mld_enable_ap(hapd_iface, 0, link_params)
+
+        link_params['channel'] = '6'
+        link_params['wpa_key_mgmt'] = 'SAE-EXT-KEY EPPKE'
+        hapd1 = eht_mld_enable_ap(hapd_iface, 1, link_params)
+
+        wpas.connect(ssid, scan_freq="2412 2437", key_mgmt="EPPKE",
+                     ieee80211w="2", beacon_prot="1", pairwise="CCMP")
+        eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
+                          valid_links=3, active_links=3)
