@@ -9935,7 +9935,9 @@ static bool hostapd_eid_rnr_bss(struct hostapd_data *hapd,
 	struct hostapd_iface *iface = hapd->iface;
 	struct hostapd_data *bss = iface->bss[i];
 	u8 bss_param = 0;
+#ifdef CONFIG_IEEE80211BE
 	bool ap_mld = false;
+#endif /* CONFIG_IEEE80211BE */
 	u8 *eid = *pos;
 
 	if (!bss || !bss->conf || bss == reporting_hapd)
