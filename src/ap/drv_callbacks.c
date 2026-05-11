@@ -2877,7 +2877,7 @@ static int hostapd_event_btwt_add(struct hostapd_data *hapd,
 	ieee802_11_set_bss_critical_update(hapd,
 					   BSS_CRIT_UPDATE_EVENT_BCAST_TWT_PARAM_SET);
 #endif /* CONFIG_IEEE80211BE */
-	ieee802_11_set_beacon_per_bss_only(hapd);
+	ieee802_11_set_beacon(hapd);
 
 	return 0;
 }
