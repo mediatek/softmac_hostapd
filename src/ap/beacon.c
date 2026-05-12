@@ -556,14 +556,22 @@ static u8 * hostapd_eid_supported_op_classes(struct hostapd_data *hapd, u8 *eid)
 {
 	u8 op_class, channel;
 	enum oper_chan_width chwidth;
+	int secondary_channel;
+	u8 seg0, seg1;
 
 	if (!(hapd->iface->drv_flags & WPA_DRIVER_FLAGS_AP_CSA) ||
 	    !hapd->iface->freq)
 		return eid;
 
-	chwidth = hostapd_get_oper_chan_width_of_bss(hapd);
+	hostapd_get_oper_chan_info_of_bss(hapd, &chwidth, &seg0, &seg1);
+	secondary_channel = hapd->iconf->secondary_channel;
+
+	if (seg0 == hapd->iconf->channel &&
+	    chwidth == CONF_OPER_CHWIDTH_USE_HT)
+		secondary_channel = 0;
+
 	if (ieee80211_freq_to_channel_ext(hapd->iface->freq,
-					  hapd->iconf->secondary_channel,
+					  secondary_channel,
 					  chwidth,
 					  &op_class, &channel) ==
 	    NUM_HOSTAPD_MODES)

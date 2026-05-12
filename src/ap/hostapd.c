@@ -5468,19 +5468,30 @@ u8 hostapd_get_oper_class_of_bss(struct hostapd_data *hapd)
 	if (hapd->iconf->ieee80211be && !hostapd_is_eht_enabled(hapd) &&
 	    hapd->iface->freq) {
 		enum oper_chan_width bss_chwidth, iface_chwidth;
+		u8 seg0, seg1;
 		u8 chan;
 
 		iface_chwidth = hostapd_get_oper_chwidth(hapd->iconf);
-		bss_chwidth = hostapd_get_oper_chan_width_of_bss(hapd);
+		hostapd_get_oper_chan_info_of_bss(hapd, &bss_chwidth,
+						  &seg0, &seg1);
 
 		/* If the BSS channel width is different from the interface
 		 * channel width, re-compute the operating class as per the BSS
 		 * channel width.
 		 */
 		if (bss_chwidth != iface_chwidth) {
+			int secondary_channel = hapd->iconf->secondary_channel;
+
+			/* Check if legacy bandwidth is downgraded to 20 MHz
+			 * and derive operating class accordingly.
+			 */
+			if (seg0 == hapd->iconf->channel &&
+			    bss_chwidth == CONF_OPER_CHWIDTH_USE_HT)
+				secondary_channel = 0;
+
 			if (ieee80211_freq_to_channel_ext(
 				    hapd->iface->freq,
-				    hapd->iconf->secondary_channel,
+				    secondary_channel,
 				    bss_chwidth, &op_class,
 				    &chan) == NUM_HOSTAPD_MODES ||
 			    chan != hapd->iconf->channel)

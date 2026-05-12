@@ -206,11 +206,12 @@ void hostapd_free_neighbor_db(struct hostapd_data *hapd)
 static enum nr_chan_width
 hostapd_get_nr_chan_width(struct hostapd_data *hapd,
 			  int ht, int vht, int he,
-			  enum oper_chan_width oper_chwidth)
+			  enum oper_chan_width oper_chwidth,
+			  int secondary_channel)
 {
 	if (!ht && !vht && !he)
 		return NR_CHAN_WIDTH_20;
-	if (!hapd->iconf->secondary_channel)
+	if (!secondary_channel)
 		return NR_CHAN_WIDTH_20;
 	if ((!vht && !he) || oper_chwidth == CONF_OPER_CHWIDTH_USE_HT)
 		return NR_CHAN_WIDTH_40;
@@ -238,6 +239,7 @@ void hostapd_neighbor_set_own_report(struct hostapd_data *hapd)
 	u8 center_freq1_idx = 0, center_freq2_idx = 0;
 	enum oper_chan_width oper_chwidth;
 	enum nr_chan_width width;
+	int secondary_channel;
 	u32 bssid_info;
 	struct wpabuf *nr;
 
@@ -276,14 +278,20 @@ void hostapd_neighbor_set_own_report(struct hostapd_data *hapd)
 
 	hostapd_get_oper_chan_info_of_bss(hapd, &oper_chwidth,
 					  &center_freq1_idx, &center_freq2_idx);
+	secondary_channel = hapd->iconf->secondary_channel;
+
+	if (center_freq1_idx == hapd->iconf->channel &&
+	    oper_chwidth == CONF_OPER_CHWIDTH_USE_HT)
+		secondary_channel = 0;
 
 	if (ieee80211_freq_to_channel_ext(hapd->iface->freq,
-					  hapd->iconf->secondary_channel,
+					  secondary_channel,
 					  oper_chwidth,
 					  &op_class, &channel) ==
 	    NUM_HOSTAPD_MODES)
 		return;
-	width = hostapd_get_nr_chan_width(hapd, ht, vht, he, oper_chwidth);
+	width = hostapd_get_nr_chan_width(hapd, ht, vht, he, oper_chwidth,
+					  secondary_channel);
 
 	if (width != NR_CHAN_WIDTH_80P80)
 		center_freq2_idx = 0;
@@ -291,7 +299,7 @@ void hostapd_neighbor_set_own_report(struct hostapd_data *hapd)
 	if (!vht && ht) {
 		center_freq1_idx = 0;
 		ieee80211_freq_to_chan(hapd->iface->freq +
-				       10 * hapd->iconf->secondary_channel,
+				       10 * secondary_channel,
 				       &center_freq1_idx);
 	}
 
