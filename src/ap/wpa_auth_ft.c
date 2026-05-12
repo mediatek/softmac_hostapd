@@ -2239,7 +2239,7 @@ void wpa_auth_ft_store_keys(struct wpa_state_machine *sm, const u8 *pmk_r0,
 	if (psk_local && wpa_key_mgmt_ft_psk(sm->wpa_key_mgmt))
 		return;
 
-	if (wpa_ft_get_vlan(wpa_auth, sm->addr, &vlan) < 0) {
+	if (wpa_ft_get_vlan(sm->wpa_auth, sm->addr, &vlan) < 0) {
 		wpa_printf(MSG_DEBUG, "FT: vlan not available for STA " MACSTR,
 			   MAC2STR(sm->addr));
 		return;
