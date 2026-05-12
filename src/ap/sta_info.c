@@ -80,9 +80,6 @@ struct sta_info * ap_get_sta(struct hostapd_data *hapd, const u8 *sta)
 		struct hostapd_data *h;
 
 		for_each_mld_link(h, hapd) {
-			if (h == hapd)
-				continue;
-
 			for (s = h->sta_list; s; s = s->next)
 				if ((!os_memcmp(s->setup_link_addr, sta, 6) ||
 				     !os_memcmp(s->addr, sta, 6)) &&
