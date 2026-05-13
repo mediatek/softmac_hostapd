@@ -3616,6 +3616,18 @@ void nan_set_sched_update_pending(struct nan_data *nan, bool pending)
 }
 
 
+void nan_set_supported_bands(struct nan_data *nan, u8 supported_bands)
+{
+	if (!nan || !nan->cfg)
+		return;
+
+	nan->cfg->dev_capa.supported_bands = supported_bands;
+	wpa_printf(MSG_DEBUG,
+		   "NAN: dev_capa.supported_bands updated to 0x%02x",
+		   nan->cfg->dev_capa.supported_bands);
+}
+
+
 void nan_local_sched_update(struct nan_data *nan, struct nan_schedule *sched)
 {
 	struct nan_peer *peer;

@@ -1890,7 +1890,31 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 #else /* CONFIG_TESTING_OPTIONS */
 	NAN_PARSE_INT(master_pref, 2, 254);
 #endif /* CONFIG_TESTING_OPTIONS */
-	NAN_PARSE_INT(dual_band, 0, 1);
+
+	if (os_strcmp("dual_band", cmd) == 0) {
+		int val = atoi(param);
+		u8 supported_bands;
+
+		if (val < 0 || val > 1) {
+			wpa_printf(MSG_INFO,
+				   "NAN: Invalid value for dual_band");
+			return -1;
+		}
+
+		config->dual_band = val;
+
+		if (nan) {
+			supported_bands = NAN_DEV_CAPA_SBAND_2G;
+			if (val &&
+			    (wpa_s->nan_capa.drv_flags &
+			     WPA_DRIVER_FLAGS_NAN_SUPPORT_DUAL_BAND))
+				supported_bands |= NAN_DEV_CAPA_SBAND_5G;
+			nan_set_supported_bands(nan, supported_bands);
+		}
+
+		return 0;
+	}
+
 	NAN_PARSE_INT(scan_period, 0, 0xffff);
 	NAN_PARSE_INT(scan_dwell_time, 10, 150);
 	NAN_PARSE_INT(discovery_beacon_interval, 50, 200);
