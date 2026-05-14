@@ -3123,7 +3123,7 @@ hostapd_ctrl_iface_add_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 
 	hapd->broadcast_twt_cnt++;
 	dl_list_add_tail(&hapd->btwt_sp_list, &entry->list);
-	ieee802_11_set_beacon_per_bss_only(hapd);
+	ieee802_11_set_critical_update_beacon(hapd, BSS_CRIT_UPDATE_SINGLE);
 
 	return os_snprintf(buf, buflen, "broadcast_twt: id=%hhu min_wake_dur=%hhu "
 			   "wake_intv_mantissa=%hu wake_intv_exp=%hu "
@@ -3184,7 +3184,7 @@ hostapd_ctrl_iface_del_broadcast_twt(struct hostapd_data *hapd, char *cmd,
 
 	hapd->broadcast_twt_cnt--;
 	dl_list_del(&entry->list);
-	ieee802_11_set_beacon_per_bss_only(hapd);
+	ieee802_11_set_critical_update_beacon(hapd, BSS_CRIT_UPDATE_SINGLE);
 	ret = os_snprintf(buf, buflen, "broadcast_twt: id=%hhu in bssid="
 			  MACSTR " deleted\n", entry->btwt.id,
 			  MAC2STR(hapd->own_addr));
