@@ -5753,19 +5753,20 @@ int hostapd_iface_switch_channel(struct hostapd_iface *iface,
 	}
 
 	for (i = 0; i < iface->num_bss; i++) {
-		/* Save CHAN_SWITCH VHT, HE, and EHT config */
-		hostapd_chan_switch_config(iface->bss[i],
-					   &settings->freq_params);
+		struct hostapd_data *h = iface->bss[i];
 
-		err = hostapd_switch_channel(iface->bss[i], settings);
+		/* Save CHAN_SWITCH VHT, HE, and EHT config */
+		hostapd_chan_switch_config(h, &settings->freq_params);
+
+		err = hostapd_switch_channel(h, settings);
 		if (err) {
 			wpa_printf(MSG_ERROR, "Channel switch failed, err=%d", err);
 			goto err;
 		}
 
 #ifdef CONFIG_IEEE80211BE
-		if (iface->bss[i]->conf->mld_ap) {
-			err = hostapd_update_aff_link_beacon(iface->bss[i], settings->cs_count);
+		if (h->conf->mld_ap && h->mld && h->mld->started) {
+			err = hostapd_update_aff_link_beacon(h, settings->cs_count);
 			if (err) {
 				wpa_printf(MSG_ERROR, "Update affiliated link failed, err=%d", err);
 				goto err;
