@@ -3628,6 +3628,23 @@ void nan_set_supported_bands(struct nan_data *nan, u8 supported_bands)
 }
 
 
+void nan_set_ndpe_support(struct nan_data *nan, bool enable)
+{
+	if (!nan || !nan->cfg)
+		return;
+
+	if (enable)
+		nan->cfg->dev_capa.capa |= NAN_DEV_CAPA_NDPE_ATTR_SUPP;
+	else
+		nan->cfg->dev_capa.capa &= ~NAN_DEV_CAPA_NDPE_ATTR_SUPP;
+
+	wpa_printf(MSG_DEBUG,
+		   "NAN: NDPE support %s (dev_capa.capa=0x%02x)",
+		   enable ? "enabled" : "disabled",
+		   nan->cfg->dev_capa.capa);
+}
+
+
 void nan_local_sched_update(struct nan_data *nan, struct nan_schedule *sched)
 {
 	struct nan_peer *peer;

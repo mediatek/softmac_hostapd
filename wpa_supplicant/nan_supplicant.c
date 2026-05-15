@@ -2104,6 +2104,25 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 						   max_ndl_idle_period);
 	}
 
+	if (os_strcmp("ndpe", cmd) == 0) {
+		int val = atoi(param);
+
+		if (val < 0 || val > 1) {
+			wpa_printf(MSG_INFO, "NAN: Invalid value for ndpe");
+			return -1;
+		}
+
+		if (!nan) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NAN not started, cannot set ndpe");
+			return -1;
+		}
+
+		nan_set_ndpe_support(nan, !!val);
+
+		return 0;
+	}
+
 	wpa_printf(MSG_INFO, "NAN: Unknown NAN_SET cmd='%s'", cmd);
 	return -1;
 }
