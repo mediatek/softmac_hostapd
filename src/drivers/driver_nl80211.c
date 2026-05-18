@@ -16030,7 +16030,7 @@ nl80211_mu_ctrl(void *priv, u8 radio_idx, struct wpa_driver_mu_params *params)
 		break;
 	case MU_CTRL_UPDATE:
 		if (nla_put(msg, MTK_VENDOR_ATTR_MU_CTRL_STRUCT,
-			    sizeof(struct connac3_muru), params->muru_config))
+			    sizeof(struct mtk_muru), params->muru_config))
 			goto fail;
 		break;
 	default:

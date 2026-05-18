@@ -419,7 +419,7 @@ enum {
 	MU_CTRL_ONOFF,
 };
 
-struct connac3_muru_comm {
+struct mtk_muru_comm {
 	u8 pda_pol;
 	u8 band;
 	u8 spe_idx;
@@ -432,7 +432,7 @@ struct connac3_muru_comm {
 	u8 _rsv[3];
 };
 
-struct connac3_muru_dl {
+struct mtk_muru_dl {
 	u8 user_num;
 	u8 tx_mode;
 	u8 bw;
@@ -478,7 +478,7 @@ struct connac3_muru_dl {
 	} usr[16];
 };
 
-struct connac3_muru_ul {
+struct mtk_muru_ul {
 	u8 user_num;
 	u8 tx_mode;
 
@@ -515,26 +515,37 @@ struct connac3_muru_ul {
 		u8 target_rssi;
 		le32 trig_pkt_size;
 		u8 ru_allo_ps160;
-		u8 _rsv2[3];
+		u8 dru_dbw;
+		u8 _rsv2[2];
 	} usr[16];
 };
 
-struct connac3_muru_dbg {
+struct mtk_muru_dbg {
 	/* HE TB RX Debug */
 	le32 rx_hetb_nonsf_en_bitmap;
 	le32 rx_hetb_cfg[2];
 };
 
-struct connac3_muru {
+struct mtk_muru_uhr {
+	u8 ul_dru_ind;
+	u8 mu_bar_dru_ind;
+	u8 mu_bar_dru_dbw;
+	u8 _rsv_uhr;
+};
+
+struct mtk_muru {
 	le32 cfg_comm;
 	le32 cfg_dl;
 	le32 cfg_ul;
 	le32 cfg_dbg;
 
-	struct connac3_muru_comm comm;
-	struct connac3_muru_dl dl;
-	struct connac3_muru_ul ul;
-	struct connac3_muru_dbg dbg;
+	struct mtk_muru_comm comm;
+	struct mtk_muru_dl dl;
+	struct mtk_muru_ul ul;
+	struct mtk_muru_dbg dbg;
+
+	le32 cfg_uhr;
+	struct mtk_muru_uhr uhr;
 };
 
 #define MURU_OFDMA_SCH_TYPE_DL	BIT(0)
@@ -573,5 +584,18 @@ struct connac3_muru {
 #define MURU_FIXED_USER_UL_MCS		BIT(19)
 #define MURU_FIXED_USER_UL_NSS		BIT(20)
 #define MURU_FIXED_USER_UL_RU_ALLOC	BIT(21)
+
+/* UHR Common Config */
+#define MURU_FIXED_UHR_UL_DRU_IND	BIT(0)
+#define MURU_FIXED_UHR_MU_BAR_DRU	BIT(1)
+#define MURU_FIXED_UHR_USER_DRU_DBW	BIT(2)
+
+enum muru_drubw {
+	MURU_DRUBW_BW20,
+	MURU_DRUBW_BW40,
+	MURU_DRUBW_BW80,
+	MURU_DRUBW_BW60,
+	MURU_DRUBW_RRU  = 0xF,
+};
 
 #endif /* MTK_VENDOR_H */

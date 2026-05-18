@@ -5195,10 +5195,10 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 	u8 i;
 	int cnt = 0, ret;
 	u16 *val;
-	struct connac3_muru *muru;
-	struct connac3_muru_dl *dl;
-	struct connac3_muru_ul *ul;
-	struct connac3_muru_comm *comm;
+	struct mtk_muru *muru;
+	struct mtk_muru_dl *dl;
+	struct mtk_muru_ul *ul;
+	struct mtk_muru_comm *comm;
 
 	config = cmd;
 	pos = os_strchr(config, ' ');
@@ -5223,8 +5223,8 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 	}
 
 	if (hapd->iconf->muru_config == NULL) {
-		hapd->iconf->muru_config = os_zalloc(sizeof(struct connac3_muru));
-		hapd->iconf->muru_config_len = sizeof(struct connac3_muru);
+		hapd->iconf->muru_config = os_zalloc(sizeof(struct mtk_muru));
+		hapd->iconf->muru_config_len = sizeof(struct mtk_muru);
 	}
 
 	muru = hapd->iconf->muru_config;
@@ -5369,6 +5369,43 @@ hostapd_ctrl_iface_set_mu(struct hostapd_data *hapd, char *cmd,
 	} else if (os_strcmp(config, "global_comm_band") == 0) {
 		comm->band = (u8)atoi(value);
 		muru->cfg_comm |= host_to_le32(MURU_COMM_BAND);
+	} else if (os_strcmp(config, "ul_dru_ind") == 0) {
+		muru->uhr.ul_dru_ind = (u8)atoi(value);
+		muru->cfg_uhr |= host_to_le32(MURU_FIXED_UHR_UL_DRU_IND);
+	} else if (os_strcmp(config, "mubar") == 0) {
+		cnt = hostapd_parse_argument_helper(value, &val);
+		if (cnt == -1)
+			goto fail;
+		if (cnt != 2 || val[1] > MURU_DRUBW_BW60)
+			goto para_fail;
+		muru->uhr.mu_bar_dru_ind = (u8)val[0];
+		muru->uhr.mu_bar_dru_dbw = (u8)val[1];
+		os_free(val);
+		muru->cfg_uhr |= host_to_le32(MURU_FIXED_UHR_MU_BAR_DRU);
+	} else if (os_strcmp(config, "ul_user_dru_dbw") == 0) {
+		MURU_CFG_DEPENDENCE_CHECK(muru->cfg_ul, MURU_FIXED_UL_TOTAL_USER_CNT);
+		cnt = hostapd_parse_argument_helper(value, &val);
+		if (cnt == -1)
+			goto fail;
+		if (cnt != ul->user_num)
+			goto para_fail;
+		for (i = 0; i < cnt; i++) {
+			u8 v = (u8)val[i];
+
+			switch (v) {
+			case MURU_DRUBW_BW20:
+			case MURU_DRUBW_BW40:
+			case MURU_DRUBW_BW80:
+			case MURU_DRUBW_BW60:
+			case MURU_DRUBW_RRU:
+				break;
+			default:
+				goto para_fail;
+			}
+			ul->usr[i].dru_dbw = v;
+		}
+		os_free(val);
+		muru->cfg_uhr |= host_to_le32(MURU_FIXED_UHR_USER_DRU_DBW);
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Unsupported parameter %s for SET_MU", config);
