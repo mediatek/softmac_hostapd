@@ -4608,6 +4608,7 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 
 				neg_ttlm->dlink[tid] = map;
 				neg_ttlm->ulink[tid] = map;
+				neg_ttlm->enabled_links |= map;
 			}
 
 			/* End of the TTLM */

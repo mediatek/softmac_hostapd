@@ -3198,6 +3198,8 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 			return -EINVAL;
 		}
 
+		neg_ttlm->enabled_links |= map;
+
 		pos += map_size;
 		ttlm_ie_len -= map_size;
 	}
