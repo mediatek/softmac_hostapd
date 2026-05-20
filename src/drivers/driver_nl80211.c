@@ -12528,7 +12528,7 @@ static int nl80211_switch_channel(void *priv, struct csa_settings *settings)
 	if (!beacon_csa)
 		goto fail;
 
-	ret = set_beacon_data(msg, &settings->beacon_csa, true);
+	ret = set_beacon_data(msg, &settings->beacon_csa, false);
 	if (ret)
 		goto error;
 
@@ -12621,7 +12621,7 @@ static int nl80211_switch_color(void *priv, struct cca_settings *settings)
 		goto error;
 	}
 
-	ret = set_beacon_data(msg, &settings->beacon_cca, true);
+	ret = set_beacon_data(msg, &settings->beacon_cca, false);
 	if (ret)
 		goto error;
 
