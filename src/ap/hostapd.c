@@ -4653,16 +4653,68 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 	int ret;
 	enum oper_chan_width chanwidth;
 	u8 chan;
+	int sec_channel_offset;
 
 	os_memset(&old_freq, 0, sizeof(old_freq));
 	if (!iface || !iface->freq || hapd->csa_in_progress)
 		return -1;
 
 	chanwidth = hostapd_chan_width_from_freq_params(&settings->freq_params);
+	sec_channel_offset = settings->freq_params.sec_channel_offset;
+#ifdef CONFIG_IEEE80211BE
+	/* When Switching to an 11BE channel, adjust the legacy BW and center
+	 * frequencies accordingly
+	 */
+	if (chanwidth == CONF_OPER_CHWIDTH_320MHZ ||
+	    settings->freq_params.punct_bitmap) {
+		enum oper_chan_width chan_op_bw = chanwidth;
+		u8 oper_centr_freq0_idx = 0, oper_centr_freq1_idx = 0, pri_chan = 0;
+
+		ieee80211_freq_to_chan(settings->freq_params.center_freq1,
+				       &oper_centr_freq0_idx);
+		ieee80211_freq_to_chan(settings->freq_params.center_freq2,
+				       &oper_centr_freq1_idx);
+		ieee80211_freq_to_chan(settings->freq_params.freq,
+				       &pri_chan);
+
+		punct_update_legacy_bw(settings->freq_params.punct_bitmap,
+				       pri_chan,
+				       &chan_op_bw,
+				       &oper_centr_freq0_idx,
+				       &oper_centr_freq1_idx);
+
+		/* Downgrade the EHT 320 MHz BW to legacy 160 MHz BW and
+		 * calculate the correspoding 160 MHz center freq for later
+		 * ECSA opclass calculation which needs legacy BW and
+		 * secondary channel offset.
+		 */
+		if (chan_op_bw == CONF_OPER_CHWIDTH_320MHZ) {
+			chan_op_bw = CONF_OPER_CHWIDTH_160MHZ;
+
+			if (pri_chan < oper_centr_freq0_idx)
+				oper_centr_freq0_idx -= 16;
+			else
+				oper_centr_freq0_idx += 16;
+		}
+
+		chanwidth = chan_op_bw;
+		if (oper_centr_freq0_idx == 0 || oper_centr_freq0_idx == pri_chan)
+			sec_channel_offset = 0;
+		else if (oper_centr_freq0_idx > pri_chan)
+			sec_channel_offset = 1;
+		else
+			sec_channel_offset = -1;
+
+		wpa_printf(MSG_DEBUG,
+			   "ECSA Legacy BW %d chan1 %d chan2 %d sec_chan %d",
+			   chan_op_bw, oper_centr_freq0_idx, oper_centr_freq1_idx,
+			   sec_channel_offset);
+	}
+#endif /* CONFIG_IEEE80211BE */
 
 	if (ieee80211_freq_to_channel_ext(
 		    settings->freq_params.freq,
-		    settings->freq_params.sec_channel_offset,
+		    sec_channel_offset,
 		    chanwidth,
 		    &hapd->iface->cs_oper_class,
 		    &chan) == NUM_HOSTAPD_MODES) {
