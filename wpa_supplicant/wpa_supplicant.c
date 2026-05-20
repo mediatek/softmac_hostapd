@@ -4932,6 +4932,12 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	}
 #endif /* CONFIG_ENC_ASSOC */
 
+	if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_OKC_PMKID_IN_ASSOC) &&
+	    (ssid->proactive_key_caching < 0 ? wpa_s->conf->okc :
+	     ssid->proactive_key_caching) &&
+	    (ssid->proto & WPA_PROTO_RSN))
+		params.okc_pmkid_in_assoc = true;
+
 	params.drop_unencrypted = use_crypt;
 
 	params.mgmt_frame_protection = wpas_get_ssid_pmf(wpa_s, ssid);
