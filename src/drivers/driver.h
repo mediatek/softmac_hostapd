@@ -1455,6 +1455,14 @@ struct wpa_driver_associate_params {
 	 * eppke_supported - Whether EPPKE authentication is supported
 	 */
 	bool eppke_supported;
+
+	/**
+	 * okc_pmkid_in_assoc - wpa_supplicant support for OKC derived PMKID in
+	 * (Re)Association Request frames. When wpa_the supplicant can detect
+	 * and handle a driver-generated OKC PMKID in the (Re)Association
+	 * Request frame.
+	 */
+	bool okc_pmkid_in_assoc;
 };
 
 enum hide_ssid {
@@ -2593,6 +2601,8 @@ struct wpa_driver_capa {
 #define WPA_DRIVER_FLAGS2_PMKSA_PRIVACY		0x0000001000000000ULL
 /** Driver supports MAC address filter for remain-on-channel */
 #define WPA_DRIVER_FLAGS2_ROC_ADDR_FILTER	0x0000002000000000ULL
+/** Driver supports adding OKC derived PMKID in (Re)Association Request frame */
+#define WPA_DRIVER_FLAGS2_OKC_PMKID_IN_ASSOC	0x0000004000000000ULL
 	u64 flags2;
 
 #define FULL_AP_CLIENT_STATE_SUPP(drv_flags) \
