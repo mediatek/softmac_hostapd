@@ -969,11 +969,23 @@ int hostapd_drv_send_mlme(struct hostapd_data *hapd,
 			  const u16 *csa_offs, size_t csa_offs_len,
 			  int no_encrypt)
 {
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) msg;
 	int link_id = -1;
 
 #ifdef CONFIG_IEEE80211BE
-	if (hapd->conf->mld_ap)
+	if (hapd->conf->mld_ap) {
 		link_id = hapd->mld_link_id;
+
+		if (len < IEEE80211_HDRLEN)
+			return -1;
+
+		if (!hostapd_is_link_tx_allowed(hapd, hdr->addr1, link_id)) {
+			wpa_printf(MSG_ERROR,
+				   "unicast TX to " MACSTR " on invalid link_id %d\n",
+				   MAC2STR(hdr->addr1), link_id);
+			return -1;
+		}
+	}
 #endif /* CONFIG_IEEE80211BE */
 
 	if (!hapd->driver || !hapd->driver->send_mlme || !hapd->drv_priv)
@@ -1125,13 +1137,20 @@ static int hapd_drv_send_action(struct hostapd_data *hapd, unsigned int freq,
 	} else if (hapd->conf->mld_ap) {
 		sta = ap_get_sta(hapd, dst);
 
-		if (ap_sta_is_mld(hapd, sta)) {
+
+		if (!hostapd_is_action_frame_link_agnostic(data[0], data[1]))
+			link_id = hapd->mld_link_id;
+		else if (ap_sta_is_mld(hapd, sta)) {
 			own_addr = hapd->mld->mld_addr;
 			bssid = own_addr;
 		}
 
-		if (!hostapd_is_action_frame_link_agnostic(data[0], data[1]))
-			link_id = hapd->mld_link_id;
+		if (!hostapd_is_link_tx_allowed(hapd, dst, link_id)) {
+			wpa_printf(MSG_ERROR,
+				   "unicast TX to " MACSTR " on invalid link_id %d\n",
+				   MAC2STR(dst), link_id);
+			return -1;
+		}
 #endif /* CONFIG_IEEE80211BE */
 	}
 

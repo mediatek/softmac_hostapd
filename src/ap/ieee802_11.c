@@ -9331,6 +9331,10 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	int ret = 0;
 	unsigned int freq;
 	int ssi_signal = fi ? fi->ssi_signal : 0;
+#ifdef CONFIG_IEEE80211BE
+	struct sta_info *sta;
+	bool tx_allowed_links_changed = false;
+#endif /* CONFIG_IEEE80211BE */
 
 	if (len < 24)
 		return 0;
@@ -9407,9 +9411,45 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		return 1;
 	}
 
+#ifdef CONFIG_IEEE80211BE
+	sta = ap_get_sta(hapd, mgmt->sa);
+	if (ap_sta_is_mld(hapd, sta) && sta->mld_assoc_sta) {
+		sta = sta->mld_assoc_sta;
+		if (sta->neg_ttlm.valid) {
+			if (!(sta->neg_ttlm.enabled_links & BIT(hapd->mld_link_id)) &&
+			    !(is_class1_mgmt(mgmt, len) || is_class2_mgmt(mgmt) ||
+			      is_ttlm_action(mgmt, len))) {
+				/* Per IEEE802.11be-2024, 35.3.7.2 TID-To-Link Mapping (TTLM)
+				* If a link is disabled for a non-AP MLD, it shall not be used
+				* for individually addressed frame exchange between the
+				* corresponding non-AP STA affiliated with the non-AP MLD and
+				* AP affiliated with the associated AP MLD, including Management
+				* and Control frames, except that if the link is disabled for a
+				* non-AP MLD but is not advertised as disabled by the AP MLD,
+				* then the link may be used for class 1 and 2 Management frames,
+				* class 1 Control frames and TID-To-Link Mapping Request,
+				* TID-To-Link Mapping Response and TID-To-Link Mapping Teardown
+				* frames, if transmitted for a procedure that is initiated by the
+				* non-AP MLD.
+				*/
+				wpa_printf(MSG_DEBUG,
+					"Dropped the invalid frame sent from the STA's disabled link");
+				return 0;
+			}
+
+			/* temporarily allow TX on STA's all links, including
+			 * STA's TTLM disabled link(s)
+			 */
+			sta->neg_ttlm.tx_allowed_links = sta->mld_info.valid_links;
+			tx_allowed_links_changed = true;
+		}
+	}
+#endif /* CONFIG_IEEE80211BE */
+
 	if (stype == WLAN_FC_STYPE_PROBE_REQ) {
 		handle_probe_req(hapd, mgmt, len, ssi_signal);
-		return 1;
+		ret = 1;
+		goto out;
 	}
 
 	if ((!is_broadcast_ether_addr(mgmt->da) ||
@@ -9427,7 +9467,8 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "MGMT: DA=" MACSTR " not our address",
 			       MAC2STR(mgmt->da));
-		return 0;
+		ret = 0;
+		goto out;
 	}
 
 	if (hapd->iconf->track_sta_max_num)
@@ -9473,6 +9514,11 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		break;
 	}
 
+out:
+#ifdef CONFIG_IEEE80211BE
+	if (tx_allowed_links_changed)
+		sta->neg_ttlm.tx_allowed_links = sta->neg_ttlm.enabled_links;
+#endif /* CONFIG_IEEE80211BE */
 	return ret;
 }
 

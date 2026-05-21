@@ -897,6 +897,7 @@ struct ieee80211_neg_ttlm {
 	bool valid;
 	u8 dialog_token;
 	u16 enabled_links;
+	u16 tx_allowed_links;
 };
 
 struct neg_ttlm_req {

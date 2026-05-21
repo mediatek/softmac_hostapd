@@ -978,6 +978,15 @@ int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
 	if (!sta)
 		return -1;
 
+#ifdef CONFIG_IEEE80211BE
+	if (!hostapd_is_link_tx_allowed(hapd, addr, hapd->mld_link_id)) {
+		wpa_printf(MSG_ERROR,
+			   "unicast TX to " MACSTR " on invalid link_id %u\n",
+			   MAC2STR(addr), hapd->mld_link_id);
+		return -1;
+	}
+#endif /* CONFIG_IEEE80211BE */
+
 	hostapd_drv_poll_client(hapd, hapd->own_addr, addr,
 				sta->flags & WLAN_STA_WMM);
 	return 0;

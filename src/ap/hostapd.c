@@ -624,6 +624,37 @@ bool hostapd_is_link_enabled(struct hostapd_data *hapd, u8 link_id)
 	       !(BIT(link_id) & hapd->mld->new_attlm.disabled_links);
 }
 
+
+bool hostapd_is_link_tx_allowed(struct hostapd_data *hapd, const u8 *addr,
+				int link_id)
+{
+	struct sta_info *sta = ap_get_sta(hapd, addr);
+	u16 links = 0;
+
+	if (!hostapd_is_mld_ap(hapd) || link_id < 0)
+		return true;
+
+	if (!hostapd_is_link_enabled(hapd, link_id))
+		return false;
+
+	/* Boradcast/multicast address or non-MLD STA */
+	if (!ap_sta_is_mld(hapd, sta))
+		return true;
+
+	sta = sta->mld_assoc_sta;
+	if (!sta) {
+		wpa_printf(MSG_ERROR,
+			   "Failed: disallowed transmission on link_id=%d due "
+			   "to NULL mld_assoc_sta on STA " MACSTR, link_id,
+			   MAC2STR(addr));
+		return false;
+	}
+
+	links = sta->neg_ttlm.valid ? sta->neg_ttlm.tx_allowed_links :
+				      sta->mld_info.valid_links;
+
+	return BIT(link_id) & links;
+}
 #endif /* CONFIG_IEEE80211BE */
 
 

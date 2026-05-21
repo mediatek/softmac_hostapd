@@ -4613,6 +4613,7 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 				neg_ttlm->enabled_links |= map;
 			}
 
+			neg_ttlm->tx_allowed_links = neg_ttlm->enabled_links;
 			/* End of the TTLM */
 			dir = -1;
 		}

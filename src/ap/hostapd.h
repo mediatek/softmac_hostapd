@@ -1113,6 +1113,8 @@ void hostapd_refresh_all_iface_beacons(struct hostapd_iface *hapd_iface);
 bool hostapd_is_attlm_active(struct hostapd_data *hapd);
 bool hostapd_is_same_attlm(struct hostapd_data *hapd1, struct hostapd_data *hapd2);
 bool hostapd_is_link_enabled(struct hostapd_data *hapd, u8 link_id);
+bool hostapd_is_link_tx_allowed(struct hostapd_data *hapd, const u8 *addr,
+				int link_id);
 #ifdef CONFIG_TESTING_OPTIONS
 void hostapd_link_remove_cb(struct hostapd_data *hapd, u16 removed_links);
 int hostapd_mld_set_attlm(struct hostapd_data *hapd);
