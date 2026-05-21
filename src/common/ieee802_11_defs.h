@@ -1315,6 +1315,10 @@ struct ieee80211_mgmt {
 					u8 variable[];
 				} STRUCT_PACKED rrm;
 				struct {
+					u8 action;
+					u8 variable[];
+				} STRUCT_PACKED prot_eht;
+				struct {
 					u8 action; /* Protected EHT - 11 */
 					u8 dialog_token;
 					/* Reconfiguration Multi-Link element,

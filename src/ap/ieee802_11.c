@@ -9017,6 +9017,75 @@ static int robust_action_frame(u8 category)
 }
 
 
+static bool is_class1_mgmt(const struct ieee80211_mgmt *mgmt, size_t len)
+{
+	u16 fc = le_to_host16(mgmt->frame_control);
+	u16 stype = WLAN_FC_GET_STYPE(fc);
+
+	switch (stype) {
+	case WLAN_FC_STYPE_PROBE_REQ:
+	case WLAN_FC_STYPE_PROBE_RESP:
+	case WLAN_FC_STYPE_BEACON:
+	case WLAN_FC_STYPE_AUTH:
+	case WLAN_FC_STYPE_DEAUTH:
+	case WLAN_FC_STYPE_ATIM:
+		return true;
+	case WLAN_FC_STYPE_ACTION:
+		if (len <= IEEE80211_HDRLEN)
+			return false;
+
+		switch (mgmt->u.action.category) {
+		case WLAN_ACTION_PUBLIC:
+		case WLAN_ACTION_SELF_PROTECTED:
+		case WLAN_ACTION_UNPROTECTED_DMG:
+			return true;
+		}
+		/* fallthrough */
+	default:
+		return false;
+	}
+}
+
+
+static bool is_class2_mgmt(const struct ieee80211_mgmt *mgmt)
+{
+	u16 fc = le_to_host16(mgmt->frame_control);
+	u16 stype = WLAN_FC_GET_STYPE(fc);
+
+	switch (stype) {
+	case WLAN_FC_STYPE_ASSOC_REQ:
+	case WLAN_FC_STYPE_ASSOC_RESP:
+	case WLAN_FC_STYPE_REASSOC_REQ:
+	case WLAN_FC_STYPE_REASSOC_RESP:
+	case WLAN_FC_STYPE_DISASSOC:
+		return true;
+	default:
+		return false;
+	}
+}
+
+
+static bool is_ttlm_action(const struct ieee80211_mgmt *mgmt, size_t len)
+{
+	u16 fc = le_to_host16(mgmt->frame_control);
+	u16 stype = WLAN_FC_GET_STYPE(fc);
+
+	if (stype != WLAN_FC_STYPE_ACTION ||
+	    len < IEEE80211_HDRLEN + 2 ||
+	    mgmt->u.action.category != WLAN_ACTION_PROTECTED_EHT)
+		return false;
+
+	switch (mgmt->u.action.u.prot_eht.action) {
+	case WLAN_PROT_EHT_T2L_MAPPING_REQUEST:
+	case WLAN_PROT_EHT_T2L_MAPPING_RESPONSE:
+	case WLAN_PROT_EHT_T2L_MAPPING_TEARDOWN:
+		return true;
+	}
+
+	return false;
+}
+
+
 static int handle_action(struct hostapd_data *hapd,
 			 const struct ieee80211_mgmt *mgmt, size_t len,
 			 unsigned int freq)
