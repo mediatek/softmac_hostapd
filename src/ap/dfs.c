@@ -2022,7 +2022,7 @@ int hostapd_dfs_get_target_state(struct hostapd_iface *iface, enum chan_width wi
 {
 	struct hostapd_channel_data *chan;
 	struct hostapd_hw_modes *mode = iface->current_mode;
-	int half_width, chan_state, state = 0;
+	int half_width, chan_state, state;
 	int upper, lower;
 	int i;
 	bool in_range;
@@ -2052,6 +2052,7 @@ int hostapd_dfs_get_target_state(struct hostapd_iface *iface, enum chan_width wi
 		return 0;
 	}
 
+	state = HOSTAPD_CHAN_DFS_AVAILABLE;
 	for (i = 0; i < mode->num_channels; i++) {
 		chan = &mode->channels[i];
 
@@ -2146,12 +2147,18 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 		return 0;
 	}
 
+	iface->radar_background.temp_ch = 0;
+	if (iface->radar_background.cac_started)
+		return 0;
+
 	if (!cac_required) {
 		if (!bw_changed && center != background_center)
 			return 0;
 		/* Update background radar due to bw change or channel overlapping */
 		update_background = true;
 	} else {
+		bool subchan_ready;
+
 		/*
 		 * Get available channel for main channel if background radar
 		 * is ready (no CAC in progress).
@@ -2160,26 +2167,19 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 		 * Also, select an usable channel for background radar if no
 		 * available channel exists.
 		 */
-		if (!iface->radar_background.cac_started) {
-			bool subchan_ready;
-
-			iface->radar_background.temp_ch = 1;
-			subchan_ready = (center - 40 == background_center ||
-					 center + 40 == background_center) &&
-					n_chans == 8;
-			if (iface->radar_background.max_bw80 && subchan_ready) {
-				chan = hw_get_channel_chan(iface->current_mode,
-							   iface->radar_background.channel,
-							   NULL);
-				n_chans /= 2;
-			} else {
-				chan = dfs_get_csa_channel(iface, n_chans, 0, DFS_AVAILABLE);
-				if (!chan)
-					update_background = true;
-			}
+		iface->radar_background.temp_ch = 1;
+		subchan_ready = (center - 40 == background_center ||
+				 center + 40 == background_center) &&
+				 n_chans == 8;
+		if (iface->radar_background.max_bw80 && subchan_ready) {
+			chan = hw_get_channel_chan(iface->current_mode,
+						   iface->radar_background.channel,
+						   NULL);
+			n_chans /= 2;
 		} else {
-			iface->radar_background.temp_ch = 0;
-			return 0;
+			chan = dfs_get_csa_channel(iface, n_chans, 0, DFS_AVAILABLE);
+			if (!chan)
+				update_background = true;
 		}
 	}
 
