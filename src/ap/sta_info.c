@@ -2293,6 +2293,7 @@ static void hostapd_reset_assoc_sta(struct hostapd_data *hapd, struct sta_info *
 			li->resp_sta_profile = NULL;
 			li->resp_sta_profile_len = 0;
 		}
+		link_sta->mld_info.valid_links &= ~BIT(hapd->mld_link_id);
 	}
 
 	for_each_mld_link(link_bss, hapd) {

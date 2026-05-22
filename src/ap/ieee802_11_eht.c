@@ -1907,6 +1907,7 @@ void hostapd_link_reconf_resp_tx_status(struct hostapd_data *hapd,
 			link->resp_sta_profile = NULL;
 			link->resp_sta_profile_len = 0;
 			link->valid = false;
+			other_sta->mld_info.valid_links &= ~BIT(link_id);
 		}
 		wpa_auth_set_ml_info(assoc_sta->wpa_sm,
 				     assoc_sta->mld_assoc_link_id,
@@ -2040,6 +2041,7 @@ hostapd_ml_process_reconf_link(struct hostapd_data *hapd,
 		_link = &other_sta->mld_info.links[link_id];
 		_link->valid = true;
 		_link->status = WLAN_STATUS_SUCCESS;
+		other_sta->mld_info.valid_links |= BIT(link_id);
 		os_memcpy(_link->local_addr, other_hapd->own_addr, ETH_ALEN);
 		os_memcpy(_link->peer_addr, link_addr, ETH_ALEN);
 	}

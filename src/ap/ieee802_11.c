@@ -3732,6 +3732,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			ap_sta_set_mld(sta, true);
 			sta->mld_assoc_link_id = link_id;
 			sta->mld_assoc_sta = sta;
+			sta->mld_info.valid_links = BIT(link_id);
 
 			/*
 			 * Set the MLD address as the station address and the
@@ -5489,10 +5490,12 @@ int hostapd_process_assoc_ml_info(struct hostapd_data *hapd,
 	int ret = 0;
 #ifdef CONFIG_IEEE80211BE
 	unsigned int i;
+	u16 valid_links;
 
 	if (!hostapd_is_multiple_link_mld(hapd))
 		return 0;
 
+	valid_links = BIT(sta->mld_assoc_link_id);
 	for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
 		struct hostapd_data *bss = NULL;
 		struct mld_link_info *link = &sta->mld_info.links[i];
@@ -5531,6 +5534,20 @@ int hostapd_process_assoc_ml_info(struct hostapd_data *hapd,
 				    LINK_PARSE_ASSOC, offload,
 				    set_beacon))
 				ret = -1;
+			else
+				valid_links |= BIT(bss->mld_link_id);
+		}
+	}
+
+	if (valid_links) {
+		struct hostapd_data *bss;
+
+		for_each_mld_link(bss, hapd) {
+			struct sta_info *lsta;
+
+			lsta = ap_get_sta(bss, sta->addr);
+			if (lsta)
+				lsta->mld_info.valid_links = valid_links;
 		}
 	}
 #endif /* CONFIG_IEEE80211BE */
