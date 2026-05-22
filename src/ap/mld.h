@@ -31,6 +31,7 @@ struct mld_link_info {
 
 struct mld_info {
 	bool mld_sta;
+	u16 valid_links;
 
 	struct ml_common_info {
 		u8 mld_addr[ETH_ALEN];
