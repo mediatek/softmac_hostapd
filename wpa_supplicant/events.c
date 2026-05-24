@@ -5975,6 +5975,7 @@ void wpa_supplicant_update_channel_list(struct wpa_supplicant *wpa_s,
 	dl_list_for_each(ifs, &wpa_s->radio->ifaces, struct wpa_supplicant,
 			 radio_list) {
 		bool was_6ghz_enabled;
+		char alpha2[3];
 
 		wpa_printf(MSG_DEBUG, "%s: Updating hw mode",
 			   ifs->ifname);
@@ -5987,7 +5988,27 @@ void wpa_supplicant_update_channel_list(struct wpa_supplicant *wpa_s,
 		}
 		free_hw_features(ifs);
 		ifs->hw.modes = wpa_drv_get_hw_feature_data(
-			ifs, &ifs->hw.num_modes, &ifs->hw.flags, &dfs_domain);
+			ifs, &ifs->hw.num_modes, &ifs->hw.flags, &dfs_domain,
+			alpha2, sizeof(alpha2));
+
+		/* Keep hw_dfs_domain in sync with the latest driver data */
+		ifs->hw_dfs_domain = dfs_domain;
+
+		/*
+		 * If device_country was not set via a REGDOM_TYPE_COUNTRY
+		 * event (e.g., on Android where the country is pre-configured
+		 * before wpa_supplicant starts and no regdom change event is
+		 * sent), populate it from the alpha2 returned by the driver.
+		 */
+		if (!ifs->device_country_set && alpha2[0] && alpha2[1]) {
+			ifs->device_country[0] = alpha2[0];
+			ifs->device_country[1] = alpha2[1];
+			ifs->device_country[2] = '\0';
+			ifs->device_country_set = true;
+			wpa_printf(MSG_DEBUG,
+				   "%s: Device country code set to '%s' from hw feature data",
+				   ifs->ifname, ifs->device_country);
+		}
 
 		was_6ghz_enabled = ifs->is_6ghz_enabled;
 		ifs->is_6ghz_enabled = wpas_is_6ghz_supported(ifs, true);
