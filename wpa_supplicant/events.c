@@ -2138,8 +2138,10 @@ static int wpa_supplicant_connect_ml_missing(struct wpa_supplicant *wpa_s,
 
 	usable_links = wpa_bss_get_usable_links(wpa_s, selected, ssid,
 						&missing_links);
+	/* FIXME Always do ML probe for the sake of stability.
 	if (!usable_links || !missing_links)
 		return 0;
+	*/
 
 	removed_links = wpa_bss_parse_reconf_ml_element(wpa_s, selected);
 	missing_links &= ~removed_links;
