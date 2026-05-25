@@ -616,6 +616,7 @@ uc_hostapd_iface_stop(uc_vm_t *vm, size_t nargs)
 
 		hostapd_drv_stop_ap(hapd);
 		hapd->beacon_set_done = 0;
+		hostapd_cleanup_cs_params(hapd);
 	}
 
 	return NULL;
