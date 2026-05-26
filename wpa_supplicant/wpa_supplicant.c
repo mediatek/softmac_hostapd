@@ -1139,6 +1139,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 			      enum wpa_states state)
 {
 	enum wpa_states old_state = wpa_s->wpa_state;
+	int new_connection = wpa_s->new_connection;
 #if defined(CONFIG_FILS) && defined(IEEE8021X_EAPOL)
 	bool update_fils_connect_params = false;
 #endif /* CONFIG_FILS && IEEE8021X_EAPOL */
@@ -1260,12 +1261,6 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		if (ssid && (ssid->key_mgmt & WPA_KEY_MGMT_OWE))
 			wpas_update_owe_connect_params(wpa_s);
 #endif /* CONFIG_OWE */
-		if (wpa_s->conf->wfa_gen_capa == WFA_GEN_CAPA_PROTECTED &&
-		    pmf_in_use(wpa_s, wpa_s->bssid)) {
-			eloop_cancel_timeout(wpas_wfa_capab_tx, wpa_s, NULL);
-			eloop_register_timeout(0, 100000, wpas_wfa_capab_tx,
-					       wpa_s, NULL);
-		}
 	} else if (state == WPA_DISCONNECTED || state == WPA_ASSOCIATING ||
 		   state == WPA_ASSOCIATED) {
 		wpa_s->new_connection = 1;
@@ -1276,6 +1271,14 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		sme_sched_obss_scan(wpa_s, 0);
 	}
 	wpa_s->wpa_state = state;
+
+	if (state == WPA_COMPLETED && new_connection &&
+	    wpa_s->conf->wfa_gen_capa == WFA_GEN_CAPA_PROTECTED &&
+	    pmf_in_use(wpa_s, wpa_s->bssid)) {
+		eloop_cancel_timeout(wpas_wfa_capab_tx, wpa_s, NULL);
+		eloop_register_timeout(0, 100000, wpas_wfa_capab_tx,
+				       wpa_s, NULL);
+	}
 
 #ifndef CONFIG_NO_ROBUST_AV
 	if (state == WPA_COMPLETED && dl_list_len(&wpa_s->active_scs_ids) &&
