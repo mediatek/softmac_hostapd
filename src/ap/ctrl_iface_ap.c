@@ -824,8 +824,19 @@ int hostapd_ctrl_iface_deauthenticate(struct hostapd_data *hapd,
 		hostapd_drv_sta_deauth(hapd, addr, reason);
 		if (sta)
 			ap_sta_deauthenticate(hapd, sta, reason);
-		else if (is_broadcast_ether_addr(addr))
+		else if (is_broadcast_ether_addr(addr)) {
+#ifdef CONFIG_IEEE80211BE
+			struct hostapd_data *h;
+			if (hostapd_is_mld_ap(hapd)) {
+				for_each_mld_link(h, hapd) {
+					if (h == hapd)
+						continue;
+					hostapd_drv_sta_deauth(h, addr, reason);
+				}
+			}
+#endif /* CONFIG_IEEE80211BE */
 			hostapd_free_stas(hapd);
+		}
 	}
 
 	return 0;
@@ -907,8 +918,20 @@ int hostapd_ctrl_iface_disassociate(struct hostapd_data *hapd,
 		hostapd_drv_sta_disassoc(hapd, addr, reason);
 		if (sta)
 			ap_sta_disassociate(hapd, sta, reason);
-		else if (is_broadcast_ether_addr(addr))
+		else if (is_broadcast_ether_addr(addr)) {
+#ifdef CONFIG_IEEE80211BE
+			struct hostapd_data *h;
+			if (hostapd_is_mld_ap(hapd)) {
+				for_each_mld_link(h, hapd) {
+					if (h == hapd)
+						continue;
+
+					hostapd_drv_sta_disassoc(h, addr, reason);
+				}
+			}
+#endif /* CONFIG_IEEE80211BE */
 			hostapd_free_stas(hapd);
+		}
 	}
 
 	return 0;
