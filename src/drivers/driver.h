@@ -1457,6 +1457,12 @@ struct wpa_driver_associate_params {
 	bool eppke_supported;
 
 	/**
+	 * ieee8021x_auth_supported - Whether IEEE 802.1X authentication in
+	 * Authentication frames is supported by wpa_supplicant
+	 */
+	bool ieee8021x_auth_supported;
+
+	/**
 	 * okc_pmkid_in_assoc - wpa_supplicant support for OKC derived PMKID in
 	 * (Re)Association Request frames. When wpa_the supplicant can detect
 	 * and handle a driver-generated OKC PMKID in the (Re)Association

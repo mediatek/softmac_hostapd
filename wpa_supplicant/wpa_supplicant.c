@@ -3798,6 +3798,42 @@ int wpas_populate_wfa_capa(struct wpa_supplicant *wpa_s, struct wpa_bss *bss,
 }
 
 
+#ifdef CONFIG_IEEE8021X_AUTH
+static bool wpas_set_802_1x_auth_alg(struct wpa_supplicant *wpa_s,
+				     struct wpa_bss *bss,
+				     struct wpa_ssid *ssid,
+				     struct wpa_driver_associate_params *params)
+{
+	const u8 *rsnxe;
+
+	if (!ssid->eap_over_auth_frame ||
+	    !(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_802_1X_AUTH) ||
+	    !wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt &
+					~WPA_KEY_MGMT_IEEE8021X))
+		return false;
+
+	params->ieee8021x_auth_supported = true;
+
+	if (!bss)
+		return false;
+
+	if (!wpa_key_mgmt_wpa_ieee8021x(wpa_s->key_mgmt &
+					~WPA_KEY_MGMT_IEEE8021X))
+		return false;
+
+	rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
+	if (ieee802_11_rsnx_capab(rsnxe,
+				  WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES)) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Using IEEE 802.1X authentication using Authentication frames");
+		return true;
+	}
+
+	return false;
+}
+#endif /* CONFIG_IEEE8021X_AUTH */
+
+
 static u8 * wpas_populate_assoc_ies(
 	struct wpa_supplicant *wpa_s,
 	struct wpa_bss *bss, struct wpa_ssid *ssid,
@@ -3964,14 +4000,8 @@ static u8 * wpas_populate_assoc_ies(
 #endif /* CONFIG_SAE */
 
 #ifdef CONFIG_IEEE8021X_AUTH
-	if (ssid->eap_over_auth_frame &&
-	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_802_1X_AUTH) &&
-	    wpa_key_mgmt_wpa_ieee8021x(wpa_s->key_mgmt &
-				       ~WPA_KEY_MGMT_IEEE8021X)) {
-		wpa_dbg(wpa_s, MSG_DEBUG,
-			"IEEE 802.1X Authentication using Authentication frames");
+	if (wpas_set_802_1x_auth_alg(wpa_s, bss, ssid, params))
 		algs = WPA_AUTH_ALG_802_1X;
-	}
 #endif /* CONFIG_IEEE8021X_AUTH */
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "Automatic auth_alg selection: 0x%x", algs);

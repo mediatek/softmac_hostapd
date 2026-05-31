@@ -7915,7 +7915,7 @@ static int nl80211_connect_ext(struct i802_bss *bss,
 #endif /* CONFIG_ENC_ASSOC */
 
 #ifdef CONFIG_IEEE8021X_AUTH
-	if (params->auth_alg & WPA_AUTH_ALG_802_1X) {
+	if (params->ieee8021x_auth_supported) {
 		wpa_printf(MSG_DEBUG,
 			   "- IEEE 802.1X external authentication support");
 		connect_ext_feature_set(features,
