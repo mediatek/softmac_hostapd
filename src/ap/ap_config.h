@@ -1389,6 +1389,7 @@ struct hostapd_config {
 	} three_wire;
 	u8 ibf_enable;
 	u8 dfs_detect_mode;
+	u8 amsdu;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff
