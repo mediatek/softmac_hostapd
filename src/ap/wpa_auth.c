@@ -8379,3 +8379,15 @@ bool wpa_auth_ap_support_secure_ltf(struct wpa_authenticator *wpa_auth)
 	return wpa_auth->conf.secure_ltf;
 }
 #endif /* CONFIG_IEEE8021X_AUTH */
+
+void wpa_assign_wpa_auth_group(struct wpa_state_machine *sm,
+				  struct wpa_authenticator *wpa_auth)
+{
+	if (!sm || !sm->group || !wpa_auth || !wpa_auth->group)
+		return;
+
+	wpa_group_put(sm->wpa_auth, sm->group);
+	sm->wpa_auth = wpa_auth;
+	sm->group = wpa_auth->group;
+	wpa_group_get(sm->wpa_auth, sm->group);
+}
