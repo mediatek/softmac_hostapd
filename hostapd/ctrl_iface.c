@@ -2797,7 +2797,6 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 	int bandwidth, oper_chwidth;
 	bool background_radar, bw_changed, cac_required = false;
 	unsigned int i;
-	unsigned int num_err = 0;
 	int err = 0;
 
 	ret = hostapd_parse_csa_settings(iface, pos, &settings);
@@ -2887,6 +2886,14 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 		break;
 	}
 
+	ret = ieee80211n_check_40mhz(iface, &settings);
+	if (ret)
+		return ret > 0 ? 0 : ret;
+
+	ret = hostapd_iface_switch_channel(iface, &settings);
+	if (ret)
+		return ret;
+
 #ifdef CONFIG_IEEE80211BE
 	hapd = iface->bss[0];
 	if (hapd->iconf->punct_bitmap != settings.freq_params.punct_bitmap &&
@@ -2897,31 +2904,6 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 			return ret;
 	}
 #endif /* CONFIG_IEEE80211BE */
-
-	ret = ieee80211n_check_40mhz(iface, &settings);
-	if (ret)
-		return ret > 0 ? 0 : ret;
-
-	for (i = 0; i < iface->num_bss; i++) {
-
-		/* Save CHAN_SWITCH VHT, HE, and EHT config */
-		hostapd_chan_switch_config(iface->bss[i],
-					   &settings.freq_params);
-
-		err = hostapd_switch_channel(iface->bss[i], &settings);
-		if (err) {
-			ret = err;
-			num_err++;
-		}
-
-#ifdef CONFIG_IEEE80211BE
-		if (!err && iface->bss[i]->conf->mld_ap)
-			hostapd_update_aff_link_beacon(iface->bss[i], settings.cs_count);
-#endif /* CONFIG_IEEE80211BE */
-	}
-
-	if (iface->num_bss == num_err)
-		return ret;
 
 	if (background_radar) {
 		u8 seg0 = 0, seg1 = 0;

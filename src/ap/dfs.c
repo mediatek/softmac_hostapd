@@ -1083,8 +1083,6 @@ static int hostapd_dfs_request_channel_switch(struct hostapd_iface *iface,
 	int ieee80211_mode = IEEE80211_MODE_AP, err;
 	struct csa_settings csa_settings;
 	u8 new_vht_oper_chwidth;
-	unsigned int i;
-	unsigned int num_err = 0;
 	u8 op_class, chan;
 	struct hostapd_channel_info info;
 
@@ -1145,18 +1143,8 @@ static int hostapd_dfs_request_channel_switch(struct hostapd_iface *iface,
 		return err;
 	}
 
-	for (i = 0; i < iface->num_bss; i++) {
-		err = hostapd_switch_channel(iface->bss[i], &csa_settings);
-		if (err)
-			num_err++;
-
-#ifdef CONFIG_IEEE80211BE
-		if (!err && iface->bss[i]->conf->mld_ap)
-			hostapd_update_aff_link_beacon(iface->bss[i], csa_settings.cs_count);
-#endif /* CONFIG_IEEE80211BE */
-	}
-
-	if (num_err == iface->num_bss) {
+	err = hostapd_iface_switch_channel(iface, &csa_settings);
+	if (err) {
 		wpa_printf(MSG_WARNING,
 			   "DFS failed to schedule CSA (%d) - trying fallback",
 			   err);
@@ -1180,7 +1168,7 @@ static int hostapd_dfs_request_channel_switch(struct hostapd_iface *iface,
 		hostapd_disable_iface(iface);
 		hostapd_enable_iface(iface);
 
-		return 0;
+		return err;
 	}
 
 	/* Channel configuration will be updated once CSA completes and
@@ -1299,6 +1287,8 @@ hostapd_dfs_start_channel_switch_background(struct hostapd_iface *iface)
 						 current_vht_oper_chwidth,
 						 iface->radar_background.centr_freq_seg0_idx,
 						 iface->radar_background.centr_freq_seg1_idx);
+	if (ret)
+		return ret;
 
 	iface->conf->channel = iface->radar_background.channel;
 	iface->freq = iface->radar_background.freq;

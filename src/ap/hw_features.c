@@ -415,7 +415,7 @@ static int ieee80211n_trigger_chan_switch(struct hostapd_iface *iface, bool oper
 {
 	struct csa_settings *settings = (struct csa_settings *)iface->scan_cb_data;
 	struct hostapd_freq_params *freq_param = &settings->freq_params;
-	int i, err = 0;
+	int err;
 
 	if (!oper40) {
 		freq_param->bandwidth = 20;
@@ -423,25 +423,7 @@ static int ieee80211n_trigger_chan_switch(struct hostapd_iface *iface, bool oper
 		freq_param->center_freq1 = freq_param->freq;
 	}
 
-	for (i = 0; i < iface->num_bss; i++) {
-		if (!iface->bss[i]->beacon_set_done)
-			continue;
-
-		/* Save CHAN_SWITCH VHT, HE, and EHT config */
-		hostapd_chan_switch_config(iface->bss[i], freq_param);
-
-		err = hostapd_switch_channel(iface->bss[i], settings);
-		if (err) {
-			wpa_printf(MSG_ERROR,
-				   "Failed to channel switch after ht scan, restart interface");
-			goto out;
-		}
-
-#ifdef CONFIG_IEEE80211BE
-		if (iface->bss[i]->conf->mld_ap)
-			hostapd_update_aff_link_beacon(iface->bss[i], settings->cs_count);
-#endif /* CONFIG_IEEE80211BE */
-	}
+	err = hostapd_iface_switch_channel(iface, settings);
 
 out:
 	os_free(iface->scan_cb_data);

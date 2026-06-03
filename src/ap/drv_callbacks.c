@@ -2797,11 +2797,6 @@ static void hostapd_event_pp_bitmap_update(struct hostapd_data *hapd,
 	int err, freq;
 	struct csa_settings csa_settings;
 	struct hostapd_channel_info info;
-	unsigned int i;
-
-	/* Check if CSA in progress */
-	if (hostapd_csa_in_progress(iface))
-		return;
 
 	if (!hw_get_channel_chan(cmode, iface->conf->channel, &freq))
 		return;
@@ -2850,18 +2845,7 @@ static void hostapd_event_pp_bitmap_update(struct hostapd_data *hapd,
 		return;
 	}
 
-	for (i = 0; i < iface->num_bss; i++) {
-		ieee802_11_set_bss_critical_update(iface->bss[i],
-						   BSS_CRIT_UPDATE_EVENT_CSA);
-
-		err = hostapd_switch_channel(iface->bss[i], &csa_settings);
-		if (err)
-			break;
-
-		if (iface->bss[i]->conf->mld_ap)
-			hostapd_update_aff_link_beacon(iface->bss[i],
-						       csa_settings.cs_count);
-	}
+	hostapd_iface_switch_channel(iface, &csa_settings);
 }
 #endif /* CONFIG_IEEE80211BE */
 

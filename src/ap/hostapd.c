@@ -5652,6 +5652,7 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 		struct hostapd_hw_modes *mode = h->iface->current_mode;
 		struct csa_settings settings = {};
 		struct hostapd_freq_params old_freq;
+		struct hostapd_channel_info info;
 		unsigned int link_id = h->mld_link_id;
 		int ret;
 
@@ -5664,19 +5665,37 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 						 &old_freq);
 		if (ret)
 			return ret;
-		hostapd_set_freq_params(&settings.freq_params, conf->hw_mode,
-					hostapd_hw_get_freq(h, conf->channel),
-					conf->channel, conf->enable_edmg,
-					conf->edmg_channel, conf->ieee80211n,
-					conf->ieee80211ac, conf->ieee80211ax,
-					conf->ieee80211be, conf->secondary_channel,
-					hostapd_get_oper_chwidth(conf),
-					hostapd_get_oper_centr_freq_seg0_idx(conf),
-					hostapd_get_oper_centr_freq_seg1_idx(conf),
-					conf->vht_capab,
-					mode ? &mode->he_capab[IEEE80211_MODE_AP] : NULL,
-					mode ? &mode->eht_capab[IEEE80211_MODE_AP] : NULL,
-					hostapd_get_punct_bitmap(h));
+
+		info = (struct hostapd_channel_info) {
+			.mode = conf->hw_mode,
+			.freq = hostapd_hw_get_freq(h, conf->channel),
+			.channel = conf->channel,
+			.edmg.enabled = conf->enable_edmg,
+			.edmg.channel = conf->edmg_channel,
+			.ht.enabled = conf->ieee80211n,
+			.vht.enabled = conf->ieee80211ac,
+			.he.enabled = conf->ieee80211ax,
+			.eht.enabled = conf->ieee80211be,
+			.ht.sec_channel_offset = conf->secondary_channel,
+			.oper_chwidth = hostapd_get_oper_chwidth(conf),
+			.center_segment0 = hostapd_get_oper_centr_freq_seg0_idx(conf),
+			.center_segment1 = hostapd_get_oper_centr_freq_seg1_idx(conf),
+			.vht.caps = conf->vht_capab,
+			.he.cap = mode ? &mode->he_capab[IEEE80211_MODE_AP] : NULL,
+			.eht.cap = mode ? &mode->eht_capab[IEEE80211_MODE_AP] : NULL,
+			.eht.punct_bitmap = hostapd_get_punct_bitmap(h),
+#ifdef CONFIG_IEEE80211BN
+			.uhr.enabled = conf->ieee80211bn,
+			.uhr.dbe_bandwidth = conf->dbe_bandwidth,
+			.uhr.cap = mode ? &mode->uhr_capab[IEEE80211_MODE_AP] : NULL,
+			.uhr.dbe_punct_bitmap = conf->dbe_punct_bitmap,
+#endif /* CONFIG_IEEE80211BN */
+		};
+
+		ret = hostapd_set_freq_params(&settings.freq_params, &info);
+		if (ret)
+			return ret;
+
 		hapd->cs_freq_params.channel = 0;
 		ieee802_11_set_bss_critical_update(hapd, BSS_CRIT_UPDATE_EVENT_EHT_OPERATION);
 		ret = hostapd_build_beacon_data(h, &settings.beacon_after);
@@ -5712,6 +5731,58 @@ int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count)
 	return 0;
 }
 #endif /* CONFIG_IEEE80211BE */
+
+
+int hostapd_iface_switch_channel(struct hostapd_iface *iface,
+				 struct csa_settings *settings)
+{
+	int i, err;
+
+	if (hostapd_csa_in_progress(iface)) {
+		if (!iface->cac_started) {
+			wpa_printf(MSG_ERROR,
+				   "Channel switch not allowed: CSA is ongoing for a BSS");
+			return -1;
+		}
+
+		/* allow another channel switch during post CSA radar detection */
+		for (i = 0; i < iface->num_bss; i++)
+			hostapd_cleanup_cs_params(iface->bss[i]);
+	}
+
+	for (i = 0; i < iface->num_bss; i++) {
+		/* Save CHAN_SWITCH VHT, HE, and EHT config */
+		hostapd_chan_switch_config(iface->bss[i],
+					   &settings->freq_params);
+
+		err = hostapd_switch_channel(iface->bss[i], settings);
+		if (err) {
+			wpa_printf(MSG_ERROR, "Channel switch failed, err=%d", err);
+			goto err;
+		}
+
+#ifdef CONFIG_IEEE80211BE
+		if (iface->bss[i]->conf->mld_ap) {
+			err = hostapd_update_aff_link_beacon(iface->bss[i], settings->cs_count);
+			if (err) {
+				wpa_printf(MSG_ERROR, "Update affiliated link failed, err=%d", err);
+				goto err;
+			}
+		}
+#endif /* CONFIG_IEEE80211BE */
+	}
+
+	return 0;
+
+err:
+	iface->conf->ch_switch_vht_config = 0;
+	iface->conf->ch_switch_he_config = 0;
+	iface->conf->ch_switch_eht_config = 0;
+	for (i = 0; i < iface->num_bss; i++)
+		hostapd_cleanup_cs_params(iface->bss[i]);
+
+	return err;
+}
 
 
 void

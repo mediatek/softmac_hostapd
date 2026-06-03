@@ -765,7 +765,7 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	struct hostapd_config *conf;
 	struct csa_settings csa = {};
 	uint64_t intval;
-	int i, ret = 0;
+	int ret = 0;
 
 	wpa_printf(MSG_INFO, "ucode: mtk: channel switch for %s\n", iface->phy);
 	if (!iface || ucv_type(info) != UC_OBJECT)
@@ -824,14 +824,7 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	wpa_printf(MSG_INFO, "    * punct_bitmap is %d\n",
 		   csa.freq_params.punct_bitmap);
 
-	for (i = 0; i < iface->num_bss; i++) {
-		ret = hostapd_switch_channel(iface->bss[i], &csa);
-
-#ifdef CONFIG_IEEE80211BE
-		if (!ret && iface->bss[i]->conf->mld_ap)
-			hostapd_update_aff_link_beacon(iface->bss[i], csa.cs_count);
-#endif
-	}
+	ret = hostapd_iface_switch_channel(iface, &csa);
 
 	return ucv_boolean_new(!ret);
 }

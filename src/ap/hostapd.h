@@ -926,6 +926,8 @@ int hostapd_switch_channel(struct hostapd_data *hapd,
 #ifdef CONFIG_IEEE80211BE
 int hostapd_update_aff_link_beacon(struct hostapd_data *hapd, u8 cs_count);
 #endif /* CONFIG_IEEE80211BE */
+int hostapd_iface_switch_channel(struct hostapd_iface *iface,
+				 struct csa_settings *settings);
 void
 hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 				const struct hostapd_freq_params *freq_params);

@@ -711,7 +711,6 @@ hostapd_switch_chan(struct ubus_context *ctx, struct ubus_object *obj,
 	u8 chwidth = hostapd_get_oper_chwidth(iconf);
 	u8 seg0 = 0, seg1 = 0;
 	int ret = UBUS_STATUS_OK;
-	int i;
 
 	blobmsg_parse(csa_policy, __CSA_MAX, tb, blob_data(msg), blob_len(msg));
 
@@ -790,17 +789,8 @@ hostapd_switch_chan(struct ubus_context *ctx, struct ubus_object *obj,
 		hostapd_set_freq_params(&css.freq_params, &info);
 	}
 
-	for (i = 0; i < hapd->iface->num_bss; i++) {
-		struct hostapd_data *bss = hapd->iface->bss[i];
-
-		if (hostapd_switch_channel(bss, &css) != 0)
-			ret = UBUS_STATUS_NOT_SUPPORTED;
-
-#ifdef CONFIG_IEEE80211BE
-		if (!ret && bss->conf->mld_ap)
-			hostapd_update_aff_link_beacon(bss, css.cs_count);
-#endif /* CONFIG_IEEE80211BE */
-	}
+	if (hostapd_iface_switch_channel(hapd->iface, &css))
+		ret = UBUS_STATUS_NOT_SUPPORTED;
 
 	if (!ret || !tb[CSA_FORCE] || !blobmsg_get_bool(tb[CSA_FORCE]))
 		return ret;
