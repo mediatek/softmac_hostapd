@@ -1040,6 +1040,20 @@ static int interface_count(struct hostapd_iface *iface)
 }
 
 
+static void hostapd_wps_update_dualband(struct hostapd_data *hapd)
+{
+	int dualband = interface_count(hapd->iface) > 1;
+
+	if (!dualband && hapd->wps &&
+	    (hapd->wps->dev.rf_bands & (WPS_RF_50GHZ | WPS_RF_24GHZ)) ==
+	    (WPS_RF_50GHZ | WPS_RF_24GHZ))
+		dualband = 1;
+
+	if (hapd->wps && hapd->wps->registrar)
+		wps_registrar_set_dualband(hapd->wps->registrar, dualband);
+}
+
+
 static int hostapd_wps_set_vendor_ext(struct hostapd_data *hapd,
 				      struct wps_context *wps)
 {
@@ -1628,6 +1642,7 @@ static int wps_button_pushed(struct hostapd_data *hapd, void *ctx)
 	if (hapd->wps == NULL)
 		return 0;
 
+	hostapd_wps_update_dualband(hapd);
 	ret = wps_registrar_button_pushed(hapd->wps->registrar,
 					  data->p2p_dev_addr);
 	if (ret)
@@ -1643,6 +1658,7 @@ static int wps_button_pushed(struct hostapd_data *hapd, void *ctx)
 				continue;
 
 			/* TODO: error recovery if one of the link returns failure */
+			hostapd_wps_update_dualband(h);
 			ret = wps_registrar_button_pushed(h->wps->registrar,
 							  data->p2p_dev_addr);
 			if (ret)

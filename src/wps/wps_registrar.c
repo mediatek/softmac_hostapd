@@ -3462,6 +3462,12 @@ int wps_registrar_update_ie(struct wps_registrar *reg)
 }
 
 
+void wps_registrar_set_dualband(struct wps_registrar *reg, int dualband)
+{
+	reg->dualband = dualband;
+}
+
+
 static void wps_registrar_set_selected_timeout(void *eloop_ctx,
 					       void *timeout_ctx)
 {

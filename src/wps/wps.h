@@ -870,6 +870,7 @@ void wps_registrar_probe_req_rx(struct wps_registrar *reg, const u8 *addr,
 				const struct wpabuf *wps_data,
 				int p2p_wildcard);
 int wps_registrar_update_ie(struct wps_registrar *reg);
+void wps_registrar_set_dualband(struct wps_registrar *reg, int dualband);
 int wps_registrar_get_info(struct wps_registrar *reg, const u8 *addr,
 			   char *buf, size_t buflen);
 int wps_registrar_config_ap(struct wps_registrar *reg,
