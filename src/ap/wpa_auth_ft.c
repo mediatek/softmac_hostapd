@@ -2777,7 +2777,7 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 	size_t mdie_len, ftie_len, rsnie_len = 0, r0kh_id_len, subelem_len = 0;
 	u8 rsnxe_buf[10], *rsnxe = rsnxe_buf;
 	size_t rsnxe_len;
-	int rsnxe_used;
+	int rsnxe_used = 0;
 	int res;
 	struct wpa_auth_config *conf;
 	struct wpa_ft_ies parse;
@@ -2954,9 +2954,9 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 		anonce = NULL;
 		snonce = NULL;
 	}
-	rsnxe_used = (auth_alg == WLAN_AUTH_FT) &&
-		(conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
-		 conf->sae_pwe == SAE_PWE_BOTH);
+	if (auth_alg == WLAN_AUTH_FT && !omit_rsnxe)
+		rsnxe_used = conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
+			conf->sae_pwe == SAE_PWE_BOTH;
 #ifdef CONFIG_TESTING_OPTIONS
 	if (sm->wpa_auth->conf.ft_rsnxe_used) {
 		rsnxe_used = sm->wpa_auth->conf.ft_rsnxe_used == 1;
