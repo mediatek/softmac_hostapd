@@ -1368,6 +1368,30 @@ static void hostapd_wpa_auth_remove_roamed_fto(void *ctx, const u8 *sta_addr)
 }
 
 
+static int hostapd_wpa_auth_get_rsnxe_used(void *ctx, bool is_mld)
+{
+	struct hostapd_data *hapd = ctx, *bss;
+	struct wpa_authenticator *wpa_auth;
+	const u8 *rsnxe;
+
+#ifdef CONFIG_IEEE80211BE
+	if (is_mld) {
+		for_each_mld_link(bss, hapd) {
+			wpa_auth = bss->wpa_auth;
+			rsnxe = get_ie(wpa_auth->wpa_ie, wpa_auth->wpa_ie_len,
+				       WLAN_EID_RSNX);
+			if (rsnxe)
+				return 1;
+		}
+		return 0;
+	}
+#endif /* CONFIG_IEEE80211BE */
+	wpa_auth = hapd->wpa_auth;
+	rsnxe = get_ie(wpa_auth->wpa_ie, wpa_auth->wpa_ie_len, WLAN_EID_RSNX);
+	return rsnxe != NULL;
+}
+
+
 static int hostapd_wpa_auth_set_vlan(void *ctx, const u8 *sta_addr,
 				     struct vlan_description *vlan)
 {
@@ -1910,6 +1934,7 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 		.set_session_timeout = hostapd_wpa_auth_set_session_timeout,
 		.get_session_timeout = hostapd_wpa_auth_get_session_timeout,
 		.remove_roamed_fto = hostapd_wpa_auth_remove_roamed_fto,
+		.get_rsnxe_used = hostapd_wpa_auth_get_rsnxe_used,
 #endif /* CONFIG_IEEE80211R_AP */
 #ifndef CONFIG_NO_RADIUS
 		.request_radius_psk = hostapd_request_radius_psk,

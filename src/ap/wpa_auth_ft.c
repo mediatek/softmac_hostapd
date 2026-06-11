@@ -700,6 +700,13 @@ static void wpa_ft_remove_roamed_sta(struct wpa_authenticator *wpa_auth,
 	return;
 }
 
+static int wpa_ft_get_rsnxe_used(struct wpa_authenticator *wpa_auth,
+				 bool is_mld)
+{
+	if (wpa_auth->cb->get_rsnxe_used == NULL)
+		return 0;
+	return wpa_auth->cb->get_rsnxe_used(wpa_auth->cb_ctx, is_mld);
+}
 
 static int wpa_ft_set_vlan(struct wpa_authenticator *wpa_auth,
 			   const u8 *sta_addr, struct vlan_description *vlan)
@@ -2777,7 +2784,7 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 	size_t mdie_len, ftie_len, rsnie_len = 0, r0kh_id_len, subelem_len = 0;
 	u8 rsnxe_buf[10], *rsnxe = rsnxe_buf;
 	size_t rsnxe_len;
-	int rsnxe_used;
+	int rsnxe_used = 0;
 	int res;
 	struct wpa_auth_config *conf;
 	struct wpa_ft_ies parse;
@@ -2954,9 +2961,8 @@ u8 * wpa_sm_write_assoc_resp_ies(struct wpa_state_machine *sm, u8 *pos,
 		anonce = NULL;
 		snonce = NULL;
 	}
-	rsnxe_used = (auth_alg == WLAN_AUTH_FT) &&
-		(conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
-		 conf->sae_pwe == SAE_PWE_BOTH);
+	if (auth_alg == WLAN_AUTH_FT)
+		rsnxe_used = wpa_ft_get_rsnxe_used(sm->wpa_auth, mld_sta);
 #ifdef CONFIG_TESTING_OPTIONS
 	if (sm->wpa_auth->conf.ft_rsnxe_used) {
 		rsnxe_used = sm->wpa_auth->conf.ft_rsnxe_used == 1;
