@@ -54,6 +54,8 @@ static void wpa_sm_call_step(void *eloop_ctx, void *timeout_ctx);
 static void wpa_group_sm_step(struct wpa_authenticator *wpa_auth,
 			      struct wpa_group *group);
 static void wpa_request_new_ptk(struct wpa_state_machine *sm);
+static int wpa_gtk_update(struct wpa_authenticator *wpa_auth,
+			  struct wpa_group *group);
 static int wpa_group_config_group_keys(struct wpa_authenticator *wpa_auth,
 				       struct wpa_group *group);
 static int wpa_derive_ptk(struct wpa_state_machine *sm, const u8 *snonce,
@@ -2758,7 +2760,7 @@ static void wpa_group_ensure_init(struct wpa_authenticator *wpa_auth,
 	}
 
 	if (wpa_group_init_gmk_and_counter(wpa_auth, group) < 0 ||
-	    wpa_group_update_gtk(wpa_auth, group) < 0 ||
+	    wpa_gtk_update(wpa_auth, group) < 0 ||
 	    wpa_group_config_group_keys(wpa_auth, group) < 0) {
 		wpa_printf(MSG_INFO, "WPA: GMK/GTK setup failed");
 		group->first_sta_seen = false;
