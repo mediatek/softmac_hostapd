@@ -2194,7 +2194,7 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 	memcpy(background_settings, settings, sizeof(*settings));
 	freq_params->freq = chan->freq;
 	freq_params->channel = chan->chan;
-	freq_params->sec_channel_offset = 1;
+	freq_params->sec_channel_offset = n_chans > 1 ? 1 : 0;
 	freq_params->center_freq1 = chan->freq + (n_chans - 1) * 10;
 	freq_params->center_freq2 = 0;
 	freq_params->bandwidth = n_chans * 20;
