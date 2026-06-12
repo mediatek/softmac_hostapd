@@ -11606,12 +11606,21 @@ static size_t hostapd_eid_mbssid_elem_len(struct hostapd_data *hapd,
 
 		auth = wpa_auth_get_wpa_ie(bss->wpa_auth, &auth_len);
 		if (auth) {
+			const u8 *tx_bss_ie;
+			size_t tx_bss_ie_len;
+
 			rsn = get_ie(auth, auth_len, WLAN_EID_RSN);
-			if (rsn)
+			tx_bss_ie = hostapd_wpa_ie(tx_bss, WLAN_EID_RSN);
+			tx_bss_ie_len = tx_bss_ie ? 2 + tx_bss_ie[1] : 0;
+			if (rsn && ((2 + rsn[1] != tx_bss_ie_len) ||
+			    (os_memcmp(rsn, tx_bss_ie, tx_bss_ie_len) != 0)))
 				nontx_profile_len += 2 + rsn[1];
 
 			rsnx = get_ie(auth, auth_len, WLAN_EID_RSNX);
-			if (rsnx)
+			tx_bss_ie = hostapd_wpa_ie(tx_bss, WLAN_EID_RSNX);
+			tx_bss_ie_len = tx_bss_ie ? 2 + tx_bss_ie[1] : 0;
+			if (rsnx && ((2 + rsnx[1] != tx_bss_ie_len) ||
+			    (os_memcmp(rsnx, tx_bss_ie, tx_bss_ie_len) != 0)))
 				nontx_profile_len += 2 + rsnx[1];
 		}
 
@@ -11654,11 +11663,16 @@ static size_t hostapd_eid_mbssid_elem_len(struct hostapd_data *hapd,
 		 * is different from that of TxBSS.
 		 * TODO: Check if any vendor elem is different or should not be inherited at all
 		 */
-		nontx_profile_len += hostapd_eid_wmm_len(bss);
-		nontx_profile_len += hostapd_mbo_ie_len(bss);
-		nontx_profile_len += hostapd_get_rsne_override_len(bss);
-		nontx_profile_len += hostapd_get_rsne_override_2_len(bss);
-		nontx_profile_len += hostapd_get_rsnxe_override_len(bss);
+		if (hostapd_get_rsne_override_len(bss) ||
+		    hostapd_get_rsne_override_2_len(bss) ||
+		    hostapd_get_rsne_override_len(tx_bss) ||
+		    hostapd_get_rsne_override_2_len(tx_bss)) {
+			nontx_profile_len += hostapd_eid_wmm_len(bss);
+			nontx_profile_len += hostapd_mbo_ie_len(bss);
+			nontx_profile_len += hostapd_get_rsne_override_len(bss);
+			nontx_profile_len += hostapd_get_rsne_override_2_len(bss);
+			nontx_profile_len += hostapd_get_rsnxe_override_len(bss);
+		}
 
 		if (ie_count)
 			nontx_profile_len += 4 + ie_count + 1;
@@ -11821,14 +11835,23 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 
 		auth = wpa_auth_get_wpa_ie(bss->wpa_auth, &auth_len);
 		if (auth) {
+			const u8 *tx_bss_ie;
+			size_t tx_bss_ie_len;
+
 			rsn = get_ie(auth, auth_len, WLAN_EID_RSN);
-			if (rsn) {
+			tx_bss_ie = hostapd_wpa_ie(tx_bss, WLAN_EID_RSN);
+			tx_bss_ie_len = tx_bss_ie ? 2 + tx_bss_ie[1] : 0;
+			if (rsn && ((2 + rsn[1] != tx_bss_ie_len) ||
+			    (os_memcmp(rsn, tx_bss_ie, tx_bss_ie_len) != 0))) {
 				os_memcpy(eid, rsn, 2 + rsn[1]);
 				eid += 2 + rsn[1];
 			}
 
 			rsnx = get_ie(auth, auth_len, WLAN_EID_RSNX);
-			if (rsnx) {
+			tx_bss_ie = hostapd_wpa_ie(tx_bss, WLAN_EID_RSNX);
+			tx_bss_ie_len = tx_bss_ie ? 2 + tx_bss_ie[1] : 0;
+			if (rsnx && ((2 + rsnx[1] != tx_bss_ie_len) ||
+			    (os_memcmp(rsnx, tx_bss_ie, tx_bss_ie_len) != 0))) {
 				os_memcpy(eid, rsnx, 2 + rsnx[1]);
 				eid += 2 + rsnx[1];
 			}
@@ -11876,11 +11899,16 @@ static u8 * hostapd_eid_mbssid_elem(struct hostapd_data *hapd, u8 *eid, u8 *end,
 		 * is different from that of TxBSS.
 		 * TODO: Check if any vendor elem is different or should not be inherited at all
 		 */
-		eid = hostapd_eid_wmm(bss, eid);
-		eid = hostapd_eid_mbo(bss, eid, end - eid);
-		eid = hostapd_get_rsne_override(bss, eid, end - eid);
-		eid = hostapd_get_rsne_override_2(bss, eid, end - eid);
-		eid = hostapd_get_rsnxe_override(bss, eid, end - eid);
+		if (hostapd_get_rsne_override_len(bss) ||
+		    hostapd_get_rsne_override_2_len(bss) ||
+		    hostapd_get_rsne_override_len(tx_bss) ||
+		    hostapd_get_rsne_override_2_len(tx_bss)) {
+			eid = hostapd_eid_wmm(bss, eid);
+			eid = hostapd_eid_mbo(bss, eid, end - eid);
+			eid = hostapd_get_rsne_override(bss, eid, end - eid);
+			eid = hostapd_get_rsne_override_2(bss, eid, end - eid);
+			eid = hostapd_get_rsnxe_override(bss, eid, end - eid);
+		}
 
 		if (non_inherit_ttlm)
 			non_inherit_ext_ie[ext_ie_count++] =
