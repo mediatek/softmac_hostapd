@@ -2141,8 +2141,6 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 	bool update_background = false;
 
 	if (!dfs_use_radar_background(iface)) {
-		if (settings->cs_count < 10)
-			settings->cs_count = 10;
 		settings->block_tx = cac_required;
 		return 0;
 	}

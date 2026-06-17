@@ -2803,6 +2803,16 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 	if (ret)
 		return ret;
 
+	/* Allow direct CSA (CSA count = 0), but otherwise, when the CSA count is
+	 * less than 10, use 10 instead to avoid race conditions in MBSS cases.
+	 */
+	if (settings.cs_count && settings.cs_count < 10) {
+		wpa_printf(MSG_INFO,
+			   "chanswitch: csa count %d is less than 10, use 10 instead",
+			   settings.cs_count);
+		settings.cs_count = 10;
+	}
+
 	settings.link_id = -1;
 #ifdef CONFIG_IEEE80211BE
 	/* Reject if EHT is disabled in channel switch settings but the
