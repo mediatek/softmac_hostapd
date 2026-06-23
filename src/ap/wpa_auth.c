@@ -8315,7 +8315,14 @@ void wpa_reset_assoc_sm_info(struct wpa_state_machine *assoc_sm,
 			     u8 mld_assoc_link_id)
 {
 #ifdef CONFIG_IEEE80211BE
+	struct wpa_authenticator *old_auth = assoc_sm->wpa_auth;
+	struct wpa_group *old_group = assoc_sm->group;
+
 	assoc_sm->wpa_auth = wpa_auth;
+	assoc_sm->group = wpa_auth->group;
+	wpa_group_get(assoc_sm->wpa_auth, assoc_sm->group);
+	wpa_group_put(old_auth, old_group);
+
 	assoc_sm->mld_assoc_link_id = mld_assoc_link_id;
 #endif /* CONFIG_IEEE80211BE */
 }
