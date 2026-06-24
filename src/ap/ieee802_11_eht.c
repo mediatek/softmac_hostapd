@@ -1945,21 +1945,23 @@ void hostapd_neg_ttlm_resp_tx_status(struct hostapd_data *hapd,
 	}
 
 	neg_ttlm = &assoc_sta->neg_ttlm;
-	if (!neg_ttlm->valid) {
-		wpa_printf(MSG_DEBUG,
-			   "MLD: Unexpected Negotiated TTLM Request TX status");
-		return;
-	}
-
-	if (dialog_token != neg_ttlm->dialog_token) {
+	if (neg_ttlm->dialog_token != 0 && dialog_token != neg_ttlm->dialog_token) {
 		wpa_printf(MSG_DEBUG,
 			   "MLD: Negotiated TTLM session expired for %u",
 			   dialog_token);
 		return;
 	}
 
-	if (ok && status_code == WLAN_STATUS_SUCCESS)
-		ret = hostapd_drv_set_sta_ttlm(assoc_hapd, assoc_sta->addr, neg_ttlm);
+	if (ok && status_code == WLAN_STATUS_SUCCESS) {
+		if (!neg_ttlm->def_link_map) {
+			neg_ttlm->valid = true;
+			ret = hostapd_drv_set_sta_ttlm(assoc_hapd, assoc_sta->addr,
+						       neg_ttlm);
+		} else {
+			hostapd_teardown_neg_ttlm(assoc_hapd, assoc_sta);
+			ret = 0;
+		}
+	}
 
 	if (ret) {
 		ieee802_11_send_neg_ttlm_teardown(hapd, assoc_sta->addr);
@@ -3021,12 +3023,7 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 	}
 
 	if (control & IEEE80211_TTLM_CONTROL_DEF_LINK_MAP) {
-		for (tid = 0; tid < IEEE80211_TTLM_NUM_TIDS; tid++) {
-			neg_ttlm->dlink[tid] = hapd->mld->valid_links;
-			neg_ttlm->ulink[tid] = hapd->mld->valid_links;
-		}
 		*direction = IEEE80211_TTLM_DIRECTION_BOTH;
-		neg_ttlm->valid = true;
 		neg_ttlm->def_link_map = true;
 		return 0;
 	}
@@ -3081,7 +3078,6 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 		ttlm_ie_len -= map_size;
 	}
 
-	neg_ttlm->valid = true;
 	return 0;
 }
 
@@ -3233,7 +3229,7 @@ static void ieee802_11_rx_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 
 		return;
 
 	sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
-	if (!sta || !sta->neg_ttlm.valid)
+	if (!sta)
 		return;
 
 	os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
