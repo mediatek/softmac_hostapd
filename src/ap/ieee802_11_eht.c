@@ -3535,7 +3535,13 @@ int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info 
 	int ret, i;
 	bool map_size = neg_ttlm->link_map_size;
 
-	/* TODO currently do not support bi-direction Neg-TTLM */
+	/* TODO currently do not support bi-direction Neg-TTLM or default TTLM */
+	if (neg_ttlm->def_link_map) {
+		wpa_printf(MSG_ERROR,
+			   "Do not support TTLM request with def_link_map being 1");
+		return -1;
+	}
+
 	for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
 		if (neg_ttlm->ulink[i] != neg_ttlm->dlink[i]) {
 			wpa_printf(MSG_ERROR,
@@ -3572,8 +3578,6 @@ int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info 
 	wpabuf_put_u8(buf, WLAN_EID_EXT_TID_TO_LINK_MAPPING);
 	control |= IEEE80211_TTLM_DIRECTION_BOTH;
 	control |= IEEE80211_TTLM_CONTROL_INDICATOR;
-	if (neg_ttlm->def_link_map)
-		control |= IEEE80211_TTLM_CONTROL_DEF_LINK_MAP;
 	if (map_size)
 		control |= IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE;
 	wpabuf_put_le16(buf, control);

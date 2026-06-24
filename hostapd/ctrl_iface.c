@@ -4336,9 +4336,15 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 				return -1;
 			}
 
+			/* TODO How to handle this? */
+			if (tmp == 1) {
+				wpa_printf(MSG_ERROR,
+					   "TTLM: Not support TTLM request with"
+					   " def_link_map being 1");
+				return -1;
+			}
+
 			neg_ttlm->def_link_map = !!tmp;
-			if (neg_ttlm->def_link_map)
-				dir = -1;
 		} else if (os_strncmp(token, "link_map_size=", 15) == 0) {
 			tmp = atoi(token + 15);
 			if (tmp < 0 || tmp > 2) {
