@@ -4388,9 +4388,11 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 				}
 
 				map = strtol(map_str, NULL, 0);
-				if (map < 0 || map > BIT(MAX_NUM_MLD_LINKS) - 1) {
+				if (map < 0 || map > BIT(MAX_NUM_MLD_LINKS) - 1 ||
+				    (map & ~sta->mld_info.valid_links)) {
 					wpa_printf(MSG_ERROR,
-						   "TTLM: Invalid map: %d", map);
+						   "TTLM: TID %d: Invalid map: "
+						   "0x%x", tid, map);
 					return -1;
 				}
 

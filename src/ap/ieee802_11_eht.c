@@ -3000,7 +3000,7 @@ static u16 ieee80211_get_link_map(u8 bm_size, const u8 *data)
 static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 				     const u8 *ttlm_ie, size_t ttlm_ie_len,
 				     struct ieee80211_neg_ttlm *neg_ttlm,
-				     u8 *direction)
+				     u8 *direction, u16 sta_valid_links)
 {
 	u8 control, link_map_presence, map_size, tid;
 	const u8 *pos = ttlm_ie;
@@ -3058,6 +3058,13 @@ static int ieee802_11_parse_neg_ttlm(struct hostapd_data *hapd,
 		map = ieee80211_get_link_map(map_size, pos);
 		if (!map) {
 			wpa_printf(MSG_ERROR, "No active links for TID %d", tid);
+			return -EINVAL;
+		}
+
+		if (map & ~sta_valid_links) {
+			wpa_printf(MSG_ERROR,
+				   "TID %u: link mapping 0x%x contains link(s) "
+				   "not set up by the STA.", tid, map);
 			return -EINVAL;
 		}
 
@@ -3154,7 +3161,8 @@ static void ieee802_11_rx_neg_ttlm_req(struct hostapd_data *hapd, const u8 *addr
 	}
 
 	ret = ieee802_11_parse_neg_ttlm(hapd, elems.ttlm[0], elems.ttlm_len[0],
-					&new_ttlm, &direction);
+					&new_ttlm, &direction,
+					sta->mld_info.valid_links);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "Invalid TTLM format");
 		goto fail;
