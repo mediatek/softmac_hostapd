@@ -1967,7 +1967,6 @@ void hostapd_neg_ttlm_resp_tx_status(struct hostapd_data *hapd,
 	if (ret) {
 		ieee802_11_send_neg_ttlm_teardown(hapd, assoc_sta->addr);
 		hostapd_teardown_neg_ttlm(assoc_hapd, assoc_sta);
-		os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
 	}
 }
 
@@ -3186,7 +3185,7 @@ fail:
 	if (ret) {
 		/* For synchronization */
 		ieee802_11_send_neg_ttlm_teardown(hapd, addr);
-		os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
+		hostapd_teardown_neg_ttlm(assoc_hapd, sta);
 	}
 }
 
@@ -3218,7 +3217,6 @@ static void ieee802_11_rx_neg_ttlm_resp(struct hostapd_data *hapd, const u8 *add
 		if (ret) {
 			ieee802_11_send_neg_ttlm_teardown(hapd, sta->addr);
 			hostapd_teardown_neg_ttlm(assoc_hapd, sta);
-			os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
 		}
 	} else {
 		wpa_printf(MSG_ERROR, "TTLM: STA rejected TTLM request");
@@ -3241,8 +3239,6 @@ static void ieee802_11_rx_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 
 	sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
 	if (!sta)
 		return;
-
-	os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
 
 	hostapd_teardown_neg_ttlm(assoc_hapd, sta);
 	return;
@@ -3633,7 +3629,7 @@ void hostapd_teardown_neg_ttlm(struct hostapd_data *hapd, struct sta_info *sta)
 {
 	const u8 *addr = sta->addr;
 
-	sta->neg_ttlm.valid = false;
+	os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
 
 	if (hostapd_is_attlm_active(hapd) && !hapd->mld->new_attlm.switch_time) {
 		struct attlm_settings *attlm = &hapd->mld->new_attlm;
