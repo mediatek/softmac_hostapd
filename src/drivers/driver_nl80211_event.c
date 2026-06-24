@@ -2926,8 +2926,9 @@ static void nl80211_radar_event(struct i802_bss *bss, struct nlattr **tb)
 		 * if the link frequency is 5 GHz, pass the event to it.
 		 */
 		for_each_link_default(bss_iter->valid_links, i, 0) {
-			if (bss_iter->links[i].freq < 5180 ||
-			    bss_iter->links[i].freq > 5900)
+			if (bss_iter->links[i].freq &&
+			    (bss_iter->links[i].freq < 5180 ||
+			     bss_iter->links[i].freq > 5900))
 				continue;
 
 			data.dfs_event.link_id = bss_iter->valid_links ?
