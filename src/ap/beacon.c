@@ -1158,6 +1158,9 @@ static void hostapd_fill_probe_resp_ml_params(struct hostapd_data *hapd,
 			}
 		}
 		params->mld_ap = hapd;
+	} else if (mld_id == -1 && hapd->iconf->mbssid &&
+		   hapd != hostapd_mbssid_get_tx_bss(hapd)) {
+		params->mld_ap = hapd;
 	}
 
 	for_each_mld_link(link, hapd) {
