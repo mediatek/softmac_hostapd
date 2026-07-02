@@ -2795,7 +2795,7 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 	int ret;
 	int freq, state;
 	int bandwidth, oper_chwidth;
-	bool background_radar, bw_changed, cac_required = false;
+	bool bw_changed, background_radar = false, cac_required = false;
 	unsigned int i;
 	int err = 0;
 

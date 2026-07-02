@@ -2173,6 +2173,9 @@ int hostapd_dfs_handle_csa(struct hostapd_iface *iface,
 			chan = hw_get_channel_chan(iface->current_mode,
 						   iface->radar_background.channel,
 						   NULL);
+			if (!chan)
+				goto bkg_disable;
+
 			n_chans /= 2;
 		} else {
 			chan = dfs_get_csa_channel(iface, n_chans, 0, DFS_AVAILABLE);
