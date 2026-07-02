@@ -414,10 +414,16 @@ static int ieee80211n_check_40mhz_2g4(struct hostapd_iface *iface,
 static int ieee80211n_trigger_chan_switch(struct hostapd_iface *iface, bool oper40)
 {
 	struct csa_settings *settings = (struct csa_settings *)iface->scan_cb_data;
-	struct hostapd_freq_params *freq_param = &settings->freq_params;
 	int err;
 
+	if (!settings) {
+		wpa_printf(MSG_ERROR, "Failed to switch channel, csa_settings is NULL");
+		return -1;
+	}
+
 	if (!oper40) {
+		struct hostapd_freq_params *freq_param = &settings->freq_params;
+
 		freq_param->bandwidth = 20;
 		freq_param->sec_channel_offset = 0;
 		freq_param->center_freq1 = freq_param->freq;
@@ -425,7 +431,6 @@ static int ieee80211n_trigger_chan_switch(struct hostapd_iface *iface, bool oper
 
 	err = hostapd_iface_switch_channel(iface, settings);
 
-out:
 	os_free(iface->scan_cb_data);
 	iface->scan_cb_data = NULL;
 	if (err) {
@@ -631,20 +636,13 @@ static void ap_ht40_scan_retry(void *eloop_data, void *user_data)
 		wpa_printf(MSG_ERROR,
 			   "Failed to request a scan of neighboring BSSes ret=%d (%s) - try to scan again (attempt %d)",
 			   ret, strerror(-ret), iface->num_ht40_scan_tries);
-		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, user_data);
+		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, NULL);
 		return;
 	}
 
 	if (ret == 0) {
 		iface->scan_cb = ieee80211n_check_scan;
 		iface->bss[0]->scan_cookie = params.scan_cookie;
-		/* A shallow copy is fine for csa_settings since beacon_data
-		 * will be filled afterwards
-		 */
-		if (user_data) {
-			iface->scan_cb_data = (void *)os_malloc(sizeof(*user_data));
-			os_memcpy(iface->scan_cb_data, user_data, sizeof(*user_data));
-		}
 		return;
 	}
 
@@ -702,9 +700,9 @@ int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *dat
 			   "Failed to request a scan of neighboring BSSes ret=%d (%s) - try to scan again",
 			   ret, strerror(-ret));
 		iface->num_ht40_scan_tries = 1;
-		eloop_cancel_timeout(ap_ht40_scan_retry, iface, data);
-		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, data);
-		return 1;
+		eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
+		eloop_register_timeout(1, 0, ap_ht40_scan_retry, iface, NULL);
+		goto out;
 	}
 
 	if (ret < 0) {
@@ -717,11 +715,19 @@ int ieee80211n_check_40mhz(struct hostapd_iface *iface, struct csa_settings *dat
 	iface->scan_cb = ieee80211n_check_scan;
 	iface->bss[0]->scan_cookie = params.scan_cookie;
 
+out:
 	/* A shallow copy is fine for csa_settings since beacon_data
 	 * will be filled afterwards
 	 */
 	if (data) {
+		os_free(iface->scan_cb_data);
 		iface->scan_cb_data = (void *)os_malloc(sizeof(*data));
+		if (!iface->scan_cb_data) {
+			wpa_printf(MSG_ERROR, "Failed to allocate scan cb data");
+			eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
+			iface->scan_cb = NULL;
+			return -1;
+		}
 		os_memcpy(iface->scan_cb_data, data, sizeof(*data));
 	}
 
