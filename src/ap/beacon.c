@@ -3583,7 +3583,7 @@ fail:
 int ieee802_11_set_beacon(struct hostapd_data *hapd)
 {
 	struct hostapd_iface *iface = hapd->iface;
-	int ret, link_id;
+	int ret;
 	size_t i, j;
 	bool is_6g, hapd_mld = false;
 #ifdef CONFIG_IEEE80211BE
