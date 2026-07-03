@@ -4976,9 +4976,10 @@ int hostapd_fill_cca_settings(struct hostapd_data *hapd,
 {
 	struct hostapd_iface *iface = hapd->iface;
 	u8 old_color;
+	u8 old_disabled;
 	int ret;
 
-	if (!iface || iface->conf->he_op.he_bss_color_disabled)
+	if (!iface)
 		return -1;
 
 	settings->link_id = -1;
@@ -4988,12 +4989,16 @@ int hostapd_fill_cca_settings(struct hostapd_data *hapd,
 #endif /* CONFIG_IEEE80211BE */
 
 	old_color = iface->conf->he_op.he_bss_color;
+	old_disabled = iface->conf->he_op.he_bss_color_disabled;
+
 	iface->conf->he_op.he_bss_color = hapd->cca_color;
+	iface->conf->he_op.he_bss_color_disabled = 0;
 	ret = hostapd_build_beacon_data(hapd, &settings->beacon_after);
-	if (ret)
-		return ret;
 
 	iface->conf->he_op.he_bss_color = old_color;
+	iface->conf->he_op.he_bss_color_disabled = old_disabled;
+	if (ret)
+		return ret;
 
 	settings->cca_count = hapd->cca_count;
 	settings->cca_color = hapd->cca_color,
@@ -5029,6 +5034,14 @@ void hostapd_switch_color_timeout_handler(void *eloop_data, void *user_ctx)
 		hapd->first_color_collision.sec;
 	if (delta_t < DOT11BSS_COLOR_COLLISION_AP_PERIOD)
 		return;
+
+	/* IEEE Std 802.11-2024, 26.17.3.5.1: once the BSS color collision has
+	 * persisted for dot11BSSColorCollisionAPPeriod the AP shall set BSS
+	 * Color Disabled to 1. Set it now so that beacon_cca (built inside
+	 * hostapd_fill_cca_settings()) and any incidental beacon rebuild
+	 * during the CCA countdown carry the correct Disabled=1 state.
+	 */
+	hapd->iface->conf->he_op.he_bss_color_disabled = 1;
 
 	r = os_random() % HE_OPERATION_BSS_COLOR_MAX;
 	for (i = 0; i < HE_OPERATION_BSS_COLOR_MAX; i++) {

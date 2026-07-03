@@ -2501,8 +2501,14 @@ static void hostapd_event_color_change(struct hostapd_data *hapd, bool success)
 		if (bss->cca_color == 0)
 			continue;
 
-		if (success)
+		if (success) {
 			hapd->iface->conf->he_op.he_bss_color = bss->cca_color;
+			/* Clear the disabled flag set during CCA so that
+			 * subsequent beacon rebuilds advertise the new color
+			 * as enabled.
+			 */
+			hapd->iface->conf->he_op.he_bss_color_disabled = 0;
+		}
 
 		bss->cca_in_progress = 0;
 		if (ieee802_11_set_beacon(bss)) {

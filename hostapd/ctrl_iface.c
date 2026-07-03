@@ -2767,7 +2767,10 @@ static int hostapd_ctrl_iface_color_change(struct hostapd_iface *iface,
 		return -1;
 	}
 
-	iface->conf->he_op.he_bss_color_disabled = 0;
+	/* IEEE Std 802.11-2024, 26.17.3.4: BSS Color Disabled shall be 1 during
+	 * the time leading up to the BSS color change TBTT.
+	 */
+	iface->conf->he_op.he_bss_color_disabled = 1;
 
 	for (i = 0; i < iface->num_bss; i++) {
 		struct hostapd_data *bss = iface->bss[i];
