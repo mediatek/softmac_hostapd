@@ -2907,7 +2907,9 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 #ifdef CONFIG_IEEE80211BE
 	hapd = iface->bss[0];
 	if (hapd->iconf->punct_bitmap != settings.freq_params.punct_bitmap &&
-	    hapd->iconf->pp_mode != PP_USR_MODE) {
+	    hapd->iconf->pp_mode != PP_USR_MODE &&
+	    (iface->dfs_domain != HOSTAPD_DFS_REGION_FCC ||
+	     !is_6ghz_op_class(iface->conf->op_class))) {
 		hapd->iconf->pp_mode = PP_USR_MODE;
 		ret = hostapd_drv_pp_mode_set(hapd);
 		if (ret)
@@ -6212,6 +6214,13 @@ hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 	if (value == NULL)
 		return -1;
 	*value++ = '\0';
+
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->iface->dfs_domain == HOSTAPD_DFS_REGION_FCC &&
+	    is_6ghz_op_class(hapd->iconf->op_class))
+		return os_snprintf(buf, buflen, "puncturing is not allowed in "
+						"6G under FCC\n");
+#endif /* CONFIG_IEEE80211BE */
 
 	if (os_strcmp(config, "mode") == 0) {
 		int val = strtol(value, NULL, 10);

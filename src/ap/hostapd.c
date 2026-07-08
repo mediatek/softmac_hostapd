@@ -2528,6 +2528,16 @@ static int setup_interface2(struct hostapd_iface *iface)
 
 		if (iface->conf->ieee80211h)
 			wpa_printf(MSG_DEBUG, "DFS support is enabled");
+
+#ifdef CONFIG_IEEE80211BE
+		if (iface->dfs_domain == HOSTAPD_DFS_REGION_FCC &&
+		    is_6ghz_op_class(iface->conf->op_class)) {
+			wpa_printf(MSG_DEBUG, "puncturing is not allowed "
+					      "in 6G under FCC");
+			iface->conf->pp_mode = 0;
+			iface->conf->punct_bitmap = 0;
+		}
+#endif
 	}
 	return hostapd_setup_interface_complete(iface, 0);
 
@@ -5751,6 +5761,15 @@ int hostapd_iface_switch_channel(struct hostapd_iface *iface,
 		for (i = 0; i < iface->num_bss; i++)
 			hostapd_cleanup_cs_params(iface->bss[i]);
 	}
+
+#ifdef CONFIG_IEEE80211BE
+	if (settings->freq_params.punct_bitmap &&
+	    iface->dfs_domain == HOSTAPD_DFS_REGION_FCC &&
+	    is_6ghz_op_class(iface->conf->op_class)) {
+		wpa_printf(MSG_DEBUG, "puncturing is not allowed in 6G under FCC");
+		settings->freq_params.punct_bitmap = 0;
+	}
+#endif /* CONFIG_IEEE80211BE */
 
 	for (i = 0; i < iface->num_bss; i++) {
 		struct hostapd_data *h = iface->bss[i];
