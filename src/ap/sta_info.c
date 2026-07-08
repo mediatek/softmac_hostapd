@@ -1038,7 +1038,7 @@ static void ap_sta_disconnect_common(struct hostapd_data *hapd,
 
 	wpa_printf(MSG_DEBUG,
 		   "reschedule ap_handle_timer timeout (%u sec) for " MACSTR,
-		   MAC2STR(sta->addr), timeout);
+		   timeout, MAC2STR(sta->addr));
 
 	eloop_cancel_timeout(ap_handle_timer, hapd, sta);
 	eloop_register_timeout(timeout, 0, ap_handle_timer, hapd, sta);
