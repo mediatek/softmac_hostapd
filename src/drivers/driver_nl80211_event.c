@@ -1463,10 +1463,22 @@ static void mlme_event_tsf_offset(struct wpa_driver_nl80211_data *drv,
 				  struct nlattr *tsf_offset)
 {
 	union wpa_event_data event;
+	size_t len;
+
+	if (!link_id || !tsf_offset)
+		return;
+
+	len = nla_len(tsf_offset);
+	if (len > sizeof(event.tsf_event.tsf_offset)) {
+		wpa_printf(MSG_DEBUG,
+			   "nl80211: Invalid TSF offset attribute length %zu",
+			   len);
+		return;
+	}
 
 	os_memset(&event, 0, sizeof(event));
 	event.tsf_event.link_id = nla_get_u8(link_id);
-	os_memcpy(event.tsf_event.tsf_offset, nla_data(tsf_offset), nla_len(tsf_offset));
+	os_memcpy(event.tsf_event.tsf_offset, nla_data(tsf_offset), len);
 
 	wpa_supplicant_event(drv->ctx, EVENT_TSF_OFFSET, &event);
 }
