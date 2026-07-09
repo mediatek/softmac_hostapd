@@ -2843,6 +2843,7 @@ wpas_p2p_init_group_interface(struct wpa_supplicant *wpa_s, int go)
 
 	wpas_p2p_clone_config(group_wpa_s, wpa_s);
 	group_wpa_s->p2p2 = wpa_s->p2p2;
+	group_wpa_s->p2p_mode = wpa_s->p2p_mode;
 
 	/* Propagate assisted-DFS state from the STA interface */
 	src_wpa_s = wpas_p2p_get_assisted_dfs_src(wpa_s);
@@ -8186,7 +8187,15 @@ wpas_p2p_get_group_iface(struct wpa_supplicant *wpa_s, int addr_allocated,
 			 * We may be called on the p2p_dev interface which
 			 * cannot be used for group operations, so always use
 			 * the primary interface.
+			 *
+			 * Propagate p2p2 and p2p_mode to the parent interface
+			 * before switching. When p2p_no_group_iface=1 the
+			 * caller sets these flags on the p2p_mgmt interface,
+			 * but the group operation reads them back from the
+			 * parent after this function returns.
 			 */
+			wpa_s->parent->p2p2 = wpa_s->p2p2;
+			wpa_s->parent->p2p_mode = wpa_s->p2p_mode;
 			wpa_s->parent->p2pdev = wpa_s;
 			wpa_s = wpa_s->parent;
 		}
