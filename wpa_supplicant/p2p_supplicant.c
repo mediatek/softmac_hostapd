@@ -8512,7 +8512,7 @@ int wpas_p2p_group_add_persistent(struct wpa_supplicant *wpa_s,
 				os_strlcpy(wpa_s->pending_join_password,
 					   ssid->passphrase,
 					   sizeof(wpa_s->pending_join_password));
-			return wpas_p2p_join_start(wpa_s, 0, ssid->ssid,
+			return wpas_p2p_join_start(wpa_s, freq, ssid->ssid,
 						   ssid->ssid_len);
 		}
 
