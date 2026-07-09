@@ -482,6 +482,25 @@ static size_t hostapd_get_rsnxe_override_len(struct hostapd_data *hapd)
 }
 
 
+u8 * hostapd_get_rsn_override_elems(struct hostapd_data *hapd, u8 *pos,
+				    size_t len)
+{
+	u8 *end = pos + len;
+
+	pos = hostapd_get_rsne_override(hapd, pos, end - pos);
+	pos = hostapd_get_rsne_override_2(hapd, pos, end - pos);
+	return hostapd_get_rsnxe_override(hapd, pos, end - pos);
+}
+
+
+size_t hostapd_get_rsn_override_elems_len(struct hostapd_data *hapd)
+{
+	return hostapd_get_rsne_override_len(hapd) +
+		hostapd_get_rsne_override_2_len(hapd) +
+		hostapd_get_rsnxe_override_len(hapd);
+}
+
+
 static u8 * hostapd_eid_csa(struct hostapd_data *hapd, u8 *eid)
 {
 #ifdef CONFIG_TESTING_OPTIONS

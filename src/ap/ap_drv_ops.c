@@ -23,6 +23,7 @@
 #include "wpa_auth.h"
 #include "hw_features.h"
 #include "robust_av.h"
+#include "beacon.h"
 #include "ap_drv_ops.h"
 
 
@@ -76,6 +77,10 @@ int hostapd_build_ap_extra_ies(struct hostapd_data *hapd,
 {
 	struct wpabuf *beacon = NULL, *proberesp = NULL, *assocresp = NULL;
 	u8 buf[208], *pos;
+#ifdef CONFIG_P2P
+	u8 rsn_override[3 * (2 + 255)];
+	size_t len;
+#endif /* CONFIG_P2P */
 
 	*beacon_ret = *proberesp_ret = *assocresp_ret = NULL;
 
@@ -220,6 +225,19 @@ int hostapd_build_ap_extra_ies(struct hostapd_data *hapd,
 	add_buf(&proberesp, hapd->conf->presp_elements);
 #endif /* CONFIG_TESTING_OPTIONS */
 	add_buf(&assocresp, hapd->conf->assocresp_elements);
+
+#ifdef CONFIG_P2P
+	len = hostapd_get_rsn_override_elems_len(hapd);
+	if (len > sizeof(rsn_override))
+		goto fail;
+	pos = hostapd_get_rsn_override_elems(hapd, rsn_override,
+					     sizeof(rsn_override));
+	if (add_buf_data(&beacon, rsn_override,
+			 pos - rsn_override) < 0 ||
+	    add_buf_data(&proberesp, rsn_override,
+			 pos - rsn_override) < 0)
+		goto fail;
+#endif /* CONFIG_P2P */
 
 	*beacon_ret = beacon;
 	*proberesp_ret = proberesp;
