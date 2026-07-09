@@ -2099,9 +2099,11 @@ static void wpas_start_gc(struct wpa_supplicant *wpa_s,
 	}
 	ssid->proto = WPA_PROTO_RSN;
 	if (wpa_s->p2p_mode == WPA_P2P_MODE_WFD_PCC)
-		ssid->key_mgmt = WPA_KEY_MGMT_SAE | WPA_KEY_MGMT_PSK;
+		ssid->key_mgmt = WPA_KEY_MGMT_SAE | WPA_KEY_MGMT_SAE_EXT_KEY |
+			WPA_KEY_MGMT_PSK;
 	else
 		ssid->key_mgmt = WPA_KEY_MGMT_SAE;
+	ssid->p2p_mode = wpa_s->p2p_mode;
 	ssid->pairwise_cipher = WPA_CIPHER_CCMP;
 	ssid->group_cipher = WPA_CIPHER_CCMP;
 	if (res->cipher)
