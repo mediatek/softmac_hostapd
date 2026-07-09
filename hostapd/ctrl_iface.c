@@ -6215,12 +6215,10 @@ hostapd_ctrl_iface_set_pp(struct hostapd_data *hapd, char *cmd, char *buf,
 		return -1;
 	*value++ = '\0';
 
-#ifdef CONFIG_IEEE80211BE
 	if (hapd->iface->dfs_domain == HOSTAPD_DFS_REGION_FCC &&
 	    is_6ghz_op_class(hapd->iconf->op_class))
 		return os_snprintf(buf, buflen, "puncturing is not allowed in "
 						"6G under FCC\n");
-#endif /* CONFIG_IEEE80211BE */
 
 	if (os_strcmp(config, "mode") == 0) {
 		int val = strtol(value, NULL, 10);
