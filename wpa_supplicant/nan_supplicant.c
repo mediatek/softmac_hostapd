@@ -4922,6 +4922,7 @@ void wpas_nan_usd_state_change_notif(struct wpa_supplicant *wpa_s)
 }
 
 
+#ifdef CONFIG_NAN
 static struct wpa_supplicant *
 wpas_nan_get_mgmt_iface(struct wpa_supplicant *wpa_s)
 {
@@ -4935,6 +4936,7 @@ wpas_nan_get_mgmt_iface(struct wpa_supplicant *wpa_s)
 
 	return wpa_s;
 }
+#endif /* CONFIG_NAN */
 
 
 int wpas_nan_tx_status(struct wpa_supplicant *wpa_s,
