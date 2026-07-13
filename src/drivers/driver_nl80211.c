@@ -181,7 +181,9 @@ static struct nla_policy csi_ctrl_policy[NUM_MTK_VENDOR_ATTRS_CSI_CTRL] = {
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_TYPE] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL1] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2] = { .type = NLA_U32 },
-	[MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR] = { .type = NLA_BINARY,
+						.minlen = ETH_ALEN,
+						.maxlen = ETH_ALEN },
 	[MTK_VENDOR_ATTR_CSI_CTRL_DUMP_NUM] = { .type = NLA_U16 },
 	[MTK_VENDOR_ATTR_CSI_CTRL_DATA] = { .type = NLA_NESTED },
 };
@@ -193,7 +195,9 @@ static struct nla_policy csi_data_policy[NUM_MTK_VENDOR_ATTRS_CSI_DATA] = {
 	[MTK_VENDOR_ATTR_CSI_DATA_SNR] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_DATA_BW] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_DATA_CH_IDX] = { .type = NLA_U8 },
-	[MTK_VENDOR_ATTR_CSI_DATA_TA] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_CSI_DATA_TA] = { .type = NLA_BINARY,
+					  .minlen = ETH_ALEN,
+					  .maxlen = ETH_ALEN },
 	[MTK_VENDOR_ATTR_CSI_DATA_NUM] = { .type = NLA_U32 },
 	[MTK_VENDOR_ATTR_CSI_DATA_I] = { .type = NLA_NESTED },
 	[MTK_VENDOR_ATTR_CSI_DATA_Q] = { .type = NLA_NESTED },
@@ -18480,8 +18484,8 @@ nl80211_csi_set(void *priv, u8 radio_idx, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *ma
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
 	struct nlattr *data;
-	void *tb1, *tb2;
-	int ret, i;
+	void *tb1;
+	int ret;
 
 	if (!drv->mtk_csi_vendor_cmd_avail) {
 		wpa_printf(MSG_ERROR,
@@ -18516,14 +18520,8 @@ nl80211_csi_set(void *priv, u8 radio_idx, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *ma
 	nla_nest_end(msg, tb1);
 
 	if (mac) {
-		tb2 = nla_nest_start(msg, MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR | NLA_F_NESTED);
-		if (!tb2)
+		if (nla_put(msg, MTK_VENDOR_ATTR_CSI_CTRL_MAC_ADDR, ETH_ALEN, mac))
 			goto fail;
-
-		for (i = 0; i < ETH_ALEN; i++)
-			nla_put_u8(msg, i, mac[i]);
-
-		nla_nest_end(msg, tb2);
 	}
 
 	nla_nest_end(msg, data);
@@ -18579,9 +18577,12 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_BW] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_CH_IDX] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_TA] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_NUM] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_I] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_Q] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_INFO] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_TX_ANT] &&
+	      tb2[MTK_VENDOR_ATTR_CSI_DATA_RX_ANT] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_MODE] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_CHAIN_INFO])) {
 		fprintf(stderr, "Attributes error for CSI data\n");
@@ -18604,11 +18605,7 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 
 	c->data_num = nla_get_u32(tb2[MTK_VENDOR_ATTR_CSI_DATA_NUM]);
 
-	idx = 0;
-	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_TA], rem) {
-		if (idx < ETH_ALEN)
-			c->ta[idx++] = nla_get_u8(cur);
-	}
+	os_memcpy(c->ta, nla_data(tb2[MTK_VENDOR_ATTR_CSI_DATA_TA]), ETH_ALEN);
 
 	idx = 0;
 	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_I], rem) {
