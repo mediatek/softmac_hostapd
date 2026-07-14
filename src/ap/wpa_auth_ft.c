@@ -4151,8 +4151,8 @@ static void wpa_ft_rrb_rx_request_cb(void *ctx, const u8 *dst,
 
 	wpa_printf(MSG_DEBUG, "FT: Over-the-DS RX request cb for " MACSTR,
 		   MAC2STR(sm->addr));
-	wpa_ft_send_rrb_auth_resp(sm, sm->ft_pending_current_ap, sm->addr,
-				  resp, ies, ies_len);
+	ret = wpa_ft_send_rrb_auth_resp(sm, sm->ft_pending_current_ap, sm->addr,
+					resp, ies, ies_len);
 	if (resp == WLAN_STATUS_SUCCESS && !ret)
 		sm->ft_ds_req_state = FT_OTD_WAIT_REASSOC;
 	else
