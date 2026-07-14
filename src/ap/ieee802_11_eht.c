@@ -3597,16 +3597,16 @@ int ieee802_11_send_neg_ttlm_teardown(struct hostapd_data *hapd, const u8 *addr)
 	size_t len = 2;
 	int ret;
 
-	buf = wpabuf_alloc(len);
-	if (!buf)
-		return -1;
-
 	if (hostapd_is_attlm_active(hapd) &&
 	    hapd->mld->new_attlm.disabled_links & BIT(hapd->mld_link_id)) {
 		wpa_printf(MSG_ERROR,
 			   "Request Neg-TTLM teardown on disabled link");
 		return -1;
 	}
+
+	buf = wpabuf_alloc(len);
+	if (!buf)
+		return -1;
 
 	wpabuf_put_u8(buf, WLAN_ACTION_PROTECTED_EHT);
 	wpabuf_put_u8(buf, WLAN_PROT_EHT_T2L_MAPPING_TEARDOWN);
