@@ -1035,8 +1035,8 @@ int wpa_ft_mic(int key_mgmt, const u8 *kck, size_t kck_len, const u8 *sta_addr,
 	       const struct wpabuf *extra,
 	       u8 *mic)
 {
-	const u8 *addr[18];
-	size_t len[18];
+	const u8 *addr[54];
+	size_t len[54];
 	size_t i, num_elem = 0;
 	u8 zero_mic[32];
 	size_t mic_len, fte_fixed_len;
