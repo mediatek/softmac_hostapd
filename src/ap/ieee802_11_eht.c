@@ -3119,27 +3119,26 @@ static void ieee802_11_rx_neg_ttlm_req(struct hostapd_data *hapd, const u8 *addr
 	struct hostapd_data *assoc_hapd;
 	struct neg_ttlm_req *neg_ttlm_req;
 	struct ieee802_11_elems elems;
-	struct ieee80211_neg_ttlm *neg_ttlm;
+	struct ieee80211_neg_ttlm new_ttlm;
 	struct sta_info *sta;
 	u8 direction;
 	u16 status_code = WLAN_STATUS_DENIED_TID_TO_LINK_MAPPING;
-	int ret = 0, tid;
+	int ret = 0;
+
+	if (len < sizeof(struct neg_ttlm_req))
+		return;
 
 	/* TODO Check if AP MLD support Neg-TTLM */
 	if (!hostapd_is_mld_ap(hapd))
-		goto fail;
+		return;
 
 	sta = ap_get_sta(hapd, addr);
 	if (!sta || !ap_sta_is_mld(hapd, sta))
-		goto fail;
+		return;
 
 	sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
 	if (!sta)
-		goto fail;
-
-	/* TODO check the relationship between Adv-TTLM and Neg-TTLM */
-	if (hostapd_is_attlm_active(hapd))
-		goto fail;
+		return;
 
 	neg_ttlm_req = (struct neg_ttlm_req *)frm;
 	if (ieee802_11_parse_elems(neg_ttlm_req->variable, len - 1, &elems, 1) ==
@@ -3156,11 +3155,8 @@ static void ieee802_11_rx_neg_ttlm_req(struct hostapd_data *hapd, const u8 *addr
 		goto fail;
 	}
 
-	neg_ttlm = &sta->neg_ttlm;
 	ret = ieee802_11_parse_neg_ttlm(hapd, elems.ttlm[0], elems.ttlm_len[0],
-					neg_ttlm, &direction);
-	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
-
+					&new_ttlm, &direction);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "Invalid TTLM format");
 		goto fail;
@@ -3171,6 +3167,12 @@ static void ieee802_11_rx_neg_ttlm_req(struct hostapd_data *hapd, const u8 *addr
 		goto fail;
 	}
 
+	/* TODO handle the overrlap between Adv-TTLM and Neg-TTLM */
+	if (hostapd_is_attlm_active(hapd))
+		goto fail;
+
+	os_memcpy(&sta->neg_ttlm, &new_ttlm, sizeof(sta->neg_ttlm));
+	sta->neg_ttlm.dialog_token = neg_ttlm_req->dialog_token;
 	status_code = WLAN_STATUS_SUCCESS;
 fail:
 	ret = ieee802_11_send_neg_ttlm_resp(hapd, addr, neg_ttlm_req->dialog_token, status_code);
@@ -3178,7 +3180,7 @@ fail:
 	if (ret) {
 		/* For synchronization */
 		ieee802_11_send_neg_ttlm_teardown(hapd, addr);
-		os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
+		os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
 	}
 }
 
