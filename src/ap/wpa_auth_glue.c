@@ -494,7 +494,8 @@ static const u8 * hostapd_wpa_auth_get_psk(void *ctx, const u8 *addr,
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 	const u8 *psk;
 
-	sta->psk_idx = 0;
+	if (sta)
+		sta->psk_idx = 0;
 	if (vlan_id)
 		*vlan_id = 0;
 	if (psk_len)
