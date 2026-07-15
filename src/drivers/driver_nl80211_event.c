@@ -1405,6 +1405,9 @@ static void mlme_event_attlm(struct wpa_driver_nl80211_data *drv,
 	struct i802_bss *bss;
 	int ifidx;
 
+	if (!ifindex || !event)
+		return;
+
 	ifidx = nla_get_u32(ifindex);
 	bss = get_bss_ifindex(drv, ifidx);
 	if (bss == NULL) {
@@ -1414,11 +1417,9 @@ static void mlme_event_attlm(struct wpa_driver_nl80211_data *drv,
 		return;
 	}
 
-	if (!event)
-		return;
-
 	wpa_printf(MSG_DEBUG, "nl80211: %s: A-TTLM event", bss->ifname);
 
+	os_memset(&data, 0, sizeof(data));
 	data.attlm_event.switch_time_tsf_tu = switch_time_tsf_tu ?
 					nla_get_u16(switch_time_tsf_tu) : 0;
 	event_type = nla_get_u32(event);
