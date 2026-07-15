@@ -12633,8 +12633,7 @@ wpa_supplicant_ctrl_iface_setup_link_reconfig(struct wpa_supplicant *wpa_s,
 }
 
 
-static int wpas_ctrl_iface_neg_ttlm_setup(struct wpa_supplicant *wpa_s,
-					  const char *cmd)
+static int wpas_ctrl_iface_neg_ttlm_setup(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	int dir, i = 0, ret;
 	u16 tid_bitmap[IEEE80211_TTLM_NUM_TIDS];
