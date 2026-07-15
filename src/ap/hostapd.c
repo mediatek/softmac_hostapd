@@ -4756,7 +4756,9 @@ int hostapd_remove_mld(struct hapd_interfaces *interfaces, char *buf)
 	struct hostapd_iface *iface;
 	struct hostapd_data *first_hapd;
 	struct hostapd_mld *mld = NULL;
-	int ret, i, j, num_mld, first_hapd_idx;
+	int ret = 0, num_mld, first_hapd_idx = -1;
+	size_t i, j;
+	u8 link_id;
 
 	for (i = 0; i < interfaces->mld_count; i++) {
 		if (interfaces->mld[i] &&
@@ -4769,6 +4771,13 @@ int hostapd_remove_mld(struct hapd_interfaces *interfaces, char *buf)
 	if (!mld) {
 		wpa_printf(MSG_ERROR, "MLD not found");
 		return -1;
+	}
+
+	if (!mld->fbss) {
+		wpa_printf(MSG_ERROR,
+			   "No first BSS on the MLD, just cleanup the MLD instance");
+		ret = -1;
+		goto out;
 	}
 
 	for (i = 0; i < interfaces->count; i++) {
@@ -4789,27 +4798,51 @@ int hostapd_remove_mld(struct hapd_interfaces *interfaces, char *buf)
 		}
 	}
 
-	for (i = interfaces->count - 1; i >= 0; i--) {
-		iface = interfaces->iface[i];
-		if (!iface)
+	first_hapd = mld->fbss;
+	for (j = 0; j < first_hapd->iface->num_bss; j++) {
+		if (first_hapd->iface->bss[j] == first_hapd) {
+			first_hapd_idx = (int)j;
+			break;
+		}
+	}
+
+	if (first_hapd_idx < 0) {
+		wpa_printf(MSG_ERROR,
+			   "First BSS not found in its own iface,"
+			   " just cleanup the MLD instance");
+		ret = -1;
+		goto out;
+	}
+
+	for (i = interfaces->count; i > 0; i--) {
+		iface = interfaces->iface[i - 1];
+		if (!iface || iface == first_hapd->iface)
 			continue;
 
 		for (j = 0; j < iface->num_bss; j++) {
 			if (os_strcmp(iface->bss[j]->conf->iface, mld->name) == 0) {
-				if (hostapd_mld_is_first_bss(iface->bss[j])) {
-					first_hapd = iface->bss[j];
-					first_hapd_idx = j;
-					break;
+				link_id = iface->bss[j]->mld_link_id;
+				if (hostapd_remove_mld_link_by_idx(iface, (int)j)) {
+					wpa_printf(MSG_ERROR,
+						   "AP MLD: failed to remove link ID %u",
+						   link_id);
+					ret = -1;
 				}
-
-				hostapd_remove_mld_link_by_idx(iface, j);
+				break;
 			}
 		}
 	}
 
-	hostapd_remove_mld_link_by_idx(first_hapd->iface, first_hapd_idx);
+	link_id = first_hapd->mld_link_id;
+	if (hostapd_remove_mld_link_by_idx(first_hapd->iface, first_hapd_idx)) {
+		wpa_printf(MSG_ERROR,
+			   "AP MLD: failed to remove link ID %u", link_id);
+		ret = -1;
+	}
+
+out:
 	hostapd_cleanup_unused_mlds(interfaces);
-	return 0;
+	return ret;
 }
 #endif /* CONFIG_IEEE80211BE */
 
