@@ -16750,7 +16750,7 @@ static int nl80211_get_aval_color_bmp(void *priv, u64 *aval_color_bmp, u8 link_i
 	struct wpa_driver_nl80211_data *drv = bss->drv;
 	struct nl_msg *msg;
 	struct nlattr *attr;
-	int ret;
+	int ret = 0;
 
 	if (!drv->mtk_bss_color_vendor_cmd_avail) {
 		wpa_printf(MSG_INFO,
@@ -16761,17 +16761,21 @@ static int nl80211_get_aval_color_bmp(void *priv, u64 *aval_color_bmp, u8 link_i
 	if (!(msg = nl80211_bss_msg(bss, NLM_F_DUMP, NL80211_CMD_VENDOR)) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
-			MTK_NL80211_VENDOR_SUBCMD_BSS_COLOR_CTRL))
-		return -ENOBUFS;
+			MTK_NL80211_VENDOR_SUBCMD_BSS_COLOR_CTRL)) {
+		ret = -ENOBUFS;
+		goto fail;
+	}
 
 	attr = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
 	if (!attr) {
-		nlmsg_free(msg);
-		return -1;
+		ret = -1;
+		goto fail;
 	}
 
-	if (nla_put_u8(msg, MTK_VENDOR_ATTR_AVAL_BSS_COLOR_LINK_ID, link_id))
-		return -ENOBUFS;
+	if (nla_put_u8(msg, MTK_VENDOR_ATTR_AVAL_BSS_COLOR_LINK_ID, link_id)) {
+		ret = -ENOBUFS;
+		goto fail;
+	}
 
 	nla_nest_end(msg, attr);
 
@@ -16781,6 +16785,11 @@ static int nl80211_get_aval_color_bmp(void *priv, u64 *aval_color_bmp, u8 link_i
 		wpa_printf(MSG_ERROR, "Failed to send BSS COLOR vendor cmd. ret=%d (%s) ",
 			   ret, strerror(-ret));
 	}
+
+	return ret;
+
+fail:
+	nlmsg_free(msg);
 	return ret;
 }
 
