@@ -415,6 +415,7 @@ static struct wpa_bss * wpas_ml_connect_pref(struct wpa_supplicant *wpa_s,
 					     struct wpa_bss *bss,
 					     struct wpa_ssid *ssid)
 {
+	struct wpa_bss *target_bss;
 	unsigned int low, high, i;
 
 	wpa_printf(MSG_DEBUG,
@@ -483,13 +484,21 @@ found:
 
 	/* Get the BSS entry and do the switch */
 	if (ssid && ssid->ssid_len)
-		bss = wpa_bss_get(wpa_s, wpa_s->links[i].bssid, ssid->ssid,
-				  ssid->ssid_len);
+		target_bss = wpa_bss_get(wpa_s, wpa_s->links[i].bssid,
+					 ssid->ssid, ssid->ssid_len);
 	else
-		bss = wpa_bss_get_bssid(wpa_s, wpa_s->links[i].bssid);
+		target_bss = wpa_bss_get_bssid(wpa_s, wpa_s->links[i].bssid);
+
+	if (!target_bss) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: No match for connect/band pref BSS in the"
+			   " scan results");
+		return bss;
+	}
+
 	wpa_s->mlo_assoc_link_id = i;
 
-	return bss;
+	return target_bss;
 }
 #endif /* CONFIG_TESTING_OPTIONS */
 
