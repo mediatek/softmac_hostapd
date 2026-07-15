@@ -138,7 +138,7 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	const char *state;
 	uc_value_t *val;
 	enum oper_chan_width oper_chwidth;
-	int control_freq, center_freq1, bw320_offset = 1, radio_idx;
+	int center_freq1, bw320_offset = 1, radio_idx;
 
 	if (event != EVENT_CH_SWITCH_STARTED &&
 	    event != EVENT_LINK_CH_SWITCH_STARTED)
@@ -147,6 +147,14 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 	val = wpa_ucode_registry_get(iface_registry, wpa_s->ucode.idx);
 	if (!val)
 		return;
+
+	if (wpa_s->wpa_state < WPA_COMPLETED) {
+		wpa_printf(MSG_INFO,
+			   "ucode: mtk: receive channel switch event "
+			   "before association finished, reconnect\n");
+		wpa_supplicant_reconnect(wpa_s);
+		return;
+	}
 
 	if (wpa_ucode_call_prepare("event"))
 		return;
@@ -159,15 +167,6 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 
 	if (event == EVENT_CH_SWITCH_STARTED ||
 	    event == EVENT_LINK_CH_SWITCH_STARTED) {
-		if (wpa_s->wpa_state < WPA_COMPLETED) {
-			wpa_printf(MSG_INFO,
-				   "ucode: mtk: receive channel switch event"
-				   "before association finished, reconnect\n");
-			wpa_supplicant_reconnect(wpa_s);
-			return;
-		}
-
-		control_freq = data->ch_switch.freq;
 		center_freq1 = data->ch_switch.cf1;
 
 		switch (data->ch_switch.ch_width) {
@@ -193,8 +192,8 @@ void wpas_ucode_event(struct wpa_supplicant *wpa_s, int event, union wpa_event_d
 
 		/* Check bandwidth 320 MHz-2 */
 		if (oper_chwidth == CONF_OPER_CHWIDTH_320MHZ &&
-		    (center_freq1 == 6265) || center_freq1 == 6585 ||
-		     center_freq1 == 6905)
+		    (center_freq1 == 6265 || center_freq1 == 6585 ||
+		     center_freq1 == 6905))
 			bw320_offset = 2;
 
 		radio_idx = wpas_get_radio_idx_with_freq(wpa_s, data->ch_switch.freq);
