@@ -6211,7 +6211,7 @@ struct wpa_driver_ops {
 	 * @priv: Private driver interface data
 	 *
 	 */
-	int (*beacon_ctrl)(void *priv, u8 beacon_mode);
+	int (*beacon_ctrl)(void *priv, s8 link_id, u8 beacon_mode);
 
 	/**
 	 * set_epcs - Set EPCS state and WMM parameters for peer MLD in driver
