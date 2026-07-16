@@ -832,8 +832,14 @@ uc_wpas_iface_config(uc_vm_t *vm, size_t nargs)
 		}
 	} else if (!strcmp(name, "mld_assoc_band")) {
 		if (!get) {
-			char *band = ucv_string_get(val);
+			char *band;
+
+			if (ucv_type(val) != UC_STRING)
+				return NULL;
+
+			band = ucv_string_get(val);
 			wpa_printf(MSG_INFO, "mtk: ucode: Set band mask to %s\n", band);
+
 			if (!strcmp(band, "2g")) {
 				wpa_s->setband_mask = WPA_SETBAND_2G;
 			} else if (!strcmp(band, "5g")) {
@@ -842,7 +848,7 @@ uc_wpas_iface_config(uc_vm_t *vm, size_t nargs)
 				wpa_s->setband_mask = WPA_SETBAND_6G;
 			} else {
 				wpa_printf(MSG_ERROR, "mtk: ucode: Invalid band %s\n", band);
-				ret = ucv_boolean_new(false);
+				return ucv_boolean_new(false);
 			}
 			ret = ucv_boolean_new(true);
 		}
