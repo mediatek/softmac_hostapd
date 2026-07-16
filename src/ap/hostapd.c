@@ -5977,12 +5977,12 @@ int hostapd_mld_add_link(struct hostapd_data *hapd)
 {
 	struct hostapd_mld *mld = hapd->mld;
 
-	if (!hapd->conf->mld_ap || (mld->valid_links & BIT(hapd->mld_link_id)))
-		return 0;
-
 	/* Should not happen */
 	if (!mld)
 		return -1;
+
+	if (!hapd->conf->mld_ap || (mld->valid_links & BIT(hapd->mld_link_id)))
+		return 0;
 
 	dl_list_add_tail(&mld->links, &hapd->link);
 	mld->num_links++;
