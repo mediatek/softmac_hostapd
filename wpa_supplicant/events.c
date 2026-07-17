@@ -4330,24 +4330,12 @@ no_pfs:
 
 		if (bss && is_assisted_p2p_dfs_allowed(wpa_s, bss) &&
 		    is_dfs_owner_ap(wpa_s, bss)) {
-			enum chan_width ap_operation_chan_width =
-				CHAN_WIDTH_UNKNOWN;
-			struct ieee802_11_elems resp_elems_local;
-
-			/* Parse resp_ies locally to extract AP operation
-			 * channel width */
-			if (data->assoc_info.resp_ies &&
-			    ieee802_11_parse_elems(
-				    data->assoc_info.resp_ies,
-				    data->assoc_info.resp_ies_len,
-				    &resp_elems_local, 0) != ParseFailed)
-				ap_operation_chan_width =
-					get_operation_channel_width(
-						&resp_elems_local);
-
 			wpa_s->assisted_dfs = true;
-			wpas_update_dfs_ap_info(wpa_s, wpa_s->assoc_freq,
-						ap_operation_chan_width, false);
+			wpas_update_dfs_ap_info(
+				wpa_s, wpa_s->assoc_freq,
+				wpa_s->connection_set ?
+				wpa_s->connection_channel_bandwidth :
+				CHAN_WIDTH_UNKNOWN, false);
 		}
 	} else if (wpa_s->allow_p2p_assisted_dfs && wpa_s->valid_links) {
 		/* For MLO, check other links as well for DFS */
