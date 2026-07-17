@@ -2462,11 +2462,39 @@ int wpas_p2p_try_edmg_channel(struct wpa_supplicant *wpa_s,
 }
 
 
+/*
+ * Find the STA interface that owns the current assisted-DFS state.
+ * Walk the parent chain first (dedicated-P2P-device topology); fall back to
+ * scanning global->ifaces for a non-P2P STA (standalone-p2p0 topology).
+ */
+static struct wpa_supplicant *
+wpas_p2p_get_assisted_dfs_src(struct wpa_supplicant *wpa_s)
+{
+	struct wpa_supplicant *src, *ifs;
+
+	src = wpa_s;
+	while (src->parent && src->parent != src)
+		src = src->parent;
+	if (src->assisted_dfs)
+		return src;
+
+	for (ifs = wpa_s->global->ifaces; ifs; ifs = ifs->next) {
+		if (ifs->assisted_dfs &&
+		    ifs->p2p_group_interface == NOT_P2P_GROUP_INTERFACE &&
+		    !ifs->p2p_mgmt)
+			return ifs;
+	}
+
+	return wpa_s;
+}
+
+
 static void wpas_start_go(struct wpa_supplicant *wpa_s,
 			  struct p2p_go_neg_results *params,
 			  int group_formation, enum wpa_p2p_mode p2p_mode)
 {
 	struct wpa_ssid *ssid;
+	struct wpa_supplicant *src_wpa_s;
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "P2P: Starting GO");
 	if (wpas_copy_go_neg_results(wpa_s, params) < 0) {
@@ -2498,6 +2526,26 @@ static void wpas_start_go(struct wpa_supplicant *wpa_s,
 	ssid->max_oper_chwidth = params->max_oper_chwidth;
 	ssid->vht_center_freq2 = params->vht_center_freq2;
 	ssid->he = params->he;
+
+	/*
+	 * Cap the GO bandwidth to the STA's operating width when assisted DFS
+	 * is active. oper_chan_width enum values are not monotonically ordered
+	 * by bandwidth, so an unconditional assignment is used instead of a
+	 * numeric comparison.
+	 */
+	src_wpa_s = wpas_p2p_get_assisted_dfs_src(wpa_s);
+	if (src_wpa_s->assisted_dfs &&
+	    src_wpa_s->sta_connected_chan_width != CHAN_WIDTH_UNKNOWN) {
+		ssid->max_oper_chwidth =
+			chan_width_to_oper_chwidth(
+				src_wpa_s->sta_connected_chan_width);
+		wpa_printf(MSG_DEBUG,
+			   "P2P: assisted-DFS GO: set max_oper_chwidth=%d from STA chan_width=%d (src=%s)",
+			   ssid->max_oper_chwidth,
+			   src_wpa_s->sta_connected_chan_width,
+			   src_wpa_s->ifname);
+	}
+
 	if (params->edmg) {
 		u8 op_channel, op_class;
 
@@ -2754,6 +2802,7 @@ wpas_p2p_init_group_interface(struct wpa_supplicant *wpa_s, int go)
 {
 	struct wpa_interface iface;
 	struct wpa_supplicant *group_wpa_s;
+	struct wpa_supplicant *src_wpa_s;
 
 	if (!wpa_s->pending_interface_name[0]) {
 		wpa_printf(MSG_ERROR, "P2P: No pending group interface");
@@ -2794,7 +2843,16 @@ wpas_p2p_init_group_interface(struct wpa_supplicant *wpa_s, int go)
 
 	wpas_p2p_clone_config(group_wpa_s, wpa_s);
 	group_wpa_s->p2p2 = wpa_s->p2p2;
-	group_wpa_s->assisted_dfs = wpa_s->assisted_dfs;
+
+	/* Propagate assisted-DFS state from the STA interface */
+	src_wpa_s = wpas_p2p_get_assisted_dfs_src(wpa_s);
+	group_wpa_s->assisted_dfs = src_wpa_s->assisted_dfs;
+	group_wpa_s->allow_p2p_assisted_dfs =
+		src_wpa_s->allow_p2p_assisted_dfs;
+	group_wpa_s->sta_connected_chan_width =
+		src_wpa_s->sta_connected_chan_width;
+	group_wpa_s->sta_connected_freq = src_wpa_s->sta_connected_freq;
+	group_wpa_s->dfs_ap_connected = src_wpa_s->dfs_ap_connected;
 
 	if (wpa_s->conf->p2p_interface_random_mac_addr) {
 		if (wpa_drv_set_mac_addr(group_wpa_s,
