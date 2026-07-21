@@ -615,7 +615,7 @@ static void sme_check_802_1x_pmksa_caching(struct wpa_supplicant *wpa_s,
 	peer_addr = sme_get_peer_addr(wpa_s, external);
 	key_mgmt = sme_get_key_mgmt(wpa_s, external);
 
-	rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
+	rsnxe = bss ? wpa_bss_get_ie(bss, WLAN_EID_RSNX) : NULL;
 	if (ssid->eap_over_auth_frame &&
 	    ieee802_11_rsnx_capab(rsnxe,
 				  WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) &&
