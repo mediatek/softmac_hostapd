@@ -159,9 +159,14 @@ static void gas_serv_free_dialogs(struct hostapd_data *hapd,
 
 #ifdef CONFIG_HS20
 static void anqp_add_hs_capab_list(struct hostapd_data *hapd,
-				   struct wpabuf *buf)
+				   struct wpabuf **_buf)
 {
 	u8 *len;
+	struct wpabuf *buf;
+
+	if (wpabuf_resize(_buf, 2 + 2 + 4 + 1 + 1 + 6) < 0)
+		return;
+	buf = *_buf;
 
 	len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
 	wpabuf_put_be24(buf, OUI_WFA);
@@ -199,7 +204,7 @@ static struct anqp_element * get_anqp_elem(struct hostapd_data *hapd,
 }
 
 
-static void anqp_add_elem(struct hostapd_data *hapd, struct wpabuf *buf,
+static void anqp_add_elem(struct hostapd_data *hapd, struct wpabuf **buf,
 			  u16 infoid)
 {
 	struct anqp_element *elem;
@@ -207,19 +212,16 @@ static void anqp_add_elem(struct hostapd_data *hapd, struct wpabuf *buf,
 	elem = get_anqp_elem(hapd, infoid);
 	if (!elem)
 		return;
-	if (wpabuf_tailroom(buf) < 2 + 2 + wpabuf_len(elem->payload)) {
-		wpa_printf(MSG_DEBUG, "ANQP: No room for InfoID %u payload",
-			   infoid);
+	if (wpabuf_resize(buf, 2 + 2 + wpabuf_len(elem->payload)) < 0)
 		return;
-	}
 
-	wpabuf_put_le16(buf, infoid);
-	wpabuf_put_le16(buf, wpabuf_len(elem->payload));
-	wpabuf_put_buf(buf, elem->payload);
+	wpabuf_put_le16(*buf, infoid);
+	wpabuf_put_le16(*buf, wpabuf_len(elem->payload));
+	wpabuf_put_buf(*buf, elem->payload);
 }
 
 
-static int anqp_add_override(struct hostapd_data *hapd, struct wpabuf *buf,
+static int anqp_add_override(struct hostapd_data *hapd, struct wpabuf **buf,
 			     u16 infoid)
 {
 	if (get_anqp_elem(hapd, infoid)) {
@@ -232,14 +234,16 @@ static int anqp_add_override(struct hostapd_data *hapd, struct wpabuf *buf,
 
 
 static void anqp_add_capab_list(struct hostapd_data *hapd,
-				struct wpabuf *buf)
+				struct wpabuf **_buf)
 {
 	u8 *len;
 	u16 id;
+	struct wpabuf *buf;
 
-	if (anqp_add_override(hapd, buf, ANQP_CAPABILITY_LIST))
+	if (anqp_add_override(hapd, _buf, ANQP_CAPABILITY_LIST))
 		return;
 
+	buf = *_buf;
 	len = gas_anqp_add_element(buf, ANQP_CAPABILITY_LIST);
 	wpabuf_put_le16(buf, ANQP_CAPABILITY_LIST);
 	if (hapd->conf->venue_name || get_anqp_elem(hapd, ANQP_VENUE_NAME))
@@ -295,13 +299,13 @@ static void anqp_add_capab_list(struct hostapd_data *hapd,
 			wpabuf_put_le16(buf, id);
 	}
 #ifdef CONFIG_HS20
-	anqp_add_hs_capab_list(hapd, buf);
+	anqp_add_hs_capab_list(hapd, &buf);
 #endif /* CONFIG_HS20 */
 	gas_anqp_set_element_len(buf, len);
 }
 
 
-static void anqp_add_venue_name(struct hostapd_data *hapd, struct wpabuf *buf)
+static void anqp_add_venue_name(struct hostapd_data *hapd, struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_VENUE_NAME))
 		return;
@@ -309,22 +313,33 @@ static void anqp_add_venue_name(struct hostapd_data *hapd, struct wpabuf *buf)
 	if (hapd->conf->venue_name) {
 		u8 *len;
 		unsigned int i;
-		len = gas_anqp_add_element(buf, ANQP_VENUE_NAME);
-		wpabuf_put_u8(buf, hapd->conf->venue_group);
-		wpabuf_put_u8(buf, hapd->conf->venue_type);
+		size_t tlen = 2 + 2 + 1 + 1;
+
+		for (i = 0; i < hapd->conf->venue_name_count; i++) {
+			struct hostapd_lang_string *vn;
+
+			vn = &hapd->conf->venue_name[i];
+			tlen += 1 + 3 + vn->name_len;
+		}
+		if (wpabuf_resize(buf, tlen) < 0)
+			return;
+
+		len = gas_anqp_add_element(*buf, ANQP_VENUE_NAME);
+		wpabuf_put_u8(*buf, hapd->conf->venue_group);
+		wpabuf_put_u8(*buf, hapd->conf->venue_type);
 		for (i = 0; i < hapd->conf->venue_name_count; i++) {
 			struct hostapd_lang_string *vn;
 			vn = &hapd->conf->venue_name[i];
-			wpabuf_put_u8(buf, 3 + vn->name_len);
-			wpabuf_put_data(buf, vn->lang, 3);
-			wpabuf_put_data(buf, vn->name, vn->name_len);
+			wpabuf_put_u8(*buf, 3 + vn->name_len);
+			wpabuf_put_data(*buf, vn->lang, 3);
+			wpabuf_put_data(*buf, vn->name, vn->name_len);
 		}
-		gas_anqp_set_element_len(buf, len);
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 
 
-static void anqp_add_venue_url(struct hostapd_data *hapd, struct wpabuf *buf)
+static void anqp_add_venue_url(struct hostapd_data *hapd, struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_VENUE_URL))
 		return;
@@ -332,67 +347,108 @@ static void anqp_add_venue_url(struct hostapd_data *hapd, struct wpabuf *buf)
 	if (hapd->conf->venue_url) {
 		u8 *len;
 		unsigned int i;
+		size_t tlen = 2 + 2;
 
-		len = gas_anqp_add_element(buf, ANQP_VENUE_URL);
 		for (i = 0; i < hapd->conf->venue_url_count; i++) {
 			struct hostapd_venue_url *url;
 
 			url = &hapd->conf->venue_url[i];
-			wpabuf_put_u8(buf, 1 + url->url_len);
-			wpabuf_put_u8(buf, url->venue_number);
-			wpabuf_put_data(buf, url->url, url->url_len);
+			tlen += 1 + 1 + url->url_len;
 		}
-		gas_anqp_set_element_len(buf, len);
+		if (wpabuf_resize(buf, tlen) < 0)
+			return;
+
+		len = gas_anqp_add_element(*buf, ANQP_VENUE_URL);
+		for (i = 0; i < hapd->conf->venue_url_count; i++) {
+			struct hostapd_venue_url *url;
+
+			url = &hapd->conf->venue_url[i];
+			wpabuf_put_u8(*buf, 1 + url->url_len);
+			wpabuf_put_u8(*buf, url->venue_number);
+			wpabuf_put_data(*buf, url->url, url->url_len);
+		}
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 
 
 static void anqp_add_network_auth_type(struct hostapd_data *hapd,
-				       struct wpabuf *buf)
+				       struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_NETWORK_AUTH_TYPE))
 		return;
 
 	if (hapd->conf->network_auth_type) {
-		wpabuf_put_le16(buf, ANQP_NETWORK_AUTH_TYPE);
-		wpabuf_put_le16(buf, hapd->conf->network_auth_type_len);
-		wpabuf_put_data(buf, hapd->conf->network_auth_type,
+		if (wpabuf_resize(buf, 2 + 2 +
+				  hapd->conf->network_auth_type_len) < 0)
+			return;
+		wpabuf_put_le16(*buf, ANQP_NETWORK_AUTH_TYPE);
+		wpabuf_put_le16(*buf, hapd->conf->network_auth_type_len);
+		wpabuf_put_data(*buf, hapd->conf->network_auth_type,
 				hapd->conf->network_auth_type_len);
 	}
 }
 
 
 static void anqp_add_roaming_consortium(struct hostapd_data *hapd,
-					struct wpabuf *buf)
+					struct wpabuf **buf)
 {
 	unsigned int i;
 	u8 *len;
+	size_t tlen = 2 + 2;
 
 	if (anqp_add_override(hapd, buf, ANQP_ROAMING_CONSORTIUM))
 		return;
 
-	len = gas_anqp_add_element(buf, ANQP_ROAMING_CONSORTIUM);
+	for (i = 0; i < hapd->conf->roaming_consortium_count; i++) {
+		struct hostapd_roaming_consortium *rc;
+
+		rc = &hapd->conf->roaming_consortium[i];
+		tlen += 1 + rc->len;
+	}
+
+	if (wpabuf_resize(buf, tlen) < 0)
+		return;
+
+	len = gas_anqp_add_element(*buf, ANQP_ROAMING_CONSORTIUM);
 	for (i = 0; i < hapd->conf->roaming_consortium_count; i++) {
 		struct hostapd_roaming_consortium *rc;
 		rc = &hapd->conf->roaming_consortium[i];
-		wpabuf_put_u8(buf, rc->len);
-		wpabuf_put_data(buf, rc->oi, rc->len);
+		wpabuf_put_u8(*buf, rc->len);
+		wpabuf_put_data(*buf, rc->oi, rc->len);
 	}
-	gas_anqp_set_element_len(buf, len);
+	gas_anqp_set_element_len(*buf, len);
 }
 
 
 static void anqp_add_ip_addr_type_availability(struct hostapd_data *hapd,
-					       struct wpabuf *buf)
+					       struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_IP_ADDR_TYPE_AVAILABILITY))
 		return;
 
 	if (hapd->conf->ipaddr_type_configured) {
-		wpabuf_put_le16(buf, ANQP_IP_ADDR_TYPE_AVAILABILITY);
-		wpabuf_put_le16(buf, 1);
-		wpabuf_put_u8(buf, hapd->conf->ipaddr_type_availability);
+		if (wpabuf_resize(buf, 2 + 2 + 1) < 0)
+			return;
+		wpabuf_put_le16(*buf, ANQP_IP_ADDR_TYPE_AVAILABILITY);
+		wpabuf_put_le16(*buf, 1);
+		wpabuf_put_u8(*buf, hapd->conf->ipaddr_type_availability);
 	}
+}
+
+
+static size_t anqp_len_nai_realm_eap(struct hostapd_nai_realm_data *realm)
+{
+	unsigned int i;
+	size_t len = 1;
+
+	for (i = 0; i < realm->eap_method_count; i++) {
+		struct hostapd_nai_realm_eap *eap = &realm->eap_method[i];
+
+		len += 1 + 1 + 1 + 3 * eap->num_auths;
+	}
+
+	return len;
 }
 
 
@@ -435,7 +491,7 @@ static void anqp_add_nai_realm_data(struct wpabuf *buf,
 
 
 static int hs20_add_nai_home_realm_matches(struct hostapd_data *hapd,
-					   struct wpabuf *buf,
+					   struct wpabuf **buf,
 					   const u8 *home_realm,
 					   size_t home_realm_len)
 {
@@ -447,6 +503,7 @@ static int hs20_add_nai_home_realm_matches(struct hostapd_data *hapd,
 		unsigned int realm_data_idx;
 		unsigned int realm_idx;
 	} matches[10];
+	size_t tlen = 2 + 2 + 2;
 
 	pos = home_realm;
 	end = pos + home_realm_len;
@@ -491,12 +548,17 @@ static int hs20_add_nai_home_realm_matches(struct hostapd_data *hapd,
 				for (k = 0; k < MAX_NAI_REALMS &&
 					     realm->realm[k] &&
 					     num_matching < 10; k++) {
-					if ((int) os_strlen(realm->realm[k]) !=
-					    rend - rpos ||
+					size_t rlen;
+
+					rlen = os_strlen(realm->realm[k]);
+					if ((int) rlen != rend - rpos ||
 					    os_strncmp((char *) rpos,
 						       realm->realm[k],
 						       rend - rpos) != 0)
 						continue;
+					tlen += 2 + 1 + 1 + rlen +
+						anqp_len_nai_realm_eap(realm);
+
 					matches[num_matching].realm_data_idx =
 						j;
 					matches[num_matching].realm_idx = k;
@@ -508,8 +570,11 @@ static int hs20_add_nai_home_realm_matches(struct hostapd_data *hapd,
 		pos += realm_len;
 	}
 
-	realm_list_len = gas_anqp_add_element(buf, ANQP_NAI_REALM);
-	wpabuf_put_le16(buf, num_matching);
+	if (wpabuf_resize(buf, tlen) < 0)
+		return -1;
+
+	realm_list_len = gas_anqp_add_element(*buf, ANQP_NAI_REALM);
+	wpabuf_put_le16(*buf, num_matching);
 
 	/*
 	 * There are two ways to format. 1. each realm in a NAI Realm Data unit
@@ -521,14 +586,14 @@ static int hs20_add_nai_home_realm_matches(struct hostapd_data *hapd,
 		wpa_printf(MSG_DEBUG, "realm_idx %d, realm_data_idx %d",
 			   matches[i].realm_data_idx, matches[i].realm_idx);
 		realm = &hapd->conf->nai_realm_data[matches[i].realm_data_idx];
-		anqp_add_nai_realm_data(buf, realm, matches[i].realm_idx);
+		anqp_add_nai_realm_data(*buf, realm, matches[i].realm_idx);
 	}
-	gas_anqp_set_element_len(buf, realm_list_len);
+	gas_anqp_set_element_len(*buf, realm_list_len);
 	return 0;
 }
 
 
-static void anqp_add_nai_realm(struct hostapd_data *hapd, struct wpabuf *buf,
+static void anqp_add_nai_realm(struct hostapd_data *hapd, struct wpabuf **buf,
 			       const u8 *home_realm, size_t home_realm_len,
 			       int nai_realm, int nai_home_realm)
 {
@@ -539,26 +604,43 @@ static void anqp_add_nai_realm(struct hostapd_data *hapd, struct wpabuf *buf,
 	if (nai_realm && hapd->conf->nai_realm_data) {
 		u8 *len;
 		unsigned int i, j;
-		len = gas_anqp_add_element(buf, ANQP_NAI_REALM);
-		wpabuf_put_le16(buf, hapd->conf->nai_realm_count);
+		size_t tlen = 2 + 2 + 2;
+
+		for (i = 0; i < hapd->conf->nai_realm_count; i++) {
+			struct hostapd_nai_realm_data *realm;
+
+			realm = &hapd->conf->nai_realm_data[i];
+			tlen += 2 + 1 + 1;
+			for (j = 0; realm->realm[j]; j++) {
+				if (j > 0)
+					tlen++;
+				tlen += os_strlen(realm->realm[j]);
+			}
+			tlen += anqp_len_nai_realm_eap(realm);
+		}
+		if (wpabuf_resize(buf, tlen) < 0)
+			return;
+
+		len = gas_anqp_add_element(*buf, ANQP_NAI_REALM);
+		wpabuf_put_le16(*buf, hapd->conf->nai_realm_count);
 		for (i = 0; i < hapd->conf->nai_realm_count; i++) {
 			u8 *realm_data_len, *realm_len;
 			struct hostapd_nai_realm_data *realm;
 
 			realm = &hapd->conf->nai_realm_data[i];
-			realm_data_len = wpabuf_put(buf, 2);
-			wpabuf_put_u8(buf, realm->encoding);
-			realm_len = wpabuf_put(buf, 1);
+			realm_data_len = wpabuf_put(*buf, 2);
+			wpabuf_put_u8(*buf, realm->encoding);
+			realm_len = wpabuf_put(*buf, 1);
 			for (j = 0; realm->realm[j]; j++) {
 				if (j > 0)
-					wpabuf_put_u8(buf, ';');
-				wpabuf_put_str(buf, realm->realm[j]);
+					wpabuf_put_u8(*buf, ';');
+				wpabuf_put_str(*buf, realm->realm[j]);
 			}
-			*realm_len = (u8 *) wpabuf_put(buf, 0) - realm_len - 1;
-			anqp_add_nai_realm_eap(buf, realm);
-			gas_anqp_set_element_len(buf, realm_data_len);
+			*realm_len = (u8 *) wpabuf_put(*buf, 0) - realm_len - 1;
+			anqp_add_nai_realm_eap(*buf, realm);
+			gas_anqp_set_element_len(*buf, realm_data_len);
 		}
-		gas_anqp_set_element_len(buf, len);
+		gas_anqp_set_element_len(*buf, len);
 	} else if (nai_home_realm && hapd->conf->nai_realm_data && home_realm) {
 		hs20_add_nai_home_realm_matches(hapd, buf, home_realm,
 						home_realm_len);
@@ -567,30 +649,35 @@ static void anqp_add_nai_realm(struct hostapd_data *hapd, struct wpabuf *buf,
 
 
 static void anqp_add_3gpp_cellular_network(struct hostapd_data *hapd,
-					   struct wpabuf *buf)
+					   struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_3GPP_CELLULAR_NETWORK))
 		return;
 
 	if (hapd->conf->anqp_3gpp_cell_net) {
-		wpabuf_put_le16(buf, ANQP_3GPP_CELLULAR_NETWORK);
-		wpabuf_put_le16(buf,
+		if (wpabuf_resize(buf, 2 + 2 +
+				  hapd->conf->anqp_3gpp_cell_net_len) < 0)
+			return;
+		wpabuf_put_le16(*buf, ANQP_3GPP_CELLULAR_NETWORK);
+		wpabuf_put_le16(*buf,
 				hapd->conf->anqp_3gpp_cell_net_len);
-		wpabuf_put_data(buf, hapd->conf->anqp_3gpp_cell_net,
+		wpabuf_put_data(*buf, hapd->conf->anqp_3gpp_cell_net,
 				hapd->conf->anqp_3gpp_cell_net_len);
 	}
 }
 
 
-static void anqp_add_domain_name(struct hostapd_data *hapd, struct wpabuf *buf)
+static void anqp_add_domain_name(struct hostapd_data *hapd, struct wpabuf **buf)
 {
 	if (anqp_add_override(hapd, buf, ANQP_DOMAIN_NAME))
 		return;
 
 	if (hapd->conf->domain_name) {
-		wpabuf_put_le16(buf, ANQP_DOMAIN_NAME);
-		wpabuf_put_le16(buf, hapd->conf->domain_name_len);
-		wpabuf_put_data(buf, hapd->conf->domain_name,
+		if (wpabuf_resize(buf, 2 + 2 + hapd->conf->domain_name_len) < 0)
+			return;
+		wpabuf_put_le16(*buf, ANQP_DOMAIN_NAME);
+		wpabuf_put_le16(*buf, hapd->conf->domain_name_len);
+		wpabuf_put_data(*buf, hapd->conf->domain_name,
 				hapd->conf->domain_name_len);
 	}
 }
@@ -598,7 +685,7 @@ static void anqp_add_domain_name(struct hostapd_data *hapd, struct wpabuf *buf)
 
 #ifdef CONFIG_FILS
 static void anqp_add_fils_realm_info(struct hostapd_data *hapd,
-				     struct wpabuf *buf)
+				     struct wpabuf **buf)
 {
 	size_t count;
 
@@ -611,14 +698,16 @@ static void anqp_add_fils_realm_info(struct hostapd_data *hapd,
 	if (count) {
 		struct fils_realm *realm;
 
-		wpabuf_put_le16(buf, ANQP_FILS_REALM_INFO);
-		wpabuf_put_le16(buf, 2 * count);
+		if (wpabuf_resize(buf, 2 + 2 + 2 * count) < 0)
+			return;
+		wpabuf_put_le16(*buf, ANQP_FILS_REALM_INFO);
+		wpabuf_put_le16(*buf, 2 * count);
 
 		dl_list_for_each(realm, &hapd->conf->fils_realms,
 				 struct fils_realm, list) {
 			if (count == 0)
 				break;
-			wpabuf_put_data(buf, realm->hash, 2);
+			wpabuf_put_data(*buf, realm->hash, 2);
 			count--;
 		}
 	}
@@ -629,11 +718,26 @@ static void anqp_add_fils_realm_info(struct hostapd_data *hapd,
 #ifdef CONFIG_HS20
 
 static void anqp_add_operator_friendly_name(struct hostapd_data *hapd,
-					    struct wpabuf *buf)
+					    struct wpabuf **_buf)
 {
 	if (hapd->conf->hs20_oper_friendly_name) {
 		u8 *len;
 		unsigned int i;
+		size_t tlen = 2 + 2 + 4 + 1 + 1;
+		struct wpabuf *buf;
+
+		for (i = 0; i < hapd->conf->hs20_oper_friendly_name_count; i++)
+		{
+			struct hostapd_lang_string *vn;
+
+			vn = &hapd->conf->hs20_oper_friendly_name[i];
+			tlen += 1 + 3 + vn->name_len;
+		}
+
+		if (wpabuf_resize(_buf, tlen) < 0)
+			return;
+		buf = *_buf;
+
 		len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
 		wpabuf_put_be24(buf, OUI_WFA);
 		wpabuf_put_u8(buf, HS20_ANQP_OUI_TYPE);
@@ -653,48 +757,63 @@ static void anqp_add_operator_friendly_name(struct hostapd_data *hapd,
 
 
 static void anqp_add_wan_metrics(struct hostapd_data *hapd,
-				 struct wpabuf *buf)
+				 struct wpabuf **buf)
 {
 	if (hapd->conf->hs20_wan_metrics) {
-		u8 *len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
-		wpabuf_put_be24(buf, OUI_WFA);
-		wpabuf_put_u8(buf, HS20_ANQP_OUI_TYPE);
-		wpabuf_put_u8(buf, HS20_STYPE_WAN_METRICS);
-		wpabuf_put_u8(buf, 0); /* Reserved */
-		wpabuf_put_data(buf, hapd->conf->hs20_wan_metrics, 13);
-		gas_anqp_set_element_len(buf, len);
+		u8 *len;
+
+		if (wpabuf_resize(buf, 2 + 2 + 4 + 1 + 1 + 13) < 0)
+			return;
+		len = gas_anqp_add_element(*buf, ANQP_VENDOR_SPECIFIC);
+		wpabuf_put_be24(*buf, OUI_WFA);
+		wpabuf_put_u8(*buf, HS20_ANQP_OUI_TYPE);
+		wpabuf_put_u8(*buf, HS20_STYPE_WAN_METRICS);
+		wpabuf_put_u8(*buf, 0); /* Reserved */
+		wpabuf_put_data(*buf, hapd->conf->hs20_wan_metrics, 13);
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 
 
 static void anqp_add_connection_capability(struct hostapd_data *hapd,
-					   struct wpabuf *buf)
+					   struct wpabuf **buf)
 {
 	if (hapd->conf->hs20_connection_capability) {
-		u8 *len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
-		wpabuf_put_be24(buf, OUI_WFA);
-		wpabuf_put_u8(buf, HS20_ANQP_OUI_TYPE);
-		wpabuf_put_u8(buf, HS20_STYPE_CONNECTION_CAPABILITY);
-		wpabuf_put_u8(buf, 0); /* Reserved */
-		wpabuf_put_data(buf, hapd->conf->hs20_connection_capability,
+		u8 *len;
+
+		if (wpabuf_resize(buf, 2 + 2 + 4 + 1 + 1 +
+				  hapd->conf->hs20_connection_capability_len) <
+		    0)
+			return;
+		len = gas_anqp_add_element(*buf, ANQP_VENDOR_SPECIFIC);
+		wpabuf_put_be24(*buf, OUI_WFA);
+		wpabuf_put_u8(*buf, HS20_ANQP_OUI_TYPE);
+		wpabuf_put_u8(*buf, HS20_STYPE_CONNECTION_CAPABILITY);
+		wpabuf_put_u8(*buf, 0); /* Reserved */
+		wpabuf_put_data(*buf, hapd->conf->hs20_connection_capability,
 				hapd->conf->hs20_connection_capability_len);
-		gas_anqp_set_element_len(buf, len);
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 
 
 static void anqp_add_operating_class(struct hostapd_data *hapd,
-				     struct wpabuf *buf)
+				     struct wpabuf **buf)
 {
 	if (hapd->conf->hs20_operating_class) {
-		u8 *len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
-		wpabuf_put_be24(buf, OUI_WFA);
-		wpabuf_put_u8(buf, HS20_ANQP_OUI_TYPE);
-		wpabuf_put_u8(buf, HS20_STYPE_OPERATING_CLASS);
-		wpabuf_put_u8(buf, 0); /* Reserved */
-		wpabuf_put_data(buf, hapd->conf->hs20_operating_class,
+		u8 *len;
+
+		if (wpabuf_resize(buf, 2 + 2 + 4 + 1 + 1 +
+				  hapd->conf->hs20_operating_class_len) < 0)
+			return;
+		len = gas_anqp_add_element(*buf, ANQP_VENDOR_SPECIFIC);
+		wpabuf_put_be24(*buf, OUI_WFA);
+		wpabuf_put_u8(*buf, HS20_ANQP_OUI_TYPE);
+		wpabuf_put_u8(*buf, HS20_STYPE_OPERATING_CLASS);
+		wpabuf_put_u8(*buf, 0); /* Reserved */
+		wpabuf_put_data(*buf, hapd->conf->hs20_operating_class,
 				hapd->conf->hs20_operating_class_len);
-		gas_anqp_set_element_len(buf, len);
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 
@@ -703,15 +822,19 @@ static void anqp_add_operating_class(struct hostapd_data *hapd,
 
 #ifdef CONFIG_MBO
 static void anqp_add_mbo_cell_data_conn_pref(struct hostapd_data *hapd,
-					     struct wpabuf *buf)
+					     struct wpabuf **buf)
 {
 	if (hapd->conf->mbo_cell_data_conn_pref >= 0) {
-		u8 *len = gas_anqp_add_element(buf, ANQP_VENDOR_SPECIFIC);
-		wpabuf_put_be24(buf, OUI_WFA);
-		wpabuf_put_u8(buf, MBO_ANQP_OUI_TYPE);
-		wpabuf_put_u8(buf, MBO_ANQP_SUBTYPE_CELL_CONN_PREF);
-		wpabuf_put_u8(buf, hapd->conf->mbo_cell_data_conn_pref);
-		gas_anqp_set_element_len(buf, len);
+		u8 *len;
+
+		if (wpabuf_resize(buf, 2 + 4 + 1 + 1) < 0)
+			return;
+		len = gas_anqp_add_element(*buf, ANQP_VENDOR_SPECIFIC);
+		wpabuf_put_be24(*buf, OUI_WFA);
+		wpabuf_put_u8(*buf, MBO_ANQP_OUI_TYPE);
+		wpabuf_put_u8(*buf, MBO_ANQP_SUBTYPE_CELL_CONN_PREF);
+		wpabuf_put_u8(*buf, hapd->conf->mbo_cell_data_conn_pref);
+		gas_anqp_set_element_len(*buf, len);
 	}
 }
 #endif /* CONFIG_MBO */
@@ -760,68 +883,68 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 		return NULL;
 
 	if (request & ANQP_REQ_CAPABILITY_LIST)
-		anqp_add_capab_list(hapd, buf);
+		anqp_add_capab_list(hapd, &buf);
 	if (request & ANQP_REQ_VENUE_NAME)
-		anqp_add_venue_name(hapd, buf);
+		anqp_add_venue_name(hapd, &buf);
 	if (request & ANQP_REQ_EMERGENCY_CALL_NUMBER)
-		anqp_add_elem(hapd, buf, ANQP_EMERGENCY_CALL_NUMBER);
+		anqp_add_elem(hapd, &buf, ANQP_EMERGENCY_CALL_NUMBER);
 	if (request & ANQP_REQ_NETWORK_AUTH_TYPE)
-		anqp_add_network_auth_type(hapd, buf);
+		anqp_add_network_auth_type(hapd, &buf);
 	if (request & ANQP_REQ_ROAMING_CONSORTIUM)
-		anqp_add_roaming_consortium(hapd, buf);
+		anqp_add_roaming_consortium(hapd, &buf);
 	if (request & ANQP_REQ_IP_ADDR_TYPE_AVAILABILITY)
-		anqp_add_ip_addr_type_availability(hapd, buf);
+		anqp_add_ip_addr_type_availability(hapd, &buf);
 	if (request & (ANQP_REQ_NAI_REALM | ANQP_REQ_NAI_HOME_REALM))
-		anqp_add_nai_realm(hapd, buf, home_realm, home_realm_len,
+		anqp_add_nai_realm(hapd, &buf, home_realm, home_realm_len,
 				   request & ANQP_REQ_NAI_REALM,
 				   request & ANQP_REQ_NAI_HOME_REALM);
 	if (request & ANQP_REQ_3GPP_CELLULAR_NETWORK)
-		anqp_add_3gpp_cellular_network(hapd, buf);
+		anqp_add_3gpp_cellular_network(hapd, &buf);
 	if (request & ANQP_REQ_AP_GEOSPATIAL_LOCATION)
-		anqp_add_elem(hapd, buf, ANQP_AP_GEOSPATIAL_LOCATION);
+		anqp_add_elem(hapd, &buf, ANQP_AP_GEOSPATIAL_LOCATION);
 	if (request & ANQP_REQ_AP_CIVIC_LOCATION)
-		anqp_add_elem(hapd, buf, ANQP_AP_CIVIC_LOCATION);
+		anqp_add_elem(hapd, &buf, ANQP_AP_CIVIC_LOCATION);
 	if (request & ANQP_REQ_AP_LOCATION_PUBLIC_URI)
-		anqp_add_elem(hapd, buf, ANQP_AP_LOCATION_PUBLIC_URI);
+		anqp_add_elem(hapd, &buf, ANQP_AP_LOCATION_PUBLIC_URI);
 	if (request & ANQP_REQ_DOMAIN_NAME)
-		anqp_add_domain_name(hapd, buf);
+		anqp_add_domain_name(hapd, &buf);
 	if (request & ANQP_REQ_EMERGENCY_ALERT_URI)
-		anqp_add_elem(hapd, buf, ANQP_EMERGENCY_ALERT_URI);
+		anqp_add_elem(hapd, &buf, ANQP_EMERGENCY_ALERT_URI);
 	if (request & ANQP_REQ_TDLS_CAPABILITY)
-		anqp_add_elem(hapd, buf, ANQP_TDLS_CAPABILITY);
+		anqp_add_elem(hapd, &buf, ANQP_TDLS_CAPABILITY);
 	if (request & ANQP_REQ_EMERGENCY_NAI)
-		anqp_add_elem(hapd, buf, ANQP_EMERGENCY_NAI);
+		anqp_add_elem(hapd, &buf, ANQP_EMERGENCY_NAI);
 
 	for (i = 0; i < num_extra_req; i++) {
 #ifdef CONFIG_FILS
 		if (extra_req[i] == ANQP_FILS_REALM_INFO) {
-			anqp_add_fils_realm_info(hapd, buf);
+			anqp_add_fils_realm_info(hapd, &buf);
 			continue;
 		}
 #endif /* CONFIG_FILS */
 		if (extra_req[i] == ANQP_VENUE_URL) {
-			anqp_add_venue_url(hapd, buf);
+			anqp_add_venue_url(hapd, &buf);
 			continue;
 		}
-		anqp_add_elem(hapd, buf, extra_req[i]);
+		anqp_add_elem(hapd, &buf, extra_req[i]);
 	}
 
 #ifdef CONFIG_HS20
 	if (request & ANQP_REQ_HS_CAPABILITY_LIST)
-		anqp_add_hs_capab_list(hapd, buf);
+		anqp_add_hs_capab_list(hapd, &buf);
 	if (request & ANQP_REQ_OPERATOR_FRIENDLY_NAME)
-		anqp_add_operator_friendly_name(hapd, buf);
+		anqp_add_operator_friendly_name(hapd, &buf);
 	if (request & ANQP_REQ_WAN_METRICS)
-		anqp_add_wan_metrics(hapd, buf);
+		anqp_add_wan_metrics(hapd, &buf);
 	if (request & ANQP_REQ_CONNECTION_CAPABILITY)
-		anqp_add_connection_capability(hapd, buf);
+		anqp_add_connection_capability(hapd, &buf);
 	if (request & ANQP_REQ_OPERATING_CLASS)
-		anqp_add_operating_class(hapd, buf);
+		anqp_add_operating_class(hapd, &buf);
 #endif /* CONFIG_HS20 */
 
 #ifdef CONFIG_MBO
 	if (request & ANQP_REQ_MBO_CELL_DATA_CONN_PREF)
-		anqp_add_mbo_cell_data_conn_pref(hapd, buf);
+		anqp_add_mbo_cell_data_conn_pref(hapd, &buf);
 #endif /* CONFIG_MBO */
 
 	return buf;
