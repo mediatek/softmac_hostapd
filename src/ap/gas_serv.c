@@ -312,14 +312,20 @@ static void anqp_add_venue_name(struct hostapd_data *hapd, struct wpabuf **buf)
 
 	if (hapd->conf->venue_name) {
 		u8 *len;
-		unsigned int i;
+		unsigned int i, count = 0;
 		size_t tlen = 2 + 2 + 1 + 1;
 
 		for (i = 0; i < hapd->conf->venue_name_count; i++) {
 			struct hostapd_lang_string *vn;
 
 			vn = &hapd->conf->venue_name[i];
+			if (tlen + 1 + 3 + vn->name_len > 2 + 2 + 65535) {
+				wpa_printf(MSG_INFO,
+					   "ANQP: Too many venue names configured to fit into an ANQP-element");
+				break;
+			}
 			tlen += 1 + 3 + vn->name_len;
+			count++;
 		}
 		if (wpabuf_resize(buf, tlen) < 0)
 			return;
@@ -327,8 +333,9 @@ static void anqp_add_venue_name(struct hostapd_data *hapd, struct wpabuf **buf)
 		len = gas_anqp_add_element(*buf, ANQP_VENUE_NAME);
 		wpabuf_put_u8(*buf, hapd->conf->venue_group);
 		wpabuf_put_u8(*buf, hapd->conf->venue_type);
-		for (i = 0; i < hapd->conf->venue_name_count; i++) {
+		for (i = 0; i < count; i++) {
 			struct hostapd_lang_string *vn;
+
 			vn = &hapd->conf->venue_name[i];
 			wpabuf_put_u8(*buf, 3 + vn->name_len);
 			wpabuf_put_data(*buf, vn->lang, 3);
