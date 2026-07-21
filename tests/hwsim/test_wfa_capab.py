@@ -15,6 +15,22 @@ def test_wfa_gen_capa_protected(dev, apdev):
     finally:
         dev[0].set("wfa_gen_capa", "0")
 
+def test_wfa_gen_capa_protected_roam(dev, apdev):
+    """WFA generational capabilities indication (protected, roam)"""
+    try:
+        dev[0].set("wfa_gen_capa", "1")
+        run_wfa_gen_capa(dev, apdev)
+        params = hostapd.wpa3_params(ssid="wfa-capab", password="12345678")
+        hapd = hostapd.add_ap(apdev[1], params)
+        bssid = hapd.own_addr()
+        dev[0].scan_for_bss(bssid, freq=2412)
+        dev[0].roam(bssid)
+        ev = hapd.wait_event(["WFA-GEN-CAPAB"], timeout=10)
+        if ev is None:
+            raise Exception("Generational capabilities indication not received")
+    finally:
+        dev[0].set("wfa_gen_capa", "0")
+
 def test_wfa_gen_capa_unprotected(dev, apdev):
     """WFA generational capabilities indication (unprotected)"""
     try:
