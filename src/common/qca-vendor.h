@@ -1593,6 +1593,28 @@ enum qca_radiotap_vendor_ids {
  *	qca_wlan_vendor_attr_hw_blocked_chans_req.
  *	Response/event attributes are defined in enum
  *	qca_wlan_vendor_attr_hw_blocked_chans_resp.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_CRYPTO_TEST: Subcommand used to validate the
+ *	hardware crypto engine functionality (encrypt/decrypt), using the
+ *	externally supplied variable configuration parameters such as cipher,
+ *	key, AAD, Nonce, Tag, and payload.
+ *
+ *	Crypto test mode must be enabled through
+ *	%QCA_WLAN_VENDOR_ATTR_CONFIG_CRYPTO_TEST_MODE_ENABLE before using this
+ *	command. This is required to allow the driver to configure the crypto
+ *	engine with externally provided test parameters. While the device is
+ *	operating in this test mode, regular transmit and receive functionality
+ *	is disabled.
+ *
+ *	Once testing is complete, userspace should disable the crypto test mode
+ *	using %QCA_WLAN_VENDOR_ATTR_CONFIG_CRYPTO_TEST_MODE_ENABLE.
+ *
+ *	When used as a command, userspace provides the required input parameters
+ *	to the driver for execution of the crypto operation. When used as an
+ *	event, the driver reports the resulting output back to userspace.
+ *
+ *	The attributes used with this command are defined in
+ *	enum qca_wlan_vendor_attr_crypto_test.
  */
 enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
@@ -1857,6 +1879,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG = 278,
 	QCA_NL80211_VENDOR_SUBCMD_TAS = 279,
 	QCA_NL80211_VENDOR_SUBCMD_HW_BLOCKED_CHANS = 280,
+	QCA_NL80211_VENDOR_SUBCMD_CRYPTO_TEST = 281,
 };
 
 /* Compatibility defines for previously used subcmd names.
@@ -4462,6 +4485,17 @@ enum qca_wlan_vendor_attr_config {
 	 * 1 - Enable, 0 - Disable.
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_2X_LDPC_RX = 148,
+
+	/* 8-bit unsigned value used to enable or disable crypto testing in
+	 * the device.
+	 *
+	 * While crypto test mode is enabled, normal transmit and receive
+	 * functionality is disabled.
+	 *
+	 * 0 - disable crypto test mode
+	 * 1 - enable crypto test mode
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_CRYPTO_TEST_MODE_ENABLE = 149,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
@@ -25033,6 +25067,117 @@ enum qca_wlan_vendor_attr_hw_blocked_chans_req {
 	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_MAX =
 	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_crypto_test_mode: AES crypto modes
+ *	Used by QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MODE and sent from userspace
+ *	to the driver.
+ *
+ * @QCA_WLAN_VENDOR_CRYPTO_TEST_AES_CCM: Indicates AES-CCM crypto mode
+ * @QCA_WLAN_VENDOR_CRYPTO_TEST_AES_GCM: Indicates AES-GCM crypto mode
+ */
+enum qca_wlan_vendor_crypto_test_mode {
+	QCA_WLAN_VENDOR_CRYPTO_TEST_MODE_AES_CCM,
+	QCA_WLAN_VENDOR_CRYPTO_TEST_MODE_AES_GCM,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_crypto_test: Defines the attributes used in the
+ *	QCA_NL80211_VENDOR_SUBCMD_CRYPTO_TEST command.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_DECRYPT: Flag attribute. Used in a command
+ *	from userspace to indicate that it is a decryption request. If not
+ *	included it is treated as a request for encryption.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MODE: u8 attribute. Used in a command from
+ *	userspace to indicate the AES mode to be used for encryption/decryption.
+ *	Possible values are defined in enum qca_wlan_vendor_crypto_test_mode.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_KEY: Variable length byte array
+ *	attribute. Used in a command from userspace containing the key for
+ *	encryption/decryption.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_NONCE: Variable length byte array
+ *	attribute. Used in a command from userspace containing the Nonce
+ *	for encryption/decryption.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_TAG: Variable length byte array
+ *	attribute. Used in a command from userspace containing the Tag (MIC)
+ *	for encryption/decryption.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AAD: Variable length byte array
+ *	attribute. Used in a command from userspace containing the AAD
+ *	for encryption/decryption.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_PAYLOAD: Variable length byte array
+ *	attribute. When used in a command from userspace, it contains the
+ *	plaintext for encryption or ciphertext for decryption. When used in an
+ *	event, it contains the result returned from the driver.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_COOKIE: u32 attribute used in command
+ *	response and event. When multiple requests are queued in parallel to
+ *	the driver, the events may not always be received in order. To be able
+ *	to track a request with its corresponding event, the driver assigns a
+ *	unique cookie value for each request that is also returned to userspace
+ *	in the command response. The same cookie value is included in the
+ *	corresponding event, allowing userspace to correlate the event with the
+ *	original request.
+ *
+ *	For fragmented requests, all fragments belonging to a request are
+ *	associated with the same cookie value.
+ *
+ *	The asynchronous event mechanism allows userspace to submit
+ *	multiple requests without waiting for each result, improving throughput
+ *	when processing a large number of test vectors.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_FRAG_IDX: u32 attribute used in both
+ *	command and event. For requests with larger payload, userspace
+ *	fragments it across multiple requests with each fragment
+ *	assigned a fragment index. Fragment indices must start from zero and
+ *	increment by 1 for subsequent fragments, where fragments belonging to
+ *	a request are sent consecutively and in increasing index order.
+ *	All fragments include %QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_FRAG_IDX. The
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MORE_BIT is included in all fragments
+ *	except the last fragment.
+ *	The first fragment includes %QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AAD along
+ *	with the initial portion of the payload.
+ *	Fragments with indices greater than zero include only the remaining
+ *	portions of the payload and do not include
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AAD.
+ *	Other attributes such as
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_DECRYPT,
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MODE,
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_KEY,
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_NONCE, and
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_TAG
+ *	are included in all fragments and are expected to have identical values
+ *	across all fragments of a given request.
+ *	The maximum length of %QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_PAYLOAD per
+ *	fragment is 1368 bytes. Payloads larger than this will be split across
+ *	multiple requests.
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_FRAG_IDX and
+ *	%QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MORE_BIT together support
+ *	fragmentation.
+ *
+ *	When the driver returns the result, it may also be fragmented across
+ *	multiple events, with each fragment carrying the corresponding fragment
+ *	index.
+ * @QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MORE_BIT: Flag attribute. Used in
+ *	command and event for requests with larger payload that are
+ *	fragmented across multiple requests. When present, it indicates
+ *	that there are more fragments to follow. Absence of this attribute
+ *	marks the final fragment.
+ */
+enum qca_wlan_vendor_attr_crypto_test {
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_DECRYPT = 1,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MODE = 2,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_KEY = 3,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_NONCE = 4,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_TAG = 5,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AAD = 6,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_PAYLOAD = 7,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_COOKIE = 8,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_FRAG_IDX = 9,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MORE_BIT = 10,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_MAX =
+	QCA_WLAN_VENDOR_ATTR_CRYPTO_TEST_AFTER_LAST - 1,
 };
 
 #endif /* QCA_VENDOR_H */
