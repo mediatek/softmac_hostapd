@@ -1618,6 +1618,9 @@ int hostapd_drv_mu_ctrl(struct hostapd_data *hapd, u8 mode)
 	params.mode = mode;
 	params.mu_onoff = hapd->iconf->mu_onoff;
 	params.muru_config = os_zalloc(hapd->iconf->muru_config_len);
+	if (!params.muru_config)
+		return -1;
+
 	os_memcpy(params.muru_config, hapd->iconf->muru_config, hapd->iconf->muru_config_len);
 
 	ret = hapd->driver->mu_ctrl(hapd->drv_priv, radio_idx, &params);
