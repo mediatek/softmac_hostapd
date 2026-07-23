@@ -89,16 +89,39 @@ int hostapd_neighbor_show(struct hostapd_data *hapd, char *buf, size_t buflen)
 }
 
 
-int hostapd_neighbor_count(struct hostapd_data *hapd)
+static bool hostapd_neighbor_needs_pref_subelem(const struct wpabuf *nr)
+{
+	size_t nr_len = wpabuf_len(nr);
+	/* bssid + bssid_info + op_class + channel + phy_type */
+	const size_t fixed_hdr_len = 6 + 4 + 1 + 1 + 1;
+
+	if (nr_len < fixed_hdr_len) {
+		wpa_printf(MSG_ERROR,
+			   "Neighbor Report: malformed entry (len=%zu < %zu)",
+			   nr_len, fixed_hdr_len);
+		return false;
+	}
+
+	return get_ie(wpabuf_head_u8(nr) + fixed_hdr_len,
+		      nr_len - fixed_hdr_len,
+		      WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE) == NULL;
+}
+
+
+size_t hostapd_neighbor_buffer_len(struct hostapd_data *hapd)
 {
 	struct hostapd_neighbor_entry *nr;
-	int count = 0;
+	size_t len = 0;
 
-	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry,
-			 list) {
-		count++;
+	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list) {
+		if (!nr->nr)
+			continue;
+
+		len += 2 + wpabuf_len(nr->nr) +
+			(hostapd_neighbor_needs_pref_subelem(nr->nr) ? 3 : 0);
 	}
-	return count;
+
+	return len;
 }
 
 
@@ -107,25 +130,28 @@ int hostapd_neighbor_insert_buffer(struct hostapd_data *hapd, char *buf,
 {
 	struct hostapd_neighbor_entry *nr;
 	char *pos = buf;
+	char *end = buf + buflen;
 
-	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry,
-			 list) {
-		struct neighbor_report_element *nre;
-		struct element *preference_subelem;
+	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list) {
+		bool need_subelem;
+		size_t nr_len, need;
 
-		nre = (struct neighbor_report_element *)pos;
-		/* For neighbor report IE, we only need bssid and nr*/
+		if (!nr->nr)
+			continue;
+
+		need_subelem = hostapd_neighbor_needs_pref_subelem(nr->nr);
+		nr_len = wpabuf_len(nr->nr);
+		need = 2 + nr_len + (need_subelem ? 3 : 0);
+
+		if ((size_t) (end - pos) < need)
+			break;
+
 		*pos++ = WLAN_EID_NEIGHBOR_REPORT;
-		*pos++ = wpabuf_len(nr->nr);
-		os_memcpy(pos, wpabuf_head(nr->nr), wpabuf_len(nr->nr));
-		pos += wpabuf_len(nr->nr);
+		*pos++ = nr_len + (need_subelem ? 3 : 0);
+		os_memcpy(pos, wpabuf_head(nr->nr), nr_len);
+		pos += nr_len;
 
-		preference_subelem = (struct element *)
-			get_ie(nre->variable,
-			       nre->len - (6 + 4 + 1 + 1 + 1),
-			       WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE);
-		if (!preference_subelem) {
-			nre->len += 3;
+		if (need_subelem) {
 			*pos++ = WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE;
 			*pos++ = 1;
 			*pos++ = 0xff;

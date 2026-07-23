@@ -391,19 +391,24 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	u8 *pos;
 	int res;
 
-	int nr_num = hostapd_neighbor_count(hapd);
-	int nr_size = ETH_ALEN + 4 + 1 + 1 + 1 + 5;
-	int total_nr_size = nr_num * nr_size;
-	u8 *nr_data = os_malloc(total_nr_size);
+	size_t total_nr_size = hostapd_neighbor_buffer_len(hapd);
 	int nr_data_len = 0;
-	if(nr_data == NULL) {
-		wpa_printf (MSG_ERROR, "Failed to allocate memory");
-	} else {
-	    nr_data_len = hostapd_neighbor_insert_buffer(hapd, nr_data, total_nr_size);
+	u8 *nr_data = NULL;
+
+	if (total_nr_size) {
+		nr_data = os_malloc(total_nr_size);
+		if (nr_data == NULL) {
+			wpa_printf(MSG_ERROR,
+				   "WNM: Failed to allocate memory for neighbor report");
+			return -1;
+		}
+		nr_data_len = hostapd_neighbor_insert_buffer(hapd, nr_data, total_nr_size);
 	}
+
 	mgmt = os_zalloc(sizeof(*mgmt) + nr_data_len);
 	if (mgmt == NULL) {
-		wpa_printf (MSG_ERROR, "Failed to allocate memory for mgmt frame");
+		wpa_printf(MSG_ERROR, "WNM: Failed to allocate memory for BTM request");
+		os_free(nr_data);
 		return -1;
 	}
 
@@ -418,14 +423,15 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	mgmt->u.action.u.bss_tm_req.action = WNM_BSS_TRANS_MGMT_REQ;
 	mgmt->u.action.u.bss_tm_req.dialog_token = dialog_token;
 	mgmt->u.action.u.bss_tm_req.req_mode = 0;
-	if(nr_num) {
-		mgmt->u.action.u.bss_tm_req.req_mode |= WNM_BSS_TM_REQ_PREF_CAND_LIST_INCLUDED;
+	if (nr_data_len) {
+		mgmt->u.action.u.bss_tm_req.req_mode |=
+			WNM_BSS_TM_REQ_PREF_CAND_LIST_INCLUDED;
 	}
 	mgmt->u.action.u.bss_tm_req.disassoc_timer = host_to_le16(0);
 	mgmt->u.action.u.bss_tm_req.validity_interval = 1;
 	pos = mgmt->u.action.u.bss_tm_req.variable;
 
-	if(nr_num) {
+	if (nr_data_len) {
 		os_memcpy(pos, nr_data, nr_data_len);
 		pos += nr_data_len;
 	}
@@ -443,6 +449,7 @@ static int ieee802_11_send_bss_trans_mgmt_request(struct hostapd_data *hapd,
 	res = hostapd_drv_send_action(hapd, hapd->iface->freq, 0,
 				      mgmt->da, &mgmt->u.action.category, len);
 	os_free(mgmt);
+	os_free(nr_data);
 	return res;
 }
 
