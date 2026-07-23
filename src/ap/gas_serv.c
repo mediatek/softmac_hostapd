@@ -367,16 +367,16 @@ static void anqp_add_neighbor_report(struct hostapd_data *hapd,
 {
 	struct hostapd_neighbor_entry *nr;
 	u8 *len_pos = gas_anqp_add_element(buf, ANQP_NEIGHBOR_REPORT);
-	if (dl_list_empty(&hapd->nr_db)) {
-		wpabuf_put_le16(buf, 0);
+
+	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list) {
+		if (!nr->nr)
+			continue;
+
+		wpabuf_put_u8(buf, WLAN_EID_NEIGHBOR_REPORT);
+		wpabuf_put_u8(buf, wpabuf_len(nr->nr));
+		wpabuf_put_buf(buf, nr->nr);
 	}
-	else {
-		dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list ) {
-			wpabuf_put_u8(buf, WLAN_EID_NEIGHBOR_REPORT);
-			wpabuf_put_u8(buf, wpabuf_len(nr->nr));
-			wpabuf_put_buf(buf, nr->nr);
-		}
-	}
+
 	gas_anqp_set_element_len(buf, len_pos);
 }
 
@@ -769,7 +769,7 @@ gas_serv_build_gas_resp_payload(struct hostapd_data *hapd,
 	if (request & (ANQP_REQ_NAI_REALM | ANQP_REQ_NAI_HOME_REALM))
 		len += 1000;
 	if (request & ANQP_REQ_NEIGHBOR_REPORT)
-		len += (40 * hostapd_neighbor_count(hapd));
+		len += hostapd_neighbor_buffer_len(hapd);
 #ifdef CONFIG_FILS
 	if (request & ANQP_FILS_REALM_INFO)
 		len += 2 * dl_list_len(&hapd->conf->fils_realms);

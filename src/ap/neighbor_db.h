@@ -10,6 +10,21 @@
 #ifndef NEIGHBOR_DB_H
 #define NEIGHBOR_DB_H
 
+/*
+ * Fixed fields of a Neighbor Report element body: BSSID + BSSID Information +
+ * Operating Class + Channel Number + PHY Type.
+ */
+#define NR_FIXED_FIELDS_LEN	(6 + 4 + 1 + 1 + 1)
+
+/* BSS Transition Candidate Preference subelement: ID + Length + 1-octet body. */
+#define NR_PREF_SUBELEM_LEN	3
+
+/*
+ * The element Length field is one octet and has to cover an appended
+ * preference subelement as well.
+ */
+#define NR_MAX_FIELDS_LEN	(255 - NR_PREF_SUBELEM_LEN)
+
 struct hostapd_neighbor_entry *
 hostapd_neighbor_get(struct hostapd_data *hapd, const u8 *bssid,
 		     const struct wpa_ssid_value *ssid);
@@ -25,7 +40,7 @@ int hostapd_neighbor_remove(struct hostapd_data *hapd, const u8 *bssid,
 			    const struct wpa_ssid_value *ssid);
 void hostapd_free_neighbor_db(struct hostapd_data *hapd);
 
-int hostapd_neighbor_count(struct hostapd_data *hapd);
+size_t hostapd_neighbor_buffer_len(struct hostapd_data *hapd);
 int hostapd_neighbor_insert_buffer(struct hostapd_data *hapd, char *buf,
         size_t buflen);
 void hostapd_neighbor_set_own_report_pref(struct hostapd_data *hapd, u8 *nei_buf,
