@@ -1357,10 +1357,11 @@ hostapd_dfs_background_expand(struct hostapd_iface *iface, int chan_width)
 	}
 
 	primary_backup = iface->radar_background.primary_backup;
-	if (chan->chan > primary_backup ||
+	if (!primary_backup || chan->chan > primary_backup ||
 	    primary_backup > chan->chan + expanded_width / 5 - 4) {
-		wpa_printf(MSG_ERROR, "DFS: Invalid backup primary ch: %d", primary_backup);
-		goto out;
+		wpa_printf(MSG_ERROR, "DFS: Invalid backup primary ch: %d change to %d",
+			   primary_backup, chan->chan);
+		primary_backup = chan->chan;
 	}
 
 	iface->radar_background.freq = 5000 +  5 * primary_backup;
@@ -1661,6 +1662,9 @@ hostapd_dfs_background_start_channel_switch(struct hostapd_iface *iface,
 		 * Just select a new random channel according to the
 		 * regulations for monitoring.
 		 */
+		/* the primary backup is out-of-date */
+		if (iface->radar_background.primary_backup)
+			iface->radar_background.primary_backup = 0;
 		hostapd_dfs_update_background_chain(iface);
 		return 0;
 	}
