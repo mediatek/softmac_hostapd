@@ -6602,6 +6602,30 @@ static int owe_trans_ssid_match(struct wpa_supplicant *wpa_s, const u8 *bssid,
 #endif /* CONFIG_OWE */
 
 
+static bool wpas_get_ssid_match_bssid(const struct wpa_supplicant *wpa_s,
+				      const struct wpa_ssid *ssid,
+				      const u8 *assoc_bssid)
+{
+	int link_id;
+
+	if (!ssid->bssid_set)
+		return true;
+
+	if (ether_addr_equal(assoc_bssid, ssid->bssid))
+		return true;
+
+	if (!wpa_s->valid_links)
+		return false;
+
+	for_each_link(wpa_s->valid_links, link_id) {
+		if (ether_addr_equal(wpa_s->links[link_id].bssid,
+				     ssid->bssid))
+			return true;
+	}
+
+	return false;
+}
+
 /**
  * wpa_supplicant_get_ssid - Get a pointer to the current network structure
  * @wpa_s: Pointer to wpa_supplicant data
@@ -6640,15 +6664,13 @@ struct wpa_ssid * wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 		      (!entry->ssid ||
 		       os_memcmp(ssid, entry->ssid, ssid_len) == 0)) ||
 		     wired) &&
-		    (wpa_s->valid_links || !entry->bssid_set ||
-		     ether_addr_equal(bssid, entry->bssid)))
+		    wpas_get_ssid_match_bssid(wpa_s, entry, bssid))
 			return entry;
 #ifdef CONFIG_WPS
 		if (!wpas_network_disabled(wpa_s, entry) &&
 		    (entry->key_mgmt & WPA_KEY_MGMT_WPS) &&
 		    (entry->ssid == NULL || entry->ssid_len == 0) &&
-		    (wpa_s->valid_links || !entry->bssid_set ||
-		     ether_addr_equal(bssid, entry->bssid)))
+		    wpas_get_ssid_match_bssid(wpa_s, entry, bssid))
 			return entry;
 #endif /* CONFIG_WPS */
 
@@ -6657,14 +6679,13 @@ struct wpa_ssid * wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 		    (entry->ssid &&
 		     owe_trans_ssid_match(wpa_s, bssid, entry->ssid,
 					  entry->ssid_len)) &&
-		    (wpa_s->valid_links || !entry->bssid_set ||
-		     ether_addr_equal(bssid, entry->bssid)))
+		    wpas_get_ssid_match_bssid(wpa_s, entry, bssid))
 			return entry;
 #endif /* CONFIG_OWE */
 
 		if (!wpas_network_disabled(wpa_s, entry) && entry->bssid_set &&
 		    entry->ssid_len == 0 &&
-		    ether_addr_equal(bssid, entry->bssid))
+		    wpas_get_ssid_match_bssid(wpa_s, entry, bssid))
 			return entry;
 
 		entry = entry->next;
