@@ -89,16 +89,29 @@ int hostapd_neighbor_show(struct hostapd_data *hapd, char *buf, size_t buflen)
 }
 
 
-int hostapd_neighbor_count(struct hostapd_data *hapd)
+static bool hostapd_neighbor_should_append_pref_subelem(const struct wpabuf *nr)
+{
+	return get_ie(wpabuf_head_u8(nr) + NR_FIXED_FIELDS_LEN,
+		      wpabuf_len(nr) - NR_FIXED_FIELDS_LEN,
+		      WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE) == NULL;
+}
+
+
+size_t hostapd_neighbor_buffer_len(struct hostapd_data *hapd)
 {
 	struct hostapd_neighbor_entry *nr;
-	int count = 0;
+	size_t len = 0;
 
-	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry,
-			 list) {
-		count++;
+	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list) {
+		if (!nr->nr)
+			continue;
+
+		len += 2 + wpabuf_len(nr->nr);
+		len += hostapd_neighbor_should_append_pref_subelem(nr->nr) ?
+			NR_PREF_SUBELEM_LEN : 0;
 	}
-	return count;
+
+	return len;
 }
 
 
@@ -107,25 +120,30 @@ int hostapd_neighbor_insert_buffer(struct hostapd_data *hapd, char *buf,
 {
 	struct hostapd_neighbor_entry *nr;
 	char *pos = buf;
+	char *end = buf + buflen;
 
-	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry,
-			 list) {
-		struct neighbor_report_element *nre;
-		struct element *preference_subelem;
+	dl_list_for_each(nr, &hapd->nr_db, struct hostapd_neighbor_entry, list) {
+		bool append_pref_subelem;
+		size_t vlen, nre_len;
 
-		nre = (struct neighbor_report_element *)pos;
-		/* For neighbor report IE, we only need bssid and nr*/
+		if (!nr->nr)
+			continue;
+
+		append_pref_subelem =
+			hostapd_neighbor_should_append_pref_subelem(nr->nr);
+		vlen = wpabuf_len(nr->nr);
+		nre_len = 1 + 1 + vlen +
+			(append_pref_subelem ? NR_PREF_SUBELEM_LEN : 0);
+
+		if ((size_t) (end - pos) < nre_len)
+			break;
+
 		*pos++ = WLAN_EID_NEIGHBOR_REPORT;
-		*pos++ = wpabuf_len(nr->nr);
-		os_memcpy(pos, wpabuf_head(nr->nr), wpabuf_len(nr->nr));
-		pos += wpabuf_len(nr->nr);
+		*pos++ = nre_len - 2;
+		os_memcpy(pos, wpabuf_head(nr->nr), vlen);
+		pos += vlen;
 
-		preference_subelem = (struct element *)
-			get_ie(nre->variable,
-			       nre->len - (6 + 4 + 1 + 1 + 1),
-			       WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE);
-		if (!preference_subelem) {
-			nre->len += 3;
+		if (append_pref_subelem) {
 			*pos++ = WNM_NEIGHBOR_BSS_TRANSITION_CANDIDATE;
 			*pos++ = 1;
 			*pos++ = 0xff;
@@ -175,6 +193,16 @@ int hostapd_neighbor_set(struct hostapd_data *hapd, const u8 *bssid,
 			 u8 bss_parameters)
 {
 	struct hostapd_neighbor_entry *entry;
+
+	if (!nr || wpabuf_len(nr) < NR_FIXED_FIELDS_LEN ||
+	    wpabuf_len(nr) > NR_MAX_FIELDS_LEN) {
+		wpa_printf(MSG_ERROR,
+			   "Neighbor Report: malformed entry for " MACSTR
+			   " (len=%zu, expected %d..%d)",
+			   MAC2STR(bssid), nr ? wpabuf_len(nr) : 0,
+			   NR_FIXED_FIELDS_LEN, NR_MAX_FIELDS_LEN);
+		return -1;
+	}
 
 	entry = hostapd_neighbor_get(hapd, bssid, ssid);
 	if (!entry)
