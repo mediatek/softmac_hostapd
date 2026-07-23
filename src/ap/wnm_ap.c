@@ -1012,6 +1012,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 	u8 *buf, *pos;
 	struct ieee80211_mgmt *mgmt;
 	size_t url_len;
+	size_t buf_len = 1000 + nei_rep_len + mbo_len;
 	const u8 *own_addr = wnm_ap_get_own_addr(hapd, sta);
 
 	wpa_printf(MSG_DEBUG, "WNM: Send BSS Transition Management Request to "
@@ -1019,7 +1020,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 		   " req_mode=0x%x disassoc_timer=%d valid_int=0x%x dialog_token=%u",
 		   MAC2STR(sta->addr), req_mode, disassoc_timer, valid_int,
 		   dialog_token);
-	buf = os_zalloc(1000 + nei_rep_len + mbo_len);
+	buf = os_zalloc(buf_len);
 	if (buf == NULL)
 		return -1;
 	mgmt = (struct ieee80211_mgmt *) buf;
@@ -1064,7 +1065,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 
 	if (mbo_len > 0) {
-		pos += mbo_add_ie(pos, buf + sizeof(buf) - pos, mbo_attrs,
+		pos += mbo_add_ie(pos, buf + buf_len - pos, mbo_attrs,
 				  mbo_len);
 	}
 
