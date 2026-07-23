@@ -1585,6 +1585,14 @@ enum qca_radiotap_vendor_ids {
  *
  *	The attributes used with this command are defined in
  *	enum qca_wlan_vendor_attr_tas.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_HW_BLOCKED_CHANS: Vendor subcommand/event used
+ *	to query hardware blocked channel information from the driver or
+ *	firmware.
+ *	Request attributes are defined in enum
+ *	qca_wlan_vendor_attr_hw_blocked_chans_req.
+ *	Response/event attributes are defined in enum
+ *	qca_wlan_vendor_attr_hw_blocked_chans_resp.
  */
 enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
@@ -1848,6 +1856,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS = 277,
 	QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG = 278,
 	QCA_NL80211_VENDOR_SUBCMD_TAS = 279,
+	QCA_NL80211_VENDOR_SUBCMD_HW_BLOCKED_CHANS = 280,
 };
 
 /* Compatibility defines for previously used subcmd names.
@@ -24766,6 +24775,213 @@ enum qca_wlan_tx_power_level {
 	QCA_WLAN_TX_POWER_LEVEL_MEDIUM = 2,
 	QCA_WLAN_TX_POWER_LEVEL_HIGH = 3,
 	QCA_WLAN_TX_POWER_LEVEL_EXTRA_HIGH = 4,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_fb_chan - Nested attributes for a
+ * full-bandwidth blocked channel entry.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_BW: u32 attribute. Required.
+ * Blocked channel width encoded using enum nl80211_chan_width.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_CENTER_FREQ: u32 attribute.
+ * Required. Blocked bandwidth center frequency in MHz.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_PRI20_BITMAP: u32 bitmap.
+ * Required.
+ * Bitmap of blocked primary 20 MHz subchannels for
+ * QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_BW centered at
+ * QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_CENTER_FREQ.
+ * Each bit N in the bitmap corresponds to the Nth 20 MHz subchannel
+ * from the lower edge (low edge = center_freq - BW / 2 + 10 MHz).
+ * If bit N is set, then that 20 MHz subchannel is blocked from being used as
+ * primary 20 MHz channel. More than one channel bit can be set.
+ * Valid bits by width:
+ * 20 MHz: bit [0]
+ * 40 MHz: bits [0..1]
+ * 80 MHz: bits [0..3]
+ * 160 MHz: bits [0..7]
+ * 320 MHz: bits [0..15]
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_fb_chan {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_BW = 1,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_CENTER_FREQ = 2,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_PRI20_BITMAP = 3,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_FB_CHAN_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_pc_chan - Nested attributes for
+ * a punctured blocked channel entry.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_BW: u32 attribute.
+ * Required. Blocked channel width encoded using enum nl80211_chan_width.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_CENTER_FREQ: u32 attribute.
+ * Required. Blocked bandwidth center frequency in MHz.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_PUNC_PATTERN_BITMAP:
+ * u32 bitmap. Required.
+ * Bitmap of blocked puncturing patterns for
+ * QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_BW centered at
+ * QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_CENTER_FREQ.
+ * Each bit in the bitmap corresponds to a puncture pattern.
+ * If bit N is set, the puncture pattern corresponding to bit N for the
+ * width specified by QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_BW is
+ * blocked. More than one puncture pattern can be blocked.
+ * Each bit N corresponds to a puncture pattern for a particular BW as:
+ * 80 MHz:
+ *     idx 0->0x0001, 1->0x0002, 2->0x0004, 3->0x0008
+ * 160 MHz:
+ *     idx 0->0x0001, 1->0x0002, 2->0x0004, 3->0x0008
+ *     idx 4->0x0010, 5->0x0020, 6->0x0040, 7->0x0080
+ *     idx 8->0x000C, 9->0x0003, 10->0x00C0, 11->0x0030
+ * 320 MHz:
+ *     idx 0->0x000C, 1->0x0003, 2->0x00C0, 3->0x0030
+ *     idx 4->0x0C00, 5->0x0300, 6->0xC000, 7->0x3000
+ *     idx 8->0x000F, 9->0x00F0, 10->0x0F00, 11->0xF000
+ *     idx 12->0xF003, 13->0xF00C, 14->0xF030, 15->0xF0C0
+ *     idx 16->0xF300, 17->0xFC00, 18->0x003F, 19->0x00CF
+ *     idx 20->0x030F, 21->0x0C0F, 22->0x300F, 23->0xC00F
+ *
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_pc_chan {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_BW = 1,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_CENTER_FREQ = 2,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_PUNC_PATTERN_BITMAP = 3,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PC_CHAN_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_pwr_mode - Nested attributes for
+ * one 6 GHz power-mode entry in
+ * QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_PWR_MODE_LIST.
+ * Valid only for NL80211_BAND_6GHZ.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_ID: u8 attribute. Required.
+ * 6 GHz AP power mode value:
+ * 0 = Low Power Indoor (LPI) Mode.
+ * 1 = Standard Power (SP) Mode.
+ * 2 = Very Low Power (VLP) Mode.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_FB_CHAN_LIST: Nested array.
+ * Optional. Uses enum qca_wlan_vendor_attr_hw_blocked_chans_fb_chan.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_PC_CHAN_LIST: Nested array.
+ * Optional. Uses enum qca_wlan_vendor_attr_hw_blocked_chans_pc_chan.
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_pwr_mode {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_ID = 1,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_FB_CHAN_LIST = 2,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_PC_CHAN_LIST = 3,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_PWR_MODE_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_band - Nested per-band blocked
+ * channel attributes in response/event payload.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_ID: u32 attribute.
+ * Required. Band identifier from enum nl80211_band.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_FB_CHAN_LIST: Nested array.
+ * Optional. Uses enum qca_wlan_vendor_attr_hw_blocked_chans_fb_chan.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_PC_CHAN_LIST: Nested array.
+ * Optional. Uses enum qca_wlan_vendor_attr_hw_blocked_chans_pc_chan.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_PWR_MODE_LIST: Nested array.
+ * Optional. For NL80211_BAND_6GHZ only. Uses enum
+ * qca_wlan_vendor_attr_hw_blocked_chans_pwr_mode.
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_band {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_ID = 1,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_FB_CHAN_LIST = 2,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_PC_CHAN_LIST = 3,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_PWR_MODE_LIST = 4,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_BAND_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_radio - Nested per-radio
+ * blocked-channel attributes in response/event payload.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_RADIO_INDEX: s32 attribute.
+ * Required. Non-negative radio index of this radio entry (same semantics as
+ * NL80211_ATTR_WIPHY_RADIO_INDEX).
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_BAND_LIST: Nested array of
+ * per-band entries. Required.
+ * Uses enum qca_wlan_vendor_attr_hw_blocked_chans_band.
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_radio {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_RADIO_INDEX = 1,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_BAND_LIST = 2,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RADIO_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_resp - Response/event attributes
+ * used with QCA_NL80211_VENDOR_SUBCMD_HW_BLOCKED_CHANS.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_RADIO_LIST: Nested array of
+ * per-radio entries. Required. Each radio entry uses
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_radio.
+ * If requested for a particular radio index, the response shall have a single
+ * radio in the array corresponding to the requested radio index.
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_resp {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_RADIO_LIST = 1,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_RESP_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_hw_blocked_chans_req - Request attributes used with
+ * QCA_NL80211_VENDOR_SUBCMD_HW_BLOCKED_CHANS.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_RADIO_INDEX: s32 attribute.
+ * Optional. Radio index with the same semantics as
+ * NL80211_ATTR_WIPHY_RADIO_INDEX. When absent in the request, driver returns
+ * blocked-channel data for all radios.
+ */
+enum qca_wlan_vendor_attr_hw_blocked_chans_req {
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_RADIO_INDEX = 1,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_MAX =
+	QCA_WLAN_VENDOR_ATTR_HW_BLOCKED_CHANS_REQ_AFTER_LAST - 1,
 };
 
 #endif /* QCA_VENDOR_H */
