@@ -228,6 +228,7 @@ static void hostapd_handle_mscs_req(struct hostapd_data *hapd,
 	const struct ieee80211_mgmt *mgmt = (const struct ieee80211_mgmt *) buf;
 	const struct element *elem;
 	struct sta_info *sta;
+	const u8 *end = buf + len;
 	u8 token;
 
 	sta = ap_get_sta(hapd, mgmt->sa);
@@ -240,17 +241,19 @@ static void hostapd_handle_mscs_req(struct hostapd_data *hapd,
 	token = mgmt->u.action.u.mscs.dialog_token;
 	elem = (const struct element *) mgmt->u.action.u.mscs.variable;
 
-	if (elem->id != WLAN_EID_EXTENSION ||
-	    elem->data[0] != WLAN_EID_EXT_MSCS_DESCRIPTOR) {
-		wpa_printf(MSG_ERROR, "%s: no MSCS Descriptor element", __func__);
-		return;
+	if (end - (const u8 *) elem < 3 || elem->id != WLAN_EID_EXTENSION ||
+	    elem->datalen < 1 || elem->data[0] != WLAN_EID_EXT_MSCS_DESCRIPTOR) {
+		wpa_printf(MSG_ERROR, "%s: no valid MSCS Descriptor element",
+			   __func__);
+		sta->mscs_assoc_setup_status = WLAN_STATUS_REQUEST_DECLINED;
+		goto out;
 	}
 
 	sta->mscs_assoc_setup_status =
 		hostapd_set_mscs(hapd, mgmt->sa, &elem->data[1], elem->datalen - 1);
 
-	send_mscs_response(hapd, mgmt->sa, token,
-			   sta->mscs_assoc_setup_status);
+out:
+	send_mscs_response(hapd, mgmt->sa, token, sta->mscs_assoc_setup_status);
 }
 
 void hostapd_del_mscs(struct hostapd_data *hapd, u8 *mac)
