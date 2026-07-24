@@ -7829,6 +7829,7 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 				   const struct p2p_channels *channels)
 {
 	struct wpa_used_freq_data *freqs;
+	struct wpa_supplicant *src_wpa_s;
 	unsigned int cand;
 	unsigned int num, i;
 	int ignore_no_freqs = 0;
@@ -7933,11 +7934,16 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 		goto success;
 	}
 
+	src_wpa_s = wpas_p2p_get_assisted_dfs_src(wpa_s);
 	/* consider using one of the shared frequencies */
 	if (num &&
 	    (!wpa_s->conf->p2p_ignore_shared_freq || !unused_channels)) {
 		cand = wpas_p2p_pick_best_used_freq(wpa_s, freqs, num);
-		if (wpas_p2p_supported_freq_go(wpa_s, channels, cand)) {
+		if (wpas_p2p_supported_freq_go(wpa_s, channels, cand) &&
+		    (!ieee80211_is_dfs(cand, wpa_s->hw.modes,
+				       wpa_s->hw.num_modes) ||
+		     wpa_s->p2p_go_allow_dfs ||
+		     src_wpa_s->assisted_dfs)) {
 			wpa_printf(MSG_DEBUG,
 				   "P2P: Use shared freq (%d MHz) for GO",
 				   cand);
@@ -7948,7 +7954,11 @@ static int wpas_p2p_init_go_params(struct wpa_supplicant *wpa_s,
 		/* try using one of the shared freqs */
 		for (i = 0; i < num; i++) {
 			if (wpas_p2p_supported_freq_go(wpa_s, channels,
-						       freqs[i].freq)) {
+						       freqs[i].freq) &&
+			    (!ieee80211_is_dfs(freqs[i].freq, wpa_s->hw.modes,
+					       wpa_s->hw.num_modes) ||
+			     wpa_s->p2p_go_allow_dfs ||
+			     src_wpa_s->assisted_dfs)) {
 				wpa_printf(MSG_DEBUG,
 					   "P2P: Use shared freq (%d MHz) for GO",
 					   freqs[i].freq);
