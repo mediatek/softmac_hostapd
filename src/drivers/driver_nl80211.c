@@ -18487,7 +18487,7 @@ nl80211_set_scs(void *priv, struct hostapd_scs_desc_info *info, u8 link_id)
 
 fail:
 	nlmsg_free(msg);
-	return ret;
+	return -ENOBUFS;
 }
 #endif
 
