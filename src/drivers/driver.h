@@ -76,6 +76,13 @@ enum hostapd_chan_width_attr {
 #define HOSTAPD_DFS_REGION_ETSI	2
 #define HOSTAPD_DFS_REGION_JP	3
 
+/* Mandatory fields of the QoS Characteristics element: EID Extension(1) +
+ * Control Info(4) + Minimum Service Interval(4) + Maximum Service Interval(4) +
+ * Minimum Data Rate(3) + Delay Bound(3)
+ */
+#define EID_EXT_QOS_CHAR_MIN_SIZE 19
+#define EID_EXT_QOS_CHAR_MAX_SIZE 44
+
 /**
  * struct hostapd_scs_desc_info - SCS Req information
  * @id: SCSID of each SCS stream
@@ -85,13 +92,12 @@ enum hostapd_chan_width_attr {
  * @qos_ie: QoS Characteristics IE in SCS Descriptor element
  * @qos_ie_len: the length of QoS Characteristics element
  */
-#define EID_EXT_QOS_CHAR_MAX_SIZE 44
 struct hostapd_scs_desc_info {
 	u8 id;
 	u8 req_type;
 	u8 dir;
 	u8 peer_addr[ETH_ALEN];
-	u8 qos_ie[EID_EXT_QOS_CHAR_MAX_SIZE];
+	u8 qos_ie[EID_EXT_QOS_CHAR_MAX_SIZE + 2];
 	u8 qos_ie_len;
 };
 
