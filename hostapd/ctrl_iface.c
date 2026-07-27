@@ -4911,8 +4911,8 @@ hostapd_parse_argument_helper(char *value, u16 **ptr_input)
 		wpa_printf(MSG_ERROR, "Failed to allocate memory.\n");
 		return -1;
 	}
-	while (value) {
-		u8 val = strtol(value, &endptr, 10);
+	while (value && cnt < MAX_MU_CTRL_NUM) {
+		u16 val = strtol(value, &endptr, 10);
 
 		if (value != endptr) {
 			input[cnt++] = val;
