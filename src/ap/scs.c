@@ -299,22 +299,21 @@ static int hostapd_find_available_scs_session(struct sta_info *sta)
 static bool hostapd_parse_qos_char_element(const struct element *elem,
 					   struct hostapd_scs_desc_info *info)
 {
-	u8 id_extension = elem->data[0];
 	u32 control_info;
 
-	info->qos_ie_len = elem->datalen + 2;
-
-	if (id_extension != WLAN_EID_EXT_QOS_CHARACTERISTICS ||
-	    info->qos_ie_len > sizeof(info->qos_ie))
+	if (elem->datalen < EID_EXT_QOS_CHAR_MIN_SIZE ||
+	    elem->datalen > EID_EXT_QOS_CHAR_MAX_SIZE ||
+	    elem->data[0] != WLAN_EID_EXT_QOS_CHARACTERISTICS)
 		return false;
 
 	control_info = WPA_GET_LE32(&elem->data[1]);
-	info->dir = control_info & 0x3;
 
 	/* Only support Uplink direction SCS request now. */
-	if (info->dir != SCS_DIRECTION_UP)
+	if ((control_info & 0x3) != SCS_DIRECTION_UP)
 		return false;
 
+	info->dir = SCS_DIRECTION_UP;
+	info->qos_ie_len = elem->datalen + 2;
 	os_memcpy(info->qos_ie, elem, info->qos_ie_len);
 
 	return true;
@@ -351,8 +350,8 @@ static u16 hostapd_process_scs_descriptor(struct hostapd_data *hapd,
 		for_each_element(elem, payload + 2, scs_desc_len - 2) {
 			switch (elem->id) {
 			case WLAN_EID_EXTENSION:
-				qos_char_elem_avail =
-					hostapd_parse_qos_char_element(elem, info);
+				if (hostapd_parse_qos_char_element(elem, info))
+					qos_char_elem_avail = true;
 				break;
 			default:
 				/* The rest elements would be ignored now. */
@@ -454,12 +453,19 @@ static void hostapd_handle_scs_req(struct hostapd_data *hapd,
 	len = end - pos;
 
 	for_each_element(elem, pos, len) {
-		if (elem->id != WLAN_EID_SCS_DESCRIPTOR) {
-			wpa_printf(MSG_ERROR, "%s: no scs elem %d in scs req frame!\n",
-				   __func__, WLAN_EID_SCS_DESCRIPTOR);
+		if (index >= SCS_MAX_CFG_CNT) {
+			wpa_printf(MSG_ERROR, "%s: too many SCS descriptors\n",
+				   __func__);
 			break;
 		}
 
+		if (elem->datalen < 2 || elem->id != WLAN_EID_SCS_DESCRIPTOR) {
+			wpa_printf(MSG_ERROR, "%s: invalid SCS descriptor elem\n",
+				   __func__);
+			break;
+		}
+
+		os_memset(&info, 0, sizeof(info));
 		info.id = elem->data[0];
 		if (!info.id) {
 			wpa_printf(MSG_ERROR, "%s: SCSID = 0 is invalid\n", __func__);
