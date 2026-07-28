@@ -5279,7 +5279,6 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "punct_bitmap") == 0) {
 		if (get_u16(pos, line, &conf->punct_bitmap))
 			return 1;
-		conf->punct_bitmap = atoi(pos);
 	} else if (os_strcmp(buf, "punct_acs_threshold") == 0) {
 		int val = atoi(pos);
 
