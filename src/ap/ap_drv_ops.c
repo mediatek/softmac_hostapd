@@ -1888,17 +1888,9 @@ int hostapd_drv_pp_mode_set(struct hostapd_data *hapd)
 
 int hostapd_drv_beacon_ctrl(struct hostapd_data *hapd, u8 beacon_mode)
 {
-	s8 link_id = -1;
-
 	if (!hapd->driver || !hapd->driver->beacon_ctrl)
 		return 0;
-
-#ifdef CONFIG_IEEE80211BE
-	if (hapd->conf->mld_ap)
-		link_id = hapd->mld_link_id;
-#endif /* CONFIG_IEEE80211BE */
-
-	return hapd->driver->beacon_ctrl(hapd->drv_priv, link_id, beacon_mode);
+	return hapd->driver->beacon_ctrl(hapd->drv_priv, beacon_mode);
 }
 
 #ifdef CONFIG_IEEE80211BE

@@ -16126,7 +16126,7 @@ static int nl80211_mu_dump(void *priv, u8 radio_idx, u8 *mu_onoff)
 
 	return ret;
 }
-static int nl80211_beacon_ctrl(void *priv, s8 link_id, u8 beacon_mode)
+static int nl80211_beacon_ctrl(void *priv, u8 beacon_mode)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -16145,11 +16145,6 @@ static int nl80211_beacon_ctrl(void *priv, s8 link_id, u8 beacon_mode)
 		nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD, MTK_NL80211_VENDOR_SUBCMD_BEACON_CTRL) ||
 		!(data = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA)) ||
 		nla_put_u8(msg, MTK_VENDOR_ATTR_BEACON_CTRL_MODE, beacon_mode)) {
-		nlmsg_free(msg);
-		return -ENOBUFS;
-	}
-	if ((link_id > -1) &&
-		nla_put_u8(msg, MTK_VENDOR_ATTR_BEACON_CTRL_LINK_ID, link_id)) {
 		nlmsg_free(msg);
 		return -ENOBUFS;
 	}
