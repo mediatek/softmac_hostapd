@@ -265,7 +265,7 @@ static void add_ptk_variants(struct wlantest *wt, const u8 *ptk,
 static int add_ptk_file(struct wlantest *wt, const char *ptk_file)
 {
 	FILE *f;
-	u8 ptk[96];
+	u8 ptk[112];
 	size_t ptk_len;
 	char buf[300], *pos;
 	struct wlantest_ptk *p;
@@ -289,7 +289,7 @@ static int add_ptk_file(struct wlantest *wt, const char *ptk_file)
 		ptk_len /= 2;
 		if (ptk_len != 16 && ptk_len != 32 &&
 		    ptk_len != 48 && ptk_len != 64 &&
-		    ptk_len != 80 && ptk_len != 96)
+		    ptk_len != 80 && ptk_len != 96 && ptk_len != 112)
 			continue;
 
 		if (hexstr2bin(buf, ptk, ptk_len) < 0)
