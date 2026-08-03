@@ -4219,7 +4219,7 @@ SM_STATE(WPA_PTK, PTKCALCNEGOTIATING)
 	if (wpa_auth_validate_ml_kdes_m2(sm, &kde) < 0) {
 		wpa_sta_disconnect(wpa_auth, sm->addr,
 				   WLAN_REASON_PREV_AUTH_NOT_VALID);
-		return;
+		goto out;
 	}
 
 	if (vlan_id && wpa_key_mgmt_wpa_psk(sm->wpa_key_mgmt) &&
