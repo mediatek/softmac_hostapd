@@ -200,14 +200,26 @@ static struct nla_policy csi_data_policy[NUM_MTK_VENDOR_ATTRS_CSI_DATA] = {
 					  .minlen = ETH_ALEN,
 					  .maxlen = ETH_ALEN },
 	[MTK_VENDOR_ATTR_CSI_DATA_NUM] = { .type = NLA_U32 },
-	[MTK_VENDOR_ATTR_CSI_DATA_I] = { .type = NLA_NESTED },
-	[MTK_VENDOR_ATTR_CSI_DATA_Q] = { .type = NLA_NESTED },
+	[MTK_VENDOR_ATTR_CSI_DATA_I] = { .type = NLA_BINARY },
+	[MTK_VENDOR_ATTR_CSI_DATA_Q] = { .type = NLA_BINARY },
 	[MTK_VENDOR_ATTR_CSI_DATA_INFO] = { .type = NLA_U32 },
-	[MTK_VENDOR_ATTR_CSI_DATA_TX_ANT] = { .type = NLA_U8 },
-	[MTK_VENDOR_ATTR_CSI_DATA_RX_ANT] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_CSI_DATA_TX_ANT] = { .type = NLA_U16 },
+	[MTK_VENDOR_ATTR_CSI_DATA_RX_ANT] = { .type = NLA_U16 },
 	[MTK_VENDOR_ATTR_CSI_DATA_MODE] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_CSI_DATA_CHAIN_INFO] = { .type = NLA_U32 },
 };
+
+static int mt76_csi_copy_data(s16 *dst, struct nlattr *attr, u32 data_num)
+{
+	u32 data_len;
+
+	data_len = data_num * sizeof(s16);
+	if (nla_len(attr) != data_len)
+		return -EINVAL;
+
+	os_memcpy(dst, nla_data(attr), data_len);
+	return 0;
+}
 
 static struct nla_policy
 txpower_ctrl_policy[NUM_MTK_VENDOR_ATTRS_TXPOWER_CTRL] = {
@@ -18559,11 +18571,14 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
 	struct nlattr *tb1[NUM_MTK_VENDOR_ATTRS_CSI_CTRL];
 	struct nlattr *tb2[NUM_MTK_VENDOR_ATTRS_CSI_DATA];
-	struct nlattr *attr, *cur, *data;
-	int len = 0, rem, idx;
+	struct nlattr *attr;
+	int err;
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct csi_resp_data *csi_resp = (struct csi_resp_data *)arg;
 	struct csi_data *c = csi_resp->csi_buf;
+
+	if (csi_resp->buf_cnt >= csi_resp->usr_need_cnt)
+		return NL_SKIP;
 
 	c += csi_resp->buf_cnt;
 
@@ -18574,14 +18589,19 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	if (!attr)
 		return NL_SKIP;
 
-	nla_parse_nested(tb1, MTK_VENDOR_ATTR_CSI_CTRL_MAX,
-			attr, csi_ctrl_policy);
+	err = nla_parse_nested(tb1, MTK_VENDOR_ATTR_CSI_CTRL_MAX,
+			       attr, csi_ctrl_policy);
+	if (err)
+		return NL_SKIP;
 
 	if (!tb1[MTK_VENDOR_ATTR_CSI_CTRL_DATA])
 		return NL_SKIP;
 
-	nla_parse_nested(tb2, MTK_VENDOR_ATTR_CSI_DATA_MAX,
-			tb1[MTK_VENDOR_ATTR_CSI_CTRL_DATA], csi_data_policy);
+	err = nla_parse_nested(tb2, MTK_VENDOR_ATTR_CSI_DATA_MAX,
+			       tb1[MTK_VENDOR_ATTR_CSI_CTRL_DATA],
+			       csi_data_policy);
+	if (err)
+		return NL_SKIP;
 
 	if (!(tb2[MTK_VENDOR_ATTR_CSI_DATA_VER] &&
 	      tb2[MTK_VENDOR_ATTR_CSI_DATA_TS] &&
@@ -18617,19 +18637,20 @@ mt76_csi_dump_cb(struct nl_msg *msg, void *arg)
 	c->ts = nla_get_u32(tb2[MTK_VENDOR_ATTR_CSI_DATA_TS]);
 
 	c->data_num = nla_get_u32(tb2[MTK_VENDOR_ATTR_CSI_DATA_NUM]);
-
-	os_memcpy(c->ta, nla_data(tb2[MTK_VENDOR_ATTR_CSI_DATA_TA]), ETH_ALEN);
-
-	idx = 0;
-	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_I], rem) {
-		if (idx < c->data_num)
-			c->data_i[idx++] = nla_get_u16(cur);
+	if (c->data_num > CSI_BW320_DATA_COUNT) {
+		fprintf(stderr, "Invalid CSI data num: %u\n", c->data_num);
+		return NL_SKIP;
 	}
 
-	idx = 0;
-	nla_for_each_nested(cur, tb2[MTK_VENDOR_ATTR_CSI_DATA_Q], rem) {
-		if (idx < c->data_num)
-			c->data_q[idx++] = nla_get_u16(cur);
+	os_memcpy(c->ta, nla_data(tb2[MTK_VENDOR_ATTR_CSI_DATA_TA]), ETH_ALEN);
+	if (mt76_csi_copy_data(c->data_i, tb2[MTK_VENDOR_ATTR_CSI_DATA_I],
+			       c->data_num) ||
+	    mt76_csi_copy_data(c->data_q, tb2[MTK_VENDOR_ATTR_CSI_DATA_Q],
+			       c->data_num)) {
+		fprintf(stderr, "Invalid CSI data length: num=%u i=%d q=%d\n",
+			c->data_num, nla_len(tb2[MTK_VENDOR_ATTR_CSI_DATA_I]),
+			nla_len(tb2[MTK_VENDOR_ATTR_CSI_DATA_Q]));
+		return NL_SKIP;
 	}
 
 	csi_resp->buf_cnt++;
