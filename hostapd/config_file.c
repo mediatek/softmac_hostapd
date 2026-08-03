@@ -4424,6 +4424,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->sae_confirm_immediate = atoi(pos);
 	} else if (os_strcmp(buf, "sae_pwe") == 0) {
 		bss->sae_pwe = atoi(pos);
+	} else if (os_strcmp(buf, "sae_accept_h2e_without_use") == 0) {
+		bss->sae_accept_h2e_without_use = atoi(pos);
 	} else if (os_strcmp(buf, "sae_pw_id_num") == 0) {
 		bss->sae_pw_id_num = atoi(pos);
 	} else if (os_strcmp(buf, "sae_pw_id_key") == 0) {

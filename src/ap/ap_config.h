@@ -670,6 +670,12 @@ struct hostapd_bss_config {
 	int sae_require_mfp;
 	int sae_confirm_immediate;
 	enum sae_pwe sae_pwe;
+	/* Accept an SAE association even when the STA advertises SAE H2E
+	 * support in the RSNXE but authenticated using hunting-and-pecking.
+	 * This is a workaround for WPA3-Personal Compatibility Mode and
+	 * RSNXE-override interoperability (e.g., some MLO STAs that add only
+	 * the RSNXE Override element and do not use H2E on 2.4/5 GHz) */
+	bool sae_accept_h2e_without_use;
 	int *sae_groups;
 	struct sae_password_entry *sae_passwords;
 	int sae_password_psk;
