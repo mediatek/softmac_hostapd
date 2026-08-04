@@ -847,11 +847,20 @@ void hostapd_ocv_check_csa_sa_query(void *eloop_ctx, void *timeout_ctx);
 void hostapd_switch_color(struct hostapd_data *hapd, u64 bitmap);
 void hostapd_cleanup_cca_params(struct hostapd_data *hapd);
 #ifdef CONFIG_AFC
+int hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
+				       int *power);
 int hostapd_afc_handle_request(struct hostapd_iface *iface);
 void hostapd_afc_send_request(struct hostapd_iface *iface);
 void hostapd_afc_stop(struct hostapd_iface *iface);
 void hostap_afc_disable_channels(struct hostapd_iface *iface);
 #else /* CONFIG_AFC */
+static inline int
+hostap_afc_get_chan_max_eirp_power(struct hostapd_iface *iface, bool psd,
+				   int *power)
+{
+	return -EINVAL;
+}
+
 static inline int hostapd_afc_handle_request(struct hostapd_iface *iface)
 {
 	return 1;
