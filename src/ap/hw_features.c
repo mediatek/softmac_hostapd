@@ -1090,7 +1090,8 @@ static bool hostapd_is_usable_punct_bitmap(struct hostapd_iface *iface)
  */
 static int hostapd_is_usable_chans(struct hostapd_iface *iface)
 {
-	int secondary_freq;
+	int secondary_freq, new_sec;
+	enum hostapd_chan_width_attr bw_flag;
 	struct hostapd_channel_data *pri_chan;
 	int err, err2;
 
@@ -1133,18 +1134,19 @@ static int hostapd_is_usable_chans(struct hostapd_iface *iface)
 	if (!iface->conf->ht40_plus_minus_allowed)
 		return err;
 
-	/* Both HT40+ and HT40- are set, pick a valid secondary channel */
-	secondary_freq = iface->freq + 20;
-	err2 = hostapd_is_usable_chan(iface, secondary_freq, 0);
-	if (err2 > 0 && (pri_chan->allowed_bw & HOSTAPD_CHAN_WIDTH_40P)) {
-		iface->conf->secondary_channel = 1;
-		return 1;
-	}
+	/* Both HT40+ and HT40- are set, check the swapped pri/sec channel
+	 * option for a 40 MHz channel */
+	new_sec = -iface->conf->secondary_channel;
+	bw_flag = new_sec == 1 ?
+		HOSTAPD_CHAN_WIDTH_40P : HOSTAPD_CHAN_WIDTH_40M;
 
-	secondary_freq = iface->freq - 20;
+	secondary_freq = iface->freq + new_sec * 20;
 	err2 = hostapd_is_usable_chan(iface, secondary_freq, 0);
-	if (err2 > 0 && (pri_chan->allowed_bw & HOSTAPD_CHAN_WIDTH_40M)) {
-		iface->conf->secondary_channel = -1;
+	if (err2 <= 0)
+		return err;
+
+	if (pri_chan->allowed_bw & bw_flag) {
+		iface->conf->secondary_channel = new_sec;
 		return 1;
 	}
 
