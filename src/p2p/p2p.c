@@ -4176,6 +4176,17 @@ void p2p_listen_failed(struct p2p_data *p2p, unsigned int freq)
 
 	p2p_dbg(p2p, "Listen failed on freq=%u", freq);
 	p2p->pending_listen_freq = 0;
+	p2p->pending_listen_wait_drv = false;
+
+	if (p2p->state == P2P_SEARCH ||
+	    p2p->state == P2P_CONNECT_LISTEN ||
+	    p2p->state == P2P_WAIT_PEER_CONNECT ||
+	    p2p->state == P2P_WAIT_PEER_IDLE ||
+	    p2p->state == P2P_INVITE_LISTEN) {
+		p2p_dbg(p2p,
+			"Schedule timeout after listen failure to continue state machine");
+		p2p_set_timeout(p2p, 0, 100000);
+	}
 }
 
 
