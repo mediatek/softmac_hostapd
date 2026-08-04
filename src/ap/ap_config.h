@@ -1290,6 +1290,47 @@ struct hostapd_config {
 
 	/* Disable MCS15 Subfield in EHT operation element */
 	bool disable_mcs15_rx;
+
+#ifdef CONFIG_AFC
+	struct {
+		char *socket;
+		struct {
+			char *version;
+			char *sn;
+		} request;
+		unsigned int n_cert_ids;
+		struct afc_cert_id {
+			char *ruleset;
+			char *id;
+		} *cert_ids;
+		struct {
+			enum afc_location_type {
+				AFC_ELLIPSE,
+				AFC_LINEAR_POLYGON,
+				AFC_RADIAL_POLYGON,
+			} type;
+			unsigned int n_linear_polygon_data;
+			struct afc_linear_polygon {
+				double longitude;
+				double latitude;
+			} *linear_polygon_data;
+			unsigned int n_radial_polygon_data;
+			struct afc_radial_polygon {
+				double length;
+				double angle;
+			} *radial_polygon_data;
+			int major_axis;
+			int minor_axis;
+			int orientation;
+			double height;
+			char *height_type;
+			int vertical_tolerance;
+		} location;
+		struct wpa_freq_range_list freqs;
+		int *op_class; /* int array */
+		int min_power;
+	} afc;
+#endif /* CONFIG_AFC */
 };
 
 
@@ -1452,5 +1493,6 @@ int hostapd_add_acl_maclist(struct mac_acl_entry **acl, int *num,
 void hostapd_remove_acl_mac(struct mac_acl_entry **acl, int *num,
 			    const u8 *addr);
 bool hostapd_config_check_bss_6g(struct hostapd_bss_config *bss);
+void hostapd_config_free_afc_cert_ids(struct hostapd_config *conf);
 
 #endif /* HOSTAPD_CONFIG_H */

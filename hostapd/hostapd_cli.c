@@ -1765,6 +1765,31 @@ static int hostapd_cli_cmd_driver(struct wpa_ctrl *ctrl, int argc, char *argv[])
 #endif /* ANDROID */
 
 
+#ifdef CONFIG_AFC
+
+static int hostapd_cli_cmd_afc_get_request(struct wpa_ctrl *ctrl, int argc,
+					   char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "AFC_GET_REQUEST", 0, 0, NULL);
+}
+
+
+static int hostapd_cli_cmd_afc_get_response(struct wpa_ctrl *ctrl, int argc,
+					    char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "AFC_GET_RESPONSE", 0, 0, NULL);
+}
+
+
+static int hostapd_cli_cmd_afc_send_request(struct wpa_ctrl *ctrl, int argc,
+					    char *argv[])
+{
+	return hostapd_cli_cmd(ctrl, "AFC_SEND_REQUEST", 0, 0, NULL);
+}
+
+#endif /* CONFIG_AFC */
+
+
 struct hostapd_cli_cmd {
 	const char *cmd;
 	int (*handler)(struct wpa_ctrl *ctrl, int argc, char *argv[]);
@@ -2013,6 +2038,14 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	 NULL,
 	 "<addr>, [reset=], [policy_id_list=], Send unsolicited DSCP request"},
 #endif /* CONFIG_ROBUST_AV */
+#ifdef CONFIG_AFC
+	{ "afc_get_request", hostapd_cli_cmd_afc_get_request, NULL,
+	  " = Show latest AFC request data"},
+	{ "afc_get_response", hostapd_cli_cmd_afc_get_response, NULL,
+	  " = Show latest AFC response data"},
+	{ "afc_send_request", hostapd_cli_cmd_afc_send_request, NULL,
+	  " = Send another AFC request and upadte the timeout"},
+#endif /* CONFIG_AFC */
 	{ NULL, NULL, NULL, NULL }
 };
 

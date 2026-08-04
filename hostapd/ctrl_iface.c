@@ -4174,6 +4174,44 @@ static int hostapd_ctrl_iface_proc_coord_test(struct hostapd_data *hapd,
 #endif /* CONFIG_TESTING_OPTIONS */
 
 
+#ifdef CONFIG_AFC
+
+static int hostapd_ctrl_afc_get_request(struct hostapd_data *hapd, char *cmd,
+					char *buf, size_t buflen)
+{
+	size_t len;
+
+	if (!hapd->iface->afc_request)
+		return -1;
+
+	len = wpabuf_len(hapd->iface->afc_request);
+	if (buflen < len + 1)
+		return -1;
+	os_memcpy(buf, wpabuf_head(hapd->iface->afc_request), len);
+	buf[len] = '\n';
+	return len + 1;
+}
+
+
+static int hostapd_ctrl_afc_get_response(struct hostapd_data *hapd, char *cmd,
+					 char *buf, size_t buflen)
+{
+	if (!hapd->iface->afc_response)
+		return -1;
+
+	return os_snprintf(buf, buflen, "%s\n", hapd->iface->afc_response);
+}
+
+
+static int hostapd_ctrl_afc_send_request(struct hostapd_data *hapd, char *cmd)
+{
+	hostapd_afc_send_request(hapd->iface);
+	return 0;
+}
+
+#endif /* CONFIG_AFC */
+
+
 static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      char *buf, char *reply,
 					      int reply_size,
@@ -4804,6 +4842,18 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 		if (hostapd_ctrl_send_unsolicited_dscp_req(hapd, buf + 26))
 			reply_len = -1;
 #endif /* CONFIG_ROBUST_AV */
+#ifdef CONFIG_AFC
+	}  else if (os_strncmp(buf, "AFC_GET_REQUEST", 15) == 0) {
+		reply_len = hostapd_ctrl_afc_get_request(hapd, buf + 15,
+							    reply, reply_size);
+	}  else if (os_strncmp(buf, "AFC_GET_RESPONSE", 16) == 0) {
+		reply_len = hostapd_ctrl_afc_get_response(hapd, buf + 16,
+							     reply,
+							     reply_size);
+	}  else if (os_strncmp(buf, "AFC_SEND_REQUEST", 16) == 0) {
+		if (hostapd_ctrl_afc_send_request(hapd, buf + 16) < 0)
+			reply_len = -1;
+#endif /* CONFIG_AFC */
 	} else {
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;

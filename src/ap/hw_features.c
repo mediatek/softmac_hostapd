@@ -221,6 +221,8 @@ int hostapd_get_hw_features(struct hostapd_iface *iface)
 	iface->hw_features = modes;
 	iface->num_hw_features = num_modes;
 
+	hostap_afc_disable_channels(iface);
+
 	if (orig_mode_valid && !iface->current_mode) {
 		wpa_printf(MSG_ERROR,
 			   "%s: Could not update iface->current_mode",
