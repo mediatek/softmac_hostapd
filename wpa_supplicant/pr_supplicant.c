@@ -27,7 +27,7 @@ static void wpas_pr_pasn_auth_work_done(struct wpa_supplicant *wpa_s);
 static void wpas_pr_pasn_auth_retry_timeout(void *eloop_ctx, void *timeout_ctx);
 
 /* Total listen window (ms) for the PASN responder ROC */
-#define PR_PASN_RESPONDER_ROC_DURATION 5000
+#define PR_PASN_RESPONDER_ROC_DURATION 10000
 /* Initiator PASN authentication timeout (s) */
 #define PR_PASN_AUTH_TIMEOUT           10
 /* Retry interval (ms) for unacked PASN Authentication frame 1 */
