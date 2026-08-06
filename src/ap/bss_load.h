@@ -10,8 +10,9 @@
 #define BSS_LOAD_UPDATE_H
 
 
-int bss_load_update_init(struct hostapd_data *hapd);
-void bss_load_update_deinit(struct hostapd_data *hapd);
+struct hostapd_data *bss_load_get_hapd(struct hostapd_iface *iface);
+int bss_load_update_init(struct hostapd_iface *iface);
+void bss_load_update_deinit(struct hostapd_iface *iface);
 
 
 #endif /* BSS_LOAD_UPDATE_H */

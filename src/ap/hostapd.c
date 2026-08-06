@@ -746,7 +746,6 @@ void hostapd_free_hapd_data(struct hostapd_data *hapd)
 	gas_serv_deinit(hapd);
 #endif /* CONFIG_INTERWORKING || CONFIG_DPP */
 
-	bss_load_update_deinit(hapd);
 	ndisc_snoop_deinit(hapd);
 	dhcp_snoop_deinit(hapd);
 	x_snoop_deinit(hapd);
@@ -915,6 +914,7 @@ void hostapd_cleanup_iface_partial(struct hostapd_iface *iface)
 	ap_list_deinit(iface);
 	sta_track_deinit(iface);
 	airtime_policy_update_deinit(iface);
+	bss_load_update_deinit(iface);
 	hostapd_free_multi_hw_info(iface->multi_hw_info);
 	iface->multi_hw_info = NULL;
 	iface->num_multi_hws = 0;
@@ -1952,11 +1952,6 @@ setup_mld:
 	    hostapd_drv_set_qos_map(hapd, conf->qos_map_set,
 				    conf->qos_map_set_len)) {
 		wpa_printf(MSG_ERROR, "Failed to initialize QoS Map");
-		return -1;
-	}
-
-	if (conf->bss_load_update_period && bss_load_update_init(hapd)) {
-		wpa_printf(MSG_ERROR, "BSS Load initialization failed");
 		return -1;
 	}
 
@@ -3110,6 +3105,11 @@ dfs_offload:
 		wpa_msg(iface->bss[0]->msg_ctx, MSG_INFO, AFC_EVENT_COMPLETE);
 #endif /* CONFIG_AFC */
 
+	if (bss_load_update_init(iface)) {
+		wpa_printf(MSG_ERROR, "BSS Load initialization failed");
+		goto fail;
+	}
+
 	hostapd_set_state(iface, HAPD_IFACE_ENABLED);
 	hostapd_owe_update_trans(iface);
 	airtime_policy_update_init(iface);
@@ -4124,12 +4124,17 @@ int hostapd_enable_bss(struct hostapd_data *hapd)
 	if (hapd->beacon_set_done)
 		return 0;
 
-	if (hapd->conf->bss_load_update_period && bss_load_update_init(hapd)) {
+	if (ieee802_11_set_beacon_per_bss_only(hapd))
+		return -1;
+
+	if (hapd == bss_load_get_hapd(hapd->iface) &&
+	    bss_load_update_init(hapd->iface)) {
+		hostapd_disable_bss(hapd);
 		wpa_printf(MSG_ERROR, "BSS Load initialization failed");
 		return -1;
 	}
 
-	return ieee802_11_set_beacon_per_bss_only(hapd);
+	return 0;
 }
 
 
@@ -4242,7 +4247,6 @@ int hostapd_disable_bss(struct hostapd_data *hapd)
 	}
 
 	hapd->beacon_set_done = 0;
-	bss_load_update_deinit(hapd);
 	hostapd_bss_deinit_no_free(hapd);
 	return hostapd_drv_stop_ap(hapd);
 }
@@ -4489,7 +4493,9 @@ int hostapd_add_iface(struct hapd_interfaces *interfaces, char *buf)
 
 			if (start_ctrl_iface_bss(hapd) < 0 ||
 			    (hapd_iface->state == HAPD_IFACE_ENABLED &&
-			     hostapd_setup_bss(hapd, false, true))) {
+			     hostapd_setup_bss(hapd, false, true)) ||
+			    (hapd == bss_load_get_hapd(hapd->iface) &&
+			     bss_load_update_init(hapd->iface))) {
 				hostapd_bss_link_deinit(hapd);
 				hostapd_cleanup(hapd);
 				hapd_iface->bss[hapd_iface->num_bss - 1] = NULL;
