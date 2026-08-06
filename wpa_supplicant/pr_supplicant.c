@@ -1165,6 +1165,11 @@ static void wpas_pr_schedule_responder_roc(struct wpa_supplicant *wpa_s,
 	}
 	rwork->freq = freq;
 
+	if (wpa_s->pr_responder_mode &&
+	    !is_zero_ether_addr(wpa_s->pr_responder_src_addr))
+		os_memcpy(rwork->src_addr, wpa_s->pr_responder_src_addr,
+			  ETH_ALEN);
+
 	if (!radio_add_work(wpa_s, freq, "pr-pasn-roc", 0,
 			    wpas_pr_pasn_roc_start_cb, rwork)) {
 		wpa_printf(MSG_INFO, "PR PASN: Failed to reschedule ROC");
