@@ -1140,6 +1140,8 @@ static void wpas_pr_pasn_roc_start_cb(struct wpa_radio_work *work, int deinit)
 			   "PR PASN: Failed to start ROC for responder");
 		wpas_pr_pasn_roc_work_done(wpa_s);
 		wpas_pr_pasn_abort_responder(wpa_s);
+		wpas_notify_pr_ranging_terminated(wpa_s,
+						  PR_SESSION_END_NEG_FAILED);
 		return;
 	}
 
