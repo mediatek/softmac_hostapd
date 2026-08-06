@@ -113,9 +113,7 @@ int os_get_reltime(struct os_reltime *t)
 			clock_id = CLOCK_MONOTONIC;
 			continue;
 		}
-#endif
-
-#ifdef CLOCK_BOOTTIME
+#elif CLOCK_BOOTTIME
 		/* CLOCK_MONOTONIC is not defined. Unknown whether such cases
 		 * exists, but it is safe to fall back to CLOCK_REALTIME.
 		 */
