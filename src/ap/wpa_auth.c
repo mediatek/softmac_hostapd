@@ -8079,6 +8079,7 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 		gtk = gsm->GTK[gsm->GN - 1];
 		gtk_len = gsm->GTK_len;
 		hdr[0] = gsm->GN & 0x03; /* KeyID bits */
+		hdr[1] = 0;
 		kde = wpa_add_kde(kde, RSN_KEY_DATA_GROUPKEY, hdr, sizeof(hdr),
 				  gtk, gtk_len);
 		kde = ieee80211w_kde_add(sm, kde);
