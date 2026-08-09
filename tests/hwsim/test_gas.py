@@ -339,6 +339,10 @@ def test_gas_fragment_with_comeback_delay_mcc(dev, apdev):
         gas_fragment_and_comeback(wpas, apdev[0], frag_limit=50,
                                   comeback_delay=500)
 
+def test_gas_no_comeback_delay(dev, apdev):
+    """GAS no comeback delay"""
+    run_gas_comeback_delay(dev, apdev, 0)
+
 def test_gas_comeback_delay(dev, apdev):
     """GAS comeback delay"""
     run_gas_comeback_delay(dev, apdev, 500)
