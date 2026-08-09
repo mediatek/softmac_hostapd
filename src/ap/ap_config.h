@@ -1022,6 +1022,8 @@ struct hostapd_bss_config {
 #ifdef CONFIG_ROBUST_AV
 	bool enable_dscp_policy_capa;
 #endif /* CONFIG_ROBUST_AV */
+
+	unsigned int gas_max_peers;
 };
 
 /**

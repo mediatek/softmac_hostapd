@@ -463,16 +463,6 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	p2p_group_notif_disassoc(hapd->p2p_group, sta->addr);
 #endif /* CONFIG_P2P */
 
-#if defined(CONFIG_INTERWORKING) || defined(CONFIG_DPP)
-	if (sta->gas_dialog) {
-		int i;
-
-		for (i = 0; i < GAS_DIALOG_MAX; i++)
-			gas_serv_dialog_clear(&sta->gas_dialog[i]);
-		os_free(sta->gas_dialog);
-	}
-#endif /* CONFIG_INTERWORKING || CONFIG_DPP */
-
 	wpabuf_free(sta->wps_ie);
 	wpabuf_free(sta->p2p_ie);
 	wpabuf_free(sta->hs20_ie);
@@ -807,14 +797,8 @@ static void ap_handle_session_timer(void *eloop_ctx, void *timeout_ctx)
 	wpa_printf(MSG_DEBUG, "%s: Session timer for STA " MACSTR,
 		   hapd->conf->iface, MAC2STR(sta->addr));
 	if (!(sta->flags & (WLAN_STA_AUTH | WLAN_STA_ASSOC |
-			    WLAN_STA_AUTHORIZED))) {
-		if (sta->flags & WLAN_STA_GAS) {
-			wpa_printf(MSG_DEBUG, "GAS: Remove temporary STA "
-				   "entry " MACSTR, MAC2STR(sta->addr));
-			ap_free_sta(hapd, sta);
-		}
+			    WLAN_STA_AUTHORIZED)))
 		return;
-	}
 
 	hostapd_drv_sta_deauth(hapd, sta->addr,
 			       WLAN_REASON_PREV_AUTH_NOT_VALID);
@@ -1989,7 +1973,7 @@ int ap_sta_flags_txt(unsigned long long flags, char *buf, size_t buflen)
 
 	buf[0] = '\0';
 	res = os_snprintf(buf, buflen,
-			  "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+			  "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 			  (flags & WLAN_STA_AUTH ? "[AUTH]" : ""),
 			  (flags & WLAN_STA_ASSOC ? "[ASSOC]" : ""),
 			  (flags & WLAN_STA_AUTHORIZED ? "[AUTHORIZED]" : ""),
@@ -2005,7 +1989,6 @@ int ap_sta_flags_txt(unsigned long long flags, char *buf, size_t buflen)
 			  (flags & WLAN_STA_WDS ? "[WDS]" : ""),
 			  (flags & WLAN_STA_NONERP ? "[NonERP]" : ""),
 			  (flags & WLAN_STA_WPS2 ? "[WPS2]" : ""),
-			  (flags & WLAN_STA_GAS ? "[GAS]" : ""),
 			  (flags & WLAN_STA_HT ? "[HT]" : ""),
 			  (flags & WLAN_STA_VHT ? "[VHT]" : ""),
 			  (flags & WLAN_STA_HE ? "[HE]" : ""),

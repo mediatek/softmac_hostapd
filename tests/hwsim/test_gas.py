@@ -1844,8 +1844,7 @@ def test_gas_server_oom(dev, apdev):
 
     dev[0].scan_for_bss(bssid, freq="2412", force_scan=True)
 
-    tests = ["ap_sta_add;gas_dialog_create",
-             "=gas_dialog_create",
+    tests = ["gas_serv_add_peer;gas_dialog_create",
              "wpabuf_alloc_copy;gas_serv_rx_gas_comeback_req"]
     for t in tests:
         with alloc_fail(hapd, 1, t):

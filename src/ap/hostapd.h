@@ -530,6 +530,11 @@ struct hostapd_data {
 
 	u64 scan_cookie; /* Scan instance identifier for the ongoing HT40 scan
 			  */
+
+#if defined(CONFIG_INTERWORKING) || defined(CONFIG_DPP)
+	bool gas_serv_initialized;
+	struct dl_list gas_peers; /* dl_list of struct gas_peer */
+#endif /* CONFIG_INTERWORKING || CONFIG_DPP */
 };
 
 
