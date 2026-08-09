@@ -1864,13 +1864,13 @@ def test_wnm_action_proto_no_pmf(dev, apdev):
 def test_wnm_bss_tm_req_with_mbo_ie(dev, apdev):
     """WNM BSS transition request with MBO IE and reassociation delay attribute"""
     ssid = "test-wnm-mbo"
-    hapd = start_wnm_ap(apdev[0], rsn=True, pmf=False, ssid=ssid)
+    hapd = start_wnm_ap(apdev[0], rsn=True, pmf=True, ssid=ssid)
     bssid = apdev[0]['bssid']
     if "OK" not in dev[0].request("SET mbo_cell_capa 1"):
         raise Exception("Failed to set STA as cellular data capable")
 
-    dev[0].connect(ssid, psk="12345678", key_mgmt="WPA-PSK",
-                   proto="WPA2", ieee80211w="0", scan_freq="2412")
+    dev[0].connect(ssid, psk="12345678", key_mgmt="WPA-PSK-SHA256",
+                   proto="WPA2", ieee80211w="2", scan_freq="2412")
 
     logger.debug("BTM request with MBO reassociation delay when disassoc imminent is not set")
     if 'FAIL' not in hapd.request("BSS_TM_REQ " + dev[0].own_addr() + " mbo=3:2:1"):
