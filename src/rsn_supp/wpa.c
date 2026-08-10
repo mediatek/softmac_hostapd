@@ -429,20 +429,13 @@ static int wpa_supplicant_get_pmk(struct wpa_sm *sm,
 			if (sm->proto == WPA_PROTO_RSN &&
 			    !wpa_key_mgmt_suite_b(sm->key_mgmt) &&
 			    !wpa_key_mgmt_ft(sm->key_mgmt)) {
-				u16 auth_alg = 0;
-
-#ifdef CONFIG_IEEE8021X_AUTH
-				if (eapol_sm_get_eap_over_auth_frame(sm->eapol))
-					auth_alg = WLAN_AUTH_802_1X;
-#endif /* CONFIG_IEEE8021X_AUTH */
-
 				sa = pmksa_cache_add(sm->pmksa,
 						     sm->pmk, pmk_len, NULL,
 						     NULL, 0,
 						     src_addr, sm->own_addr,
 						     sm->network_ctx,
 						     sm->key_mgmt,
-						     fils_cache_id, auth_alg);
+						     fils_cache_id, 0);
 			}
 			if (!sm->cur_pmksa && pmkid &&
 			    pmksa_cache_get(sm->pmksa, src_addr, sm->own_addr,
@@ -491,14 +484,6 @@ static int wpa_supplicant_get_pmk(struct wpa_sm *sm,
 	if (abort_cached && wpa_key_mgmt_wpa_ieee8021x(sm->key_mgmt) &&
 	    !wpa_key_mgmt_suite_b(sm->key_mgmt) &&
 	    !wpa_key_mgmt_ft(sm->key_mgmt)) {
-#ifdef CONFIG_IEEE8021X_AUTH
-		if (eapol_sm_get_eap_over_auth_frame(sm->eapol)) {
-			wpa_printf(MSG_DEBUG,
-				   "RSN: EAP over auth frame - skip EAPOL-Start");
-			return 0;
-		}
-#endif /* CONFIG_IEEE8021X_AUTH */
-
 		/* Send EAPOL-Start to trigger full EAP authentication. */
 		u8 *buf;
 		size_t buflen;
@@ -7799,18 +7784,6 @@ void wpa_sm_set_802_1x_auth_caps(struct wpa_sm *sm, u64 flags2)
 {
 	sm->eap_over_auth_frame =
 		!!(flags2 & WPA_DRIVER_FLAGS2_802_1X_AUTH);
-}
-
-
-const u8 * wpa_sm_get_pmk(struct wpa_sm *sm, const u8 *addr, const u8 *pmkid,
-			  size_t *pmk_len)
-{
-	if (wpa_supplicant_get_pmk(sm, addr, pmkid) < 0 ||
-	    sm->pmk_len == 0)
-		return NULL;
-
-	*pmk_len = sm->pmk_len;
-	return sm->pmk;
 }
 
 #endif /* CONFIG_IEEE8021X_AUTH */
