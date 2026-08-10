@@ -65,7 +65,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	/* First add the station without more information */
 	int aRet = hostapd_sta_add(
 	            hapd, mgmt->bssid, sta_ret->aid, 0,
-	            NULL, 0, 0, NULL, NULL, NULL, 0, NULL, 0, NULL,
+	            NULL, 0, 0, NULL, NULL, NULL, 0, NULL, 0, NULL, 0, NULL,
 	            sta_ret->flags, 0, 0, 0,
 	            0, // 0 add, 1 set
 	            mld_link_addr, mld_link_sta, eml_cap, epp_sta);
@@ -136,6 +136,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	            sta_ret->vht_capabilities,
 	            sta_ret->he_capab, sta_ret->he_capab_len,
 	            sta_ret->eht_capab, sta_ret->eht_capab_len,
+	            sta_ret->uhr_capab, sta_ret->uhr_capab_len,
 	            sta_ret->he_6ghz_capab,
 	            sta_ret->flags,
 	            0, // u8 qosinfo
@@ -155,7 +156,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	            hapd, mIfname, mgmt->bssid, sta_ret->aid, 1);
 
 	wpa_printf(MSG_INFO,
-	           "apup_process_beacon(...) Added APuP peer at %s with flags: %d,"
+	           "apup_process_beacon(...) Added APuP peer at %s with flags: %llu,"
 	           " capabilities %d",
 	           mIfname, sta_ret->flags, sta_ret->capability);
 
