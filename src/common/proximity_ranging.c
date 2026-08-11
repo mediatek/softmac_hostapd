@@ -2263,6 +2263,9 @@ static int pr_process_pasn_ranging_wrapper(struct pr_data *pr,
 		goto end;
 	}
 
+	if (dev->discovery_type == PR_DISCOVERY_TYPE_OOB)
+		dev->pr_caps = caps;
+
 	pr_get_ranging_capabilities(pr, &caps);
 
 	if ((op_mode.protocol_type & PR_EDCA_BASED_RANGING) &&
@@ -2287,6 +2290,9 @@ static int pr_process_pasn_ranging_wrapper(struct pr_data *pr,
 			goto end;
 		}
 
+		if (dev->discovery_type == PR_DISCOVERY_TYPE_OOB)
+			dev->ntb_caps = ntb;
+
 		if (dev->ntb_caps.ista_support)
 			supp_ranging_role |= PR_ISTA_SUPPORT;
 		if (dev->ntb_caps.rsta_support)
@@ -2302,6 +2308,9 @@ static int pr_process_pasn_ranging_wrapper(struct pr_data *pr,
 				   "PR: EDCA capabilities not matching");
 			goto end;
 		}
+
+		if (dev->discovery_type == PR_DISCOVERY_TYPE_OOB)
+			dev->edca_caps = edca;
 
 		if (dev->edca_caps.ista_support)
 			supp_ranging_role |= PR_ISTA_SUPPORT;
