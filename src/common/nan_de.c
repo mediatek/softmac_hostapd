@@ -3392,10 +3392,152 @@ int nan_de_config(struct nan_de *de, struct nan_de_cfg *cfg)
 }
 
 
+static void nan_de_tx_merged_sdf(struct nan_de *de, unsigned int freq,
+				 const u8 *dst, const u8 *bssid)
+{
+	struct wpabuf *buf;
+	size_t total_len = 0;
+	unsigned int i;
+	struct nan_de_service *services[NAN_DE_MAX_SERVICE];
+	unsigned int service_count = 0;
+	u8 irsa_nonce[NAN_NIRA_NONCE_LEN];
+	u8 *irsa_tag_tlv = NULL;
+	u16 irsa_tag_tlv_len = 0;
+	bool has_randomization = false;
+	bool has_zero_rsid = false;
+	int handle = -1;
+	int retry;
+
+	/* Collect all services that need to be transmitted */
+	for (i = 0; i < NAN_DE_MAX_SERVICE; i++) {
+		struct nan_de_service *srv = de->service[i];
+
+		if (!srv)
+			continue;
+
+		if ((srv->type == NAN_DE_PUBLISH && srv->publish.unsolicited) ||
+		    (srv->type == NAN_DE_SUBSCRIBE && srv->subscribe.active)) {
+			services[service_count++] = srv;
+
+			if ((srv->type == NAN_DE_PUBLISH &&
+			     srv->publish.randomize_service_id) ||
+			    (srv->type == NAN_DE_SUBSCRIBE &&
+			     srv->subscribe.randomize_service_id)) {
+				has_randomization = true;
+			}
+		}
+	}
+
+	if (service_count == 0)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Merging %u services into a single SDF",
+		   service_count);
+
+	/* Generate IRSA nonce and tag TLV, retrying if any RSID is all-zero */
+	if (has_randomization || de->cb.irsa_get_nonce_tag_tlv) {
+		for (retry = 0; retry < NAN_RSID_MAX_RETRIES; retry++) {
+			os_free(irsa_tag_tlv);
+			irsa_tag_tlv = NULL;
+			irsa_tag_tlv_len = 0;
+			has_zero_rsid = false;
+
+			nan_de_generate_irsa_and_calc_len(de, irsa_nonce,
+							  &irsa_tag_tlv,
+							  &irsa_tag_tlv_len);
+
+			/* Probe all services for all-zero RSIDs */
+			for (i = 0; i < service_count; i++) {
+				struct nan_de_service *srv = services[i];
+				enum nan_service_control_type type;
+
+				type = (srv->type == NAN_DE_PUBLISH) ?
+					NAN_SRV_CTRL_PUBLISH :
+					NAN_SRV_CTRL_SUBSCRIBE;
+
+				nan_de_sdf_attrs_put(NULL, de, srv, type, 0,
+						     srv->ssi, NULL,
+						     irsa_tag_tlv,
+						     irsa_tag_tlv_len,
+						     false, &has_zero_rsid);
+				if (has_zero_rsid)
+					break;
+			}
+
+			if (!has_zero_rsid)
+				break;
+
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Retrying IRSA nonce generation (attempt %d) due to all-zero RSID",
+				   retry + 1);
+		}
+		if (has_zero_rsid)
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Could not avoid all-zero RSID after %d attempts",
+				   NAN_RSID_MAX_RETRIES);
+
+		total_len += NAN_ATTR_HDR_LEN + 1 +
+			NAN_NIRA_NONCE_LEN + irsa_tag_tlv_len;
+	}
+
+	/* Calculate total length for all service attributes */
+	for (i = 0; i < service_count; i++) {
+		struct nan_de_service *srv = services[i];
+		enum nan_service_control_type type;
+
+		type = (srv->type == NAN_DE_PUBLISH) ? NAN_SRV_CTRL_PUBLISH :
+			NAN_SRV_CTRL_SUBSCRIBE;
+
+		total_len += nan_de_sdf_attrs_put(NULL, de, srv, type, 0,
+						  srv->ssi, NULL,
+						  irsa_tag_tlv,
+						  irsa_tag_tlv_len,
+						  false, NULL);
+	}
+
+	buf = nan_de_alloc_sdf(de, dst, total_len, NAN_SRV_CTRL_PUBLISH);
+	if (!buf) {
+		os_free(irsa_tag_tlv);
+		return;
+	}
+
+	/* Build all service attributes */
+	for (i = 0; i < service_count; i++) {
+		struct nan_de_service *srv = services[i];
+		enum nan_service_control_type type;
+
+		if (handle == -1)
+			handle = srv->id;
+
+		type = (srv->type == NAN_DE_PUBLISH) ? NAN_SRV_CTRL_PUBLISH :
+			NAN_SRV_CTRL_SUBSCRIBE;
+
+		nan_de_sdf_attrs_put(buf, de, srv, type, 0, srv->ssi, NULL,
+				     irsa_tag_tlv, irsa_tag_tlv_len, false,
+				     NULL);
+	}
+
+	/* Add IRSA if randomization is used or PKBST generated tags */
+	if (has_randomization || irsa_tag_tlv_len > 0) {
+		nan_de_irsa_attr_add(buf, irsa_nonce, irsa_tag_tlv,
+				     irsa_tag_tlv_len);
+		os_free(irsa_tag_tlv);
+	}
+
+	nan_de_tx(de, freq, 0, dst, de->nmi, bssid, buf, NULL, handle);
+	wpabuf_free(buf);
+
+	/* Update last_multicast time for all services */
+	for (i = 0; i < service_count; i++)
+		os_get_reltime(&services[i]->last_multicast);
+}
+
+
 void nan_de_dw_trigger(struct nan_de *de, int freq)
 {
 	int i;
 	struct os_reltime now;
+	bool has_services = false;
 
 	de->dw_freq = freq;
 
@@ -3419,9 +3561,12 @@ void nan_de_dw_trigger(struct nan_de *de, int freq)
 		if ((srv->type == NAN_DE_PUBLISH &&
 		     srv->publish.unsolicited) ||
 		    (srv->type == NAN_DE_SUBSCRIBE && srv->subscribe.active)) {
-			nan_de_tx_multicast(de, srv, 0);
+			has_services = true;
 		}
 	}
+
+	if (has_services)
+		nan_de_tx_merged_sdf(de, freq, nan_network_id, de->cluster_id);
 }
 
 
