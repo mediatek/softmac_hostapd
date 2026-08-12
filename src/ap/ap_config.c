@@ -1600,9 +1600,11 @@ static int hostapd_config_check_bss(struct hostapd_bss_config *bss,
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
 
-	if (full_config && bss->ignore_broadcast_ssid && conf->mbssid) {
+	if (bss->ignore_broadcast_ssid < 0 || bss->ignore_broadcast_ssid > 2) {
 		wpa_printf(MSG_ERROR,
-			   "Hidden SSID is not suppored when MBSSID is enabled");
+			   "Invalid ignore_broadcast_ssid value %d"
+			   " (must be 0, 1, or 2)",
+			   bss->ignore_broadcast_ssid);
 		return -1;
 	}
 
