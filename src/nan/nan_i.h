@@ -662,6 +662,8 @@ struct nan_attrs {
 	const u8 *npba;
 	const u8 *pbea;
 	const u8 *nira;
+	const u8 *irsa;
+	const u8 *rsia;
 	const u8 *ndpe;
 
 	u16 ndp_len;
@@ -674,6 +676,8 @@ struct nan_attrs {
 	u16 npba_len;
 	u16 pbea_len;
 	u16 nira_len;
+	u16 irsa_len;
+	u16 rsia_len;
 	u16 ndpe_len;
 };
 

@@ -250,6 +250,36 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 			attrs->pbea = pos;
 			attrs->pbea_len = attr_len;
 			break;
+		case NAN_ATTR_IRSA:
+			if (attr_len < 1 ||
+			    pos[0] != NAN_IRSA_CIPHER_VER_SIPHASH_2_4)
+				break;
+
+			/*
+			 * Cipher Version (1) + Nonce (8) + Tag (1 * 8) minimum.
+			 * Tag length is not fixed here as it can contain
+			 * multiple tags.
+			 */
+			if (attr_len <
+			    1 + NAN_NIRA_NONCE_LEN + NAN_NIRA_TAG_LEN)
+				break;
+
+			attrs->irsa = pos;
+			attrs->irsa_len = attr_len;
+			break;
+		case NAN_ATTR_RSIA:
+			/*
+			 * Requestor Instance ID (1) + RSID Control (1) +
+			 * RSID Number (1) + RSID List (RSID Number * 6).
+			 * Minimum RSID List length is 0?
+			 * Assuming at least 1+1+1 = 3 bytes.
+			 */
+			if (attr_len < 3)
+				break;
+
+			attrs->rsia = pos;
+			attrs->rsia_len = attr_len;
+			break;
 		case NAN_ATTR_MASTER_INDICATION:
 		case NAN_ATTR_CLUSTER:
 		case NAN_ATTR_NAN_ATTR_SERVICE_ID_LIST:
