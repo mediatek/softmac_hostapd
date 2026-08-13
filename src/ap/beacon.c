@@ -1177,6 +1177,49 @@ static void hostapd_gen_probe_resp(struct hostapd_data *hapd,
 
 
 #ifdef CONFIG_IEEE80211BE
+static bool is_valid_ml_probe_req(struct hostapd_data *hapd,
+				  const struct ieee80211_mgmt *mgmt,
+				  int mld_id)
+{
+	if (is_multicast_ether_addr(mgmt->da) ||
+	    is_multicast_ether_addr(mgmt->bssid)) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: Ignore broadcast ML Probe Request from " MACSTR,
+			   MAC2STR(mgmt->sa));
+		return false;
+	}
+
+	if (mld_id >= 0 && hapd != hostapd_mbssid_get_tx_bss(hapd)) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: Ignore ML Probe Request from " MACSTR
+			   " - requesting non-TX BSS with mld_id set",
+			   MAC2STR(mgmt->sa));
+		return false;
+	}
+
+	if (mld_id <= 0)
+		return true;
+
+	if (!hapd->iconf->mbssid) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: Ignore ML Probe Request from " MACSTR
+			   " - MBSSID not configured for MLD ID %d",
+			   MAC2STR(mgmt->sa), mld_id);
+		return false;
+	}
+
+	if (hostapd_get_mbssid_bss_by_idx(hapd, mld_id) == NULL) {
+		wpa_printf(MSG_DEBUG,
+			   "MLD: Ignore ML Probe Request from " MACSTR
+			   " - no BSS found for MBSSID Index %d",
+			   MAC2STR(mgmt->sa), mld_id);
+		return false;
+	}
+
+	return true;
+}
+
+
 static void hostapd_fill_probe_resp_ml_params(struct hostapd_data *hapd,
 					      struct probe_resp_params *params,
 					      const struct ieee80211_mgmt *mgmt,
@@ -1196,18 +1239,11 @@ static void hostapd_fill_probe_resp_ml_params(struct hostapd_data *hapd,
 	/*
 	 * Set mld_ap if the ML probe request explicitly requested a specific
 	 * AP MLD ID.
+	 * The error case should be handled by the caller.
 	 */
 	if (mld_id > 0) {
-		if (hapd == hostapd_mbssid_get_tx_bss(hapd)) {
-			hapd = hostapd_get_mbssid_bss_by_idx(hapd, mld_id);
-			if (!hapd) {
-				wpa_printf(MSG_INFO,
-					   "Ignore Probe Request from " MACSTR
-					   " since no matched non-TX BSS found for MBSSID Index %d",
-					   MAC2STR(mgmt->sa), mld_id);
-				goto fail;
-			}
-		}
+		/* hapd is the TX BSS and hapd != NULL are guaranteed by caller */
+		hapd = hostapd_get_mbssid_bss_by_idx(hapd, mld_id);
 		params->mld_ap = hapd;
 	} else if (mld_id == -1 && hapd->iconf->mbssid &&
 		   hapd != hostapd_mbssid_get_tx_bss(hapd)) {
@@ -1235,19 +1271,7 @@ static void hostapd_fill_probe_resp_ml_params(struct hostapd_data *hapd,
 			   mld_link_id, link_info->resp_sta_profile_len);
 	}
 
-	if (mld_id > 0 && !params->mld_ap) {
-		wpa_printf(MSG_DEBUG,
-			   "MLD: No nontransmitted BSSID for MLD ID %d",
-			   mld_id);
-		goto fail;
-	}
-
 	return;
-
-fail:
-	hostapd_free_probe_resp_params(params);
-	params->mld_ap = NULL;
-	params->mld_info = NULL;
 }
 #endif /* CONFIG_IEEE80211BE */
 
@@ -1843,6 +1867,9 @@ void handle_probe_req(struct hostapd_data *hapd,
 	if (hapd->conf->mld_ap && elems.probe_req_mle &&
 	    parse_ml_probe_req((struct ieee80211_eht_ml *) elems.probe_req_mle,
 			       elems.probe_req_mle_len, &mld_id, &links)) {
+		if (!is_valid_ml_probe_req(hapd, mgmt, mld_id))
+			return;
+
 		hostapd_fill_probe_resp_ml_params(hapd, &params, mgmt,
 						  mld_id, links);
 	}
