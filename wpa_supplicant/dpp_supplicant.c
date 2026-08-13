@@ -29,6 +29,7 @@
 #include "scan.h"
 #include "notify.h"
 #include "dpp_supplicant.h"
+#include "ucode.h"
 
 
 static int wpas_dpp_listen_start(struct wpa_supplicant *wpa_s,
@@ -4129,6 +4130,9 @@ void wpas_dpp_rx_action(struct wpa_supplicant *wpa_s, const u8 *src,
 		return;
 	}
 	wpa_hexdump(MSG_MSGDUMP, "DPP: Received message attributes", buf, len);
+	if (wpas_ucode_dpp_rx_action(wpa_s, src, type, freq, hdr, len + DPP_HDR_LEN))
+		return;
+
 	if (dpp_check_attrs(buf, len) < 0) {
 		wpa_msg(wpa_s, MSG_INFO, DPP_EVENT_RX "src=" MACSTR
 			" freq=%u type=%d ignore=invalid-attributes",
@@ -5142,7 +5146,10 @@ static void wpas_dpp_chirp_start(struct wpa_supplicant *wpa_s)
 		    wpa_s->own_addr, broadcast,
 		    wpabuf_head(msg), wpabuf_len(msg),
 		    2000, wpas_dpp_chirp_tx_status, 0) < 0)
-		wpas_dpp_chirp_stop(wpa_s);
+		wpas_dpp_chirp_tx_status(wpa_s, wpa_s->dpp_chirp_freq,
+					 broadcast, wpa_s->own_addr, broadcast,
+					 wpabuf_head(msg), wpabuf_len(msg),
+					 OFFCHANNEL_SEND_ACTION_FAILED);
 
 	wpabuf_free(announce);
 }

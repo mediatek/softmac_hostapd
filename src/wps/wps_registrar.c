@@ -2064,14 +2064,17 @@ static struct wpabuf * wps_build_m6(struct wps_data *wps)
 static struct wpabuf * wps_build_m8(struct wps_data *wps)
 {
 	struct wpabuf *msg, *plain;
+	size_t extra_len;
 
 	wpa_printf(MSG_DEBUG, "WPS: Building Message M8");
 
-	plain = wpabuf_alloc(500);
+	extra_len = wps->m8_encr_extra ?
+		wpabuf_len(wps->m8_encr_extra) : 0;
+	plain = wpabuf_alloc(500 + extra_len);
 	if (plain == NULL)
 		return NULL;
 
-	msg = wpabuf_alloc(1000);
+	msg = wpabuf_alloc(1000 + extra_len);
 	if (msg == NULL) {
 		wpabuf_free(plain);
 		return NULL;
@@ -2080,9 +2083,19 @@ static struct wpabuf * wps_build_m8(struct wps_data *wps)
 	if (wps_build_version(msg) ||
 	    wps_build_msg_type(msg, WPS_M8) ||
 	    wps_build_enrollee_nonce(wps, msg) ||
-	    ((wps->wps->ap || wps->er) && wps_build_cred(wps, plain)) ||
-	    (!wps->wps->ap && !wps->er && wps_build_ap_settings(wps, plain)) ||
-	    wps_build_key_wrap_auth(wps, plain) ||
+	    (!wps->skip_cred && (wps->wps->ap || wps->er) &&
+	     wps_build_cred(wps, plain)) ||
+	    (!wps->skip_cred && !wps->wps->ap && !wps->er &&
+	     wps_build_ap_settings(wps, plain))) {
+		wpabuf_clear_free(plain);
+		wpabuf_clear_free(msg);
+		return NULL;
+	}
+
+	if (wps->m8_encr_extra)
+		wpabuf_put_buf(plain, wps->m8_encr_extra);
+
+	if (wps_build_key_wrap_auth(wps, plain) ||
 	    wps_build_encr_settings(wps, msg, plain) ||
 	    wps_build_wfa_ext(msg, 0, NULL, 0, 0) ||
 	    wps_build_authenticator(wps, msg)) {
@@ -3018,6 +3031,13 @@ static enum wps_process_res wps_process_m7(struct wps_data *wps,
 		wps->state = SEND_WSC_NACK;
 		return WPS_CONTINUE;
 	}
+
+	if (wps->wps->m7_rx_cb)
+		wps->wps->m7_rx_cb(wps->wps->cb_ctx, wps->mac_addr_e,
+				    wpabuf_head(decrypted),
+				    wpabuf_len(decrypted),
+				    &wps->m8_encr_extra,
+				    &wps->skip_cred);
 
 	wpabuf_clear_free(decrypted);
 

@@ -33,6 +33,7 @@
 #include "p2p/p2p.h"
 #include "p2p_supplicant.h"
 #include "wps_supplicant.h"
+#include "ucode.h"
 
 
 #ifndef WPS_PIN_SCAN_IGNORE_SEL_REG
@@ -371,6 +372,14 @@ static void wpas_wps_remove_dup_network(struct wpa_supplicant *wpa_s,
 }
 
 
+static int wpa_supplicant_wps_m8_rx(void *ctx, const u8 *data,
+				     size_t data_len)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	return wpas_ucode_wps_m8_rx(wpa_s, data, data_len);
+}
+
+
 static int wpa_supplicant_wps_cred(void *ctx,
 				   const struct wps_credential *cred)
 {
@@ -400,6 +409,8 @@ static int wpa_supplicant_wps_cred(void *ctx,
 
 	wpa_hexdump_key(MSG_DEBUG, "WPS: Received Credential attribute",
 			cred->cred_attr, cred->cred_attr_len);
+
+	wpas_ucode_wps_complete(wpa_s, cred);
 
 	if (wpa_s->conf->wps_cred_processing == 1)
 		return 0;
@@ -1596,6 +1607,7 @@ int wpas_wps_init(struct wpa_supplicant *wpa_s)
 	wps->cred_cb = wpa_supplicant_wps_cred;
 	wps->event_cb = wpa_supplicant_wps_event;
 	wps->rf_band_cb = wpa_supplicant_wps_rf_band;
+	wps->m8_rx_cb = wpa_supplicant_wps_m8_rx;
 	wps->cb_ctx = wpa_s;
 
 	wps->dev.device_name = wpa_s->conf->device_name;
@@ -1713,6 +1725,7 @@ void wpas_wps_deinit(struct wpa_supplicant *wpa_s)
 	wpabuf_free(wpa_s->wps->dh_pubkey);
 	wpabuf_free(wpa_s->wps->dh_privkey);
 	wpabuf_free(wpa_s->wps->dev.vendor_ext_m1);
+	wpabuf_free(wpa_s->wps->m7_encr_extra);
 	os_free(wpa_s->wps->network_key);
 	os_free(wpa_s->wps);
 	wpa_s->wps = NULL;

@@ -128,6 +128,9 @@ struct wps_data {
 
 	int multi_ap_backhaul_sta;
 	int multi_ap_profile;
+
+	struct wpabuf *m8_encr_extra;
+	int skip_cred;
 };
 
 

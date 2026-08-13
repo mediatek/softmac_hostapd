@@ -377,14 +377,17 @@ static int wps_build_ap_settings(struct wps_data *wps, struct wpabuf *plain)
 static struct wpabuf * wps_build_m7(struct wps_data *wps)
 {
 	struct wpabuf *msg, *plain;
+	size_t extra_len;
 
 	wpa_printf(MSG_DEBUG, "WPS: Building Message M7");
 
-	plain = wpabuf_alloc(500 + wps->wps->ap_settings_len);
+	extra_len = wps->wps->m7_encr_extra ?
+		wpabuf_len(wps->wps->m7_encr_extra) : 0;
+	plain = wpabuf_alloc(500 + wps->wps->ap_settings_len + extra_len);
 	if (plain == NULL)
 		return NULL;
 
-	msg = wpabuf_alloc(1000 + wps->wps->ap_settings_len);
+	msg = wpabuf_alloc(1000 + wps->wps->ap_settings_len + extra_len);
 	if (msg == NULL) {
 		wpabuf_free(plain);
 		return NULL;
@@ -394,8 +397,16 @@ static struct wpabuf * wps_build_m7(struct wps_data *wps)
 	    wps_build_msg_type(msg, WPS_M7) ||
 	    wps_build_registrar_nonce(wps, msg) ||
 	    wps_build_e_snonce2(wps, plain) ||
-	    (wps->wps->ap && wps_build_ap_settings(wps, plain)) ||
-	    wps_build_key_wrap_auth(wps, plain) ||
+	    (wps->wps->ap && wps_build_ap_settings(wps, plain))) {
+		wpabuf_clear_free(plain);
+		wpabuf_free(msg);
+		return NULL;
+	}
+
+	if (wps->wps->m7_encr_extra)
+		wpabuf_put_buf(plain, wps->wps->m7_encr_extra);
+
+	if (wps_build_key_wrap_auth(wps, plain) ||
 	    wps_build_encr_settings(wps, msg, plain) ||
 	    wps_build_wfa_ext(msg, 0, NULL, 0, 0) ||
 	    wps_build_authenticator(wps, msg)) {
@@ -1258,8 +1269,22 @@ static enum wps_process_res wps_process_m8(struct wps_data *wps,
 	wpa_printf(MSG_DEBUG, "WPS: Processing decrypted Encrypted Settings "
 		   "attribute");
 	if (wps_parse_msg(decrypted, &eattr) < 0 ||
-	    wps_process_key_wrap_auth(wps, decrypted, eattr.key_wrap_auth) ||
-	    wps_process_creds(wps, eattr.cred, eattr.cred_len,
+	    wps_process_key_wrap_auth(wps, decrypted, eattr.key_wrap_auth)) {
+		wpabuf_clear_free(decrypted);
+		wps->state = SEND_WSC_NACK;
+		return WPS_CONTINUE;
+	}
+
+	if (wps->wps->m8_rx_cb &&
+	    wps->wps->m8_rx_cb(wps->wps->cb_ctx,
+			       wpabuf_head(decrypted),
+			       wpabuf_len(decrypted))) {
+		wpabuf_clear_free(decrypted);
+		wps->state = WPS_MSG_DONE;
+		return WPS_CONTINUE;
+	}
+
+	if (wps_process_creds(wps, eattr.cred, eattr.cred_len,
 			      eattr.num_cred, attr->version2 != NULL) ||
 	    wps_process_ap_settings_e(wps, &eattr, decrypted,
 				      attr->version2 != NULL)) {

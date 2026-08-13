@@ -850,6 +850,14 @@ struct wps_context {
 	/* Whether to send WPA2-PSK passphrase as a passphrase instead of PSK
 	 * for WPA3-Personal transition mode needs. */
 	bool use_passphrase;
+
+	struct wpabuf *m7_encr_extra;
+
+	void (*m7_rx_cb)(void *ctx, const u8 *addr,
+			 const u8 *data, size_t data_len,
+			 struct wpabuf **m8_encr_extra, int *skip_cred);
+
+	int (*m8_rx_cb)(void *ctx, const u8 *data, size_t data_len);
 };
 
 struct wps_registrar *

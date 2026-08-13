@@ -290,3 +290,12 @@ void taxonomy_sta_info_assoc_req(const struct hostapd_data *hapd,
 	wpabuf_free(sta->assoc_ie_taxonomy);
 	sta->assoc_ie_taxonomy = wpabuf_alloc_copy(ie, ie_len);
 }
+
+void taxonomy_sta_info_assoc_frame(const struct hostapd_data *hapd,
+				   struct sta_info *sta,
+				   const struct ieee80211_mgmt *mgmt,
+				   size_t len)
+{
+	wpabuf_free(sta->assoc_frame_taxonomy);
+	sta->assoc_frame_taxonomy = wpabuf_alloc_copy(mgmt, len);
+}

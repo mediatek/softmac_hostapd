@@ -1788,8 +1788,8 @@ static void gas_serv_rx_gas_initial_req(struct hostapd_data *hapd,
 	if (dpp) {
 		struct wpabuf *msg;
 
-		msg = hostapd_dpp_gas_req_handler(hapd, sa, pos, slen,
-						  data, len);
+		msg = hostapd_dpp_gas_req_handler(hapd, sa, dialog_token,
+						  pos, slen, data, len);
 		if (!msg)
 			return;
 		gas_serv_req_dpp_processing(hapd, sa, dialog_token, prot, msg,

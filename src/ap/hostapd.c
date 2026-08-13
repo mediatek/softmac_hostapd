@@ -66,7 +66,7 @@ static int hostapd_broadcast_wep_clear(struct hostapd_data *hapd);
 #endif /* CONFIG_WEP */
 static int setup_interface2(struct hostapd_iface *iface);
 static void channel_list_update_timeout(void *eloop_ctx, void *timeout_ctx);
-static void hostapd_cleanup_unused_mlds(struct hapd_interfaces *interfaces);
+void hostapd_cleanup_unused_mlds(struct hapd_interfaces *interfaces);
 static void hostapd_interface_setup_failure_handler(void *eloop_ctx,
 						    void *timeout_ctx);
 
@@ -287,6 +287,29 @@ static int hostapd_remove_hapd_iface(struct hostapd_iface *hapd_iface)
 	return 0;
 }
 
+static inline int hostapd_iface_num_sta(struct hostapd_iface *iface)
+{
+	int num_sta = 0;
+	int i;
+
+	for (i = 0; i < iface->num_bss; i++)
+		num_sta += iface->bss[i]->num_sta;
+
+	return num_sta;
+}
+
+
+int hostapd_check_max_sta(struct hostapd_data *hapd)
+{
+	if (hapd->num_sta >= hapd->conf->max_num_sta)
+		return 1;
+
+	if (hapd->iconf->max_num_sta &&
+	    hostapd_iface_num_sta(hapd->iface) >= hapd->iconf->max_num_sta)
+		return 1;
+
+	return 0;
+}
 
 int hostapd_reload_config(struct hostapd_iface *iface)
 {
@@ -294,6 +317,8 @@ int hostapd_reload_config(struct hostapd_iface *iface)
 	struct hostapd_data *hapd = iface->bss[0];
 	struct hostapd_config *newconf, *oldconf;
 	size_t j;
+
+	hostapd_ucode_reload_bss(hapd);
 
 	if (iface->config_fname == NULL) {
 		/* Only in-memory config in use - assume it has been updated */
@@ -525,6 +550,8 @@ void hostapd_free_hapd_data(struct hostapd_data *hapd)
 	hapd->beacon_set_done = 0;
 
 	wpa_printf(MSG_DEBUG, "%s(%s)", __func__, hapd->conf->iface);
+	hostapd_ucode_free_bss(hapd);
+	hostapd_ubus_free_bss(hapd);
 	accounting_deinit(hapd);
 	hostapd_deinit_wpa(hapd);
 	vlan_deinit(hapd);
@@ -535,7 +562,7 @@ void hostapd_free_hapd_data(struct hostapd_data *hapd)
 		struct hapd_interfaces *ifaces = hapd->iface->interfaces;
 		size_t i;
 
-		for (i = 0; i < ifaces->count; i++) {
+		for (i = 0; ifaces && i < ifaces->count; i++) {
 			struct hostapd_iface *iface = ifaces->iface[i];
 			size_t j;
 
@@ -685,7 +712,7 @@ static void hostapd_mld_move_vlan_list(struct hostapd_data *old_fbss,
  * If the BSS being removed is the first link, the next link becomes the first
  * link.
  */
-static void hostapd_bss_link_deinit(struct hostapd_data *hapd)
+void hostapd_bss_link_deinit(struct hostapd_data *hapd)
 {
 #ifdef CONFIG_IEEE80211BE
 	int i;
@@ -794,6 +821,7 @@ void hostapd_cleanup_iface_partial(struct hostapd_iface *iface)
 static void hostapd_cleanup_iface(struct hostapd_iface *iface)
 {
 	wpa_printf(MSG_DEBUG, "%s(%p)", __func__, iface);
+	hostapd_ucode_free_iface(iface);
 	hostapd_afc_stop(iface);
 	eloop_cancel_timeout(hostapd_interface_setup_failure_handler, iface,
 			     NULL);
@@ -1383,6 +1411,9 @@ static int hostapd_start_beacon(struct hostapd_data *hapd,
 	if (hapd->driver && hapd->driver->set_operstate)
 		hapd->driver->set_operstate(hapd->drv_priv, 1);
 
+	hostapd_ubus_add_bss(hapd);
+	hostapd_ucode_add_bss(hapd);
+
 	return 0;
 }
 
@@ -1415,6 +1446,7 @@ static int hostapd_bss_radius_init(struct hostapd_data *hapd)
 
 		os_memset(&das_conf, 0, sizeof(das_conf));
 		das_conf.port = conf->radius_das_port;
+		das_conf.nas_identifier = conf->nas_identifier;
 		das_conf.shared_secret = conf->radius_das_shared_secret;
 		das_conf.shared_secret_len =
 			conf->radius_das_shared_secret_len;
@@ -1457,7 +1489,7 @@ static int hostapd_bss_radius_init(struct hostapd_data *hapd)
  * initialized. Most of the modules that are initialized here will be
  * deinitialized in hostapd_cleanup().
  */
-static int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
+int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 			     bool start_beacon)
 {
 	struct hostapd_bss_config *conf = hapd->conf;
@@ -1500,12 +1532,17 @@ static int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 
 	if (!first) {
 		u8 *addr = hapd->own_addr;
+		bool use_existing = !first;
 
+#ifdef CONFIG_IEEE80211BE
+		if (hapd->conf->mld_ap)
+			addr = NULL;
+#endif /* CONFIG_IEEE80211BE */
 		if (!is_zero_ether_addr(conf->bssid)) {
 			/* Allocate the configured BSSID. */
 			os_memcpy(hapd->own_addr, conf->bssid, ETH_ALEN);
 
-			if (hostapd_mac_comp(hapd->own_addr,
+			if (0 && hostapd_mac_comp(hapd->own_addr,
 					     hapd->iface->bss[0]->own_addr) ==
 			    0) {
 				wpa_printf(MSG_ERROR, "BSS '%s' may not have "
@@ -1535,6 +1572,7 @@ static int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 					   hapd->mld_link_id, hapd->conf->iface);
 				goto setup_mld;
 			}
+			use_existing = true;
 		}
 #endif /* CONFIG_IEEE80211BE */
 
@@ -1543,7 +1581,7 @@ static int hostapd_setup_bss(struct hostapd_data *hapd, bool first,
 				   conf->iface, addr, hapd,
 				   &hapd->drv_priv, force_ifname, if_addr,
 				   conf->bridge[0] ? conf->bridge : NULL,
-				   1)) {
+				   use_existing)) {
 			wpa_printf(MSG_ERROR, "Failed to add BSS (BSSID="
 				   MACSTR ")", MAC2STR(hapd->own_addr));
 			hapd->interface_added = 0;
@@ -1583,6 +1621,8 @@ setup_mld:
 		hostapd_mld_add_link(hapd);
 	}
 #endif /* CONFIG_IEEE80211BE */
+
+	hostapd_ucode_create_bss(hapd);
 
 	if (conf->wmm_enabled < 0)
 		conf->wmm_enabled = hapd->iconf->ieee80211n |
@@ -1912,7 +1952,7 @@ int hostapd_set_acl(struct hostapd_data *hapd)
 }
 
 
-static int hostapd_set_ctrl_sock_iface(struct hostapd_data *hapd)
+int hostapd_set_ctrl_sock_iface(struct hostapd_data *hapd)
 {
 #ifdef CONFIG_IEEE80211BE
 	int ret;
@@ -2521,7 +2561,11 @@ static int hostapd_owe_iface_iter(struct hostapd_iface *iface, void *ctx)
 		if (!bss->conf->ssid.ssid_set || !bss->conf->ssid.ssid_len ||
 		    is_zero_ether_addr(bss->own_addr))
 			continue;
-
+		if (!os_memcmp(hapd->conf->owe_transition_bssid, bss->own_addr, ETH_ALEN) &&
+		    hapd->conf->owe_transition_ssid_len == bss->conf->ssid.ssid_len &&
+		    !os_memcmp(hapd->conf->owe_transition_ssid, bss->conf->ssid.ssid,
+			       bss->conf->ssid.ssid_len))
+			return 0;
 		os_memcpy(hapd->conf->owe_transition_bssid, bss->own_addr,
 			  ETH_ALEN);
 		os_memcpy(hapd->conf->owe_transition_ssid,
@@ -2538,10 +2582,6 @@ static int hostapd_owe_iface_iter(struct hostapd_iface *iface, void *ctx)
 
 int hostapd_owe_trans_get_info(struct hostapd_data *hapd)
 {
-	if (hapd->conf->owe_transition_ssid_len > 0 &&
-	    !is_zero_ether_addr(hapd->conf->owe_transition_bssid))
-		return 0;
-
 	/* Find transition mode SSID/BSSID information from a BSS operated by
 	 * this hostapd instance. */
 	if (!hapd->iface->interfaces ||
@@ -2585,7 +2625,7 @@ static int hostapd_owe_iface_iter2(struct hostapd_iface *iface, void *ctx)
 #endif /* CONFIG_OWE */
 
 
-static void hostapd_owe_update_trans(struct hostapd_iface *iface)
+void hostapd_owe_update_trans(struct hostapd_iface *iface)
 {
 #ifdef CONFIG_OWE
 	/* Check whether the enabled BSS can complete OWE transition mode
@@ -2626,6 +2666,7 @@ static int hostapd_setup_interface_complete_sync(struct hostapd_iface *iface,
 	if (err)
 		goto fail;
 
+	hostapd_ubus_add_iface(iface);
 	wpa_printf(MSG_DEBUG, "Completing interface initialization");
 	if (iface->freq) {
 #ifdef NEED_AP_MLME
@@ -2860,6 +2901,7 @@ dfs_offload:
 
 fail:
 	wpa_printf(MSG_ERROR, "Interface initialization failed");
+	hostapd_ubus_free_iface(iface);
 
 	if (iface->is_no_ir) {
 		hostapd_set_state(iface, HAPD_IFACE_NO_IR);
@@ -3060,7 +3102,7 @@ hostapd_alloc_bss_data(struct hostapd_iface *hapd_iface,
 }
 
 
-static void hostapd_bss_deinit(struct hostapd_data *hapd)
+void hostapd_bss_deinit(struct hostapd_data *hapd)
 {
 	if (!hapd)
 		return;
@@ -3185,7 +3227,10 @@ struct hostapd_iface * hostapd_alloc_iface(void)
 #ifdef CONFIG_IEEE80211BE
 static void hostapd_bss_alloc_link_id(struct hostapd_data *hapd)
 {
-	hapd->mld_link_id = hapd->mld->next_link_id++;
+	if (hapd->conf->mld_link_id >= 0)
+		hapd->mld_link_id = hapd->conf->mld_link_id;
+	else
+		hapd->mld_link_id = hapd->mld->next_link_id++;
 	wpa_printf(MSG_DEBUG, "AP MLD: %s: Link ID %d assigned.",
 		   hapd->mld->name, hapd->mld_link_id);
 }
@@ -3266,7 +3311,7 @@ fail:
 }
 
 
-static void hostapd_cleanup_unused_mlds(struct hapd_interfaces *interfaces)
+void hostapd_cleanup_unused_mlds(struct hapd_interfaces *interfaces)
 {
 #ifdef CONFIG_IEEE80211BE
 	struct hostapd_mld *mld, **all_mld;
@@ -3459,8 +3504,13 @@ hostapd_interface_init_bss(struct hapd_interfaces *interfaces, const char *phy,
 		}
 	}
 
-	wpa_printf(MSG_INFO, "Configuration file: %s (phy %s)%s",
-		   config_fname, phy, iface ? "" : " --> new PHY");
+	if (!strncmp(config_fname, "data:", 5)) {
+		wpa_printf(MSG_INFO, "Configuration file: %s (phy %s)%s",
+		     "<inline>", phy, iface ? "" : " --> new PHY");
+	} else {
+		wpa_printf(MSG_INFO, "Configuration file: %s (phy %s)%s",
+		     config_fname, phy, iface ? "" : " --> new PHY");
+	}
 
 	conf = interfaces->config_read_cb(config_fname);
 	if (!conf)
@@ -3607,6 +3657,7 @@ void hostapd_interface_deinit_free(struct hostapd_iface *iface)
 		   (unsigned int) iface->conf->num_bss);
 	driver = iface->bss[0]->driver;
 	drv_priv = iface->bss[0]->drv_priv;
+	hostapd_ubus_free_iface(iface);
 	hostapd_interface_deinit(iface);
 	wpa_printf(MSG_DEBUG, "%s: driver=%p drv_priv=%p -> hapd_deinit",
 		   __func__, driver, drv_priv);
@@ -4146,7 +4197,8 @@ int hostapd_remove_iface(struct hapd_interfaces *interfaces, char *buf)
 		hapd_iface = interfaces->iface[i];
 		if (hapd_iface == NULL)
 			return -1;
-		if (!os_strcmp(hapd_iface->conf->bss[0]->iface, buf)) {
+		if (!os_strcmp(hapd_iface->phy, buf) ||
+		    !os_strcmp(hapd_iface->conf->bss[0]->iface, buf)) {
 			wpa_printf(MSG_INFO, "Remove interface '%s'", buf);
 			return hostapd_remove_hapd_iface(hapd_iface);
 		}
@@ -4178,6 +4230,8 @@ int hostapd_remove_iface(struct hapd_interfaces *interfaces, char *buf)
 void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 			   int reassoc)
 {
+	int mld_assoc_link_id = -1;
+
 	if (hapd->tkip_countermeasures) {
 		hostapd_drv_sta_deauth(hapd, sta->addr,
 				       WLAN_REASON_MICHAEL_MIC_FAILURE);
@@ -4185,10 +4239,16 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 
 #ifdef CONFIG_IEEE80211BE
-	if (ap_sta_is_mld(hapd, sta) &&
-	    sta->mld_assoc_link_id != hapd->mld_link_id)
-		return;
+	if (ap_sta_is_mld(hapd, sta)) {
+		if (sta->mld_assoc_link_id == hapd->mld_link_id) {
+			mld_assoc_link_id = sta->mld_assoc_link_id;
+		} else {
+			return;
+		}
+	}
 #endif /* CONFIG_IEEE80211BE */
+        if (mld_assoc_link_id != -2)
+		hostapd_prune_associations(hapd, sta->addr, mld_assoc_link_id);
 
 	ap_sta_clear_disconnect_timeouts(hapd, sta);
 	ap_sta_clear_assoc_timeout(hapd, sta);

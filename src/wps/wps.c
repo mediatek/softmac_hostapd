@@ -182,6 +182,7 @@ void wps_deinit(struct wps_data *data)
 	bin_clear_free(data->new_psk, data->new_psk_len);
 	wps_device_data_free(&data->peer_dev);
 	bin_clear_free(data->new_ap_settings, sizeof(*data->new_ap_settings));
+	wpabuf_free(data->m8_encr_extra);
 	dh5_free(data->dh_ctx);
 	os_free(data);
 }

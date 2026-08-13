@@ -27,6 +27,7 @@
 #include "beacon.h"
 #include "sta_info.h"
 #include "wps_hostapd.h"
+#include "ucode.h"
 
 
 #ifdef CONFIG_WPS_UPNP
@@ -395,9 +396,8 @@ static int hapd_wps_reconfig_in_memory(struct hostapd_data *hapd,
 				bss->wpa_pairwise |= WPA_CIPHER_GCMP;
 			else
 				bss->wpa_pairwise |= WPA_CIPHER_CCMP;
-		}
 #ifndef CONFIG_NO_TKIP
-		if (cred->encr_type & WPS_ENCR_TKIP)
+		} else if (cred->encr_type & WPS_ENCR_TKIP)
 			bss->wpa_pairwise |= WPA_CIPHER_TKIP;
 #endif /* CONFIG_NO_TKIP */
 		bss->rsn_pairwise = bss->wpa_pairwise;
@@ -717,6 +717,17 @@ static int hostapd_wps_cred_cb(void *ctx, const struct wps_credential *cred)
 {
 	struct hostapd_data *hapd = ctx;
 	return hostapd_wps_for_each(hapd, hapd_wps_cred_cb, (void *) cred);
+}
+
+
+static void hostapd_wps_m7_rx_cb(void *ctx, const u8 *addr,
+				  const u8 *data, size_t data_len,
+				  struct wpabuf **m8_encr_extra,
+				  int *skip_cred)
+{
+	struct hostapd_data *hapd = ctx;
+	hostapd_ucode_wps_m7_rx(hapd, addr, data, data_len,
+				m8_encr_extra, skip_cred);
 }
 
 
@@ -1097,6 +1108,7 @@ int hostapd_init_wps(struct hostapd_data *hapd,
 		return -1;
 
 	wps->cred_cb = hostapd_wps_cred_cb;
+	wps->m7_rx_cb = hostapd_wps_m7_rx_cb;
 	wps->event_cb = hostapd_wps_event_cb;
 	wps->rf_band_cb = hostapd_wps_rf_band_cb;
 	wps->cb_ctx = hapd;
@@ -1183,8 +1195,7 @@ int hostapd_init_wps(struct hostapd_data *hapd,
 					  WPA_CIPHER_GCMP_256)) {
 			wps->encr_types |= WPS_ENCR_AES;
 			wps->encr_types_rsn |= WPS_ENCR_AES;
-		}
-		if (conf->rsn_pairwise & WPA_CIPHER_TKIP) {
+		} else if (conf->rsn_pairwise & WPA_CIPHER_TKIP) {
 #ifdef CONFIG_NO_TKIP
 			wpa_printf(MSG_INFO, "WPS: TKIP not supported");
 			goto fail;

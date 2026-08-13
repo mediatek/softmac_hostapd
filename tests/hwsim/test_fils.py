@@ -1493,6 +1493,10 @@ def check_ec_group(dev, group):
     tls = dev.request("GET tls_library")
     if tls.startswith("wolfSSL"):
         return
+    elif tls.startswith("mbed TLS"):
+        if int(group) == 27:
+            raise HwsimSkip("Brainpool EC group 27 not supported by mbed TLS")
+        return
     if int(group) in [25]:
         if not (tls.startswith("OpenSSL") and ("build=OpenSSL" in tls) and ("run=OpenSSL" in tls)):
             raise HwsimSkip("EC group not supported")

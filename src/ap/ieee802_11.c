@@ -64,6 +64,9 @@
 #include "pasn/pasn_common.h"
 #include "robust_av.h"
 
+#ifdef CONFIG_APUP
+#	include "apup.h"
+#endif // def CONFIG_APUP
 
 #ifdef CONFIG_FILS
 static struct wpabuf *
@@ -1114,11 +1117,16 @@ const char * sae_get_password(struct hostapd_data *hapd,
 			      struct sae_pt **s_pt,
 			      const struct sae_pk **s_pk)
 {
+	struct hostapd_bss_config *conf = hapd->conf;
+	struct hostapd_ssid *ssid = &conf->ssid;
 	const char *password = NULL;
-	struct sae_password_entry *pw;
+	struct sae_password_entry *pw = NULL;
 	struct sae_pt *pt = NULL;
 	const struct sae_pk *pk = NULL;
 	struct hostapd_sta_wpa_psk_short *psk = NULL;
+
+	if (sta && sta->use_sta_psk)
+		goto use_sta_psk;
 
 	/* With sae_track_password functionality enabled, try to first find the
 	 * next viable wildcard-address password if a password identifier was
@@ -1181,12 +1189,30 @@ const char * sae_get_password(struct hostapd_data *hapd,
 		pt = hapd->conf->ssid.pt;
 	}
 
+use_sta_psk:
 	if (!password && sta && !rx_id) {
 		for (psk = sta->psk; psk; psk = psk->next) {
-			if (psk->is_passphrase) {
-				password = psk->passphrase;
+			if (!psk->is_passphrase)
+				continue;
+
+			password = psk->passphrase;
+			if (!sta->use_sta_psk)
+				break;
+
+#ifdef CONFIG_SAE
+			if (sta->sae_pt) {
+				pt = sta->sae_pt;
 				break;
 			}
+
+			pt = sae_derive_pt(conf->sae_groups, ssid->ssid,
+					   ssid->ssid_len,
+					   (const u8 *) password,
+					   os_strlen(password),
+					   NULL, 0);
+			sta->sae_pt = pt;
+			break;
+#endif
 		}
 	}
 
@@ -2393,6 +2419,7 @@ static void handle_auth_sae(struct hostapd_data *hapd, struct sta_info *sta,
 
 			if (sae_check_confirm(sta->sae, var, var_len,
 					      NULL) < 0) {
+				hostapd_ubus_notify(hapd, "key-mismatch", sta->addr);
 				if (sae_password_track_fail(hapd, sta)) {
 					wpa_printf(MSG_DEBUG,
 						   "SAE: Reject mismatching Confirm so that another password can be attempted by "
@@ -4658,7 +4685,7 @@ static void handle_auth(struct hostapd_data *hapd,
 	u16 auth_alg, auth_transaction, status_code;
 	u16 resp = WLAN_STATUS_SUCCESS;
 	struct sta_info *sta = NULL;
-	int res, reply_res;
+	int res, reply_res, ubus_resp;
 	u16 fc;
 	const u8 *challenge = NULL;
 	u8 resp_ies[2 + WLAN_AUTH_CHALLENGE_LEN];
@@ -4697,6 +4724,11 @@ static void handle_auth(struct hostapd_data *hapd,
 	else
 		sa = mgmt->sa;
 #endif /* CONFIG_IEEE80211BE */
+	struct hostapd_ubus_request req = {
+		.type = HOSTAPD_UBUS_AUTH_REQ,
+		.mgmt_frame = mgmt,
+		.ssi_signal = rssi,
+	};
 
 	auth_alg = le_to_host16(mgmt->u.auth.auth_alg);
 	auth_transaction = le_to_host16(mgmt->u.auth.auth_transaction);
@@ -4886,6 +4918,13 @@ static void handle_auth(struct hostapd_data *hapd,
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
 		goto fail;
 	}
+	ubus_resp = hostapd_ubus_handle_event(hapd, &req);
+	if (ubus_resp) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR " rejected by ubus handler.\n",
+			MAC2STR(mgmt->sa));
+		resp = ubus_resp > 0 ? (u16) ubus_resp : WLAN_STATUS_UNSPECIFIED_FAILURE;
+		goto fail;
+	}
 	if (res == HOSTAPD_ACL_PENDING)
 		return;
 
@@ -5031,6 +5070,12 @@ static void handle_auth(struct hostapd_data *hapd,
 	if (res) {
 		wpa_printf(MSG_DEBUG, "ieee802_11_set_radius_info() failed");
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		goto fail;
+	}
+
+	res = hostapd_ucode_sta_auth(hapd, sta);
+	if (res) {
+		resp = res;
 		goto fail;
 	}
 
@@ -5440,8 +5485,8 @@ static u16 check_multi_ap(struct hostapd_data *hapd, struct sta_info *sta,
 }
 
 
-static u16 copy_supp_rates(struct hostapd_data *hapd, struct sta_info *sta,
-			   struct ieee802_11_elems *elems)
+u16 hostapd_copy_supp_rates(struct hostapd_data *hapd, struct sta_info *sta,
+			   const struct ieee802_11_elems *elems)
 {
 	/* Supported rates not used in IEEE 802.11ad/DMG */
 	if (hapd->iface->current_mode &&
@@ -5910,7 +5955,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 			       elems->ext_capab_len);
 	if (resp != WLAN_STATUS_SUCCESS)
 		goto out;
-	resp = copy_supp_rates(hapd, sta, elems);
+	resp = hostapd_copy_supp_rates(hapd, sta, elems);
 	if (resp != WLAN_STATUS_SUCCESS)
 		goto out;
 
@@ -7132,6 +7177,13 @@ static int add_associated_sta(struct hostapd_data *hapd,
 	 * drivers to accept the STA parameter configuration. Since this is
 	 * after a new FT-over-DS exchange, a new TK has been derived, so key
 	 * reinstallation is not a concern for this case.
+	 *
+	 * If the STA was associated and authorized earlier, but came for a new
+	 * connection (!added_unassoc + !reassoc), remove the existing STA entry
+	 * so that it can be re-added. This case is rarely seen when the AP could
+	 * not receive the deauth/disassoc frame from the STA. And the STA comes
+	 * back with new connection within a short period or before the inactive
+	 * STA entry is removed from the list.
 	 */
 	wpa_printf(MSG_DEBUG, "Add associated STA " MACSTR
 		   " (added_unassoc=%d auth_alg=%u ft_over_ds=%u reassoc=%d authorized=%d ft_tk=%d fils_tk=%d)",
@@ -7145,7 +7197,8 @@ static int add_associated_sta(struct hostapd_data *hapd,
 	    (!(sta->flags & WLAN_STA_AUTHORIZED) ||
 	     (reassoc && sta->ft_over_ds && sta->auth_alg == WLAN_AUTH_FT) ||
 	     (!wpa_auth_sta_ft_tk_already_set(sta->wpa_sm) &&
-	      !wpa_auth_sta_fils_tk_already_set(sta->wpa_sm)))) {
+	      !wpa_auth_sta_fils_tk_already_set(sta->wpa_sm)) ||
+	     (!reassoc && (sta->flags & WLAN_STA_AUTHORIZED)))) {
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		wpa_auth_sm_event(sta->wpa_sm, WPA_DRV_STA_REMOVED);
 		set = 0;
@@ -7839,7 +7892,7 @@ static void handle_assoc(struct hostapd_data *hapd,
 	int resp = WLAN_STATUS_SUCCESS;
 	u16 reply_res = WLAN_STATUS_UNSPECIFIED_FAILURE;
 	const u8 *pos;
-	int left, i;
+	int left, i, ubus_resp;
 	struct sta_info *sta;
 	u8 *tmp = NULL;
 #ifdef CONFIG_FILS
@@ -8100,6 +8153,11 @@ static void handle_assoc(struct hostapd_data *hapd,
 		left = res;
 	}
 #endif /* CONFIG_FILS */
+	struct hostapd_ubus_request req = {
+		.type = HOSTAPD_UBUS_ASSOC_REQ,
+		.mgmt_frame = mgmt,
+		.ssi_signal = rssi,
+	};
 
 	/* followed by SSID and Supported rates; and HT capabilities if 802.11n
 	 * is used */
@@ -8192,6 +8250,7 @@ static void handle_assoc(struct hostapd_data *hapd,
 
 #ifdef CONFIG_TAXONOMY
 	taxonomy_sta_info_assoc_req(hapd, sta, pos, left);
+	taxonomy_sta_info_assoc_frame(hapd, sta, mgmt, len);
 #endif /* CONFIG_TAXONOMY */
 
 	sta->pending_wds_enable = 0;
@@ -8205,6 +8264,13 @@ static void handle_assoc(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_FILS */
 
+	ubus_resp = hostapd_ubus_handle_event(hapd, &req);
+	if (ubus_resp) {
+		wpa_printf(MSG_DEBUG, "Station " MACSTR " assoc rejected by ubus handler.\n",
+		       MAC2STR(mgmt->sa));
+		resp = ubus_resp > 0 ? (u16) ubus_resp : WLAN_STATUS_UNSPECIFIED_FAILURE;
+		goto fail;
+	}
  fail:
 
 	/*
@@ -8457,6 +8523,7 @@ static void handle_disassoc(struct hostapd_data *hapd,
 			   (unsigned long) len);
 		return;
 	}
+	hostapd_ubus_notify(hapd, "disassoc", mgmt->sa);
 
 	sta = ap_get_sta(hapd, mgmt->sa);
 	if (!sta) {
@@ -8487,6 +8554,8 @@ static void handle_deauth(struct hostapd_data *hapd,
 
 	/* Clear the PTKSA cache entries for PASN */
 	ptksa_cache_flush(hapd->ptksa, mgmt->sa, WPA_CIPHER_NONE);
+
+	hostapd_ubus_notify(hapd, "deauth", mgmt->sa);
 
 	sta = ap_get_sta(hapd, mgmt->sa);
 	if (!sta) {
@@ -8521,6 +8590,11 @@ static void handle_beacon(struct hostapd_data *hapd,
 				      0);
 
 	ap_list_process_beacon(hapd->iface, mgmt, &elems, fi);
+
+#ifdef CONFIG_APUP
+	if (hapd->conf->apup)
+		apup_process_beacon(hapd, mgmt, len, &elems);
+#endif // def CONFIG_APUP
 }
 
 
