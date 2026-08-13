@@ -1051,6 +1051,12 @@ static void p2p_search(struct p2p_data *p2p)
 		p2p_dbg(p2p, "Driver is still in Listen state - wait for it to end before continuing");
 		return;
 	}
+
+	if (p2p->pending_listen_freq) {
+		p2p_dbg(p2p, "Clear pending_listen_freq for p2p_search");
+		p2p->pending_listen_freq = 0;
+	}
+
 	p2p->cfg->stop_listen(p2p->cfg->cb_ctx);
 	p2p->pending_listen_wait_drv = false;
 
