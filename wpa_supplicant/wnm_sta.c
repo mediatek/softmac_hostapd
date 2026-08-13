@@ -269,7 +269,8 @@ static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 			}
 			gtk_len = *(ptr + 4);
 			if (ptr[1] < 11 + gtk_len ||
-			    gtk_len < 5 || gtk_len > 32) {
+			    gtk_len !=
+			    wpa_cipher_key_len(wpa_s->group_cipher)) {
 				wpa_printf(MSG_DEBUG, "WNM: Invalid GTK "
 					   "subelem");
 				break;
@@ -280,7 +281,8 @@ static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 				ptr);
 			ptr += 13 + gtk_len;
 		} else if (*ptr == WNM_SLEEP_SUBELEM_IGTK) {
-			if (ptr[1] < 2 + 6 + WPA_IGTK_LEN) {
+			if (ptr[1] < 2 + 6 +
+			    wpa_cipher_key_len(wpa_s->mgmt_group_cipher)) {
 				wpa_printf(MSG_DEBUG, "WNM: Too short IGTK "
 					   "subelem");
 				break;
@@ -289,7 +291,8 @@ static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 						 WNM_SLEEP_SUBELEM_IGTK, ptr);
 			ptr += 10 + WPA_IGTK_LEN;
 		} else if (*ptr == WNM_SLEEP_SUBELEM_BIGTK) {
-			if (ptr[1] < 2 + 6 + WPA_BIGTK_LEN) {
+			if (ptr[1] < 2 + 6 +
+			    wpa_cipher_key_len(wpa_s->mgmt_group_cipher)) {
 				wpa_printf(MSG_DEBUG,
 					   "WNM: Too short BIGTK subelem");
 				break;
