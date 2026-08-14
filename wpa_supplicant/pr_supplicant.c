@@ -1245,8 +1245,12 @@ static void wpas_pr_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	const u8 *peer_addr = NULL;
 
 	if (deinit) {
-		if (!work->started)
+		if (work->started) {
 			eloop_cancel_timeout(wpas_pr_pasn_timeout, wpa_s, NULL);
+			eloop_cancel_timeout(wpas_pr_pasn_auth_retry_timeout,
+					     wpa_s, NULL);
+			wpa_s->pr_pasn_auth_work = NULL;
+		}
 
 		wpas_pr_pasn_free_auth_work(awork);
 		work->ctx = NULL;
