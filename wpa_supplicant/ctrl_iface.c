@@ -12919,6 +12919,87 @@ static bool wpas_nan_gtk_cs_supported(const int *cipher_list)
 }
 
 
+static size_t prepare_pairing_setup_info(const char *input, u8 *output)
+{
+	const char *ptr = input;
+	u8 *out_ptr = output;
+	size_t remaining;
+	const char *pair_start;
+	size_t pair_len;
+
+	if (!input)
+		return 0;
+
+	/* format: key1=value1,key2=value2,...,keyn=valuen
+	 * Each pair is encoded as: 1-byte length + pair data.
+	 * Worst case output size is strlen(input) + 1 byte per pair.
+	 */
+	remaining = os_strlen(input) + 1;
+
+	while (*ptr != '\0') {
+		pair_start = ptr;
+		pair_len = 0;
+
+		while (*ptr != '\0' && *ptr != ',') {
+			ptr++;
+			pair_len++;
+		}
+
+		/* Skip empty pairs */
+		if (pair_len == 0) {
+			if (*ptr == ',')
+				ptr++;
+			continue;
+		}
+
+		if (pair_len > 0xff || remaining < 1 + pair_len) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: pairing_setup_info output buffer too small");
+			break;
+		}
+
+		*out_ptr++ = (u8) pair_len;
+		remaining--;
+
+		/* Copy the key=value pair to output */
+		os_memcpy(out_ptr, pair_start, pair_len);
+		out_ptr += pair_len;
+		remaining -= pair_len;
+
+		if (*ptr == ',')
+			ptr++;
+	}
+
+	return out_ptr - output;
+}
+
+
+static u8 * wpas_nan_parse_pairing_setup_info(char *cmd, u16 *out_len)
+{
+	char *psi_pos = os_strstr(cmd, "pairing_setup_info=");
+	char *val;
+	size_t val_len;
+	u8 *buf;
+
+	if (!psi_pos)
+		return NULL;
+
+	val = psi_pos + 19;
+	val_len = os_strlen(val);
+
+	buf = os_malloc(val_len + 1);
+	if (!buf)
+		return NULL;
+
+	*out_len = prepare_pairing_setup_info(val, buf);
+
+	/* Blank out the token so str_token() skips it */
+	os_memset(psi_pos, ' ', 19 + val_len);
+
+	return buf;
+}
+
+
 static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 				 char *buf, size_t buflen)
 {
@@ -12934,6 +13015,7 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	u8 nd_pmk[PMK_LEN];
 	bool p2p = false;
 	u8 forced_addr[ETH_ALEN];
+	u8 *pairing_setup_info = NULL;
 	bool security_required_set = false;
 
 	os_memset(&params, 0, sizeof(params));
@@ -12943,6 +13025,13 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 	/* USD shall require FSD without GAS */
 	params.fsd = true;
 	params.freq = NAN_USD_DEFAULT_FREQ;
+
+	pairing_setup_info = wpas_nan_parse_pairing_setup_info(
+		cmd, &params.pairing_setup_info_len);
+	if (pairing_setup_info)
+		params.pairing_setup_info = pairing_setup_info;
+	else if (os_strstr(cmd, "pairing_setup_info="))
+		goto fail;
 
 	while ((token = str_token(cmd, " ", &context))) {
 		if (os_strncmp(token, "orig_nmi=", 9) == 0) {
@@ -13056,6 +13145,11 @@ static int wpas_ctrl_nan_publish(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "extended_pbm=", 13) == 0) {
+			params.extended_pbm = strtol(token + 13, NULL, 0);
+			continue;
+		}
+
 		if (os_strncmp(token, "cipher_suites=", 14) == 0) {
 			char *pos = token + 14;
 
@@ -13140,6 +13234,7 @@ fail:
 	wpabuf_free(ssi);
 	os_free(freq_list);
 	os_free(cipher_list);
+	os_free(pairing_setup_info);
 	return ret;
 }
 
@@ -13246,9 +13341,17 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 	int *freq_list = NULL;
 	bool p2p = false;
 	u8 forced_addr[ETH_ALEN];
+	u8 *pairing_setup_info = NULL;
 
 	os_memset(&params, 0, sizeof(params));
 	params.freq = NAN_USD_DEFAULT_FREQ;
+
+	pairing_setup_info = wpas_nan_parse_pairing_setup_info(
+		cmd, &params.pairing_setup_info_len);
+	if (pairing_setup_info)
+		params.pairing_setup_info = pairing_setup_info;
+	else if (os_strstr(cmd, "pairing_setup_info="))
+		goto fail;
 
 	while ((token = str_token(cmd, " ", &context))) {
 		if (os_strncmp(token, "service_name=", 13) == 0) {
@@ -13371,6 +13474,11 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 			continue;
 		}
 
+		if (os_strncmp(token, "extended_pbm=", 13) == 0) {
+			params.extended_pbm = strtol(token + 13, NULL, 0);
+			continue;
+		}
+
 		wpa_printf(MSG_INFO,
 			   "CTRL: Invalid NAN_SUBSCRIBE parameter: %s",
 			   token);
@@ -13385,6 +13493,7 @@ static int wpas_ctrl_nan_subscribe(struct wpa_supplicant *wpa_s, char *cmd,
 fail:
 	wpabuf_free(ssi);
 	os_free(freq_list);
+	os_free(pairing_setup_info);
 	return ret;
 }
 
