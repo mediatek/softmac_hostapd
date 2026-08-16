@@ -897,3 +897,46 @@ int siphash_2_4(const u8 *key, const u8 *data, size_t data_len, u8 *tag)
 
 	return 0;
 }
+
+
+struct wpabuf * nan_crypto_derive_irsa_tag(const u8 *nik, size_t nik_len,
+					  const u8 *nmi_addr,
+					  const u8 *irsa_nonce)
+{
+	u8 data[NAN_NIRA_STR_LEN + ETH_ALEN + NAN_NIRA_NONCE_LEN];
+	u8 tag[SIPHASH_TAG_LEN];
+	struct wpabuf *tag_buf;
+
+	if (!nik || nik_len != NAN_NIK_LEN) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Invalid NIK for tag derivation (len=%zu)",
+			   nik ? nik_len : 0);
+		return NULL;
+	}
+
+	if (!nmi_addr || !irsa_nonce) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Invalid parameters for tag derivation");
+		return NULL;
+	}
+
+	os_memcpy(data, NAN_NIRA_STR, NAN_NIRA_STR_LEN);
+	os_memcpy(&data[NAN_NIRA_STR_LEN], nmi_addr, ETH_ALEN);
+	os_memcpy(&data[NAN_NIRA_STR_LEN + ETH_ALEN], irsa_nonce,
+		  NAN_NIRA_NONCE_LEN);
+
+	if (siphash_2_4(nik, data, sizeof(data), tag) < 0) {
+		wpa_printf(MSG_DEBUG, "NAN: Failed to compute HMAC for tag");
+		return NULL;
+	}
+
+	tag_buf = wpabuf_alloc_copy(tag, NAN_NIRA_TAG_LEN);
+	if (!tag_buf)
+		wpa_printf(MSG_DEBUG, "NAN: Failed to allocate tag buffer");
+	else
+		wpa_hexdump(MSG_DEBUG, "NAN: Derived NIRA tag",
+			    wpabuf_head(tag_buf), wpabuf_len(tag_buf));
+
+	forced_memzero(tag, sizeof(tag));
+	return tag_buf;
+}

@@ -73,6 +73,8 @@ enum nan_attr_id {
 	NAN_ATTR_S3 = 0x2D,
 	NAN_ATTR_TPEA = 0x2E, /* Transmit Power Envelope attribute */
 	NAN_ATTR_PBEA = 0x2F, /* Pairing Bootstrapping Extension attribute */
+	NAN_ATTR_IRSA = 0x30, /* Identity Resolution Set attribute */
+	NAN_ATTR_RSIA = 0x31, /* Randomize Service ID attribute */
 	NAN_ATTR_PROXY_META = 0x33,
 	NAN_ATTR_VENDOR_SPECIFIC = 0xDD,
 };
@@ -104,6 +106,7 @@ enum nan_reason {
 #define NAN_SRV_CTRL_SRV_INFO                 BIT(4)
 #define NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED  BIT(5)
 #define NAN_SRV_CTRL_BINDING_BITMAP           BIT(6)
+#define NAN_SRV_CTRL_SERVICE_ID_RANDOMIZATION BIT(7)
 
 enum nan_service_control_type {
 	NAN_SRV_CTRL_PUBLISH = 0,
@@ -174,6 +177,7 @@ enum nan_pairing_bootstrapping_method {
 
 #define NAN_ATTR_HDR_LEN 3
 #define NAN_SERVICE_ID_LEN 6
+#define NAN_RSID_LEN 6 /* Randomized Service ID length (truncated SipHash) */
 
 #define NAN_USD_DEFAULT_FREQ 2437
 

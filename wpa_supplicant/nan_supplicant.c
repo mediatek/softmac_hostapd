@@ -3857,6 +3857,38 @@ static void wpas_nan_de_add_extra_attrs(void *ctx, struct wpabuf *buf)
 }
 
 
+static int wpas_irsa_get_nonce_tag_tlv(void *ctx, u8 *irsa_nonce,
+				       u8 **irsa_tag_tlv,
+				       u16 *irsa_tag_tlv_len)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (!wpa_s || !wpa_s->nan)
+		return -1;
+
+	return nan_irsa_get_nonce_tag_tlv(wpa_s->nan, irsa_nonce, irsa_tag_tlv,
+					  irsa_tag_tlv_len);
+}
+
+
+static void wpas_rsia_get_rsids(void *ctx, const u8 *service_id,
+				const u8 *irsa_tag_tlv,
+				u16 irsa_tag_tlv_len, u8 *rsid_num,
+				u8 **rsid_list, u8 *rsid_list_len,
+				bool is_unicast)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (!wpa_s || !wpa_s->nan || !service_id || !rsid_num || !rsid_list ||
+	    !rsid_list_len)
+		return;
+
+	nan_rsia_get_rsids(wpa_s->nan, service_id, irsa_tag_tlv,
+			   irsa_tag_tlv_len, rsid_num, rsid_list,
+			   rsid_list_len, is_unicast);
+}
+
+
 void wpas_nan_cluster_join(struct wpa_supplicant *wpa_s,
 			   const u8 *cluster_id,
 			   bool new_cluster)
@@ -4579,6 +4611,18 @@ static bool wpas_nan_is_peer_paired_cb(void *ctx, const u8 *peer_addr)
 #endif /* CONFIG_NAN && CONFIG_PASN */
 
 
+static struct dl_list * wpas_nan_de_get_nik_list(void *ctx, u8 tag_type)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+	enum nan_nik_type nik_type = (enum nan_nik_type) tag_type;
+
+	if (!wpa_s || !wpa_s->nan)
+		return NULL;
+
+	return nan_get_nik_list(wpa_s->nan, nik_type);
+}
+
+
 int wpas_nan_de_init(struct wpa_supplicant *wpa_s)
 {
 	struct nan_callbacks cb;
@@ -4605,6 +4649,9 @@ int wpas_nan_de_init(struct wpa_supplicant *wpa_s)
 #endif /* CONFIG_PR */
 #ifdef CONFIG_NAN
 	cb.add_extra_attrs = wpas_nan_de_add_extra_attrs;
+	cb.irsa_get_nonce_tag_tlv = wpas_irsa_get_nonce_tag_tlv;
+	cb.rsia_get_rsids = wpas_rsia_get_rsids;
+	cb.get_nik_list = wpas_nan_de_get_nik_list;
 #ifdef CONFIG_PASN
 	cb.is_peer_paired = wpas_nan_is_peer_paired_cb;
 #endif /* CONFIG_PASN */

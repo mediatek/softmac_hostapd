@@ -79,6 +79,15 @@ struct nan_callbacks {
 			const u8 *ssi, size_t ssi_len,
 			const u8 *peer_addr,
 			const u8 *buf, size_t len);
+	void (*rsia_get_rsids)(void *ctx, const u8 *service_id,
+			       const u8 *irsa_tag_tlv,
+			       u16 irsa_tag_tlv_len, u8 *rsid_num,
+			       u8 **rsid_list, u8 *rsid_list_len,
+			       bool is_unicast);
+	struct dl_list * (*get_nik_list)(void *ctx, u8 tag_type);
+
+	int (*irsa_get_nonce_tag_tlv)(void *ctx, u8 *irsa_nonce,
+				      u8 **irsa_tag_tlv, u16 *irsa_tag_tlv_len);
 
 	void (*process_p2p_usd_elems)(void *ctx, const u8 *buf,
 				      u16 buf_len, const u8 *peer_addr,
@@ -171,6 +180,9 @@ struct nan_publish_params {
 
 	/* Source MAC address for this service (optional) */
 	const u8 *forced_addr;
+
+	/* Randomize service ID for NAN services */
+	bool randomize_service_id;
 
 	/*
 	 * Pairing Bootstrapping Methods as defined in Wi-Fi Aware spec v4.0,
@@ -294,6 +306,9 @@ struct nan_subscribe_params {
 	 */
 	u8 *pairing_setup_info;
 	u16 pairing_setup_info_len;
+
+	/* Randomize service ID for NAN services */
+	bool randomize_service_id;
 
 	/*
 	 * GTK protection required for group-addressed Data frames transmitted

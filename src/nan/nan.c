@@ -3861,3 +3861,256 @@ int nan_add_assoc_self_nik(struct nan_data *nan, enum nan_nik_type type,
 
 	return -1;
 }
+
+
+static size_t nan_count_nik_list(struct dl_list *list)
+{
+	struct nan_nik_entry *entry;
+	u8 count = 0;
+
+	dl_list_for_each(entry, list, struct nan_nik_entry, list) {
+		if (entry->possessed_nik) {
+			count++;
+			if (count == 255)
+				break;
+		}
+	}
+	if (count == 0)
+		return 0;
+
+	/* 1 byte type + 1 byte count + count * tag_len */
+	return 2 + count * NAN_NIRA_TAG_LEN;
+}
+
+
+static void nan_write_nik_list(struct nan_data *nan,
+			       struct dl_list *list,
+			       enum nan_tag_type type,
+			       const u8 *irsa_nonce,
+			       u8 **buf)
+{
+	struct nan_nik_entry *entry;
+	struct wpabuf *tag_buf;
+	u8 *header = *buf;
+	u8 count = 0;
+
+	*buf += 2; /* reserve space for type + count */
+
+	dl_list_for_each(entry, list, struct nan_nik_entry, list) {
+		if (!entry->possessed_nik)
+			continue;
+
+		tag_buf = nan_crypto_derive_irsa_tag(entry->nik, NAN_NIK_LEN,
+						     nan->cfg->nmi_addr,
+						     irsa_nonce);
+		if (tag_buf) {
+			os_memcpy(*buf, wpabuf_head(tag_buf), NAN_NIRA_TAG_LEN);
+			wpabuf_free(tag_buf);
+		} else {
+			os_memset(*buf, 0, NAN_NIRA_TAG_LEN);
+		}
+		*buf += NAN_NIRA_TAG_LEN;
+		count++;
+		if (count == 255)
+			break;
+	}
+
+	if (count == 0) {
+		*buf = header;
+		return;
+	}
+
+	header[0] = type;
+	header[1] = count;
+}
+
+
+int nan_irsa_get_nonce_tag_tlv(struct nan_data *nan, u8 *irsa_nonce,
+			       u8 **irsa_tag_tlv, u16 *irsa_tag_tlv_len)
+{
+	size_t total_len, written;
+	u8 *pos;
+
+	if (!nan)
+		return -1;
+
+	if (os_get_random(irsa_nonce, NAN_NIRA_NONCE_LEN) < 0)
+		return -1;
+
+	total_len = nan_count_nik_list(&nan->self_nik_list) +
+		nan_count_nik_list(&nan->peer_nik_list) +
+		nan_count_nik_list(&nan->group_nik_list);
+
+	if (total_len == 0 || total_len > 65535) {
+		*irsa_tag_tlv = NULL;
+		*irsa_tag_tlv_len = 0;
+		return 0;
+	}
+
+	*irsa_tag_tlv = os_malloc(total_len);
+	if (!*irsa_tag_tlv)
+		return -1;
+
+	pos = *irsa_tag_tlv;
+	if (nan_count_nik_list(&nan->self_nik_list))
+		nan_write_nik_list(nan, &nan->self_nik_list,
+				   NAN_TAG_TYPE_SN, irsa_nonce, &pos);
+	if (nan_count_nik_list(&nan->peer_nik_list))
+		nan_write_nik_list(nan, &nan->peer_nik_list,
+				   NAN_TAG_TYPE_DN, irsa_nonce, &pos);
+	if (nan_count_nik_list(&nan->group_nik_list))
+		nan_write_nik_list(nan, &nan->group_nik_list,
+				   NAN_TAG_TYPE_GN, irsa_nonce, &pos);
+
+	*irsa_tag_tlv_len = (u16) total_len;
+
+	written = (size_t) (pos - *irsa_tag_tlv);
+	if (written != total_len) {
+		os_free(*irsa_tag_tlv);
+		*irsa_tag_tlv = NULL;
+		*irsa_tag_tlv_len = 0;
+		return -1;
+	}
+
+	return 0;
+}
+
+
+void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
+			const u8 *irsa_tag_tlv,
+			u16 irsa_tag_tlv_len, u8 *rsid_num,
+			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast)
+{
+	const u8 *pos, *end;
+	u8 *out_pos;
+	unsigned int total_tags = 0;
+	u8 hash[8]; /* SipHash-2-4 returns 64-bit output */
+	u8 data[NAN_SERVICE_ID_LEN + NAN_NIRA_TAG_LEN];
+
+	if (!nan || !service_id || !rsid_num || !rsid_list || !rsid_list_len)
+		return;
+
+	*rsid_num = 0;
+	*rsid_list = NULL;
+	*rsid_list_len = 0;
+
+	if (!irsa_tag_tlv || irsa_tag_tlv_len == 0)
+		return;
+
+	end = irsa_tag_tlv + irsa_tag_tlv_len;
+	os_memcpy(data, service_id, NAN_SERVICE_ID_LEN);
+
+	/* First pass: count total tags to determine allocation size */
+	pos = irsa_tag_tlv;
+	while (end - pos >= 2) {
+		u8 count = pos[1];
+
+		if (2 + count * NAN_NIRA_TAG_LEN > end - pos) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Invalid IRSA Tag TLV length");
+			return;
+		}
+		total_tags += count;
+		pos += 2 + count * NAN_NIRA_TAG_LEN;
+	}
+
+	if (total_tags == 0 || total_tags * NAN_RSID_LEN > 255)
+		return;
+
+	*rsid_list = os_malloc(total_tags * NAN_RSID_LEN);
+	if (!*rsid_list)
+		return;
+
+	/* Second pass: compute RSIDs */
+	out_pos = *rsid_list;
+	pos = irsa_tag_tlv;
+
+	while (end - pos >= 2) {
+		u8 type = pos[0];
+		u8 count = pos[1];
+		const u8 *tags = pos + 2;
+		struct dl_list *nik_list = NULL;
+		struct nan_nik_entry *entry;
+		int i = 0;
+
+		pos += 2 + count * NAN_NIRA_TAG_LEN;
+
+		switch (type) {
+		case NAN_TAG_TYPE_SN:
+			nik_list = &nan->self_nik_list;
+			break;
+		case NAN_TAG_TYPE_DN:
+			nik_list = &nan->peer_nik_list;
+			break;
+		case NAN_TAG_TYPE_GN:
+			nik_list = &nan->group_nik_list;
+			break;
+		default:
+			wpa_printf(MSG_DEBUG, "NAN: Unknown NIK type %d", type);
+			continue;
+		}
+
+		if (dl_list_empty(nik_list)) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NIK list empty for type %d but tags present",
+				   type);
+			continue;
+		}
+
+		/*
+		 * For unicast SDF TX, iterate all NIKs regardless of the
+		 * possessed_nik flag so the peer can match any of our NIKs.
+		 * For multicast SDF TX, only possessed NIKs are used.
+		 */
+		dl_list_for_each(entry, nik_list, struct nan_nik_entry, list) {
+			if (!is_unicast && !entry->possessed_nik)
+				continue;
+			if (i >= count)
+				break;
+
+			/* RSID = Truncate-48(SipHash-2-4(NIK, SID || Tag)) */
+			os_memcpy(data + NAN_SERVICE_ID_LEN,
+				  tags + i * NAN_NIRA_TAG_LEN,
+				  NAN_NIRA_TAG_LEN);
+
+			if (siphash_2_4(entry->nik, data, sizeof(data),
+					hash) == 0) {
+				os_memcpy(out_pos, hash, NAN_RSID_LEN);
+				out_pos += NAN_RSID_LEN;
+			} else {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to compute RSID");
+			}
+			i++;
+		}
+		if (i < count)
+			wpa_printf(MSG_DEBUG,
+				   "NAN: NIK list has fewer entries (%d) than tag count (%d)",
+				   i, count);
+	}
+
+	*rsid_num = (u8) ((out_pos - *rsid_list) / NAN_RSID_LEN);
+	*rsid_list_len = *rsid_num * NAN_RSID_LEN;
+	if (*rsid_num == 0) {
+		os_free(*rsid_list);
+		*rsid_list = NULL;
+	}
+}
+
+
+struct dl_list * nan_get_nik_list(struct nan_data *nan, enum nan_nik_type type)
+{
+	if (!nan)
+		return NULL;
+
+	switch (type) {
+	case NAN_NIK_TYPE_PEER:
+		return &nan->peer_nik_list;
+	case NAN_NIK_TYPE_SELF:
+		return &nan->self_nik_list;
+	case NAN_NIK_TYPE_GROUP:
+		return &nan->group_nik_list;
+	default:
+		return NULL;
+	}
+}

@@ -28,6 +28,14 @@ struct nan_de_pmkid {
 	u8 pmkid[PMKID_LEN];
 };
 
+
+enum nan_tag_type {
+	NAN_TAG_TYPE_SN,  /* Source Nonce Tag      - self NIK */
+	NAN_TAG_TYPE_DN,  /* Destination Nonce Tag - peer NIK */
+	NAN_TAG_TYPE_GN,  /* Group Nonce Tag       - GIK */
+	NAN_TAG_TYPE_PN,  /* Pairing Nonce Tag     - PIK-based rediscovery */
+};
+
 /*
  * struct nan_device_capabilities - NAN device capabilities
  * @cdw_info: Committed DW information
@@ -830,6 +838,10 @@ void nan_stop(struct nan_data *nan);
 void nan_flush(struct nan_data *nan);
 
 int siphash_2_4(const u8 *key, const u8 *data, size_t data_len, u8 *tag);
+struct wpabuf * nan_crypto_derive_irsa_tag(const u8 *nik, size_t nik_len,
+					  const u8 *nmi_addr,
+					  const u8 *nira_nonce);
+
 int nan_add_peer(struct nan_data *nan, const u8 *addr,
 		 const u8 *device_attrs, size_t device_attrs_len);
 bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
@@ -980,5 +992,12 @@ int nan_add_nik(struct nan_data *nan, const u8 *nik, enum nan_nik_type type,
 void nan_flush_niks(struct nan_data *nan);
 int nan_add_assoc_self_nik(struct nan_data *nan, enum nan_nik_type type,
 			   const u8 *nik, const u8 *self_nik);
+int nan_irsa_get_nonce_tag_tlv(struct nan_data *nan, u8 *irsa_nonce,
+			       u8 **irsa_tag_tlv, u16 *irsa_tag_tlv_len);
+void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
+			const u8 *irsa_tag_tlv,
+			u16 irsa_tag_tlv_len, u8 *rsid_num,
+			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast);
+struct dl_list * nan_get_nik_list(struct nan_data *nan, enum nan_nik_type type);
 
 #endif /* NAN_H */
