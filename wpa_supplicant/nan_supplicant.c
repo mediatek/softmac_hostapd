@@ -3875,7 +3875,7 @@ static void wpas_rsia_get_rsids(void *ctx, const u8 *service_id,
 				const u8 *irsa_tag_tlv,
 				u16 irsa_tag_tlv_len, u8 *rsid_num,
 				u8 **rsid_list, u8 *rsid_list_len,
-				bool is_unicast)
+				bool is_unicast, bool *has_zero_rsid)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
@@ -3885,7 +3885,7 @@ static void wpas_rsia_get_rsids(void *ctx, const u8 *service_id,
 
 	nan_rsia_get_rsids(wpa_s->nan, service_id, irsa_tag_tlv,
 			   irsa_tag_tlv_len, rsid_num, rsid_list,
-			   rsid_list_len, is_unicast);
+			   rsid_list_len, is_unicast, has_zero_rsid);
 }
 
 

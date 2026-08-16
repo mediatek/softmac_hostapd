@@ -83,7 +83,7 @@ struct nan_callbacks {
 			       const u8 *irsa_tag_tlv,
 			       u16 irsa_tag_tlv_len, u8 *rsid_num,
 			       u8 **rsid_list, u8 *rsid_list_len,
-			       bool is_unicast);
+			       bool is_unicast, bool *has_zero_rsid);
 	struct dl_list * (*get_nik_list)(void *ctx, u8 tag_type);
 
 	int (*irsa_get_nonce_tag_tlv)(void *ctx, u8 *irsa_nonce,

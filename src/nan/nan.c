@@ -3979,13 +3979,15 @@ int nan_irsa_get_nonce_tag_tlv(struct nan_data *nan, u8 *irsa_nonce,
 void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
 			const u8 *irsa_tag_tlv,
 			u16 irsa_tag_tlv_len, u8 *rsid_num,
-			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast)
+			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast,
+			bool *has_zero_rsid)
 {
 	const u8 *pos, *end;
 	u8 *out_pos;
 	unsigned int total_tags = 0;
 	u8 hash[8]; /* SipHash-2-4 returns 64-bit output */
 	u8 data[NAN_SERVICE_ID_LEN + NAN_NIRA_TAG_LEN];
+	static const u8 zero_rsid[NAN_RSID_LEN] = { 0, 0, 0, 0, 0, 0 };
 
 	if (!nan || !service_id || !rsid_num || !rsid_list || !rsid_list_len)
 		return;
@@ -3993,6 +3995,8 @@ void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
 	*rsid_num = 0;
 	*rsid_list = NULL;
 	*rsid_list_len = 0;
+	if (has_zero_rsid)
+		*has_zero_rsid = false;
 
 	if (!irsa_tag_tlv || irsa_tag_tlv_len == 0)
 		return;
@@ -4076,6 +4080,15 @@ void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
 			if (siphash_2_4(entry->nik, data, sizeof(data),
 					hash) == 0) {
 				os_memcpy(out_pos, hash, NAN_RSID_LEN);
+				/* A zero RSID requires regeneration with a new
+				 * nonce. */
+				if (has_zero_rsid &&
+				    os_memcmp(out_pos, zero_rsid,
+					      NAN_RSID_LEN) == 0) {
+					wpa_printf(MSG_DEBUG,
+						   "NAN: All-zero RSID derived; nonce regeneration required");
+					*has_zero_rsid = true;
+				}
 				out_pos += NAN_RSID_LEN;
 			} else {
 				wpa_printf(MSG_DEBUG,

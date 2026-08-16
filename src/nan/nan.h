@@ -997,7 +997,8 @@ int nan_irsa_get_nonce_tag_tlv(struct nan_data *nan, u8 *irsa_nonce,
 void nan_rsia_get_rsids(struct nan_data *nan, const u8 *service_id,
 			const u8 *irsa_tag_tlv,
 			u16 irsa_tag_tlv_len, u8 *rsid_num,
-			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast);
+			u8 **rsid_list, u8 *rsid_list_len, bool is_unicast,
+			bool *has_zero_rsid);
 struct dl_list * nan_get_nik_list(struct nan_data *nan, enum nan_nik_type type);
 
 #endif /* NAN_H */

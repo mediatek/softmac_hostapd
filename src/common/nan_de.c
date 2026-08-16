@@ -119,6 +119,10 @@ enum nan_de_flush_tracked_tx_reason {
 	NAN_DE_FLUSH_TRACKED_TX_WAIT_EXPIRED,
 };
 
+/* Maximum number of associated self NIKs to store for a peer/group NIK entry */
+#define NAN_DE_MAX_ASSOC_NIKS 16
+#define NAN_RSID_MAX_RETRIES 3
+
 struct nan_de {
 	u8 nmi[ETH_ALEN];
 	u8 cluster_id[ETH_ALEN];
@@ -142,6 +146,17 @@ struct nan_de {
 	struct os_reltime suspend_cycle_start;
 
 	int dw_freq;
+
+	/* State for immediate response optimization */
+	u8 matched_nik[NAN_NIK_LEN];
+	bool matched_nik_set;
+	u8 matched_nik_type;
+	/*
+	 * Associated NIKs copied from the matched NIK entry (for PEER/GROUP
+	 * types). Used to build SN tags in the outgoing IRSA.
+	 */
+	u8 matched_assoc_niks[NAN_DE_MAX_ASSOC_NIKS][NAN_NIK_LEN];
+	size_t matched_assoc_nik_count;
 
 	/* RSSI threshold for close proximity, or zero if not limited */
 	int rssi_threshold;
@@ -594,12 +609,20 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 				   enum nan_service_control_type type,
 				   u8 req_instance_id,
 				   const struct wpabuf *ssi,
-				   const struct wpabuf *attrs)
+				   const struct wpabuf *attrs,
+				   const u8 *irsa_tag_tlv,
+				   u16 irsa_tag_tlv_len,
+				   bool is_unicast,
+				   bool *has_zero_rsid)
 {
-	size_t len = 0, sda_len, sdea_len;
+	size_t len = 0, sda_len, sdea_len, rsia_len = 0;
 	u8 ctrl = type;
 	u16 sdea_ctrl = 0;
 	size_t cs_num = int_array_len(srv->cipher_suites_list);
+	u8 *rsid_list = NULL;
+	u8 rsid_ctrl = 0; /* b0-b1: 00 = 48 bit RSID by SipHash-2-4 method */
+	u8 rsid_num = 0, rsid_list_len = 0;
+	bool zero_rsid = false;
 
 	/* Proxy attribute, proxy attribute length, and NMI address */
 	if (srv->publish.orig_id)
@@ -621,6 +644,30 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	if ((srv->type == NAN_DE_SUBSCRIBE || srv->type == NAN_DE_PUBLISH) &&
 	    srv->close_proximity)
 		ctrl |= NAN_SRV_CTRL_DISCOVERY_RANGE_LIMITED;
+
+	if ((srv->type == NAN_DE_PUBLISH &&
+	     srv->publish.randomize_service_id) ||
+	    (srv->type == NAN_DE_SUBSCRIBE &&
+	     srv->subscribe.randomize_service_id)) {
+		ctrl |= NAN_SRV_CTRL_SERVICE_ID_RANDOMIZATION;
+		if (buf || has_zero_rsid) {
+			rsia_len = 1 + 1 + 1;
+			de->cb.rsia_get_rsids(de->cb.ctx, srv->service_id,
+					      irsa_tag_tlv, irsa_tag_tlv_len,
+					      &rsid_num, &rsid_list,
+					      &rsid_list_len, is_unicast,
+					      &zero_rsid);
+			if (has_zero_rsid && zero_rsid)
+				*has_zero_rsid = true;
+			rsia_len += rsid_list_len;
+			if (!buf) {
+				os_free(rsid_list);
+				rsid_list = NULL;
+			}
+		} else {
+			rsia_len = 1 + 1 + 1 + 6; /* Estimated RSID size */
+		}
+	}
 
 	len += NAN_ATTR_HDR_LEN + sda_len;
 
@@ -682,7 +729,12 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 	/* Service Descriptor attribute */
 	wpabuf_put_u8(buf, NAN_ATTR_SDA);
 	wpabuf_put_le16(buf, sda_len);
-	wpabuf_put_data(buf, srv->service_id, NAN_SERVICE_ID_LEN);
+	if (ctrl & NAN_SRV_CTRL_SERVICE_ID_RANDOMIZATION) {
+		os_memset(wpabuf_put(buf, NAN_SERVICE_ID_LEN), 0,
+			  NAN_SERVICE_ID_LEN);
+	} else {
+		wpabuf_put_data(buf, srv->service_id, NAN_SERVICE_ID_LEN);
+	}
 	/* Instance ID */
 	wpabuf_put_u8(buf,
 		      srv->publish.orig_id ? srv->publish.orig_id : srv->id);
@@ -737,6 +789,18 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 				wpabuf_put_buf(buf, ssi);
 			}
 		}
+	}
+
+	if (ctrl & NAN_SRV_CTRL_SERVICE_ID_RANDOMIZATION) {
+		/* Randomized Service ID attribute */
+		wpabuf_put_u8(buf, NAN_ATTR_RSIA);
+		wpabuf_put_le16(buf, rsia_len);
+		wpabuf_put_u8(buf, srv->publish.orig_id ? srv->publish.orig_id :
+			      srv->id);
+		wpabuf_put_u8(buf, rsid_ctrl);
+		wpabuf_put_u8(buf, rsid_num);
+		wpabuf_put_data(buf, rsid_list, rsid_list_len);
+		os_free(rsid_list);
 	}
 
 	/* Element Container attribute */
@@ -796,6 +860,119 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 }
 
 
+/**
+ * nan_de_generate_irsa_and_calc_len - Generate IRSA data and calculate length
+ * @de: NAN discovery engine context
+ * @irsa_nonce: Output buffer for generated nonce (NAN_NIRA_NONCE_LEN bytes)
+ * @irsa_tag_tlv: Output pointer to allocated tag TLV buffer
+ * @irsa_tag_tlv_len: Output length of tag TLV buffer
+ * Returns: Total IRSA length including header, or 0 if callback not set
+ *
+ * This function generates Identity Resolution Set data including:
+ * - Random nonce (8 bytes)
+ * - Tag TLVs for all possessed NIKs from all 3 lists (self, peer, group)
+ *   Each tag TLV entry contains: type(1) + count(1) + tags(8 bytes each)
+ */
+static size_t nan_de_generate_irsa_and_calc_len(struct nan_de *de,
+						u8 *irsa_nonce,
+						u8 **irsa_tag_tlv,
+						u16 *irsa_tag_tlv_len)
+{
+	if (!de->cb.irsa_get_nonce_tag_tlv)
+		return 0;
+
+	*irsa_tag_tlv = NULL;
+	*irsa_tag_tlv_len = 0;
+	if (de->cb.irsa_get_nonce_tag_tlv(de->cb.ctx, irsa_nonce,
+					  irsa_tag_tlv, irsa_tag_tlv_len) < 0)
+		return 0;
+
+	return NAN_ATTR_HDR_LEN + 1 + NAN_NIRA_NONCE_LEN + *irsa_tag_tlv_len;
+}
+
+
+static void nan_de_irsa_attr_add(struct wpabuf *buf, const u8 *irsa_nonce,
+				 const u8 *irsa_tag_tlv, u16 irsa_tag_tlv_len)
+{
+	if (!irsa_tag_tlv_len)
+		return;
+
+	wpabuf_put_u8(buf, NAN_ATTR_IRSA);
+	wpabuf_put_le16(buf, 1 + NAN_NIRA_NONCE_LEN + irsa_tag_tlv_len);
+	wpabuf_put_u8(buf, NAN_IRSA_CIPHER_VER_SIPHASH_2_4);
+	wpabuf_put_data(buf, irsa_nonce, NAN_NIRA_NONCE_LEN);
+	wpabuf_put_data(buf, irsa_tag_tlv, irsa_tag_tlv_len);
+}
+
+
+static u8 * nan_de_build_unicast_irsa_tlv(struct nan_de *de,
+					 const u8 *irsa_nonce,
+					 u16 *irsa_tag_tlv_len)
+{
+	u8 *tlv, *pos;
+	size_t tlv_len;
+	u8 i, nik_count;
+	const u8 *niks[NAN_DE_MAX_ASSOC_NIKS + 1];
+
+	if (de->matched_nik_type == NAN_NIK_TYPE_SELF) {
+		/* DN-tag matched: respond with the matched self NIK */
+		niks[0] = de->matched_nik;
+		nik_count = 1;
+	} else if (de->matched_nik_type == NAN_NIK_TYPE_PEER &&
+		   de->matched_assoc_nik_count > 0) {
+		/* SN-tag matched: respond with first associated self NIK. */
+		niks[0] = de->matched_assoc_niks[0];
+		nik_count = 1;
+	} else if (de->matched_nik_type == NAN_NIK_TYPE_GROUP &&
+		   de->matched_assoc_nik_count > 0) {
+		/* GN-tag matched: respond with all associated self NIKs */
+		unsigned int n = de->matched_assoc_nik_count;
+
+		if (n > NAN_DE_MAX_ASSOC_NIKS)
+			n = NAN_DE_MAX_ASSOC_NIKS;
+		for (i = 0; i < n; i++)
+			niks[i] = de->matched_assoc_niks[i];
+		nik_count = (u8) n;
+	} else {
+		*irsa_tag_tlv_len = 0;
+		return NULL;
+	}
+
+	/* TLV: type(1) + count(1) + nik_count * tag_len */
+	tlv_len = 2 + nik_count * NAN_NIRA_TAG_LEN;
+	tlv = os_malloc(tlv_len);
+	if (!tlv) {
+		*irsa_tag_tlv_len = 0;
+		return NULL;
+	}
+
+	pos = tlv;
+	*pos++ = NAN_TAG_TYPE_SN;
+	*pos++ = nik_count;
+
+	for (i = 0; i < nik_count; i++) {
+		struct wpabuf *tag_buf;
+
+		tag_buf = nan_crypto_derive_irsa_tag(niks[i], NAN_NIK_LEN,
+						     de->nmi, irsa_nonce);
+		if (!tag_buf) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Failed to derive SN tag for NIK %u",
+				   i);
+			os_free(tlv);
+			*irsa_tag_tlv_len = 0;
+			return NULL;
+		}
+		os_memcpy(pos, wpabuf_head(tag_buf), NAN_NIRA_TAG_LEN);
+		wpabuf_free(tag_buf);
+		pos += NAN_NIRA_TAG_LEN;
+	}
+
+	*irsa_tag_tlv_len = (u16) tlv_len;
+	return tlv;
+}
+
+
 static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 			  unsigned int wait_time,
 			  enum nan_service_control_type type,
@@ -805,16 +982,89 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 {
 	struct wpabuf *buf;
 	const u8 *forced_addr;
-	size_t len;
+	size_t len = 0;
+	u8 irsa_nonce[NAN_NIRA_NONCE_LEN];
+	u8 *irsa_tag_tlv = NULL;
+	u16 irsa_tag_tlv_len = 0;
+	bool has_randomization = false;
+	bool unicast_frame = false;
+	bool has_zero_rsid = false;
+	int retry;
 
-	len = nan_de_sdf_attrs_put(NULL, de, srv, type, req_instance_id, ssi,
-				   attrs);
+	if ((srv->type == NAN_DE_PUBLISH &&
+	     srv->publish.randomize_service_id) ||
+	    (srv->type == NAN_DE_SUBSCRIBE &&
+	     srv->subscribe.randomize_service_id))
+		has_randomization = true;
+
+	if (!ether_addr_equal(dst, nan_network_id) &&
+	    !ether_addr_equal(dst, p2p_network_id))
+		unicast_frame = true;
+
+	if (has_randomization) {
+		for (retry = 0; retry < NAN_RSID_MAX_RETRIES; retry++) {
+			os_free(irsa_tag_tlv);
+			irsa_tag_tlv = NULL;
+			irsa_tag_tlv_len = 0;
+			has_zero_rsid = false;
+
+			if (unicast_frame && de->matched_nik_set) {
+				if (os_get_random(irsa_nonce,
+						  NAN_NIRA_NONCE_LEN) < 0) {
+					wpa_printf(MSG_DEBUG,
+						   "NAN: Failed to generate IRSA nonce");
+					os_memset(irsa_nonce, 0,
+						  NAN_NIRA_NONCE_LEN);
+				}
+				irsa_tag_tlv = nan_de_build_unicast_irsa_tlv(
+					de, irsa_nonce, &irsa_tag_tlv_len);
+			} else {
+				nan_de_generate_irsa_and_calc_len(
+					de, irsa_nonce,
+					&irsa_tag_tlv, &irsa_tag_tlv_len);
+			}
+
+			/* Probe RSIDs before constructing the frame. */
+			nan_de_sdf_attrs_put(NULL, de, srv, type,
+					     req_instance_id, ssi, attrs,
+					     irsa_tag_tlv, irsa_tag_tlv_len,
+					     unicast_frame, &has_zero_rsid);
+			if (!has_zero_rsid)
+				break;
+
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Retrying IRSA nonce generation (attempt %d) due to all-zero RSID",
+				   retry + 1);
+		}
+		if (has_zero_rsid)
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Could not avoid all-zero RSID after %d attempts",
+				   NAN_RSID_MAX_RETRIES);
+
+		if (irsa_tag_tlv_len)
+			len += NAN_ATTR_HDR_LEN + 1 +
+				NAN_NIRA_NONCE_LEN + irsa_tag_tlv_len;
+	}
+
+	len += nan_de_sdf_attrs_put(NULL, de, srv, type, req_instance_id,
+				    ssi, attrs, irsa_tag_tlv,
+				    irsa_tag_tlv_len, unicast_frame, NULL);
 
 	buf = nan_de_alloc_sdf(de, dst, len, type);
-	if (!buf)
+	if (!buf) {
+		os_free(irsa_tag_tlv);
 		return;
+	}
 
-	nan_de_sdf_attrs_put(buf, de, srv, type, req_instance_id, ssi, attrs);
+	/* Build service attributes (SDA + SDEA + RSIA) */
+	nan_de_sdf_attrs_put(buf, de, srv, type, req_instance_id, ssi, attrs,
+			     irsa_tag_tlv, irsa_tag_tlv_len, unicast_frame,
+			     NULL);
+
+	if (has_randomization)
+		nan_de_irsa_attr_add(buf, irsa_nonce, irsa_tag_tlv,
+				     irsa_tag_tlv_len);
+	os_free(irsa_tag_tlv);
 
 	/* Use per-service source address if configured, otherwise use NMI */
 	forced_addr = srv->forced_addr_set ? srv->forced_addr : de->nmi;
