@@ -212,6 +212,8 @@ static void nan_de_service_free(struct nan_de_service *srv)
 	wpabuf_free(srv->srf);
 	os_free(srv->freq_list);
 	os_free(srv->cipher_suites_list);
+	os_free(srv->publish.pairing_setup_info);
+	os_free(srv->subscribe.pairing_setup_info);
 #ifdef CONFIG_NAN
 	nan_crypto_clear_pmkid_list(&srv->pmkid_list);
 #endif /* CONFIG_NAN */
@@ -490,6 +492,103 @@ static void nan_buf_add_npba(const struct nan_de *de,
 }
 
 
+struct wpabuf * nan_build_pbea(u16 extended_pbm,
+			       const u8 *pairing_setup_info,
+			       u16 pairing_setup_info_len)
+{
+	struct wpabuf *buf;
+	u8 control = 0;
+	size_t attr_len = 1; /* Control field */
+
+	if (!extended_pbm && !pairing_setup_info_len)
+		return NULL;
+
+	if (extended_pbm) {
+		control |= BIT(0);
+		attr_len += 2;
+	}
+	if (pairing_setup_info_len) {
+		control |= BIT(1);
+		attr_len += 2 + pairing_setup_info_len;
+	}
+
+	buf = wpabuf_alloc(NAN_ATTR_HDR_LEN + attr_len);
+	if (!buf)
+		return NULL;
+
+	wpabuf_put_u8(buf, NAN_ATTR_PBEA);
+	wpabuf_put_le16(buf, attr_len);
+	wpabuf_put_u8(buf, control);
+
+	if (extended_pbm)
+		wpabuf_put_le16(buf, extended_pbm);
+
+	if (pairing_setup_info_len) {
+		wpabuf_put_le16(buf, pairing_setup_info_len);
+		wpabuf_put_data(buf, pairing_setup_info,
+				pairing_setup_info_len);
+	}
+
+	return buf;
+}
+
+
+static size_t nan_pbea_len(const struct nan_de_service *srv)
+{
+	u16 extended_pbm;
+	u16 pairing_setup_info_len;
+	size_t len;
+
+	if (srv->type == NAN_DE_PUBLISH) {
+		extended_pbm = srv->publish.extended_pbm;
+		pairing_setup_info_len = srv->publish.pairing_setup_info_len;
+	} else {
+		extended_pbm = srv->subscribe.extended_pbm;
+		pairing_setup_info_len = srv->subscribe.pairing_setup_info_len;
+	}
+
+	if (!extended_pbm && !pairing_setup_info_len)
+		return 0;
+
+	len = NAN_ATTR_HDR_LEN + 1; /* attr header + Control field */
+	if (extended_pbm)
+		len += 2;
+	if (pairing_setup_info_len)
+		len += 2 + pairing_setup_info_len;
+
+	return len;
+}
+
+
+static void nan_buf_add_pbea(struct nan_de *de, struct nan_de_service *srv,
+			     struct wpabuf *buf)
+{
+	struct wpabuf *pbea;
+	const u8 *pairing_setup_info;
+	u16 extended_pbm;
+	u16 pairing_setup_info_len;
+
+	wpa_printf(MSG_DEBUG, "NAN: Add PBEA");
+
+	if (srv->type == NAN_DE_PUBLISH) {
+		extended_pbm = srv->publish.extended_pbm;
+		pairing_setup_info = srv->publish.pairing_setup_info;
+		pairing_setup_info_len = srv->publish.pairing_setup_info_len;
+	} else {
+		extended_pbm = srv->subscribe.extended_pbm;
+		pairing_setup_info = srv->subscribe.pairing_setup_info;
+		pairing_setup_info_len = srv->subscribe.pairing_setup_info_len;
+	}
+
+	pbea = nan_build_pbea(extended_pbm, pairing_setup_info,
+			      pairing_setup_info_len);
+	if (pbea) {
+		wpabuf_put_buf(buf, pbea);
+		wpabuf_free(pbea);
+	}
+}
+
+
 static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 				   struct nan_de_service *srv,
 				   enum nan_service_control_type type,
@@ -543,8 +642,10 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 		len += NAN_ATTR_HDR_LEN + 1 + wpabuf_len(srv->elems);
 
 	/* NPBA (dialog token, type and status, reason, pbm) */
-	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP)
+	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP) {
 		len += NAN_ATTR_HDR_LEN + 1 + 1 + 1 + 2;
+		len += nan_pbea_len(srv);
+	}
 
 	/* Reserve some additional space for extra attributes */
 	if (de->cb.add_extra_attrs && !srv->publish.orig_id)
@@ -646,8 +747,11 @@ static size_t nan_de_sdf_attrs_put(struct wpabuf *buf, struct nan_de *de,
 		wpabuf_put_buf(buf, srv->elems);
 	}
 
-	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP)
+	if (srv->pbm && type != NAN_SRV_CTRL_FOLLOW_UP) {
 		nan_buf_add_npba(de, srv, buf);
+		if (nan_pbea_len(srv))
+			nan_buf_add_pbea(de, srv, buf);
+	}
 
 	if (de->cb.add_extra_attrs && !srv->publish.orig_id)
 		de->cb.add_extra_attrs(de->cb.ctx, buf);
@@ -2497,6 +2601,16 @@ int nan_de_publish(struct nan_de *de, const char *service_name,
 	}
 	srv->publish.freq_list = NULL;
 
+	if (params->pairing_setup_info && params->pairing_setup_info_len > 0) {
+		srv->publish.pairing_setup_info =
+			os_memdup(params->pairing_setup_info,
+				  params->pairing_setup_info_len);
+		if (!srv->publish.pairing_setup_info)
+			goto fail;
+		srv->publish.pairing_setup_info_len =
+			params->pairing_setup_info_len;
+	}
+
 	srv->srv_proto_type = srv_proto_type;
 	if (ssi) {
 		srv->ssi = wpabuf_dup(ssi);
@@ -2784,6 +2898,16 @@ int nan_de_subscribe(struct nan_de *de, const char *service_name,
 			goto fail;
 	}
 	srv->subscribe.freq_list = NULL;
+
+	if (params->pairing_setup_info && params->pairing_setup_info_len > 0) {
+		srv->subscribe.pairing_setup_info =
+			os_memdup(params->pairing_setup_info,
+				  params->pairing_setup_info_len);
+		if (!srv->subscribe.pairing_setup_info)
+			goto fail;
+		srv->subscribe.pairing_setup_info_len =
+			params->pairing_setup_info_len;
+	}
 
 	srv->srv_proto_type = srv_proto_type;
 	if (ssi) {

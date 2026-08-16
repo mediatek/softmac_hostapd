@@ -178,6 +178,19 @@ struct nan_publish_params {
 	 */
 	u16 pbm;
 
+	/*
+	 * Additional Pairing Bootstrapping Methods as defined for PBEA in
+	 * Wi-Fi Aware specification R5
+	 */
+	u16 extended_pbm;
+
+	/*
+	 * Optional Pairing Setup Info field for PBEA as defined in Wi-Fi Aware
+	 * specification R5
+	 */
+	u8 *pairing_setup_info;
+	u16 pairing_setup_info_len;
+
 	/* int_array of cipher suites */
 	const int *cipher_suites_list;
 
@@ -270,6 +283,19 @@ struct nan_subscribe_params {
 	u16 pbm;
 
 	/*
+	 * Additional Pairing Bootstrapping Methods as defined for PBEA in
+	 * Wi-Fi Aware specification R5
+	 */
+	u16 extended_pbm;
+
+	/*
+	 * Optional Pairing Setup Info field for PBEA as defined in Wi-Fi Aware
+	 * specification R5
+	 */
+	u8 *pairing_setup_info;
+	u16 pairing_setup_info_len;
+
+	/*
 	 * GTK protection required for group-addressed Data frames transmitted
 	 * and received for the service
 	 */
@@ -302,6 +328,9 @@ void nan_de_set_tx_mcast_follow_up_prot(struct nan_de *de, bool prot);
 int nan_de_get_status(struct nan_de *de, char *buf, size_t buflen);
 
 int nan_de_stop_listen(struct nan_de *de, int handle);
+struct wpabuf * nan_build_pbea(u16 extended_pbm,
+			       const u8 *pairing_setup_info,
+			       u16 pairing_setup_info_len);
 
 struct nan_de_cfg {
 	/* N and M minimal and maximal values */
