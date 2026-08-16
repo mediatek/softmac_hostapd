@@ -723,7 +723,10 @@ int wpas_pr_init(struct wpa_global *global, struct wpa_supplicant *wpa_s,
 				   capa->pd_bandwidths, capa->pd_preambles,
 				   pr.support_6ghz);
 
-	if (wpa_s->conf->country[0] && wpa_s->conf->country[1]) {
+	if (wpa_s->device_country[0] && wpa_s->device_country[1]) {
+		os_memcpy(pr.country, wpa_s->device_country, 2);
+		pr.country[2] = 0x04;
+	} else if (wpa_s->conf->country[0] && wpa_s->conf->country[1]) {
 		os_memcpy(pr.country, wpa_s->conf->country, 2);
 		pr.country[2] = 0x04;
 	} else {
