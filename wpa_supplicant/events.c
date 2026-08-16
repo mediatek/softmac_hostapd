@@ -6043,6 +6043,7 @@ void wpa_supplicant_update_channel_list(struct wpa_supplicant *wpa_s,
 	}
 
 	wpas_p2p_update_channel_list(wpa_s, WPAS_P2P_CHANNEL_UPDATE_DRIVER);
+	wpas_pr_update_channel_list(wpa_s);
 }
 
 

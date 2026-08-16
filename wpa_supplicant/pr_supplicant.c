@@ -773,6 +773,46 @@ int wpas_pr_init(struct wpa_global *global, struct wpa_supplicant *wpa_s,
 }
 
 
+void wpas_pr_update_channel_list(struct wpa_supplicant *wpa_s)
+{
+	struct pr_data *pr;
+
+	if (!wpa_s->global || !wpa_s->global->pr)
+		return;
+
+	pr = wpa_s->global->pr;
+	if (!pr->cfg)
+		return;
+
+	wpa_s->is_6ghz_enabled = wpas_is_6ghz_supported(wpa_s, true);
+	pr->cfg->support_6ghz = wpa_s->support_6ghz && wpa_s->is_6ghz_enabled;
+
+	if (wpa_s->device_country[0] && wpa_s->device_country[1]) {
+		os_memcpy(pr->cfg->country, wpa_s->device_country, 2);
+		pr->cfg->country[2] = 0x04;
+	} else if (wpa_s->conf->country[0] && wpa_s->conf->country[1]) {
+		os_memcpy(pr->cfg->country, wpa_s->conf->country, 2);
+		pr->cfg->country[2] = 0x04;
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "PR: Update channel list (support_6ghz=%d, country=%.2s)",
+		   pr->cfg->support_6ghz, pr->cfg->country);
+
+	os_memset(&pr->cfg->edca_channels, 0, sizeof(pr->cfg->edca_channels));
+	wpas_pr_setup_edca_channels(wpa_s, &pr->cfg->edca_channels,
+				    pr->cfg->pd_format_bw_bitmap,
+				    pr->cfg->pd_preamble_bitmap,
+				    pr->cfg->support_6ghz);
+
+	os_memset(&pr->cfg->ntb_channels, 0, sizeof(pr->cfg->ntb_channels));
+	wpas_pr_setup_ntb_channels(wpa_s, &pr->cfg->ntb_channels,
+				   pr->cfg->pd_format_bw_bitmap,
+				   pr->cfg->pd_preamble_bitmap,
+				   pr->cfg->support_6ghz);
+}
+
+
 void wpas_pr_flush(struct wpa_supplicant *wpa_s)
 {
 	struct pr_data *pr = wpa_s->global->pr;
