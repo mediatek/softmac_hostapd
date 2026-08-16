@@ -678,6 +678,8 @@ int wpas_pr_init(struct wpa_global *global, struct wpa_supplicant *wpa_s,
 	pr.pd_preamble_bitmap = capa->pd_preambles;
 	pr.max_rx_antenna = capa->max_rx_antenna;
 	pr.max_tx_antenna = capa->max_tx_antenna;
+	pr.support_6ghz = capa->support_6ghz &&
+		wpas_is_6ghz_supported(wpa_s, true);
 
 	wpas_pr_setup_edca_channels(wpa_s, &pr.edca_channels,
 				    capa->pd_bandwidths,
@@ -706,8 +708,6 @@ int wpas_pr_init(struct wpa_global *global, struct wpa_supplicant *wpa_s,
 	pr.pr_max_peer_ista_role = capa->ista.max_peers;
 	pr.pr_max_peer_rsta_role = capa->rsta.max_peers;
 	pr.max_ftms_per_burst = capa->max_ftms_per_burst;
-
-	pr.support_6ghz = capa->support_6ghz;
 
 	pr.pasn_send_mgmt = wpas_pr_pasn_send_mgmt;
 	pr.negotiation_started = wpas_pr_pasn_negotiation_started;
