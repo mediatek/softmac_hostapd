@@ -4096,7 +4096,7 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 #ifdef CONFIG_P2P
 	struct ieee802_11_elems elems;
 
-	if (len < 24) {
+	if (len < offsetof(struct ieee80211_mgmt, u.auth.variable)) {
 		wpa_printf(MSG_DEBUG, "PASN: Too short Management frame");
 		return;
 	}
