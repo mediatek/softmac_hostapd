@@ -1763,7 +1763,9 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		char *tmp = os_strdup(param);
 		enum nan_nik_type nik_type;
 		bool possessed_nik = false;
-		char *pos;
+		char *pos, *assoc_nik_pos;
+		u8 assoc_nik[NAN_NIK_LEN];
+		bool has_assoc_nik = false;
 
 		if (!tmp)
 			return -1;
@@ -1775,10 +1777,32 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 		else
 			nik_type = NAN_NIK_TYPE_GROUP;
 
-		pos = os_strrchr(tmp, ' ');
-		if (pos) {
-			*pos++ = '\0';
-			possessed_nik = !!atoi(pos);
+		assoc_nik_pos = os_strstr(tmp, " associated_nik ");
+		if (assoc_nik_pos) {
+			*assoc_nik_pos = '\0';
+			assoc_nik_pos += sizeof(" associated_nik ") - 1;
+
+			pos = os_strchr(assoc_nik_pos, ' ');
+			if (pos) {
+				*pos++ = '\0';
+				possessed_nik = !!atoi(pos);
+			}
+
+			if (os_strlen(assoc_nik_pos) != NAN_NIK_LEN * 2 ||
+			    hexstr2bin(assoc_nik_pos, assoc_nik,
+				       NAN_NIK_LEN) < 0) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Invalid associated_nik item");
+				os_free(tmp);
+				return -1;
+			}
+			has_assoc_nik = true;
+		} else {
+			pos = os_strrchr(tmp, ' ');
+			if (pos) {
+				*pos++ = '\0';
+				possessed_nik = !!atoi(pos);
+			}
 		}
 
 		for (token = str_token(tmp, ",", &context); token;
@@ -1790,19 +1814,35 @@ int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 			    hexstr2bin(token, nik, NAN_NIK_LEN) < 0) {
 				wpa_printf(MSG_DEBUG, "NAN: Invalid nik item");
 				os_free(tmp);
+				forced_memzero(assoc_nik, NAN_NIK_LEN);
 				return -1;
 			}
 
 			res = nan_add_nik(nan, nik, nik_type, possessed_nik);
-			forced_memzero(nik, NAN_NIK_LEN);
 			if (res < 0) {
 				wpa_printf(MSG_DEBUG,
 					   "NAN: Failed to add NIK entry");
 				os_free(tmp);
+				forced_memzero(nik, NAN_NIK_LEN);
+				forced_memzero(assoc_nik, NAN_NIK_LEN);
 				return -1;
 			}
+
+			if (has_assoc_nik && (nik_type == NAN_NIK_TYPE_PEER ||
+					      nik_type == NAN_NIK_TYPE_GROUP) &&
+			    nan_add_assoc_self_nik(nan, nik_type, nik,
+						   assoc_nik) < 0) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to add associated self NIK entry");
+				os_free(tmp);
+				forced_memzero(nik, NAN_NIK_LEN);
+				forced_memzero(assoc_nik, NAN_NIK_LEN);
+				return -1;
+			}
+			forced_memzero(nik, NAN_NIK_LEN);
 		}
 		os_free(tmp);
+		forced_memzero(assoc_nik, NAN_NIK_LEN);
 		return 0;
 	}
 
