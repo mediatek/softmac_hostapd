@@ -68,6 +68,9 @@ struct nan_data * nan_init(const struct nan_config *cfg)
 #endif /* CONFIG_PASN */
 
 	dl_list_init(&nan->peer_list);
+	dl_list_init(&nan->self_nik_list);
+	dl_list_init(&nan->peer_nik_list);
+	dl_list_init(&nan->group_nik_list);
 
 	wpa_printf(MSG_DEBUG, "NAN: Initialized");
 
@@ -447,6 +450,7 @@ void nan_flush(struct nan_data *nan)
 	wpa_printf(MSG_DEBUG, "NAN: Reset internal state");
 
 	nan_peer_clear_all(nan);
+	nan_flush_niks(nan);
 	wpabuf_free(nan->sched.elems);
 	os_memset(&nan->sched, 0, sizeof(nan->sched));
 }
@@ -3740,4 +3744,68 @@ void nan_terminate_ndi_ndps(struct nan_data *nan, const u8 *ndi_addr)
 		nan_ndp_setup_stop(nan, peer);
 		nan_terminate_ndps_for_ndi(nan, peer, ndi_addr);
 	}
+}
+
+
+int nan_add_nik(struct nan_data *nan, const u8 *nik, enum nan_nik_type type,
+		bool possessed_nik)
+{
+	struct nan_nik_entry *entry, *cur;
+	struct dl_list *list;
+
+	if (!nan || !nik)
+		return -1;
+
+	switch (type) {
+	case NAN_NIK_TYPE_PEER:
+		list = &nan->peer_nik_list;
+		break;
+	case NAN_NIK_TYPE_SELF:
+		list = &nan->self_nik_list;
+		break;
+	case NAN_NIK_TYPE_GROUP:
+		list = &nan->group_nik_list;
+		break;
+	default:
+		return -1;
+	}
+
+	dl_list_for_each(cur, list, struct nan_nik_entry, list) {
+		if (os_memcmp(cur->nik, nik, NAN_NIK_LEN) == 0) {
+			cur->possessed_nik = possessed_nik;
+			return 0;
+		}
+	}
+
+	entry = os_zalloc(sizeof(*entry));
+	if (!entry)
+		return -1;
+	os_memcpy(entry->nik, nik, NAN_NIK_LEN);
+	entry->possessed_nik = possessed_nik;
+	dl_list_add(list, &entry->list);
+
+	return 0;
+}
+
+
+static void nan_flush_nik_list(struct dl_list *list)
+{
+	struct nan_nik_entry *entry, *tmp;
+
+	dl_list_for_each_safe(entry, tmp, list, struct nan_nik_entry, list) {
+		dl_list_del(&entry->list);
+		bin_clear_free(entry, sizeof(*entry));
+	}
+}
+
+
+void nan_flush_niks(struct nan_data *nan)
+{
+	if (!nan)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Flush NIKs");
+	nan_flush_nik_list(&nan->self_nik_list);
+	nan_flush_nik_list(&nan->peer_nik_list);
+	nan_flush_nik_list(&nan->group_nik_list);
 }

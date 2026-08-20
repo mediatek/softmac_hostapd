@@ -605,6 +605,9 @@ struct nan_peer {
  * @igtk_id: Key ID of the IGTK
  * @bigtk: BIGTK for NAN secure NDP
  * @bigtk_id: Key ID of the BIGTK
+ * @self_nik_list: List of self NIKs (NAN Identity Keys)
+ * @peer_nik_list: List of peer NIKs (NAN Identity Keys)
+ * @group_nik_list: List of group NIKs (NAN Identity Keys)
  */
 struct nan_data {
 	struct nan_config *cfg;
@@ -629,6 +632,10 @@ struct nan_data {
 
 	struct wpa_bigtk bigtk;
 	u8 bigtk_id;
+
+	struct dl_list self_nik_list;
+	struct dl_list peer_nik_list;
+	struct dl_list group_nik_list;
 };
 
 struct nan_attrs_entry {

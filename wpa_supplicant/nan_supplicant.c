@@ -3640,6 +3640,15 @@ int wpas_nan_peer_info(struct wpa_supplicant *wpa_s, const char *cmd,
 }
 
 
+void wpas_nan_flush_niks(struct wpa_supplicant *wpa_s)
+{
+	if (!wpas_nan_ready(wpa_s))
+		return;
+
+	nan_flush_niks(wpa_s->nan);
+}
+
+
 /*
  * Format: NAN_BOOTSTRAP <peer_nmi> <handle=<id>>
  *     <req_instance_id=<id>> method=<number> [auth]

@@ -17,6 +17,12 @@ struct nan_cluster_config;
 enum nan_reason;
 struct ieee80211_mgmt;
 
+enum nan_nik_type {
+	NAN_NIK_TYPE_PEER,
+	NAN_NIK_TYPE_SELF,
+	NAN_NIK_TYPE_GROUP,
+};
+
 struct nan_de_pmkid {
 	struct dl_list list;
 	u8 pmkid[PMKID_LEN];
@@ -967,5 +973,9 @@ void nan_pairing_unpair_peer(struct nan_data *nan_data, const u8 *peer_addr)
 }
 
 #endif /* CONFIG_PASN */
+
+int nan_add_nik(struct nan_data *nan, const u8 *nik, enum nan_nik_type type,
+		bool possessed_nik);
+void nan_flush_niks(struct nan_data *nan);
 
 #endif /* NAN_H */

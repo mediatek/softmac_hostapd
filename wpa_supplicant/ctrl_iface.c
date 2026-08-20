@@ -9273,6 +9273,10 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	wpas_nan_de_flush(wpa_s);
 
 	wpas_pr_flush(wpa_s);
+
+#if defined(CONFIG_NAN) || defined(CONFIG_NAN_USD)
+	wpas_nan_flush_niks(wpa_s);
+#endif /* CONFIG_NAN || CONFIG_NAN_USD */
 }
 
 
@@ -14725,6 +14729,8 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 	} else if (os_strcmp(buf, "NAN_FLUSH") == 0) {
 		wpas_nan_de_flush(wpa_s);
+	} else if (os_strcmp(buf, "NAN_NIK_FLUSH") == 0) {
+		wpas_nan_flush_niks(wpa_s);
 #endif /* CONFIG_NAN || CONFIG_NAN_USD */
 #ifdef CONFIG_PASN
 	} else if (os_strncmp(buf, "PASN_START ", 11) == 0) {

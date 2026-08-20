@@ -10,6 +10,8 @@
 #ifndef NAN_DEFS_H
 #define NAN_DEFS_H
 
+#include "utils/list.h"
+
 /* Wi-Fi Aware spec v4.0, Table 35 (NAI Action frame subtypes) */
 enum nan_subtype {
 	NAN_SUBTYPE_INVALID			= 0,
@@ -661,5 +663,12 @@ struct nan_key_lifetime_kde {
 	le16 key_bitmap;
 	be32 lifetime_sec;
 } STRUCT_PACKED;
+
+/* NAN Identity Key (NIK) entry */
+struct nan_nik_entry {
+	struct dl_list list;
+	u8 nik[NAN_NIK_LEN];
+	bool possessed_nik;
+};
 
 #endif /* NAN_DEFS_H */
