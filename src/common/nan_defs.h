@@ -669,6 +669,13 @@ struct nan_nik_entry {
 	struct dl_list list;
 	u8 nik[NAN_NIK_LEN];
 	bool possessed_nik;
+	struct dl_list associated_nik;
+};
+
+/* Associated self NIK entry for nan_nik_entry.associated_nik list */
+struct nan_assoc_nik_entry {
+	struct dl_list list;
+	u8 nik[NAN_NIK_LEN];
 };
 
 #endif /* NAN_DEFS_H */

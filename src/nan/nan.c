@@ -3782,6 +3782,7 @@ int nan_add_nik(struct nan_data *nan, const u8 *nik, enum nan_nik_type type,
 		return -1;
 	os_memcpy(entry->nik, nik, NAN_NIK_LEN);
 	entry->possessed_nik = possessed_nik;
+	dl_list_init(&entry->associated_nik);
 	dl_list_add(list, &entry->list);
 
 	return 0;
@@ -3793,6 +3794,13 @@ static void nan_flush_nik_list(struct dl_list *list)
 	struct nan_nik_entry *entry, *tmp;
 
 	dl_list_for_each_safe(entry, tmp, list, struct nan_nik_entry, list) {
+		struct nan_assoc_nik_entry *an, *an_tmp;
+
+		dl_list_for_each_safe(an, an_tmp, &entry->associated_nik,
+				      struct nan_assoc_nik_entry, list) {
+			dl_list_del(&an->list);
+			bin_clear_free(an, sizeof(*an));
+		}
 		dl_list_del(&entry->list);
 		bin_clear_free(entry, sizeof(*entry));
 	}
@@ -3808,4 +3816,48 @@ void nan_flush_niks(struct nan_data *nan)
 	nan_flush_nik_list(&nan->self_nik_list);
 	nan_flush_nik_list(&nan->peer_nik_list);
 	nan_flush_nik_list(&nan->group_nik_list);
+}
+
+
+int nan_add_assoc_self_nik(struct nan_data *nan, enum nan_nik_type type,
+			   const u8 *nik, const u8 *self_nik)
+{
+	struct dl_list *list;
+	struct nan_nik_entry *entry;
+
+	if (!nan || !nik || !self_nik)
+		return -1;
+
+	switch (type) {
+	case NAN_NIK_TYPE_PEER:
+		list = &nan->peer_nik_list;
+		break;
+	case NAN_NIK_TYPE_GROUP:
+		list = &nan->group_nik_list;
+		break;
+	default:
+		return -1;
+	}
+
+	dl_list_for_each(entry, list, struct nan_nik_entry, list) {
+		if (os_memcmp(entry->nik, nik, NAN_NIK_LEN) == 0) {
+			struct nan_assoc_nik_entry *an;
+
+			dl_list_for_each(an, &entry->associated_nik,
+					 struct nan_assoc_nik_entry, list) {
+				if (os_memcmp(an->nik, self_nik, NAN_NIK_LEN) ==
+				    0)
+					return 0;
+			}
+
+			an = os_zalloc(sizeof(*an));
+			if (!an)
+				return -1;
+			os_memcpy(an->nik, self_nik, NAN_NIK_LEN);
+			dl_list_add(&entry->associated_nik, &an->list);
+			return 0;
+		}
+	}
+
+	return -1;
 }

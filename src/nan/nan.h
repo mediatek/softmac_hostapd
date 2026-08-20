@@ -977,5 +977,7 @@ void nan_pairing_unpair_peer(struct nan_data *nan_data, const u8 *peer_addr)
 int nan_add_nik(struct nan_data *nan, const u8 *nik, enum nan_nik_type type,
 		bool possessed_nik);
 void nan_flush_niks(struct nan_data *nan);
+int nan_add_assoc_self_nik(struct nan_data *nan, enum nan_nik_type type,
+			   const u8 *nik, const u8 *self_nik);
 
 #endif /* NAN_H */
