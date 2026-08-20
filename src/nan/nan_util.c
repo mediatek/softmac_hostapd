@@ -243,6 +243,13 @@ int nan_parse_attrs(struct nan_data *nan, const u8 *data, size_t len,
 			attrs->ndpe = pos;
 			attrs->ndpe_len = attr_len;
 			break;
+		case NAN_ATTR_PBEA:
+			/* Validate minimal PBEA length: control (1) */
+			if (attr_len < 1)
+				break;
+			attrs->pbea = pos;
+			attrs->pbea_len = attr_len;
+			break;
 		case NAN_ATTR_MASTER_INDICATION:
 		case NAN_ATTR_CLUSTER:
 		case NAN_ATTR_NAN_ATTR_SERVICE_ID_LIST:

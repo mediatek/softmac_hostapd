@@ -1504,6 +1504,124 @@ static unsigned int nan_de_parse_scia(const u8 *buf, size_t len, u8 instance_id,
 }
 
 
+void nan_pairing_parse_setup_info(const u8 *info, size_t info_len,
+				  char **locale, char **vendor_name,
+				  char **model_name, char **pairing_name)
+{
+	const u8 *pos, *end;
+
+	*locale = NULL;
+	*vendor_name = NULL;
+	*model_name = NULL;
+	*pairing_name = NULL;
+
+	if (!info || info_len == 0)
+		return;
+
+	wpa_printf(MSG_DEBUG, "NAN: Parsing Pairing Setup Info len=%zu",
+		   info_len);
+
+	pos = info;
+	end = info + info_len;
+
+	while (pos < end) {
+		u8 item_len;
+		const u8 *item_data, *eq;
+		size_t key_len, val_len, i;
+
+		item_len = *pos++;
+		if (item_len == 0 || item_len > end - pos) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Invalid TXT record item length %u",
+				   item_len);
+			break;
+		}
+
+		item_data = pos;
+		pos += item_len;
+
+		eq = NULL;
+		for (i = 0; i < item_len; i++) {
+			if (item_data[i] == '=') {
+				eq = &item_data[i];
+				break;
+			}
+		}
+
+		if (!eq)
+			continue;
+
+		key_len = eq - item_data;
+		val_len = item_len - key_len - 1;
+
+		if (key_len == 6 &&
+		    os_memcmp(item_data, "locale", 6) == 0) {
+			if (*locale) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Duplicated locale key");
+				break;
+			}
+			*locale = os_malloc(val_len + 1);
+			if (*locale) {
+				os_memcpy(*locale, eq + 1, val_len);
+				(*locale)[val_len] = '\0';
+				wpa_printf(MSG_DEBUG, "NAN: Parsed locale=%s",
+					   *locale);
+			}
+		} else if (key_len == 10 &&
+			   os_memcmp(item_data, "vendorName", 10) == 0) {
+			if (*vendor_name) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Duplicated vendorName key");
+				break;
+			}
+			*vendor_name = os_malloc(val_len + 1);
+			if (*vendor_name) {
+				os_memcpy(*vendor_name, eq + 1, val_len);
+				(*vendor_name)[val_len] = '\0';
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Parsed vendorName=%s",
+					   *vendor_name);
+			}
+		} else if (key_len == 9 &&
+			   os_memcmp(item_data, "modelName", 9) == 0) {
+			if (*model_name) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Duplicated modelName key");
+				break;
+			}
+			*model_name = os_malloc(val_len + 1);
+			if (*model_name) {
+				os_memcpy(*model_name, eq + 1, val_len);
+				(*model_name)[val_len] = '\0';
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Parsed modelName=%s",
+					   *model_name);
+			}
+		} else if (key_len == 11 &&
+			   os_memcmp(item_data, "pairingName", 11) == 0) {
+			if (*pairing_name) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Duplicated pairingName key");
+				break;
+			}
+			*pairing_name = os_malloc(val_len + 1);
+			if (*pairing_name) {
+				os_memcpy(*pairing_name, eq + 1, val_len);
+				(*pairing_name)[val_len] = '\0';
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Parsed pairingName=%s",
+					   *pairing_name);
+			}
+		} else {
+			wpa_hexdump_ascii(MSG_DEBUG,
+					  "NAN: Ignore unknown TXT record",
+					  item_data, key_len);
+		}
+	}
+}
+
+
 static void nan_de_process_elem_container(struct nan_de *de, const u8 *buf,
 					  size_t len, const u8 *peer_addr,
 					  unsigned int freq, bool p2p, bool pr)

@@ -645,6 +645,7 @@ struct nan_attrs {
 	const u8 *shared_key_desc;
 	const u8 *dev_capa_ext;
 	const u8 *npba;
+	const u8 *pbea;
 	const u8 *nira;
 	const u8 *ndpe;
 
@@ -656,6 +657,7 @@ struct nan_attrs {
 	u16 shared_key_desc_len;
 	u16 dev_capa_ext_len;
 	u16 npba_len;
+	u16 pbea_len;
 	u16 nira_len;
 	u16 ndpe_len;
 };

@@ -311,4 +311,8 @@ struct nan_de_cfg {
 
 int nan_de_config(struct nan_de *de, struct nan_de_cfg *cfg);
 
+void nan_pairing_parse_setup_info(const u8 *info, size_t info_len,
+				  char **locale, char **vendor_name,
+				  char **model_name, char **pairing_name);
+
 #endif /* NAN_DE_H */
