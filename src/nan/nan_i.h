@@ -478,6 +478,10 @@ struct nan_bootstrap {
 	u8 req_instance_id;
 
 	struct wpabuf *npba;
+
+	u16 extended_pbm;
+	u8 *pairing_setup_info;
+	u16 pairing_setup_info_len;
 };
 
 /**
@@ -818,6 +822,8 @@ struct wpabuf * nan_crypto_encrypt_key_data(const struct wpabuf *key_data,
 struct wpabuf * nan_crypto_decrypt_key_data(const u8 *kek, size_t kek_len,
 					    const u8 *encrypted_data,
 					    size_t encrypted_len);
+void nan_parse_pbea(struct nan_data *nan, struct nan_peer *peer,
+		    struct nan_attrs *attrs);
 void nan_sec_reset(struct nan_data *nan, struct nan_ndp_sec *ndp_sec);
 int nan_sec_rx(struct nan_data *nan, struct nan_peer *peer,
 	       struct nan_msg *msg);

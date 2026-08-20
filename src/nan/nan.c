@@ -244,6 +244,9 @@ static void nan_del_peer(struct nan_data *nan, struct nan_peer *peer)
 
 	wpabuf_free(peer->bootstrap.npba);
 	peer->bootstrap.npba = NULL;
+	os_free(peer->bootstrap.pairing_setup_info);
+	peer->bootstrap.pairing_setup_info = NULL;
+	peer->bootstrap.pairing_setup_info_len = 0;
 	nan_bootstrap_reset(nan, peer);
 	dl_list_del(&peer->list);
 	nan_peer_flush_avail(&peer->info);
@@ -1372,6 +1375,61 @@ static void nan_parse_npba(struct nan_data *nan, struct nan_peer *peer,
 }
 
 
+void nan_parse_pbea(struct nan_data *nan, struct nan_peer *peer,
+		    struct nan_attrs *attrs)
+{
+	u8 control;
+	const u8 *pos = attrs->pbea;
+	size_t remaining = attrs->pbea_len;
+
+	if (!pos || remaining == 0)
+		return;
+
+	control = *pos++;
+	remaining--;
+
+	if (control & BIT(0)) {
+		if (remaining < 2) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: PBEA too short for Extended PBM");
+			return;
+		}
+		peer->bootstrap.extended_pbm = WPA_GET_LE16(pos);
+		pos += 2;
+		remaining -= 2;
+		wpa_printf(MSG_DEBUG,
+			   "NAN: PBEA extended bootstrapping methods: 0x%04x",
+			   peer->bootstrap.extended_pbm);
+	}
+
+	if (control & BIT(1)) {
+		u16 psi_len;
+
+		if (remaining < 2) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: PBEA too short for Pairing Setup Info");
+			return;
+		}
+
+		psi_len = WPA_GET_LE16(pos);
+		pos += 2;
+		remaining -= 2;
+
+		if (psi_len > remaining) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: PBEA Pairing Setup Info truncated: len=%u remaining=%zu",
+				   psi_len, remaining);
+			return;
+		}
+
+		os_free(peer->bootstrap.pairing_setup_info);
+		peer->bootstrap.pairing_setup_info = os_memdup(pos, psi_len);
+		peer->bootstrap.pairing_setup_info_len =
+			peer->bootstrap.pairing_setup_info ? psi_len : 0;
+	}
+}
+
+
 static void nan_parse_nira(struct nan_data *nan, struct nan_peer *peer,
 			   struct nan_attrs *attrs)
 {
@@ -1433,6 +1491,7 @@ int nan_parse_device_attrs(struct nan_data *nan, struct nan_peer *peer,
 	nan_parse_peer_elem_container(nan, peer, &attrs);
 	nan_parse_peer_dev_capa_ext(nan, peer, &attrs);
 	nan_parse_npba(nan, peer, &attrs);
+	nan_parse_pbea(nan, peer, &attrs);
 	nan_parse_nira(nan, peer, &attrs);
 
 	nan_peer_dump(nan, peer);
@@ -1763,16 +1822,23 @@ bool nan_process_followup(struct nan_data *nan, const u8 *addr, const u8 *buf,
 		return false;
 	}
 
-	if (attrs.npba && attrs.npba_len)
+	if (attrs.npba && attrs.npba_len) {
+		struct nan_peer *peer = nan_get_peer(nan, addr);
+
+		if (peer)
+			nan_parse_pbea(nan, peer, &attrs);
+
 		ret = nan_bootstrap_handle_rx(nan, addr, attrs.npba,
 					      attrs.npba_len, buf, len, handle,
 					      req_instance_id);
+	}
 #ifdef CONFIG_PASN
-	else if (attrs.shared_key_desc)
+	else if (attrs.shared_key_desc) {
 		ret = nan_pairing_followup_rx(nan, addr,
 					      (const struct nan_shared_key *)
 					      attrs.shared_key_desc,
 					      attrs.shared_key_desc_len);
+	}
 #endif /* CONFIG_PASN */
 
 	nan_attrs_clear(nan, &attrs);
