@@ -979,12 +979,18 @@ static bool wpas_nan_is_valid_publish_id_cb(void *ctx, u8 instance_id,
 
 static void wpas_nan_bootstrap_request_cb(void *ctx, const u8 *peer_nmi,
 					  u16 pbm, int handle,
-					  u8 requestor_instance_id)
+					  u8 requestor_instance_id,
+					  const char *locale,
+					  const char *vendor_name,
+					  const char *model_name,
+					  const char *pairing_name)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 
 	wpas_notify_nan_bootstrap_request(wpa_s, peer_nmi, pbm, handle,
-					  requestor_instance_id);
+					  requestor_instance_id, locale,
+					  vendor_name, model_name,
+					  pairing_name);
 }
 
 

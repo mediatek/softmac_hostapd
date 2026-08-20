@@ -350,10 +350,24 @@ static void nan_bootstrap_handle_rx_request(struct nan_data *nan,
 
 	peer->bootstrap.comeback_after = nan->cfg->bootstrap_comeback_timeout;
 
-	if (nan->cfg->bootstrap_request)
+	if (nan->cfg->bootstrap_request) {
+		char *locale = NULL, *vendor_name = NULL;
+		char *model_name = NULL, *pairing_name = NULL;
+
+		nan_pairing_parse_setup_info(
+			peer->bootstrap.pairing_setup_info,
+			peer->bootstrap.pairing_setup_info_len,
+			&locale, &vendor_name, &model_name, &pairing_name);
 		nan->cfg->bootstrap_request(nan->cfg->cb_ctx, peer->nmi_addr,
 					    peer->bootstrap.requested_pbm,
-					    handle, req_instance_id);
+					    handle, req_instance_id,
+					    locale, vendor_name,
+					    model_name, pairing_name);
+		os_free(locale);
+		os_free(vendor_name);
+		os_free(model_name);
+		os_free(pairing_name);
+	}
 
 send_response:
 	attr = nan_bootstrap_build_npba(nan, peer);

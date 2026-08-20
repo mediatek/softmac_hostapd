@@ -1300,12 +1300,23 @@ void wpas_notify_nan_transmit_req_status(struct wpa_supplicant *wpa_s,
 
 void wpas_notify_nan_bootstrap_request(struct wpa_supplicant *wpa_s,
 				       const u8 *peer_nmi, u16 pbm,
-				       int handle, u8 requestor_instance_id)
+				       int handle, u8 requestor_instance_id,
+				       const char *locale,
+				       const char *vendor_name,
+				       const char *model_name,
+				       const char *pairing_name)
 {
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_BOOTSTRAP_REQUEST
 		       "peer_nmi=" MACSTR
-		       " pbm=0x%04x handle=%d requestor_instance_id=%u",
-		       MAC2STR(peer_nmi), pbm, handle, requestor_instance_id);
+		       " pbm=0x%04x handle=%d requestor_instance_id=%u%s%s%s%s%s%s%s%s",
+		       MAC2STR(peer_nmi), pbm, handle, requestor_instance_id,
+		       locale ? " locale=" : "", locale ? locale : "",
+		       vendor_name ? " vendorName=" : "",
+		       vendor_name ? vendor_name : "",
+		       model_name ? " modelName=" : "",
+		       model_name ? model_name : "",
+		       pairing_name ? " pairingName=" : "",
+		       pairing_name ? pairing_name : "");
 }
 
 

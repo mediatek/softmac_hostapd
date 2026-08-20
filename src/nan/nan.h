@@ -631,9 +631,16 @@ struct nan_config {
 	 *     Wi-Fi Aware spec v4.0, Table 128 (NPBA format).
 	 * @handle: Service handle
 	 * @requestor_instance_id: Requestor instance ID
+	 * @locale: Pairing Setup Info 'locale' value from the PBEA (or NULL)
+	 * @vendor_name: Pairing Setup Info 'vendorName' value (or NULL)
+	 * @model_name: Pairing Setup Info 'modelName' value (or NULL)
+	 * @pairing_name: Pairing Setup Info 'pairingName' value (or NULL)
 	 */
 	void (*bootstrap_request)(void *ctx, const u8 *peer_nmi, u16 pbm,
-				  int handle, u8 requestor_instance_id);
+				  int handle, u8 requestor_instance_id,
+				  const char *locale, const char *vendor_name,
+				  const char *model_name,
+				  const char *pairing_name);
 
 	/**
 	 * get_pbea_info - Get PBEA fields for a service
