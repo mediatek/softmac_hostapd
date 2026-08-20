@@ -4799,9 +4799,13 @@ bool rsn_is_snonce_cookie(const u8 *snonce)
 void wpa_add_supported_groups(struct wpabuf *buf, const int *groups)
 {
 	unsigned int count, i;
+	static const int default_groups[] = { 19, 0 };
 
-	if (!buf || !groups)
+	if (!buf)
 		return;
+
+	if (!groups)
+		groups = default_groups;
 
 	count = int_array_len(groups);
 	if (wpabuf_tailroom(buf) < 2 + 1 + count * 2)
