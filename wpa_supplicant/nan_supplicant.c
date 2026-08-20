@@ -1748,12 +1748,63 @@ out:
 int wpas_nan_set(struct wpa_supplicant *wpa_s, char *cmd)
 {
 	struct nan_cluster_config *config = &wpa_s->nan_cluster_config;
+	struct nan_data *nan = wpa_s->nan;
 	char *param = os_strchr(cmd, ' ');
 
 	if (!param)
 		return -1;
 
 	*param++ = '\0';
+
+	if (os_strcmp("self_nik", cmd) == 0 ||
+	    os_strcmp("peer_nik", cmd) == 0 ||
+	    os_strcmp("group_nik", cmd) == 0) {
+		char *token, *context = NULL;
+		char *tmp = os_strdup(param);
+		enum nan_nik_type nik_type;
+		bool possessed_nik = false;
+		char *pos;
+
+		if (!tmp)
+			return -1;
+
+		if (os_strcmp("peer_nik", cmd) == 0)
+			nik_type = NAN_NIK_TYPE_PEER;
+		else if (os_strcmp("self_nik", cmd) == 0)
+			nik_type = NAN_NIK_TYPE_SELF;
+		else
+			nik_type = NAN_NIK_TYPE_GROUP;
+
+		pos = os_strrchr(tmp, ' ');
+		if (pos) {
+			*pos++ = '\0';
+			possessed_nik = !!atoi(pos);
+		}
+
+		for (token = str_token(tmp, ",", &context); token;
+		     token = str_token(NULL, ",", &context)) {
+			u8 nik[NAN_NIK_LEN];
+			int res;
+
+			if (os_strlen(token) != NAN_NIK_LEN * 2 ||
+			    hexstr2bin(token, nik, NAN_NIK_LEN) < 0) {
+				wpa_printf(MSG_DEBUG, "NAN: Invalid nik item");
+				os_free(tmp);
+				return -1;
+			}
+
+			res = nan_add_nik(nan, nik, nik_type, possessed_nik);
+			forced_memzero(nik, NAN_NIK_LEN);
+			if (res < 0) {
+				wpa_printf(MSG_DEBUG,
+					   "NAN: Failed to add NIK entry");
+				os_free(tmp);
+				return -1;
+			}
+		}
+		os_free(tmp);
+		return 0;
+	}
 
 #define NAN_PARSE_INT(_str, _min, _max)				     \
 	if (os_strcmp(#_str, cmd) == 0) {			     \
