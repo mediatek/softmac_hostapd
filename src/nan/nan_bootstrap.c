@@ -9,6 +9,7 @@
 #include "includes.h"
 #include "common.h"
 #include "utils/eloop.h"
+#include "common/nan_de.h"
 #include "nan_i.h"
 
 #define NAN_BOOTSTRAP_RETRY_TIMEOUT_US (1 * 1000 * 1000) /* 1 second */
@@ -140,6 +141,24 @@ static struct wpabuf * nan_bootstrap_build_npba(struct nan_data *nan,
 }
 
 
+static struct wpabuf * nan_bootstrap_build_pbea(struct nan_data *nan,
+					       int handle)
+{
+	u16 extended_pbm = 0;
+	const u8 *pairing_setup_info = NULL;
+	u16 pairing_setup_info_len = 0;
+
+	if (nan->cfg->get_pbea_info && handle > 0)
+		nan->cfg->get_pbea_info(nan->cfg->cb_ctx, handle,
+					&extended_pbm,
+					&pairing_setup_info,
+					&pairing_setup_info_len);
+
+	return nan_build_pbea(extended_pbm, pairing_setup_info,
+			      pairing_setup_info_len);
+}
+
+
 /**
  * nan_bootstrap_timeout - Bootstrap timeout handler
  * @eloop_data: NAN module context from nan_init()
@@ -150,6 +169,7 @@ static void nan_bootstrap_timeout(void *eloop_data, void *user_ctx)
 	struct nan_data *nan = eloop_data;
 	struct nan_peer *peer = user_ctx;
 	struct wpabuf *attr;
+	struct wpabuf *pbea;
 
 	wpa_printf(MSG_DEBUG, "NAN: Bootstrap: timeout. status=%u",
 		   peer->bootstrap.status);
@@ -165,6 +185,21 @@ static void nan_bootstrap_timeout(void *eloop_data, void *user_ctx)
 					      0, false,
 					      NAN_REASON_UNSPECIFIED_REASON,
 					      -1, 0);
+		return;
+	}
+
+	pbea = nan_bootstrap_build_pbea(nan, peer->bootstrap.handle);
+	attr = wpabuf_concat(attr, pbea);
+	if (!attr) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Bootstrap: Failed to allocate combined buffer");
+		nan_bootstrap_reset(nan, peer);
+
+		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx, peer->nmi_addr,
+					      0, false,
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      peer->bootstrap.handle,
+					      peer->bootstrap.req_instance_id);
 		return;
 	}
 
@@ -215,6 +250,7 @@ static void nan_bootstrap_handle_rx_request(struct nan_data *nan,
 					    const u8 *npba, u16 npba_len)
 {
 	struct wpabuf *attr = NULL;
+	struct wpabuf *pbea;
 	u16 supported_methods;
 
 	wpa_printf(MSG_DEBUG, "NAN: Bootstrap: RX request");
@@ -324,6 +360,20 @@ send_response:
 	if (!attr) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Bootstrap: Failed to build bootstrap attribute");
+		goto done;
+	}
+
+	pbea = nan_bootstrap_build_pbea(nan, handle);
+	attr = wpabuf_concat(attr, pbea);
+	if (!attr) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Bootstrap: Failed to allocate combined buffer");
+
+		nan->cfg->bootstrap_completed(nan->cfg->cb_ctx,
+					      peer->nmi_addr,
+					      0, false,
+					      NAN_REASON_UNSPECIFIED_REASON,
+					      handle, req_instance_id);
 		goto done;
 	}
 
@@ -599,6 +649,8 @@ int nan_bootstrap_request(struct nan_data *nan, int handle,
 {
 	struct nan_peer *peer;
 	int ret;
+	struct wpabuf *attr;
+	struct wpabuf *pbea;
 
 	if (!nan || !nan->nan_started)
 		return -1;
@@ -671,9 +723,19 @@ int nan_bootstrap_request(struct nan_data *nan, int handle,
 		return -1;
 	}
 
+	pbea = nan_bootstrap_build_pbea(nan, handle);
+	attr = wpabuf_concat(wpabuf_dup(peer->bootstrap.npba), pbea);
+	if (!attr) {
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Bootstrap: Failed to allocate combined buffer");
+		nan_bootstrap_reset(nan, peer);
+		return -1;
+	}
+
 	ret = nan->cfg->transmit_followup(nan->cfg->cb_ctx, peer->nmi_addr,
-					  peer->bootstrap.npba, handle,
+					  attr, handle,
 					  req_instance_id);
+	wpabuf_free(attr);
 	if (ret) {
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Bootstrap: Failed to transmit follow-up");

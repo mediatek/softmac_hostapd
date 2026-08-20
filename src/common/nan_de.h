@@ -328,6 +328,9 @@ void nan_de_set_tx_mcast_follow_up_prot(struct nan_de *de, bool prot);
 int nan_de_get_status(struct nan_de *de, char *buf, size_t buflen);
 
 int nan_de_stop_listen(struct nan_de *de, int handle);
+int nan_de_get_pbea_info(struct nan_de *de, int handle, u16 *extended_pbm,
+			 const u8 **pairing_setup_info,
+			 u16 *pairing_setup_info_len);
 struct wpabuf * nan_build_pbea(u16 extended_pbm,
 			       const u8 *pairing_setup_info,
 			       u16 pairing_setup_info_len);

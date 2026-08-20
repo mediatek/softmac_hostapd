@@ -1038,6 +1038,20 @@ static u16 wpas_nan_get_service_bootstrap_methods(void *ctx, int handle)
 }
 
 
+static int wpas_nan_get_pbea_info(void *ctx, int handle, u16 *extended_pbm,
+				  const u8 **pairing_setup_info,
+				  u16 *pairing_setup_info_len)
+{
+	struct wpa_supplicant *wpa_s = ctx;
+
+	if (!wpa_s->nan_de)
+		return -1;
+
+	return nan_de_get_pbea_info(wpa_s->nan_de, handle, extended_pbm,
+				    pairing_setup_info, pairing_setup_info_len);
+}
+
+
 #ifdef CONFIG_PASN
 
 static int wpas_nan_pasn_send_cb(void *ctx, const u8 *data, size_t data_len)
@@ -1359,6 +1373,7 @@ int wpas_nan_init(struct wpa_supplicant *wpa_s)
 		nan.transmit_followup = wpas_nan_transmit_followup_cb;
 		nan.get_supported_bootstrap_methods =
 			wpas_nan_get_service_bootstrap_methods;
+		nan.get_pbea_info = wpas_nan_get_pbea_info;
 
 		if (wpa_s->driver->get_inact_sec)
 			nan.get_peer_inactivity = wpas_nan_get_peer_inactivity;

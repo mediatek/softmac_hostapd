@@ -636,6 +636,20 @@ struct nan_config {
 				  int handle, u8 requestor_instance_id);
 
 	/**
+	 * get_pbea_info - Get PBEA fields for a service
+	 * @ctx: Callback context from cb_ctx
+	 * @handle: Service handle for which to retrieve PBEA fields
+	 * @extended_pbm: On success, extended PBM value
+	 * @pairing_setup_info: On success, pointer to pairing setup info data
+	 *	(may be NULL)
+	 * @pairing_setup_info_len: On success, length of pairing setup info
+	 * Returns: 0 on success, -1 on failure
+	 */
+	int (*get_pbea_info)(void *ctx, int handle, u16 *extended_pbm,
+			     const u8 **pairing_setup_info,
+			     u16 *pairing_setup_info_len);
+
+	/**
 	 * bootstrap_completed - Notify about completed bootstrap
 	 * @ctx: Callback context from cb_ctx
 	 * @peer_nmi: Peer NMI address

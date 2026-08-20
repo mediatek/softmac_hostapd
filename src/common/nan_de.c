@@ -2996,6 +2996,35 @@ fail:
 }
 
 
+int nan_de_get_pbea_info(struct nan_de *de, int handle, u16 *extended_pbm,
+			 const u8 **pairing_setup_info,
+			 u16 *pairing_setup_info_len)
+{
+	struct nan_de_service *srv;
+
+	if (handle < 1 || handle > NAN_DE_MAX_SERVICE)
+		return -1;
+
+	srv = de->service[handle - 1];
+	if (!srv)
+		return -1;
+
+	if (srv->type == NAN_DE_PUBLISH) {
+		*extended_pbm = srv->publish.extended_pbm;
+		*pairing_setup_info = srv->publish.pairing_setup_info;
+		*pairing_setup_info_len = srv->publish.pairing_setup_info_len;
+	} else if (srv->type == NAN_DE_SUBSCRIBE) {
+		*extended_pbm = srv->subscribe.extended_pbm;
+		*pairing_setup_info = srv->subscribe.pairing_setup_info;
+		*pairing_setup_info_len = srv->subscribe.pairing_setup_info_len;
+	} else {
+		return -1;
+	}
+
+	return 0;
+}
+
+
 void nan_de_cancel_subscribe(struct nan_de *de, int subscribe_id)
 {
 	struct nan_de_service *srv;
