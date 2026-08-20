@@ -43,6 +43,10 @@ struct nan_discovery_result {
 	bool npk_nik_caching_supp;
 	u16 pbm;
 	const u8 *orig_addr;
+	const char *psi_locale;
+	const char *psi_vendor_name;
+	const char *psi_model_name;
+	const char *psi_pairing_name;
 };
 
 struct nan_callbacks {

@@ -1622,6 +1622,66 @@ void nan_pairing_parse_setup_info(const u8 *info, size_t info_len,
 }
 
 
+static void nan_de_parse_pbea(const u8 *buf, size_t len,
+			      char **locale, char **vendor_name,
+			      char **model_name, char **pairing_name)
+{
+	const u8 *pbea, *end;
+	u16 pbea_len, pairing_setup_info_len;
+	u8 control;
+
+	*locale = NULL;
+	*vendor_name = NULL;
+	*model_name = NULL;
+	*pairing_name = NULL;
+
+	pbea = nan_de_get_attr(buf, len, NAN_ATTR_PBEA, 0);
+	if (!pbea)
+		return;
+
+	pbea++;
+	pbea_len = WPA_GET_LE16(pbea);
+	pbea += 2;
+	if (pbea_len < 1)
+		return;
+
+	end = pbea + pbea_len;
+	control = *pbea++;
+
+	wpa_printf(MSG_DEBUG, "NAN: Parsing PBEA (control=0x%02x, len=%u)",
+		   control, pbea_len);
+
+	if (control & BIT(0)) {
+		if (end - pbea < 2) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Truncated PBEA ext PBM field");
+			return;
+		}
+		pbea += 2;
+	}
+
+	if (control & BIT(1)) {
+		if (end - pbea < 2) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Truncated Length of Pairing Setup Info field");
+			return;
+		}
+
+		pairing_setup_info_len = WPA_GET_LE16(pbea);
+		pbea += 2;
+		if (pairing_setup_info_len > end - pbea) {
+			wpa_printf(MSG_DEBUG,
+				   "NAN: Truncated Pairing Setup Info field");
+			return;
+		}
+
+		nan_pairing_parse_setup_info(pbea, pairing_setup_info_len,
+					     locale, vendor_name, model_name,
+					     pairing_name);
+	}
+}
+
+
 static void nan_de_process_elem_container(struct nan_de *de, const u8 *buf,
 					  size_t len, const u8 *peer_addr,
 					  unsigned int freq, bool p2p, bool pr)
@@ -1902,8 +1962,27 @@ send_event:
 	res.pmkid_count = pmkid_count;
 	res.orig_addr = orig_addr;
 
-	if (de->cb.discovery_result)
+	if (de->cb.discovery_result) {
+		char *locale = NULL, *vendor_name = NULL;
+		char *model_name = NULL, *pairing_name = NULL;
+
+		if (buf && buf_len > 0)
+			nan_de_parse_pbea(buf, buf_len, &locale,
+					  &vendor_name, &model_name,
+					  &pairing_name);
+
+		res.psi_locale = locale;
+		res.psi_vendor_name = vendor_name;
+		res.psi_model_name = model_name;
+		res.psi_pairing_name = pairing_name;
+
 		de->cb.discovery_result(de->cb.ctx, &res);
+
+		os_free(locale);
+		os_free(vendor_name);
+		os_free(model_name);
+		os_free(pairing_name);
+	}
 
 	return true;
 }
