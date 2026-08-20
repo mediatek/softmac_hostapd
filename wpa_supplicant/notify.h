@@ -271,7 +271,11 @@ void wpas_notify_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 				       bool success);
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 				    const u8 *peer_addr, int akmp, int cipher,
-				    u16 status, const u8 *nd_pmk);
+				    u16 status, const u8 *nd_pmk,
+				    const char *psi_locale,
+				    const char *psi_vendor_name,
+				    const char *psi_model_name,
+				    const char *psi_pairing_name);
 void wpas_notify_nan_chan_evacuation(struct wpa_supplicant *wpa_s,
 				     u8 map_id, int freq);
 void wpas_notify_nan_stopped(struct wpa_supplicant *wpa_s);

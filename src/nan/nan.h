@@ -716,7 +716,11 @@ struct nan_config {
 	 */
 	int (*pairing_result_cb)(void *ctx, const u8 *peer_addr, int akmp,
 				 int cipher, u16 status, struct wpa_ptk *ptk,
-				 const u8 *nd_pmk);
+				 const u8 *nd_pmk,
+				 const char *psi_locale,
+				 const char *psi_vendor_name,
+				 const char *psi_model_name,
+				 const char *psi_pairing_name);
 
 	/**
 	 * update_pairing_credentials - Report received NIK and NPK for a peer

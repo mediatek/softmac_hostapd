@@ -540,6 +540,10 @@ struct nan_pairing_peer_data {
 	u8 tag[NAN_NIRA_TAG_LEN];
 	u32 flags;
 	struct wpabuf *pending_auth1;
+	char *psi_locale;
+	char *psi_vendor_name;
+	char *psi_model_name;
+	char *psi_pairing_name;
 	enum nan_cipher_suite_id pairing_csid;
 	int pairing_akmp;
 };

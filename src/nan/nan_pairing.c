@@ -10,6 +10,7 @@
 #include "common.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
+#include "common/nan_de.h"
 #include "pasn/pasn_common.h"
 #include "nan/nan_i.h"
 
@@ -91,6 +92,15 @@ void nan_pairing_deinit_peer(struct nan_peer *peer)
 {
 	wpabuf_free(peer->pairing.pending_auth1);
 	peer->pairing.pending_auth1 = NULL;
+
+	os_free(peer->pairing.psi_locale);
+	peer->pairing.psi_locale = NULL;
+	os_free(peer->pairing.psi_vendor_name);
+	peer->pairing.psi_vendor_name = NULL;
+	os_free(peer->pairing.psi_model_name);
+	peer->pairing.psi_model_name = NULL;
+	os_free(peer->pairing.psi_pairing_name);
+	peer->pairing.psi_pairing_name = NULL;
 
 	if (!peer->pairing.pasn)
 		return;
@@ -484,6 +494,7 @@ fail:
  * - Cipher suite information attribute (CSIA) with appropriate PASN cipher
  *   (either GCMP-256 or GCMP-128)
  * - NAN Pairing Bootstrapping Attribute (NPBA) if available
+ * - Pairing Bootstrapping Extended Attribute (PBEA) if available
  */
 static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 					   struct nan_peer *peer,
@@ -516,6 +527,28 @@ static void nan_pairing_prepare_pasn_elems(struct nan_data *nan_data,
 		nan_add_dev_capa_ext_attr(nan_data, extra_ies);
 		if (peer->bootstrap.npba)
 			wpabuf_put_buf(extra_ies, peer->bootstrap.npba);
+
+		if (peer->bootstrap.extended_pbm ||
+		    peer->bootstrap.pairing_setup_info) {
+			u16 extended_pbm = 0;
+			const u8 *pairing_setup_info = NULL;
+			u16 pairing_setup_info_len = 0;
+			struct wpabuf *pbea;
+
+			if (nan_data->cfg->get_pbea_info)
+				nan_data->cfg->get_pbea_info(
+						nan_data->cfg->cb_ctx,
+						publish_id, &extended_pbm,
+						&pairing_setup_info,
+						&pairing_setup_info_len);
+
+			pbea = nan_build_pbea(extended_pbm, pairing_setup_info,
+					      pairing_setup_info_len);
+			if (pbea) {
+				wpabuf_put_buf(extra_ies, pbea);
+				wpabuf_free(pbea);
+			}
+		}
 	} else {
 		const u8 *npkid = peer->pairing.pasn->custom_pmkid;
 
@@ -940,13 +973,30 @@ int nan_pairing_pasn_auth_tx_status(struct nan_data *nan, const u8 *data,
 				   "NAN: Pairing: Failed to derive ND PMK");
 		}
 
+		os_free(peer->pairing.psi_locale);
+		os_free(peer->pairing.psi_vendor_name);
+		os_free(peer->pairing.psi_model_name);
+		os_free(peer->pairing.psi_pairing_name);
+
+		nan_pairing_parse_setup_info(
+			peer->bootstrap.pairing_setup_info,
+			peer->bootstrap.pairing_setup_info_len,
+			&peer->pairing.psi_locale,
+			&peer->pairing.psi_vendor_name,
+			&peer->pairing.psi_model_name,
+			&peer->pairing.psi_pairing_name);
+
 		ret = nan->cfg->pairing_result_cb(nan->cfg->cb_ctx,
 						  peer->nmi_addr, pasn->akmp,
 						  pasn->cipher, pasn->status,
 						  &pasn->ptk,
 						  pasn->status ==
 						  WLAN_STATUS_SUCCESS ? nd_pmk :
-						  NULL);
+						  NULL,
+						  peer->pairing.psi_locale,
+						  peer->pairing.psi_vendor_name,
+						  peer->pairing.psi_model_name,
+						  peer->pairing.psi_pairing_name);
 		forced_memzero(nd_pmk, PMK_LEN);
 		if (pasn->status != WLAN_STATUS_SUCCESS || ret < 0) {
 			nan_pairing_deinit_peer(peer);
@@ -1063,6 +1113,7 @@ static int nan_pairing_process_elems(struct nan_data *nan_data,
 		goto fail;
 
 	nan_parse_peer_dev_capa_ext(nan_data, peer, &attrs);
+	nan_parse_pbea(nan_data, peer, &attrs);
 
 	if (!attrs.cipher_suite_info || !attrs.cipher_suite_info_len ||
 	    nan_parse_csia(attrs.cipher_suite_info, attrs.cipher_suite_info_len,
@@ -1152,7 +1203,7 @@ static int nan_pairing_handle_auth_2(struct nan_data *nan_data,
 		nan_data->cfg->pairing_result_cb(
 			nan_data->cfg->cb_ctx, peer->nmi_addr, pasn->akmp,
 			pasn->cipher, WLAN_STATUS_UNSPECIFIED_FAILURE, NULL,
-			NULL);
+			NULL, NULL, NULL, NULL, NULL);
 		nan_pairing_deinit_peer(peer);
 		return -1;
 	}
@@ -1184,12 +1235,23 @@ static int nan_pairing_handle_auth_3(struct nan_data *nan_data,
 		}
 	}
 
+	nan_pairing_parse_setup_info(peer->bootstrap.pairing_setup_info,
+				     peer->bootstrap.pairing_setup_info_len,
+				     &peer->pairing.psi_locale,
+				     &peer->pairing.psi_vendor_name,
+				     &peer->pairing.psi_model_name,
+				     &peer->pairing.psi_pairing_name);
+
 	ret = nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
 					       peer->nmi_addr, pasn->akmp,
 					       pasn->cipher, status,
 					       &pasn->ptk,
 					       status == WLAN_STATUS_SUCCESS ?
-					       nd_pmk : NULL);
+					       nd_pmk : NULL,
+					       peer->pairing.psi_locale,
+					       peer->pairing.psi_vendor_name,
+					       peer->pairing.psi_model_name,
+					       peer->pairing.psi_pairing_name);
 	forced_memzero(nd_pmk, PMK_LEN);
 	if (ret < 0 || status != WLAN_STATUS_SUCCESS)
 		nan_pairing_deinit_peer(peer);
@@ -1324,7 +1386,8 @@ int nan_pairing_auth_rx(struct nan_data *nan_data,
 		nan_data->cfg->pairing_result_cb(nan_data->cfg->cb_ctx,
 						 peer->nmi_addr, pasn->akmp,
 						 pasn->cipher, status_code,
-						 NULL, NULL);
+						 NULL, NULL,
+						 NULL, NULL, NULL, NULL);
 		nan_pairing_deinit_peer(peer);
 		wpa_printf(MSG_DEBUG,
 			   "NAN: Pairing: Authentication rejected - status=%u",

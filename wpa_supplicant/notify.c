@@ -1534,7 +1534,11 @@ void wpas_notify_nan_sched_update_done(struct wpa_supplicant *wpa_s,
 void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 				    const u8 *peer_addr, int akmp,
 				    int cipher, u16 status,
-				    const u8 *nd_pmk)
+				    const u8 *nd_pmk,
+				    const char *psi_locale,
+				    const char *psi_vendor_name,
+				    const char *psi_model_name,
+				    const char *psi_pairing_name)
 {
 	char nd_pmk_hex[2 * PMK_LEN + 1];
 
@@ -1545,13 +1549,21 @@ void wpas_notify_nan_pairing_status(struct wpa_supplicant *wpa_s,
 		nd_pmk_hex[0] = '\0';
 
 	wpa_msg_global(wpa_s, MSG_INFO, NAN_PAIRING_STATUS "addr=" MACSTR
-		       " akmp=%s cipher=%s status=%s%s%s",
+		       " akmp=%s cipher=%s status=%s%s%s%s%s%s%s%s%s%s%s",
 		       MAC2STR(peer_addr),
 		       wpa_key_mgmt_txt(akmp, WPA_PROTO_RSN),
 		       wpa_cipher_txt(cipher),
 		       status == WLAN_STATUS_SUCCESS ? "success" : "failure",
 		       nd_pmk ? " nd_pmk=" : "",
-		       nd_pmk ? nd_pmk_hex : "");
+		       nd_pmk ? nd_pmk_hex : "",
+		       psi_locale ? " locale=" : "",
+		       psi_locale ? psi_locale : "",
+		       psi_vendor_name ? " vendorName=" : "",
+		       psi_vendor_name ? psi_vendor_name : "",
+		       psi_model_name ? " modelName=" : "",
+		       psi_model_name ? psi_model_name : "",
+		       psi_pairing_name ? " pairingName=" : "",
+		       psi_pairing_name ? psi_pairing_name : "");
 	forced_memzero(nd_pmk_hex, sizeof(nd_pmk_hex));
 }
 

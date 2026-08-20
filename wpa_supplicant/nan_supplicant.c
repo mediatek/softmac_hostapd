@@ -1070,14 +1070,22 @@ static int wpas_nan_pasn_send_cb(void *ctx, const u8 *data, size_t data_len)
 
 static int wpas_nan_pasn_auth_status_cb(void *ctx, const u8 *peer_addr,
 					int akmp, int cipher, u16 status,
-					struct wpa_ptk *ptk, const u8 *nd_pmk)
+					struct wpa_ptk *ptk, const u8 *nd_pmk,
+					const char *psi_locale,
+					const char *psi_vendor_name,
+					const char *psi_model_name,
+					const char *psi_pairing_name)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	enum wpa_alg alg;
 	u8 seq[6];
 
 	wpas_notify_nan_pairing_status(wpa_s, peer_addr, akmp, cipher,
-				       status, nd_pmk);
+				       status, nd_pmk,
+				       psi_locale,
+				       psi_vendor_name,
+				       psi_model_name,
+				       psi_pairing_name);
 
 	if (status != WLAN_STATUS_SUCCESS)
 		return 0;
