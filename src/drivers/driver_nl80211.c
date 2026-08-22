@@ -144,7 +144,7 @@ rfeature_ctrl_policy[NUM_MTK_VENDOR_ATTRS_RFEATURE_CTRL] = {
 static const struct nla_policy
 wireless_ctrl_policy[NUM_MTK_VENDOR_ATTRS_WIRELESS_CTRL] = {
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_MCS] = {.type = NLA_U8 },
-	[MTK_VENDOR_ATTR_WIRELESS_CTRL_FIXED_OFDMA] = {.type = NLA_U8 },
+	[MTK_VENDOR_ATTR_WIRELESS_CTRL_OFDMA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_PPDU_TX_TYPE] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_NUSERS_OFDMA] = {.type = NLA_U8 },
 	[MTK_VENDOR_ATTR_WIRELESS_CTRL_MIMO] = {.type = NLA_U8 },
@@ -16049,6 +16049,31 @@ nl80211_mu_ctrl(void *priv, u8 radio_idx, struct wpa_driver_mu_params *params)
 			goto fail;
 		break;
 	case MU_CTRL_UPDATE:
+		if (drv->mtk_vendor_connac_version == 2) {
+			const struct mtk_muru *muru = params->muru_config;
+			u8 legacy_mode, user_num;
+
+			/* Connac2 only implements the two user-count controls. */
+			if (muru->cfg_dl & host_to_le32(MURU_FIXED_DL_TOTAL_USER_CNT)) {
+				legacy_mode = MTK_LEGACY_MU_CTRL_DL_USER_CNT;
+				user_num = muru->dl.user_num;
+			} else if (muru->cfg_ul &
+				   host_to_le32(MURU_FIXED_UL_TOTAL_USER_CNT)) {
+				legacy_mode = MTK_LEGACY_MU_CTRL_UL_USER_CNT;
+				user_num = muru->ul.user_num;
+			} else {
+				wpa_printf(MSG_ERROR,
+					   "nl80211: legacy MU only supports DL/UL user count");
+				ret = -EOPNOTSUPP;
+				goto fail;
+			}
+
+			if (nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_OFDMA_MODE,
+				       legacy_mode) ||
+			    nla_put_u8(msg, MTK_VENDOR_ATTR_MU_CTRL_OFDMA_VAL, user_num))
+				goto fail;
+			break;
+		}
 		if (nla_put(msg, MTK_VENDOR_ATTR_MU_CTRL_STRUCT,
 			    sizeof(struct mtk_muru), params->muru_config))
 			goto fail;
@@ -16665,12 +16690,8 @@ static int edcca_info_handler(struct nl_msg *msg, void *arg)
 	*info++ = nla_get_u8(attr);
 
 	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL];
-	if (!attr) {
-		wpa_printf(MSG_ERROR, "nl80211: MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL");
-		return NL_SKIP;
-	}
-
-	*info = nla_get_u8(attr);
+	/* Connac2 returns only 20/40/80 MHz thresholds. */
+	*info = attr ? nla_get_u8(attr) : 0x7f;
 	return NL_SKIP;
 }
 
@@ -18292,7 +18313,8 @@ nl80211_amnt_dump(void *priv, u8 amnt_idx, u8 *dump_buf, s8 link_id)
 	if (!data)
 		goto fail;
 
-	nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_CTRL_LINK_ID, link_id);
+	if (nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_CTRL_LINK_ID, link_id))
+		goto fail;
 	tb1 = nla_nest_start(msg, MTK_VENDOR_ATTR_AMNT_CTRL_DUMP | NLA_F_NESTED);
 	if (!tb1)
 		goto fail;
@@ -18531,7 +18553,8 @@ nl80211_csi_set(void *priv, u8 radio_idx, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *ma
 	if (!data)
 		goto fail;
 
-	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
+	if (drv->mtk_vendor_connac_version > 2)
+		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
 
 	tb1 = nla_nest_start(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG | NLA_F_NESTED);
 	if (!tb1)
@@ -18540,7 +18563,16 @@ nl80211_csi_set(void *priv, u8 radio_idx, u8 mode, u8 cfg, u8 v1, u32 v2, u8 *ma
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_MODE, mode);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_TYPE, cfg);
 	nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL1, v1);
-	nla_put_u32(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	if (drv->mtk_vendor_connac_version == 2) {
+		if (v2 > 0xff) {
+			wpa_printf(MSG_ERROR,
+				   "nl80211: legacy CSI supports an 8-bit cfg value");
+			goto fail;
+		}
+		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	} else {
+		nla_put_u32(msg, MTK_VENDOR_ATTR_CSI_CTRL_CFG_VAL2, v2);
+	}
 
 	nla_nest_end(msg, tb1);
 
@@ -18695,7 +18727,8 @@ static int nl80211_csi_dump(void *priv, u8 radio_idx, void *dump_buf)
 		if (!data)
 			goto fail;
 
-		nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
+		if (drv->mtk_vendor_connac_version > 2)
+			nla_put_u8(msg, MTK_VENDOR_ATTR_CSI_CTRL_RADIO_IDX, radio_idx);
 		nla_put_u16(msg, MTK_VENDOR_ATTR_CSI_CTRL_DUMP_NUM, CSI_DUMP_PER_NUM);
 
 		nla_nest_end(msg, data);
@@ -18709,6 +18742,7 @@ fail:
 	nlmsg_free(msg);
 	return -ENOBUFS;
 }
+
 
 static int
 nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 link_id,
@@ -18741,7 +18775,7 @@ nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 
 		goto fail;
 
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
-	if (sku_filename[0])
+	if (sku_filename[0] && drv->mtk_vendor_connac_version > 2)
 		nla_put_string(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_FILENAME,
 			       sku_filename);
 	else if (sku_idx > -1)
@@ -18754,7 +18788,7 @@ nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 
 #ifdef CONFIG_AFC
 	if (power_table) {
 		nla_put(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_AFC_TABLE,
-		        MAX_CHANNEL_NUM_6G * afc_power_table_num, power_table);
+			MAX_CHANNEL_NUM_6G * afc_power_table_num, power_table);
 	}
 #endif /* CONFIG_AFC */
 
