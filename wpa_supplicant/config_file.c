@@ -1960,7 +1960,12 @@ int wpa_config_write(const char *name, struct wpa_config *config)
 
 	os_fdatasync(f);
 
-	fclose(f);
+	if (fclose(f) != 0) {
+		wpa_printf(MSG_DEBUG,
+			   "fclose() failed ton temporary configuration file: %s",
+			   strerror(errno));
+		ret = -1;
+	}
 
 #ifdef ANDROID
 	if (!ret)
