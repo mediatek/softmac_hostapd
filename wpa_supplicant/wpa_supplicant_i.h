@@ -279,6 +279,11 @@ struct wpa_params {
 	 * proc_coord_dir - Process coordination directory
 	 */
 	const char *proc_coord_dir;
+
+	/**
+	 * conf_file_prefix - Required configuration file name prefix
+	 */
+	const char *conf_file_prefix;
 };
 
 struct p2p_srv_bonjour {

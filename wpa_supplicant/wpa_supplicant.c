@@ -7916,6 +7916,8 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 
 	if (iface->confname) {
 #ifdef CONFIG_BACKEND_FILE
+		const char *prefix = wpa_s->global->params.conf_file_prefix;
+
 		wpa_s->confname = os_rel2abs_path(iface->confname);
 		if (wpa_s->confname == NULL) {
 			wpa_printf(MSG_ERROR, "Failed to get absolute path "
@@ -7925,6 +7927,20 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		}
 		wpa_printf(MSG_DEBUG, "Configuration file '%s' -> '%s'",
 			   iface->confname, wpa_s->confname);
+		if (prefix &&
+		    os_strncmp(wpa_s->confname, prefix,
+			       os_strlen(prefix)) != 0)	{
+			wpa_printf(MSG_ERROR,
+				   "Specified configuration file (%s) does not start with the required prefix (%s)",
+				   wpa_s->confname, prefix);
+			return -1;
+		}
+		if (prefix && os_strstr(wpa_s->confname, "/../")) {
+			wpa_printf(MSG_ERROR,
+				   "Specified configuration file (%s) has /../ in it",
+				   wpa_s->confname);
+			return -1;
+		}
 #else /* CONFIG_BACKEND_FILE */
 		wpa_s->confname = os_strdup(iface->confname);
 #endif /* CONFIG_BACKEND_FILE */
@@ -8797,6 +8813,7 @@ struct wpa_global * wpa_supplicant_init(struct wpa_params *params)
 	global->params.wait_for_monitor = params->wait_for_monitor;
 	global->params.dbus_ctrl_interface = params->dbus_ctrl_interface;
 	global->params.show_details = params->show_details;
+	global->params.conf_file_prefix = params->conf_file_prefix;
 
 	if (params->pid_file) {
 		global->params.pid_file = os_strdup(params->pid_file);
