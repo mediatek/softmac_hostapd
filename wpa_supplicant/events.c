@@ -3861,6 +3861,7 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 					  union wpa_event_data *data)
 {
 	int l, len, found = 0, wpa_found, rsn_found;
+	bool sec_prof_found;
 #ifndef CONFIG_NO_WPA
 	int found_x = 0;
 #endif /* CONFIG_NO_WPA */
@@ -4173,6 +4174,7 @@ no_pfs:
 	/* Go through the IEs and make a copy of the WPA/RSN IEs, if present.
 	 */
 	wpa_found = rsn_found = 0;
+	sec_prof_found = false;
 	while (p && l >= 2) {
 		len = p[1] + 2;
 		if (len > l) {
@@ -4208,6 +4210,13 @@ no_pfs:
 		    WPA_GET_BE32(&p[2]) == RSNXE_OVERRIDE_IE_VENDOR_TYPE)
 			wpa_sm_set_ap_rsnxe_override(wpa_s->wpa, p, len);
 
+		if (!sec_prof_found &&
+		    p[0] == WLAN_EID_EXTENSION && p[1] >= 1 &&
+		    p[2] == WLAN_EID_EXT_SECURITY_PROFILE) {
+			sec_prof_found = true;
+			wpa_sm_set_ap_security_profile(wpa_s->wpa, p, len);
+		}
+
 		l -= len;
 		p += len;
 	}
@@ -4221,6 +4230,8 @@ no_pfs:
 		wpa_sm_set_ap_rsne_override_2(wpa_s->wpa, NULL, 0);
 		wpa_sm_set_ap_rsnxe_override(wpa_s->wpa, NULL, 0);
 	}
+	if (!sec_prof_found && data->assoc_info.beacon_ies)
+		wpa_sm_set_ap_security_profile(wpa_s->wpa, NULL, 0);
 	if (wpa_found || rsn_found)
 		wpa_s->ap_ies_from_associnfo = 1;
 
@@ -4320,6 +4331,7 @@ static int wpa_supplicant_assoc_update_ie(struct wpa_supplicant *wpa_s)
 {
 	const u8 *bss_wpa = NULL, *bss_rsn = NULL, *bss_rsnx = NULL;
 	const u8 *rsnoe, *rsno2e, *rsnxoe;
+	const u8 *sec_prof;
 
 	if (!wpa_s->current_bss || !wpa_s->current_ssid)
 		return -1;
@@ -4337,6 +4349,8 @@ static int wpa_supplicant_assoc_update_ie(struct wpa_supplicant *wpa_s)
 				       RSNE_OVERRIDE_2_IE_VENDOR_TYPE);
 	rsnxoe = wpa_bss_get_vendor_ie(wpa_s->current_bss,
 				       RSNXE_OVERRIDE_IE_VENDOR_TYPE);
+	sec_prof = wpa_bss_get_ie_ext(wpa_s->current_bss,
+				      WLAN_EID_EXT_SECURITY_PROFILE);
 
 	if (wpa_sm_set_ap_wpa_ie(wpa_s->wpa, bss_wpa,
 				 bss_wpa ? 2 + bss_wpa[1] : 0) ||
@@ -4349,7 +4363,9 @@ static int wpa_supplicant_assoc_update_ie(struct wpa_supplicant *wpa_s)
 	    wpa_sm_set_ap_rsne_override_2(wpa_s->wpa, rsno2e,
 					  rsno2e ? 2 + rsno2e[1] : 0) ||
 	    wpa_sm_set_ap_rsnxe_override(wpa_s->wpa, rsnxoe,
-					 rsnxoe ? 2 + rsnxoe[1] : 0))
+					 rsnxoe ? 2 + rsnxoe[1] : 0) ||
+	    wpa_sm_set_ap_security_profile(wpa_s->wpa, sec_prof,
+					   sec_prof ? 2 + sec_prof[1] : 0))
 		return -1;
 
 	return 0;
