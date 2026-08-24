@@ -4184,6 +4184,15 @@ int wpa_parse_kde_ies(const u8 *buf, size_t len, struct wpa_eapol_ie_parse *ie)
 			   pos[2] == WLAN_EID_EXT_EHT_CAPABILITIES) {
 			ie->eht_capabilities = pos + 3;
 			ie->eht_capab_len = pos[1] - 1;
+		} else if (*pos == WLAN_EID_EXTENSION &&
+			   pos[1] >= 3 &&
+			   pos[2] == WLAN_EID_EXT_SECURITY_PROFILE) {
+			ie->security_profile = pos;
+			ie->security_profile_len = dlen;
+			wpa_hexdump(MSG_DEBUG,
+				    "WPA: Security Profile element in EAPOL-Key",
+				    ie->security_profile,
+				    ie->security_profile_len);
 		} else if (*pos == WLAN_EID_QOS && pos[1] >= 1) {
 			ie->qosinfo = pos[2];
 		} else if (*pos == WLAN_EID_SUPPORTED_CHANNELS) {

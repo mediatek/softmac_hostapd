@@ -752,6 +752,8 @@ struct wpa_eapol_ie_parse {
 	size_t nan_nik_len;
 	const u8 *nan_key_lifetime;
 	size_t nan_key_lifetime_len;
+	const u8 *security_profile;
+	size_t security_profile_len;
 	u16 valid_mlo_gtks; /* bitmap of valid link GTK KDEs */
 	const u8 *mlo_gtk[MAX_NUM_MLD_LINKS];
 	size_t mlo_gtk_len[MAX_NUM_MLD_LINKS];
