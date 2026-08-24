@@ -2404,6 +2404,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 			bss, WLAN_EID_EXT_SECURITY_PROFILE);
 		u8 bitmap_len;
 		const u8 *bitmap;
+		bool eap_over_auth = false;
 
 		if (!sp ||sp[1] < 3)
 			goto no_valid_sp;
@@ -2426,22 +2427,55 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		if (sp[1] < 3 + bitmap_len)
 			goto no_valid_sp;
 
+		/*
+		 * Compute eap_over_auth to disambiguate 802.1X _AUTH profiles
+		 * (EAP over Authentication frames, profiles 3-7) from non-_AUTH
+		 * profiles (EAPOL frames, profiles 11-15). Both groups share
+		 * the same AKM, so this flag is the only distinguishing
+		 * parameter available without a new driver attribute. The
+		 * condition mirrors sme_check_802_1x_pmksa_caching() which sets
+		 * auth_1x->derive_ptk using the same three checks.
+		 *
+		 * For EPPKE sub-profiles (0-2), eap_over_auth is irrelevant:
+		 * the akmp field already carries the pre-authentication AKM.
+		 * Per IEEE P802.11bn/D2.0, Table 9-bb18, profiles 1 and 2 use
+		 * the SAE_EXT_KEY (hash-to-element) AKM variants specifically,
+		 * not the legacy SAE/FT-SAE AKMs (WPA_KEY_MGMT_EPPKE for
+		 * profile 0, WPA_KEY_MGMT_SAE_EXT_KEY for profile 1,
+		 * WPA_KEY_MGMT_FT_SAE_EXT_KEY for profile 2), so
+		 * security_profile_akm_matches() resolves the ambiguity without
+		 * any extra parameter.
+		 */
+		if (ssid && ssid->eap_over_auth_frame) {
+			const u8 *bss_rsnxe =
+				wpa_bss_get_ie(bss, WLAN_EID_RSNX);
+
+			eap_over_auth =
+				ieee802_11_rsnx_capab(
+					bss_rsnxe,
+					WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) &&
+				(wpa_s->drv_flags2 &
+				 WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION);
+		}
+
 		wpa_s->sel_security_profile =
 			security_profile_select_num(
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
-				false, bitmap, bitmap_len);
+				eap_over_auth, bitmap, bitmap_len);
 
 		if (wpa_s->sel_security_profile >= 0) {
 			wpa_dbg(wpa_s, MSG_DEBUG,
-				"Security Profile: selected profile %d (key_mgmt=0x%x)",
-				wpa_s->sel_security_profile, wpa_s->key_mgmt);
+				"Security Profile: selected profile %d (key_mgmt=0x%x eap_over_auth=%d)",
+				wpa_s->sel_security_profile, wpa_s->key_mgmt,
+				eap_over_auth);
 			wpa_sm_set_param(wpa_s->wpa,
 					 WPA_PARAM_SECURITY_PROFILE_ACTIVE,
 					 true);
 		} else {
 			wpa_dbg(wpa_s, MSG_DEBUG,
-				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x)",
-				wpa_s->key_mgmt, wpa_s->pairwise_cipher);
+				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x eap_over_auth=%d)",
+				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
+				eap_over_auth);
 		}
 	no_valid_sp:
 	}
