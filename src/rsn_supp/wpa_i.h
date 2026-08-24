@@ -121,6 +121,17 @@ struct wpa_sm {
 	unsigned int pmksa_privacy:1;
 	unsigned int eap_over_auth_frame:1;
 
+	/*
+	 * Security Profile element state (IEEE P802.11bn/D2.0, 9.4.2.369,
+	 * 37.33).
+	 *
+	 * security_profile_active: mirrors wpas_security_profile_active().
+	 * Set to 1 for wpa_supplicant-SME always, or for driver-SME only
+	 * when the driver indicates support for it. When 0, all Security
+	 * Profile element parsing and validation is skipped in wpa.c.
+	 */
+	unsigned int security_profile_active:1;
+
 	u8 *assoc_wpa_ie; /* Own WPA/RSN IE from (Re)AssocReq */
 	size_t assoc_wpa_ie_len;
 	u8 *assoc_rsnxe; /* Own RSNXE from (Re)AssocReq */
@@ -130,6 +141,15 @@ struct wpa_sm {
 	u8 *ap_rsne_override, *ap_rsne_override_2, *ap_rsnxe_override;
 	size_t ap_rsne_override_len, ap_rsne_override_2_len,
 		ap_rsnxe_override_len;
+
+	/*
+	 * ap_security_profile / ap_security_profile_len: copy of the
+	 * Security Profile element from the AP's Beacon/Probe Response frame
+	 * stored for EAPOL-Key msg 3/4 or encrypted (Re)Association Response
+	 * frame comparison.
+	 */
+	u8 *ap_security_profile;
+	size_t ap_security_profile_len;
 
 #ifdef CONFIG_TDLS
 	struct wpa_tdls_peer *tdls;
