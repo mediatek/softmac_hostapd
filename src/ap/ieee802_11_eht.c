@@ -573,6 +573,14 @@ u8 * hostapd_eid_eht_basic_ml_common(struct hostapd_data *hapd,
 
 		total_len = sta_info_len + link->resp_sta_profile_len;
 
+		if (wpabuf_tailroom(buf) < 100 + total_len &&
+		    wpabuf_resize(&buf, 100 + total_len) < 0) {
+			wpa_printf(MSG_ERROR,
+				   "MLD: Could not allocate buffer for constructing MLE");
+			wpabuf_free(buf);
+			return eid;
+		}
+
 		/* Per-STA Profile subelement */
 		wpabuf_put_u8(buf, MULTI_LINK_SUB_ELEM_ID_PER_STA_PROFILE);
 
