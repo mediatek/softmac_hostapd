@@ -1404,8 +1404,35 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 				params.auth_alg = WPA_AUTH_ALG_SAE;
 			}
 		} else {
-			wpa_dbg(wpa_s, MSG_DEBUG,
-				"SAE enabled, but target BSS does not advertise SAE AKM for RSN");
+			/*
+			 * Security Profile element preference
+			 * (IEEE P802.11bn/D2.0, 37.33): If the AP's Security
+			 * Profile element implies SAE-EXT-KEY (profiles 1, 2,
+			 * 9, 10), use SAE even when the RSNE only lists
+			 * WPA-PSK or another non-SAE AKM. The security profile
+			 * override in BSS selection already augmented
+			 * ie.key_mgmt, but authentication algorithm selection
+			 * is a separate decision here.
+			 */
+			if (wpas_security_profile_active(wpa_s)) {
+				const u8 *sp = wpa_bss_get_ie_ext(
+					bss, WLAN_EID_EXT_SECURITY_PROFILE);
+				int sp_km = security_profile_get_key_mgmt(
+					sp, ssid->key_mgmt);
+
+				if (sp_km && wpa_key_mgmt_sae(sp_km) &&
+				    !wpas_is_sae_avoided(wpa_s, ssid, &ied)) {
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"Using SAE auth_alg via Security Profile element override");
+					params.auth_alg = WPA_AUTH_ALG_SAE;
+				} else {
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"SAE enabled, but target BSS does not advertise SAE AKM for RSN");
+				}
+			} else {
+				wpa_dbg(wpa_s, MSG_DEBUG,
+					"SAE enabled, but target BSS does not advertise SAE AKM for RSN");
+			}
 		}
 	}
 #endif /* CONFIG_SAE */
