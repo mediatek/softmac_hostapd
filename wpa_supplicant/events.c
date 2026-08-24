@@ -12,6 +12,7 @@
 #include "utils/crc32.h"
 #include "eapol_supp/eapol_supp_sm.h"
 #include "rsn_supp/wpa.h"
+#include "rsn_supp/wpa_ie.h"
 #include "eloop.h"
 #include "config.h"
 #include "l2_packet/l2_packet.h"
@@ -785,6 +786,7 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 	struct wpa_ie_data ie;
 	int proto_match = 0;
 	const u8 *rsn_ie, *wpa_ie;
+	const u8 *sp = NULL; /* AP's Security Profile element */
 	int ret;
 #ifdef CONFIG_WEP
 	int wep_ok;
@@ -810,6 +812,15 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 				"   skip - 6 GHz BSS without RSNE");
 		return 0;
 	}
+
+	/*
+	 * Security Profile element preference (IEEE P802.11bn/D2.0, 37.33):
+	 * Fetch the AP's Security Profile element early so we can use it
+	 * to override the RSNE checks below when the AP advertises a security
+	 * profile that matches the STA's configured AKM/cipher.
+	 */
+	if (wpas_security_profile_active(wpa_s))
+		sp = wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE);
 
 	while ((ssid->proto & WPA_PROTO_RSN) && rsn_ie) {
 		proto_match++;
@@ -851,6 +862,41 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 				wpa_dbg(wpa_s, MSG_DEBUG,
 					"   skip RSN IE - proto mismatch");
 			break;
+		}
+
+		/*
+		 * Security Profile element preference (IEEE P802.11bn/D2.0,
+		 * 37.33):
+		 * If the AP advertises a Security Profile element whose profile
+		 * number implies an AKM/cipher that matches the STA's config,
+		 * augment ie.pairwise_cipher, ie.key_mgmt, and ie.capabilities
+		 * so the checks below pass even when the RSNE/RSNOE/RSNO2E
+		 * does not explicitly list those values.
+		 */
+		if (sp) {
+			int sp_key_mgmt = security_profile_get_key_mgmt(
+				sp, ssid->key_mgmt);
+
+			if (!sp_key_mgmt ||
+			    !(ssid->pairwise_cipher & WPA_CIPHER_GCMP_256))
+				goto no_matching_sp;
+
+			if (!(ie.pairwise_cipher & WPA_CIPHER_GCMP_256)) {
+				if (debug_print)
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"   Security Profile element overrides RSNE pairwise cipher");
+				ie.pairwise_cipher |= WPA_CIPHER_GCMP_256;
+			}
+			if (!(ie.key_mgmt & ssid->key_mgmt)) {
+				if (debug_print)
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"   Security Profile element overrides RSNE key_mgmt");
+				ie.key_mgmt |= sp_key_mgmt;
+			}
+			/* All defined profiles mandate MFPC=1/MFPR=1 */
+			ie.capabilities |= WPA_CAPABILITY_MFPC |
+				WPA_CAPABILITY_MFPR;
+		no_matching_sp:
 		}
 
 		if (!(ie.pairwise_cipher & ssid->pairwise_cipher)) {
@@ -1432,6 +1478,25 @@ static bool wpa_scan_res_ok(struct wpa_supplicant *wpa_s, struct wpa_ssid *ssid,
 		rsnxe_capa = ie[4 + 2];
 	else if (ie && ie[1] >= 1)
 		rsnxe_capa = ie[2];
+
+	/*
+	 * Security Profile element preference (IEEE P802.11bn/D2.0, 37.33):
+	 * The Extended RSN Capabilities in the Security Profile element
+	 * take precedence over the RSNXE/RSNXOE. If the AP advertises a
+	 * Security Profile element, merge its RSNX capabilities related to SAE
+	 * into rsnxe_capa so that SAE H2E and SAE-PK checks below use the
+	 * security profile values.
+	 */
+	if (wpas_security_profile_active(wpa_s)) {
+		const u8 *sp_rsnx;
+		size_t sp_rsnx_len;
+		const u8 *sp = wpa_bss_get_ie_ext(
+			bss, WLAN_EID_EXT_SECURITY_PROFILE);
+
+		sp_rsnx = security_profile_get_rsnx(sp, &sp_rsnx_len);
+		if (sp_rsnx && sp_rsnx_len >= 1)
+			rsnxe_capa |= sp_rsnx[0] & 0xF0;
+	}
 #endif /* CONFIG_SAE */
 
 	check_ssid = wpa || ssid->ssid_len > 0;
