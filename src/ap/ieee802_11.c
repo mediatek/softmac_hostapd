@@ -6745,8 +6745,11 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 		buflen += 3 + sizeof(struct ieee80211_eht_operation);
 		if (hapd->iconf->punct_bitmap)
 			buflen += EHT_OPER_DISABLED_SUBCHAN_BITMAP_SIZE;
-		if (ap_sta_is_mld(hapd, sta))
+		if (ap_sta_is_mld(hapd, sta)) {
 			buflen += hostapd_eid_eht_ml_tid_to_link_map_len(hapd);
+			buflen += hostapd_eid_eht_basic_ml_len(hapd, sta,
+							       false, true);
+		}
 	}
 #endif /* CONFIG_IEEE80211BE */
 #ifdef CONFIG_IEEE80211BN
