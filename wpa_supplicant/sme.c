@@ -611,12 +611,114 @@ fail:
 }
 
 
+static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
+					     bool external)
+{
+	int key_mgmt = sme_get_key_mgmt(wpa_s, external);
+	const u8 *sp_ap;
+	struct wpa_bss *sp_bss;
+	u8 bitmap_len;
+	const u8 *bitmap;
+	int profile_num, ret;
+
+	/*
+	 * Security Profile element is included only when the RSNE is present in
+	 * the Authentication frame. For 802.1X, the RSNE is present only in the
+	 * derive_ptk path (via the PTK sub-frame built by
+	 * sme_build_802_1x_for_ptk()). Per IEEE P802.11bn/D2.0, 37.33, do not
+	 * include the Security Profile element when derive_ptk=false (no RSNE
+	 * in the frame).
+	 *
+	 * SME-in-wpa_supplicant path: The Security Profile element was
+	 * pre-built by wpa_supplicant_set_suites() from the negotiated AKM and
+	 * cipher and stored in wpa_s->security_profile.
+	 *
+	 * External auth path: wpa_supplicant_set_suites() is not called, so
+	 * selected_security_profile_num is -1. Derive the profile number from
+	 * the driver-provided parameters (key_mgmt, ext_pairwise_cipher) by
+	 * scanning the AP's Security Profile Bitmap,
+	 * using security_profile_select_num() with eap_over_auth=true
+	 * (derive_ptk is already confirmed true at this point).
+	 *
+	 * Conditions to include the Security Profile element:
+	 *   1. Security profile support is active
+	 *   2. AP is advertising the Security Profile element
+	 *   3. A matching profile number is available (pre-built or derived)
+	 */
+	if (!wpa_s->auth_1x->derive_ptk ||
+	    !wpas_security_profile_active(wpa_s))
+		return 0;
+
+	sp_bss = external ?
+		wpa_bss_get_bssid_latest(wpa_s, wpa_s->sme.ext_auth_bssid) :
+		wpa_s->current_bss;
+
+	sp_ap = sp_bss ?
+		wpa_bss_get_ie_ext(sp_bss, WLAN_EID_EXT_SECURITY_PROFILE) :
+		NULL;
+
+	if (sp_ap &&
+	    wpa_s->sel_security_profile >= 0 &&
+	    wpa_s->security_profile_len > 0) {
+		/* SME-in-wpa_supplicant: use pre-built Security Profile
+		 * element */
+		return wpa_s->security_profile_len;
+	}
+
+	if (!external || !sp_ap || sp_ap[1] < 3)
+		return 0;
+
+	/*
+	 * External auth path: build Security Profile element from
+	 * driver-provided AKM and pairwise cipher. eap_over_auth=true because
+	 * derive_ptk is confirmed.
+	 */
+	bitmap_len = sp_ap[4] & 0x0F;
+	if (sp_ap[1] < 3 + bitmap_len)
+		return 0;
+
+	bitmap = sp_ap + 5;
+
+	profile_num = security_profile_select_num(
+		key_mgmt, wpa_s->sme.ext_pairwise_cipher, true,
+		bitmap, bitmap_len);
+
+	if (profile_num < 0)
+		return 0;
+
+	/*
+	 * Build the Security Profile element from the actual driver-negotiated
+	 * RSN Capabilities (wpa_s->sme.ext_rsn_capab) and the RSNXE
+	 * (wpa_s->sme.ext_rsnxe), not from wpa_s->wpa state, since wpa_sm_*
+	 * fields are not populated/updated for external auth. This guarantees
+	 * the element's Reduced/Extended RSN Capabilities fields match exactly
+	 * what is placed in the RSNE/RSNXE actually sent in
+	 * sme_build_802_1x_for_ptk() via wpa_external_auth_add_rsne() and the
+	 * copied ext_rsnxe buffer (IEEE P802.11bn/D2.0, 9.4.2.369).
+	 */
+	ret = security_profile_build(
+		wpa_s->sme.ext_rsn_capab,
+		wpa_s->sme.ext_rsnxe_len > 0 ? wpa_s->sme.ext_rsnxe : NULL,
+		wpa_s->sme.ext_rsnxe_len, profile_num,
+		wpa_s->security_profile, sizeof(wpa_s->security_profile));
+	if (ret <= 0)
+		return 0;
+
+	wpa_s->security_profile_len = ret;
+	wpa_s->sel_security_profile = profile_num;
+	wpa_printf(MSG_DEBUG,
+		   "IEEE 802.1X: External auth: Security Profile element built (profile=%d)",
+		   profile_num);
+	return wpa_s->security_profile_len;
+}
+
+
 static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 						   struct wpa_ssid *ssid,
 						   bool external)
 {
 	struct wpabuf *buf, *eapol_pdu;
-	size_t buf_len;
+	size_t buf_len, sp_len;
 	u32 suite = 0;
 	struct wpabuf *buf_for_ptk = NULL;
 	int key_mgmt = sme_get_key_mgmt(wpa_s, external);
@@ -634,6 +736,8 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 	if (!eapol_pdu)
 		return NULL;
 
+	sp_len = sme_802_1x_auth_start_sec_prof(wpa_s, external);
+
 	buf_len = 2 + 2 + 2 + wpabuf_len(eapol_pdu);
 
 	if (wpa_s->auth_1x->derive_ptk) {
@@ -646,6 +750,8 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 	} else {
 		buf_len += 7; /* AKM Suite Selector element */
 	}
+
+	buf_len += sp_len;
 
 	buf = wpabuf_alloc(buf_len);
 	if (!buf) {
@@ -667,6 +773,13 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 		wpabuf_put_u8(buf, 1 + 4);
 		wpabuf_put_u8(buf, WLAN_EID_EXT_AKM_SUITE_SELECTOR);
 		wpabuf_put_be32(buf, suite);
+	}
+
+	if (sp_len > 0) {
+		wpabuf_put_data(buf, wpa_s->security_profile, sp_len);
+		wpa_printf(MSG_DEBUG,
+			   "IEEE 802.1X: Including Security Profile element in auth start frame (profile=%d)",
+			   wpa_s->sel_security_profile);
 	}
 
 	wpabuf_free(eapol_pdu);
