@@ -762,9 +762,35 @@ static struct wpa_bss * wpas_pasn_allowed(struct wpa_supplicant *wpa_s,
 
 	if (!(rsne_data.key_mgmt & akmp) ||
 	    !(rsne_data.pairwise_cipher & cipher)) {
+		bool sp_match = false;
+
+		/*
+		 * The AP's RSNE may omit GCMP-256 or the requested AKM while
+		 * still supporting it via a Security Profile element (IEEE
+		 * P802.11bn/D2.0, 37.33). wpa_supplicant_set_suites() allows
+		 * GCMP-256 in this case for the normal association path; apply
+		 * the same allowance here so PASN does not reject an
+		 * AKMP/cipher combination that the rest of the connection flow
+		 * would accept.
+		 */
+		if (wpas_security_profile_active(wpa_s) &&
+		    cipher == WPA_CIPHER_GCMP_256) {
+			const u8 *sp = wpa_bss_get_ie_ext(
+				bss, WLAN_EID_EXT_SECURITY_PROFILE);
+
+			if (security_profile_get_key_mgmt(sp, akmp))
+				sp_match = true;
+		}
+
+		if (!sp_match) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: AP does not support requested AKMP or cipher");
+			return NULL;
+		}
+
 		wpa_printf(MSG_DEBUG,
-			   "PASN: AP does not support requested AKMP or cipher");
-		return NULL;
+			   "PASN: AP advertises matching Security Profile for AKMP 0x%x - allowing GCMP-256 despite RSNE",
+			   akmp);
 	}
 
 #ifdef CONFIG_ENC_ASSOC
