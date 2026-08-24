@@ -1455,6 +1455,15 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 			   wpas_eppke_ap_capable(wpa_s, bss, true)) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Using EPPKE auth_alg");
 			params.auth_alg = WPA_AUTH_ALG_EPPKE;
+		} else if (wpas_security_profile_active(wpa_s) &&
+			   (security_profile_get_key_mgmt(
+				   wpa_bss_get_ie_ext(
+					   bss,
+					   WLAN_EID_EXT_SECURITY_PROFILE),
+				   ssid->key_mgmt) & WPA_KEY_MGMT_EPPKE) &&
+			   wpas_eppke_ap_capable(wpa_s, bss, true)) {
+			wpa_dbg(wpa_s, MSG_DEBUG, "Using EPPKE auth_alg via security profile");
+			params.auth_alg = WPA_AUTH_ALG_EPPKE;
 		} else {
 			wpa_dbg(wpa_s, MSG_DEBUG,
 				"EPPKE: Target BSS does not advertise EPPKE AKM");
