@@ -88,6 +88,9 @@ struct pasn_data {
 	const u8 *extra_ies;
 	size_t extra_ies_len;
 
+	/* Security Profile element to include in PASN Auth frame 1 only. */
+	struct wpabuf *security_profile;
+
 	/* External modules do not access below variables */
 	bool derive_kek;
 	size_t kek_len;
@@ -335,6 +338,8 @@ void pasn_set_rsnxe_ie(struct pasn_data *pasn, const u8 *rsnxe_ie);
 void pasn_set_custom_pmkid(struct pasn_data *pasn, const u8 *pmkid);
 int pasn_set_extra_ies(struct pasn_data *pasn, const u8 *extra_ies,
 		       size_t extra_ies_len);
+int pasn_set_security_profile(struct pasn_data *pasn, const u8 *sp,
+			      size_t sp_len);
 void pasn_set_mfp(struct pasn_data *pasn, enum mfp_options mfp);
 
 struct rsn_pmksa_cache * pasn_responder_pmksa_cache_init(void);
