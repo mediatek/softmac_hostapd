@@ -490,7 +490,8 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		    const u8 *mdie, size_t mdie_len,
 		    const u8 *owe_dh, size_t owe_dh_len,
 		    struct wpa_state_machine *assoc_sm,
-		    bool is_ml);
+		    bool is_ml,
+		    const struct security_profile_entry_ap *security_profile);
 int wpa_validate_osen(struct wpa_authenticator *wpa_auth,
 		      struct wpa_state_machine *sm,
 		      const u8 *osen_ie, size_t osen_ie_len);
