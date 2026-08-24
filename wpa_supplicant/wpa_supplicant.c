@@ -36,6 +36,7 @@
 #include "common/version.h"
 #include "rsn_supp/preauth.h"
 #include "rsn_supp/pmksa_cache.h"
+#include "rsn_supp/wpa_ie.h"
 #include "common/wpa_ctrl.h"
 #include "common/ieee802_11_common.h"
 #include "common/ieee802_11_defs.h"
@@ -429,6 +430,8 @@ void wpa_supplicant_set_non_wpa_policy(struct wpa_supplicant *wpa_s,
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
+	wpa_s->sel_security_profile = -1;
+	wpa_s->security_profile_len = 0;
 	wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
 	wpa_s->group_cipher = WPA_CIPHER_NONE;
 	wpa_s->mgmt_group_cipher = 0;
@@ -2374,6 +2377,75 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 			 ssid->pmksa_privacy);
 #endif /* CONFIG_PMKSA_PRIVACY */
 
+	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SECURITY_PROFILE_ACTIVE, false);
+
+	/*
+	 * Security Profile element - profile selection (IEEE P802.11bn/D2.0,
+	 * 37.33, Table 9-bb18).
+	 *
+	 * When the AP advertises the Security Profile element, the STA selects
+	 * a single profile number whose AKM and pairwise cipher match the
+	 * already-negotiated wpa_s->key_mgmt and wpa_s->pairwise_cipher, and
+	 * whose bit is set in the AP's Security Profile Bitmap.
+	 *
+	 * For SME in wpa_supplicant (WPA_DRIVER_FLAGS_SME): always run
+	 * selection.
+	 * For SME in driver: only run when the driver indicates Security
+	 *  Profile element support via WPA_DRIVER_FLAGS2_SECURITY_PROFILE.
+	 *  Without this flag, leave sel_security_profile = -1 so no element is
+	 * built or sent.
+	 *
+	 * sel_security_profile is set here (or left at -1 if no matching
+	 * profile is found or the AP does not advertise the element).
+	 */
+	wpa_s->sel_security_profile = -1;
+	if (bss && wpas_security_profile_active(wpa_s)) {
+		const u8 *sp = wpa_bss_get_ie_ext(
+			bss, WLAN_EID_EXT_SECURITY_PROFILE);
+		u8 bitmap_len;
+		const u8 *bitmap;
+
+		if (!sp ||sp[1] < 3)
+			goto no_valid_sp;
+
+		/*
+		 * Element layout (from wpa_bss_get_ie_ext(), which returns
+		 * the full element starting at EID byte):
+		 *   [0] = 255 (EID_EXTENSION)
+		 *   [1] = Length
+		 *   [2] = 162 (EID_EXT_SECURITY_PROFILE)
+		 *   [3] = Reduced RSN Capabilities
+		 *   [4] = Security Profile Indication
+		 *         B0-B3 = Number Of Octets Of Bitmap
+		 *         B4-B7 = Number Of Vendor Profiles
+		 *   [5..] = Security Profile Bitmap
+		 */
+		bitmap_len = sp[4] & 0x0F;
+		bitmap = sp + 5;
+
+		if (sp[1] < 3 + bitmap_len)
+			goto no_valid_sp;
+
+		wpa_s->sel_security_profile =
+			security_profile_select_num(
+				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
+				false, bitmap, bitmap_len);
+
+		if (wpa_s->sel_security_profile >= 0) {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"Security Profile: selected profile %d (key_mgmt=0x%x)",
+				wpa_s->sel_security_profile, wpa_s->key_mgmt);
+			wpa_sm_set_param(wpa_s->wpa,
+					 WPA_PARAM_SECURITY_PROFILE_ACTIVE,
+					 true);
+		} else {
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x)",
+				wpa_s->key_mgmt, wpa_s->pairwise_cipher);
+		}
+	no_valid_sp:
+	}
+
 	if (!skip_default_rsne) {
 		if (wpa_sm_set_assoc_wpa_ie_default(wpa_s->wpa, wpa_ie,
 						    wpa_ie_len)) {
@@ -2391,6 +2463,42 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 			return -1;
 		}
 #endif /* CONFIG_NO_WPA */
+	}
+
+	/*
+	 * Security Profile element (IEEE P802.11bn/D2.0, 9.4.2.369, 37.33).
+	 *
+	 * Build the element after the RSNE and RSNXE are finalised so that all
+	 * wpa_sm parameters (mfp, ocv, ext_key_id, assoc_encryption, etc.)
+	 * are fully committed before we read them via rsn_supp_capab(sm) and
+	 * wpa_sm_get_rsnxe_capab(sm). This guarantees that the Security Profile
+	 * element's Reduced RSN Capabilities and Extended RSN Capabilities
+	 * fields are identical to the values in the RSNE and RSNXE
+	 * respectively.
+	 *
+	 * The element is stored in wpa_s->security_profile and appended to
+	 * Authentication and (Re)Association Request frames by
+	 * sme_send_authentication() and sme_associate().
+	 */
+	wpa_s->security_profile_len = 0;
+	if (wpa_s->sel_security_profile >= 0) {
+		int ret;
+
+		ret = security_profile_build_sta(
+			wpa_s->wpa, wpa_s->sel_security_profile,
+			wpa_s->security_profile,
+			sizeof(wpa_s->security_profile));
+		if (ret > 0) {
+			wpa_s->security_profile_len = ret;
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"Security Profile element built: profile=%d len=%d",
+				wpa_s->sel_security_profile, ret);
+		} else {
+			wpa_msg(wpa_s, MSG_WARNING,
+				"Security Profile: failed to build element (profile=%d)",
+				wpa_s->sel_security_profile);
+			return -1;
+		}
 	}
 
 	if (0) {
@@ -4425,6 +4533,23 @@ pfs_fail:
 		wpa_ie_len += wpa_s->rsnxe_len;
 	}
 
+	/* Security Profile element - driver-SME path */
+	if (wpa_s->security_profile_len > 0 &&
+	    wpas_security_profile_active(wpa_s) &&
+	    wpa_s->security_profile_len <= max_wpa_ie_len - wpa_ie_len) {
+		os_memcpy(wpa_ie + wpa_ie_len,
+			  wpa_s->security_profile,
+			  wpa_s->security_profile_len);
+		wpa_ie_len += wpa_s->security_profile_len;
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Security Profile element appended to connect elements (profile=%d)",
+			wpa_s->sel_security_profile);
+	} else if (wpa_s->security_profile_len > 0 &&
+		   !wpas_security_profile_active(wpa_s)) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Security Profile: driver does not support element - omitting from connect elements");
+	}
+
 #ifndef CONFIG_NO_ROBUST_AV
 #ifdef CONFIG_TESTING_OPTIONS
 	if (wpa_s->disable_mscs_support)
@@ -4794,6 +4919,8 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
+	wpa_s->sel_security_profile = -1;
+	wpa_s->security_profile_len = 0;
 #ifndef CONFIG_NO_ROBUST_AV
 	wpa_s->mscs_setup_done = false;
 #endif /* CONFIG_NO_ROBUST_AV */

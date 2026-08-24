@@ -912,6 +912,25 @@ struct wpa_supplicant {
 	u8 rsnxe[257];
 	size_t rsnxe_len;
 
+	/*
+	 * Security Profile element information
+	 *
+	 * sel_security_profile: Profile number chosen from the
+	 *   intersection of the AP's Security Profile Bitmap and the STA's
+	 *   supported profiles. -1 means no profile selected (feature
+	 *   inactive).
+	 *
+	 * security_profile / security_profile_len: Pre-built Security
+	 *   Profile element for the selected profile, built once in
+	 *   wpa_supplicant_set_suites() after the RSNE and RSNXE are
+	 *   finalised. Appended to Authentication and (Re)Association Request
+	 *   frames by sme_send_authentication() and sme_associate(),
+	 *   respectively.
+	 */
+	int sel_security_profile;
+	u8 security_profile[32];
+	size_t security_profile_len;
+
 	struct scard_data *scard;
 	char imsi[20];
 	int mnc_len;

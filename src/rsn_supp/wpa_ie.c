@@ -486,6 +486,106 @@ bool security_profile_akm_matches(int profile_num, int key_mgmt)
 }
 
 
+/*
+ * security_profile_select_num - Map parameters to a unique profile number
+ * @akmp: Negotiated AKM (WPA_KEY_MGMT_*)
+ * @pairwise_cipher: Negotiated pairwise cipher (WPA_CIPHER_*)
+ * @eap_over_auth: true when EAP is carried over Authentication frames
+ *                 (i.e., derive_ptk / eap_over_auth_frame is active).
+ *                 Used to disambiguate 802.1X _AUTH profiles (3-7) from the
+ *                 corresponding non-_AUTH profiles (11-15) that share the
+ *                 same AKM.  Must be false for non-802.1X AKMs.
+ * @bitmap: AP's Security Profile Bitmap (from the Security Profile element)
+ * @bitmap_len: Length of @bitmap in bytes
+ * Returns: Selected profile number (0-119) on success, -1 if no match found.
+ *
+ * This is the authoritative function for profile selection. It resolves all
+ * ambiguities that arise when multiple profiles share the same AKM:
+ *
+ *   EPPKE profiles (0, 1, 2):
+ *     Disambiguated by @akmp itself - the driver already carries the
+ *     pre-authentication AKM in the akmp field. Per IEEE P802.11bn/D2.0,
+ *     Table 9-bb18, the AKMP for profiles 1 and 2 refers specifically
+ *     to the EXT_KEY (hash-to-element) AKM variants, not the legacy ones:
+ *       WPA_KEY_MGMT_EPPKE          -> Profile 0 (EPPKE_NO_AUTH)
+ *       WPA_KEY_MGMT_SAE_EXT_KEY    -> Profile 1 (EPPKE_SAE)
+ *       WPA_KEY_MGMT_FT_SAE_EXT_KEY -> Profile 2 (EPPKE_FT_SAE)
+ *
+ *   802.1X _AUTH vs non-_AUTH profiles (3-7 vs 11-15):
+ *     Disambiguated by @eap_over_auth:
+ *       true  -> _AUTH profiles (EAP over Authentication frames)
+ *       false -> non-_AUTH profiles (EAP in EAPOL frames)
+ *     Callers derive this flag from negotiated parameters and local
+ *     capabilities.
+ */
+int security_profile_select_num(int akmp, int pairwise_cipher,
+				bool eap_over_auth,
+				const u8 *bitmap, size_t bitmap_len)
+{
+	unsigned int profile;
+
+	if (!bitmap || bitmap_len == 0)
+		return -1;
+
+	/* All defined profiles (0-15) require GCMP-256 as pairwise cipher */
+	if (pairwise_cipher != WPA_CIPHER_GCMP_256)
+		return -1;
+
+	for (profile = 0;
+	     profile <= SEC_PROF_MAX && profile < bitmap_len * 8;
+	     profile++) {
+		u8 byte = bitmap[profile / 8];
+
+		/* Skip profiles not advertised by the AP */
+		if (!(byte & BIT(profile % 8)))
+			continue;
+
+		/* Check AKM match using the per-profile mapping */
+		if (!security_profile_akm_matches(profile, akmp))
+			continue;
+
+		/*
+		 * Disambiguate 802.1X _AUTH profiles (EAP over Authentication
+		 * frames) from non-_AUTH profiles (EAP in EAPOL frames). Both
+		 * groups share the same AKM, so eap_over_auth is the only
+		 * distinguishing parameter available.
+		 *
+		 * _AUTH profiles  (3-7): require eap_over_auth == true
+		 * non-_AUTH profiles (11-15): require eap_over_auth == false
+		 */
+		switch (profile) {
+		case SEC_PROF_8021X_AUTH:
+		case SEC_PROF_8021X_FT_AUTH:
+		case SEC_PROF_8021X_SHA384_AUTH:
+		case SEC_PROF_8021X_FT384_AUTH:
+		case SEC_PROF_8021X_SUITEB_AUTH:
+			if (!eap_over_auth)
+				continue;
+			break;
+		case SEC_PROF_8021X:
+		case SEC_PROF_8021X_FT:
+		case SEC_PROF_8021X_SHA384:
+		case SEC_PROF_8021X_FT384:
+		case SEC_PROF_8021X_SUITEB:
+			if (eap_over_auth)
+				continue;
+			break;
+		default:
+			/*
+			 * EPPKE profiles (0-2), OWE (8), SAE (9), FT/SAE (10):
+			 * AKM match alone is sufficient - no further
+			 * disambiguation needed.
+			 */
+			break;
+		}
+
+		return profile;
+	}
+
+	return -1;
+}
+
+
 int wpa_gen_rsnxe(struct wpa_sm *sm, u8 *rsnxe, size_t rsnxe_len)
 {
 	u8 *pos = rsnxe;

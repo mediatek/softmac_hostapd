@@ -4565,6 +4565,28 @@ mscs_fail:
 					    wpa_s->ap_mld_addr : bssid);
 #endif /* CONFIG_IEEE8021X_AUTH */
 
+	/*
+	 * Security Profile element - association frame inclusion (IEEE
+	 * P802.11bn/D2.0, 37.33):
+	 * Include unconditionally when a profile has been selected (unlike the
+	 * Authentication frame, inclusion here does not depend on RSNE
+	 * presence). The element was pre-built in wpa_supplicant_set_suites()
+	 * from the same wpa_sm state as the RSNE and RSNXE, guaranteeing
+	 * consistency.
+	 */
+	if (wpa_s->sel_security_profile >= 0 &&
+	    wpa_s->security_profile_len > 0 &&
+	    wpa_s->security_profile_len <=
+	    sizeof(wpa_s->sme.assoc_req_ie) - wpa_s->sme.assoc_req_ie_len) {
+		os_memcpy(wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
+			  wpa_s->security_profile,
+			  wpa_s->security_profile_len);
+		wpa_s->sme.assoc_req_ie_len += wpa_s->security_profile_len;
+		wpa_printf(MSG_DEBUG,
+			   "SME: Appended Security Profile element to Association Request frame elements (profile=%d)",
+			   wpa_s->sel_security_profile);
+	}
+
 	params.bssid = bssid;
 	params.ssid = wpa_s->sme.ssid;
 	params.ssid_len = wpa_s->sme.ssid_len;
