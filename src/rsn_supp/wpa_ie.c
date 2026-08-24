@@ -413,11 +413,126 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
 }
 
 
+/**
+ * security_profile_akm_matches - Check if a profile's AKM matches key_mgmt
+ * @profile_num: Security Profile number (IEEE P802.11bn/D2.0, Table 9-bb18)
+ * @key_mgmt: Negotiated WPA_KEY_MGMT_* value
+ * Returns whether the profile's AKM matches key_mgmt
+ */
+bool security_profile_akm_matches(int profile_num, int key_mgmt)
+{
+	switch (profile_num) {
+	case SEC_PROF_EPPKE_NO_AUTH:
+		/*
+		 * Profile 0: EPPKE (29) without mutual authentication
+		 * No SAE pre-authentication; EPPKE is used standalone, so the
+		 * negotiated AKM is plain EPPKE.
+		 */
+		return !!(key_mgmt & WPA_KEY_MGMT_EPPKE);
+	case SEC_PROF_EPPKE_SAE:
+		/*
+		 * Profile 1: EPPKE (29) with SAE (24).
+		 * The AKMP "SAE (24)" refers specifically to the OUI type 24,
+		 * i.e., WPA_KEY_MGMT_SAE_EXT_KEY (hash-to-element only). SAE
+		 * provides mutual authentication before EPPKE key
+		 * derivation; the negotiated AKM carried is SAE_EXT_KEY.
+		 * Also accept the EPPKE AKM itself: callers match this profile
+		 * against a locally configured key_mgmt of plain EPPKE when
+		 * the AP advertises profile 1 without a legacy SAE-EXT-KEY
+		 * AKM.
+		 */
+		return !!(key_mgmt &
+			  (WPA_KEY_MGMT_SAE_EXT_KEY | WPA_KEY_MGMT_EPPKE));
+	case SEC_PROF_EPPKE_FT_SAE:
+		/*
+		 * Profile 2: EPPKE (29) with FT authentication over SAE (25)
+		 * Also accept the EPPKE AKM itself for the same reason as
+		 * profile 1 above.
+		 */
+		return !!(key_mgmt &
+			  (WPA_KEY_MGMT_FT_SAE_EXT_KEY | WPA_KEY_MGMT_EPPKE));
+	case SEC_PROF_8021X_AUTH:
+	case SEC_PROF_8021X:
+		/* Profiles 3/11: 802.1X (5) */
+		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SHA256;
+	case SEC_PROF_8021X_FT_AUTH:
+	case SEC_PROF_8021X_FT:
+		/* Profiles 4/12: 802.1X+FT (3) AKM (00-0F-AC:3) */
+		return key_mgmt == WPA_KEY_MGMT_FT_IEEE8021X;
+	case SEC_PROF_8021X_SHA384_AUTH:
+	case SEC_PROF_8021X_SHA384:
+		/* Profiles 5/13: 802.1X (23) AKM (00-0F-AC:23) */
+		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SHA384;
+	case SEC_PROF_8021X_FT384_AUTH:
+	case SEC_PROF_8021X_FT384:
+		/* Profiles 6/14: 802.1X+FT (22) AKM (00-0F-AC:22) */
+		return key_mgmt == WPA_KEY_MGMT_FT_IEEE8021X_SHA384;
+	case SEC_PROF_8021X_SUITEB_AUTH:
+	case SEC_PROF_8021X_SUITEB:
+		/* Profiles 7/15: 802.1X (12) AKM (00-0F-AC:12) */
+		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SUITE_B_192;
+	case SEC_PROF_OWE:
+		/* Profile 8: None (18) AKM (00-0F-AC:18) */
+		return key_mgmt == WPA_KEY_MGMT_OWE;
+	case SEC_PROF_SAE:
+		/* Profile 9: SAE (24). */
+		return key_mgmt == WPA_KEY_MGMT_SAE_EXT_KEY;
+	case SEC_PROF_FT_SAE:
+		/* Profile 10: FT authentication over SAE (25) */
+		return key_mgmt == WPA_KEY_MGMT_FT_SAE_EXT_KEY;
+	default:
+		return false;
+	}
+}
+
+
 int wpa_gen_rsnxe(struct wpa_sm *sm, u8 *rsnxe, size_t rsnxe_len)
 {
 	u8 *pos = rsnxe;
-	u64 capab = 0, tmp;
+	u64 capab, tmp;
 	size_t flen;
+
+	capab = wpa_sm_get_rsnxe_capab(sm);
+
+	if (!capab)
+		return 0; /* no supported extended RSN capabilities */
+	tmp = capab;
+	flen = 0;
+	while (tmp) {
+		flen++;
+		tmp >>= 8;
+	}
+	if (rsnxe_len < 2 + flen)
+		return -1;
+	capab |= flen - 1; /* bit 0-3 = Field length (n - 1) */
+
+	*pos++ = WLAN_EID_RSNX;
+	*pos++ = flen;
+	while (capab) {
+		*pos++ = capab & 0xff;
+		capab >>= 8;
+	}
+
+	return pos - rsnxe;
+}
+
+
+/*
+ * wpa_sm_get_rsnxe_capab - Compute Extended RSN Capabilities value from wpa_sm
+ * @sm: WPA state machine
+ * Returns the Extended RSN Capabilities value that wpa_gen_rsnxe() encodes into
+ * the Extended RSN Capabilities field of the RSNXE, without the length prefix
+ * bits (bits 0-3) being set. The caller is responsible for inserting the length
+ * prefix before encoding.
+ *
+ * This is the single source of extended RSN capabilities. Both wpa_gen_rsnxe()
+ * and security_profile_build_sta() call this function to guarantee that the
+ * RSNXE and the Security Profile element's Extended RSN Capabilities field
+ * always carry identical values.
+ */
+u64 wpa_sm_get_rsnxe_capab(struct wpa_sm *sm)
+{
+	u64 capab = 0;
 
 	if (wpa_key_mgmt_sae(sm->key_mgmt) &&
 	    (sm->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
@@ -459,24 +574,184 @@ int wpa_gen_rsnxe(struct wpa_sm *sm, u8 *rsnxe, size_t rsnxe_len)
 		capab |= BIT(WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES);
 #endif /* CONFIG_IEEE8021X_AUTH */
 
-	if (!capab)
-		return 0; /* no supported extended RSN capabilities */
-	tmp = capab;
-	flen = 0;
-	while (tmp) {
-		flen++;
-		tmp >>= 8;
-	}
-	if (rsnxe_len < 2 + flen)
+	return capab;
+}
+
+
+/**
+ * security_profile_build_sta - Build Security Profile element for STA TX
+ * @sm: WPA state machine - same instance used by wpa_gen_wpa_ie_rsn() and
+ *      wpa_gen_rsnxe(). All capability fields are derived from local state,
+ *      not from the AP's advertised Security Profile element.
+ * @selected_profile_num: Single profile number the STA has selected (0-119).
+ *      Only this profile's bit is set in the Security Profile Bitmap
+ *      (IEEE P802.11bn/D2.0, 37.33).
+ * @buf: Output buffer
+ * @buf_len: Size of output buffer
+ * Returns: Number of bytes written, or -1 on error.
+ *
+ * Thin wrapper over security_profile_build() for the SME-in-wpa_supplicant
+ * case: derives RSN Capabilities from rsn_supp_capab(sm) - the same function
+ * used by wpa_gen_wpa_ie_rsn() — and RSNXE from wpa_gen_rsnxe(sm, ...) - the
+ * same helper used to build the STA's actual RSNXE - so the Security Profile
+ * element always carries capability values identical to the STA's RSNE and
+ * RSNXE (IEEE P802.11bn/D2.0, 9.4.2.369).
+ */
+int security_profile_build_sta(struct wpa_sm *sm,
+			       int selected_profile_num,
+			       u8 *buf, size_t buf_len)
+{
+	u16 rsn_caps;
+	u8 rsnxe[257];
+	int rsnxe_len;
+
+	if (!sm)
 		return -1;
-	capab |= flen - 1; /* bit 0-3 = Field length (n - 1) */
 
-	*pos++ = WLAN_EID_RSNX;
-	*pos++ = flen;
-	while (capab) {
-		*pos++ = capab & 0xff;
-		capab >>= 8;
+	/*
+	 * Reduced RSN Capabilities (IEEE P802.11bn/D2.0, Figure 9-aa75) is
+	 * derived from rsn_supp_capab(sm) - the same function used by
+	 * wpa_gen_wpa_ie_rsn() - so this field always matches the RSN
+	 * Capabilities field in the STA's RSNE.
+	 *
+	 * Extended RSN Capabilities (IEEE P802.11bn/D2.0, Table 9-408) is
+	 * derived from the full RSNXE built by wpa_gen_rsnxe(sm, ...) - the
+	 * same helper used to build the STA's actual RSNXE - so this field
+	 * always matches the STA's RSNXE.
+	 */
+	rsn_caps = rsn_supp_capab(sm);
+
+	rsnxe_len = wpa_gen_rsnxe(sm, rsnxe, sizeof(rsnxe));
+	if (rsnxe_len < 0)
+		return -1;
+
+	return security_profile_build(rsn_caps,
+				      rsnxe_len > 0 ? rsnxe : NULL,
+				      (size_t) rsnxe_len,
+				      selected_profile_num, buf, buf_len);
+}
+
+
+/**
+ * security_profile_build - Build Security Profile element from explicit
+ *                          RSN Capabilities and RSNXE inputs
+ * @rsn_capab: RSN Capabilities field value (WPA_CAPABILITY_* bits), in the
+ *      same wire format as written by wpa_gen_wpa_ie_rsn() / passed to
+ *      wpa_external_auth_add_rsne(). For the SME-in-wpa_supplicant path this is
+ *      rsn_supp_capab(sm); for external authentication (SME-in-driver) this
+ *      is the driver-provided rsn_capab value (e.g., struct external_auth /
+ *      struct wpa_pasn_auth_work rsn_capab field) that was actually placed
+ *      in the negotiated RSNE.
+ * @rsnxe_ie: Full RSNXE (starting at the Element ID octet, i.e.
+ *      EID + Length + body) that was actually negotiated/sent, or %NULL if
+ *      no RSNXE is present. For the SME-in-wpa_supplicant path this is
+ *      generated fresh via wpa_gen_rsnxe(sm, ...); for external authentication
+ *      this is the driver-provided RSNXE (e.g.,
+ *      struct external_auth::rsnxe_data or the awork/sme ext_rsnxe buffer) that
+ *      were copied verbatim into the actual Authentication/(Re)Association
+ *      Request frame.
+ * @rsnxe_len: Length of @rsnxe in bytes, or 0 if @rsnxe is %NULL.
+ * @selected_profile_num: Single profile number the STA has selected (0-119).
+ *      Only this profile's bit is set in the Security Profile Bitmap.
+ * @buf: Output buffer
+ * @buf_len: Size of output buffer
+ * Returns: Number of bytes written, or -1 on error.
+ *
+ * This is the single authoritative, driver-agnostic core builder for the
+ * Security Profile element (IEEE P802.11bn/D2.0, 9.4.2.369, Figure 9-aa74,
+ * 37.33, Table 9-bb18).
+ *
+ * Because the Extended RSN Capabilities field of the Security Profile
+ * element uses the identical wire format as the RSNXE body (length prefix in
+ * bits 0-3 of the first octet), the RSNXE body bytes are copied verbatim from
+ * @rsnxe without any re-derivation. This guarantees the Security Profile
+ * element always reflects exactly what was negotiated/sent - whether that
+ * negotiation happened in wpa_sm (SME-in-wpa_supplicant) or in the driver
+ * (external authentication) - rather than re-deriving capabilities from
+ * local wpa_sm state that may not reflect the driver's actual negotiation.
+ */
+int security_profile_build(u16 rsn_capab, const u8 *rsnxe, size_t rsnxe_len,
+			   int selected_profile_num, u8 *buf, size_t buf_len)
+{
+	u8 *pos = buf;
+	u8 *len_pos;
+	u8 reduced_rsn_caps = 0;
+	const u8 *ext_rsn_body;
+	size_t ext_rsn_len;
+	size_t bitmap_len;
+	size_t total;
+	static const u8 ext_rsn_min[1] = { 0 };
+
+	if (selected_profile_num < 0 || selected_profile_num > SEC_PROF_MAX)
+		return -1;
+
+	/* Reduced RSN Capabilities (Figure 9-aa75): B0=ExtKeyID, B1=OCVC */
+	if (rsn_capab & WPA_CAPABILITY_EXT_KEY_ID_FOR_UNICAST)
+		reduced_rsn_caps |= SEC_PROF_REDUCED_RSN_CAPA_EXT_KEY_ID;
+	if (rsn_capab & WPA_CAPABILITY_OCVC)
+		reduced_rsn_caps |= SEC_PROF_REDUCED_RSN_CAPA_OCVC;
+
+	/*
+	 * Extended RSN Capabilities (Table 9-408): copy the RSNXE body
+	 * verbatim from the actually negotiated/sent RSNXE (skip the
+	 * EID + Length header of @rsnxe_ie). If no RSNXE is present, encode
+	 * the minimum 1-octet field with all bits (including the length
+	 * prefix) set to 0, per Table 9-408.
+	 */
+	if (rsnxe && rsnxe_len >= 2 && rsnxe[1] > 0 &&
+	    rsnxe_len >= (size_t) (2 + rsnxe[1])) {
+		ext_rsn_body = rsnxe + 2;
+		ext_rsn_len = rsnxe[1];
+	} else {
+		ext_rsn_body = ext_rsn_min;
+		ext_rsn_len = sizeof(ext_rsn_min);
 	}
 
-	return pos - rsnxe;
+	/*
+	 * Security Profile Bitmap: one bit per profile number.
+	 * Only the selected profile's bit is set (37.33).
+	 * Profile numbers 0-7 fit in 1 octet, 8-15 in 2 octets, etc.
+	 */
+	bitmap_len = (size_t) (selected_profile_num / 8) + 1;
+
+	/* EID(1) + Len(1) + EID_EXT(1) + ReducedRSNCaps(1) +
+	 * SecProfInd(1) + bitmap(bitmap_len) + ext_rsn(ext_rsn_len) */
+	total = 2 + 1 + 1 + 1 + bitmap_len + ext_rsn_len;
+	if (buf_len < total)
+		return -1;
+
+	*pos++ = WLAN_EID_EXTENSION;
+	len_pos = pos++; /* Length - filled in at end */
+	/* Element ID Extension */
+	*pos++ = WLAN_EID_EXT_SECURITY_PROFILE;
+
+	/* Reduced RSN Capabilities (1 octet, IEEE P802.11bn/D2.0,
+	 * Figure 9-aa75) */
+	*pos++ = reduced_rsn_caps;
+
+	/*
+	 * Security Profile Indication (1 octet, IEEE P802.11bn/D2.0,
+	 * Figure 9-aa76):
+	 * B0-B3 = Number Of Octets Of Security Profile Bitmap
+	 * B4-B7 = Number Of Vendor Specific Security Profiles (0 here)
+	 */
+	*pos++ = (u8) (bitmap_len & 0x0F);
+
+	/* Security Profile Bitmap: bit X = 1 for selected_profile_num */
+	os_memset(pos, 0, bitmap_len);
+	pos[selected_profile_num / 8] |= BIT(selected_profile_num % 8);
+	pos += bitmap_len;
+
+	/* Vendor Specific Security Profile List: empty (0 vendor profiles) */
+
+	/* Extended RSN Capabilities (variable, IEEE P802.11bn/D2.0,
+	 * Table 9-408): verbatim copy */
+	os_memcpy(pos, ext_rsn_body, ext_rsn_len);
+	pos += ext_rsn_len;
+
+	/* Fill the Length field (excludes EID and Length bytes, includes
+	 * EID_EXT) */
+	*len_pos = (u8) (pos - len_pos - 1);
+
+	return pos - buf;
 }

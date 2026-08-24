@@ -22,5 +22,12 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
 			       int pairwise_cipher, int group_cipher,
 			       int group_mgmt_cipher, u16 rsn_capab,
 			       const u8 *pmkid);
+u64 wpa_sm_get_rsnxe_capab(struct wpa_sm *sm);
+bool security_profile_akm_matches(int profile_num, int key_mgmt);
+int security_profile_build_sta(struct wpa_sm *sm, int selected_profile_num,
+			       u8 *buf, size_t buf_len);
+int security_profile_build(u16 rsn_capab, const u8 *rsnxe,
+			   size_t rsnxe_len, int selected_profile_num,
+			   u8 *buf, size_t buf_len);
 
 #endif /* WPA_IE_H */
