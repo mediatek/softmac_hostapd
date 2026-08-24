@@ -1112,7 +1112,8 @@ int get_tx_parameters(struct sta_info *sta, int ap_max_chanwidth,
 #endif /* CONFIG_OCV */
 
 
-u8 * hostapd_eid_rsnxe(struct hostapd_data *hapd, u8 *eid, size_t len)
+u8 * hostapd_eid_rsnxe(struct hostapd_data *hapd, u8 *eid, size_t len,
+		       u64 capab_mask)
 {
 	u8 *pos = eid;
 	bool sae_pk = false;
@@ -1176,6 +1177,8 @@ u8 * hostapd_eid_rsnxe(struct hostapd_data *hapd, u8 *eid, size_t len)
 		capab |= BIT_ULL(WLAN_RSNX_CAPAB_UNAUTH_EPPKE);
 #endif /* CONFIG_ENC_ASSOC */
 
+	capab &= capab_mask;
+
 	if (!capab)
 		return eid; /* no supported extended RSN capabilities */
 	tmp = capab;
@@ -1233,7 +1236,8 @@ size_t hostapd_security_profile_len(struct hostapd_data *hapd)
 	/* Bitmap size: ceil((max_profile + 1) / 8) */
 	bitmap_len = max_profile / 8 + 1;
 
-	rsnxe_end = hostapd_eid_rsnxe(hapd, rsnxe_buf, sizeof(rsnxe_buf));
+	rsnxe_end = hostapd_eid_rsnxe(hapd, rsnxe_buf, sizeof(rsnxe_buf),
+				      ~0ULL);
 	if (rsnxe_end > rsnxe_buf + 2)
 		ext_rsn_capab_len = rsnxe_end - rsnxe_buf - 2;
 
@@ -1292,7 +1296,8 @@ u8 * hostapd_eid_security_profile(struct hostapd_data *hapd, u8 *eid)
 			bitmap[p / 8] |= BIT(p % 8);
 	}
 
-	rsnxe_end = hostapd_eid_rsnxe(hapd, rsnxe_buf, sizeof(rsnxe_buf));
+	rsnxe_end = hostapd_eid_rsnxe(hapd, rsnxe_buf, sizeof(rsnxe_buf),
+				      ~0ULL);
 	if (rsnxe_end > rsnxe_buf + 2) {
 		ext_rsn_capab_len = rsnxe_end - rsnxe_buf - 2;
 		if (ext_rsn_capab_len > sizeof(ext_rsn_capab)) {

@@ -4582,6 +4582,12 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		bss->igtk_rsc_override = wpabuf_parse_bin(pos);
 	} else if (os_strcmp(buf, "no_beacon_rsnxe") == 0) {
 		bss->no_beacon_rsnxe = atoi(pos);
+	} else if (os_strcmp(buf, "rsnxe_capab_mask") == 0) {
+		/* Value is the bits to suppress (complement form):
+		 * rsnxe_capab_mask=20 suppresses SAE-H2E (bit 5 = 0x20).
+		 * Internally stored as the allow-mask (~value).
+		 */
+		bss->rsnxe_capab_mask = (~strtoull(pos, NULL, 16)) | 0x0f ;
 	} else if (os_strcmp(buf, "skip_prune_assoc") == 0) {
 		bss->skip_prune_assoc = atoi(pos);
 	} else if (os_strcmp(buf, "ft_rsnxe_used") == 0) {

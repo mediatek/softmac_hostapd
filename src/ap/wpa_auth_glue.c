@@ -282,6 +282,7 @@ static void hostapd_wpa_auth_conf(struct hostapd_iface *iface,
 			  wpabuf_head(conf->rsnxe_override_ft),
 			  wconf->rsnxe_override_ft_len);
 	}
+	wconf->rsnxe_capab_mask = conf->rsnxe_capab_mask;
 	if (conf->gtk_rsc_override &&
 	    wpabuf_len(conf->gtk_rsc_override) > 0 &&
 	    wpabuf_len(conf->gtk_rsc_override) <= WPA_KEY_RSC_LEN) {

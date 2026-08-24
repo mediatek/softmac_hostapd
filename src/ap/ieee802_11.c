@@ -6336,6 +6336,8 @@ skip_pmkid_update:
 		if (hapd->conf->sae_pwe == SAE_PWE_BOTH &&
 		    sta->auth_alg == WLAN_AUTH_SAE &&
 		    sta->sae && !sta->sae->h2e &&
+		    (hapd->conf->rsnxe_capab_mask &
+		     BIT_ULL(WLAN_RSNX_CAPAB_SAE_H2E)) &&
 		    ieee802_11_rsnx_capab_len(elems->rsnxe, elems->rsnxe_len,
 					      WLAN_RSNX_CAPAB_SAE_H2E)) {
 			if (hapd->conf->sae_accept_h2e_without_use) {
@@ -7320,7 +7322,8 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 #endif /* CONFIG_TESTING_OPTIONS */
 	if (!omit_rsnxe)
-		p = hostapd_eid_rsnxe(hapd, p, buf + buflen - p);
+		p = hostapd_eid_rsnxe(hapd, p, buf + buflen - p,
+				      hapd->conf->rsnxe_capab_mask);
 #ifdef CONFIG_TESTING_OPTIONS
 rsnxe_done:
 #endif /* CONFIG_TESTING_OPTIONS */
