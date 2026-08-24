@@ -10516,3 +10516,29 @@ void wpas_configure_frame_filters(struct wpa_supplicant *wpa_s)
 
 	wpa_drv_configure_frame_filters(wpa_s, filter);
 }
+
+
+/**
+ * wpas_security_profile_active - Is Security Profile element active?
+ * @wpa_s: Pointer to wpa_supplicant data
+ *
+ * Returns true when Security Profile element functionality is enabled:
+ *   - wpa_supplicant-SME path (WPA_DRIVER_FLAGS_SME): always active when the
+ *     AP
+ *     advertises the element.
+ *   - Driver-SME path: only active when the driver explicitly indicates
+ *     support via WPA_DRIVER_FLAGS2_SECURITY_PROFILE.
+ *     Without this flag the feature is fully disabled even if the AP
+ *     advertises the Security Profile element.
+ *
+ * Use this helper as the single gate for all Security Profile element parsing,
+ * override, and validation logic so that the driver-SME path without driver
+ * support behaves identically to a legacy STA.
+ */
+bool wpas_security_profile_active(struct wpa_supplicant *wpa_s)
+{
+	if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)
+		return true; /* wpa_supplicant-SME: always active */
+	/* driver-SME: only when driver advertises support */
+	return !!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SECURITY_PROFILE);
+}

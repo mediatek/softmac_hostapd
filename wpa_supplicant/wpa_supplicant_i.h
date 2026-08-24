@@ -2247,4 +2247,6 @@ static inline bool wpas_is_nan_iface(struct wpa_supplicant *wpa_s)
 bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
 			   struct wpa_bss *bss, bool unauth_eppke);
 
+bool wpas_security_profile_active(struct wpa_supplicant *wpa_s);
+
 #endif /* WPA_SUPPLICANT_I_H */
