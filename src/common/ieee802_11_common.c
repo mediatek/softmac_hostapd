@@ -460,6 +460,12 @@ static int ieee802_11_parse_extension(const u8 *pos, size_t elen,
 		elems->uhr_operation = pos;
 		elems->uhr_operation_len = elen;
 		break;
+	case WLAN_EID_EXT_SECURITY_PROFILE:
+		if (elen < 2)
+			break;
+		elems->security_profile = pos;
+		elems->security_profile_len = elen;
+		break;
 	default:
 		if (show_errors) {
 			wpa_printf(MSG_MSGDUMP,
