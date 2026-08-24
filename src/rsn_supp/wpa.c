@@ -7799,6 +7799,47 @@ int process_encrypted_assoc_resp(struct wpa_sm *sm, int valid_links,
 			return -1;
 	}
 
+	if (sm->security_profile_active) {
+		const u8 *assoc_sp = elems.security_profile;
+		size_t assoc_sp_len = elems.security_profile_len;
+
+		if (sm->ap_security_profile &&
+		    sm->ap_security_profile_len > 2) {
+			if (!assoc_sp || assoc_sp_len == 0) {
+				wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
+					"ENC_ASSOC: Security Profile element present in Beacon/Probe Response frame but absent in (Re)Association Response frame");
+				wpa_hexdump(MSG_DEBUG,
+					    "ENC_ASSOC: Security Profile element in Beacon/Probe Response frame",
+					    sm->ap_security_profile,
+					    sm->ap_security_profile_len);
+				return -1;
+			}
+			if (sm->ap_security_profile_len - 3 != assoc_sp_len ||
+			    os_memcmp(sm->ap_security_profile + 3,
+				      assoc_sp, assoc_sp_len) != 0) {
+				wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
+					"ENC_ASSOC: Security Profile element mismatch between Beacon/Probe Response frame and (Re)Association Response frame");
+				wpa_hexdump(MSG_DEBUG,
+					    "ENC_ASSOC: Security Profile element in Beacon/Probe Response frame",
+					    sm->ap_security_profile,
+					    sm->ap_security_profile_len);
+				wpa_hexdump(MSG_DEBUG,
+					    "ENC_ASSOC: Security Profile element in (Re)Association Response frame",
+					    assoc_sp, assoc_sp_len);
+				return -1;
+			}
+			wpa_printf(MSG_DEBUG,
+				   "ENC_ASSOC: Security Profile element in (Re)Association Response frame matches Beacon/Probe Response frame");
+		} else if (assoc_sp && assoc_sp_len > 0) {
+			wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
+				"ENC_ASSOC: Security Profile element present in (Re)Association Response frame but absent in Beacon/Probe Response frame");
+			wpa_hexdump(MSG_DEBUG,
+				    "ENC_ASSOC: Security Profile element in (Re)Association Response frame",
+				    assoc_sp, assoc_sp_len);
+			return -1;
+		}
+	}
+
 	/* TODO: Check for RSNE/RSNXE mismatch for per-STA profile for MLO */
 
 	/* Key Delivery element */
