@@ -180,6 +180,9 @@ struct pasn_data {
 	u8 epp_pmkid_cur[PMKID_LEN];
 #endif /* CONFIG_PMKSA_PRIVACY */
 
+	bool sec_prof_enabled;
+	bool sec_prof_used;
+
 	/**
 	 * send_mgmt - Function handler to transmit a Management frame
 	 * @ctx: Callback context from cb_ctx

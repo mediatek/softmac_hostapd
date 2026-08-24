@@ -909,11 +909,26 @@ int handle_auth_pasn_1(struct pasn_data *pasn,
 	}
 #endif /* CONFIG_ENC_ASSOC */
 
-	if (!(rsn_data.key_mgmt & pasn->wpa_key_mgmt) ||
-	    !(rsn_data.pairwise_cipher & pasn->rsn_pairwise)) {
-		wpa_printf(MSG_DEBUG, "PASN: Mismatch in AKMP/cipher");
+	if (!(rsn_data.key_mgmt & pasn->wpa_key_mgmt)) {
+		wpa_printf(MSG_DEBUG, "PASN: Mismatch in AKMP");
 		status = WLAN_STATUS_INVALID_RSNE;
 		goto send_resp;
+	}
+
+	if (pasn->sec_prof_enabled && pasn->sec_prof_used) {
+		if (!(rsn_data.pairwise_cipher & WPA_CIPHER_GCMP_256)) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: Pairwise cipher not allowed for security profile");
+			status = WLAN_STATUS_INVALID_RSNE;
+			goto send_resp;
+		}
+	} else {
+		if (!(rsn_data.pairwise_cipher & pasn->rsn_pairwise)) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: Mismatch in pairwise cipher");
+			status = WLAN_STATUS_INVALID_RSNE;
+			goto send_resp;
+		}
 	}
 
 	pasn->akmp = rsn_data.key_mgmt;

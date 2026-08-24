@@ -467,6 +467,10 @@ static u16 validate_security_profile(
 		   " in %s auth",
 		   MAC2STR(addr), auth_context);
 
+#ifdef CONFIG_PASN
+	sta->sec_prof_used = true;
+#endif /* CONFIG_PASN */
+
 	return WLAN_STATUS_SUCCESS;
 }
 
@@ -4299,6 +4303,8 @@ static void hapd_initialize_pasn(struct hostapd_data *hapd,
 	pasn->comeback_idx = hapd->comeback_idx;
 	pasn->comeback_key =  hapd->comeback_key;
 	pasn->comeback_pending_idx = hapd->comeback_pending_idx;
+
+	pasn->sec_prof_enabled = hapd->conf->security_profiles;
 }
 
 
@@ -4364,10 +4370,22 @@ static void hapd_pasn_update_params(struct hostapd_data *hapd,
 		return;
 	}
 
-	if (!(rsn_data.key_mgmt & pasn->wpa_key_mgmt) ||
-	    !(rsn_data.pairwise_cipher & pasn->rsn_pairwise)) {
-		wpa_printf(MSG_DEBUG, "PASN: Mismatch in AKMP/cipher");
+	if (!(rsn_data.key_mgmt & pasn->wpa_key_mgmt)) {
+		wpa_printf(MSG_DEBUG, "PASN: Mismatch in AKMP");
 		return;
+	}
+
+	if (hapd->conf->security_profiles && sta->sec_prof_used) {
+		if (!(rsn_data.pairwise_cipher & WPA_CIPHER_GCMP_256)) {
+			wpa_printf(MSG_DEBUG,
+				   "PASN: Pairwise cipher not allowed for security profile");
+			return;
+		}
+	} else {
+		if (!(rsn_data.pairwise_cipher & pasn->rsn_pairwise)) {
+			wpa_printf(MSG_DEBUG, "PASN: Mismatch in cipher");
+			return;
+		}
 	}
 
 #ifdef CONFIG_ENC_ASSOC
@@ -4436,7 +4454,6 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 			     u16 trans_seq, u16 status)
 {
 	int ret;
-#ifdef CONFIG_P2P
 	struct ieee802_11_elems elems;
 
 	if (len < offsetof(struct ieee80211_mgmt, u.auth.variable)) {
@@ -4453,6 +4470,7 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 		return;
 	}
 
+#ifdef CONFIG_P2P
 	if ((hapd->conf->p2p & (P2P_ENABLED | P2P_GROUP_OWNER)) ==
 	    (P2P_ENABLED | P2P_GROUP_OWNER) &&
 	    hapd->p2p && elems.p2p2_ie && elems.p2p2_ie_len) {
@@ -4491,6 +4509,32 @@ static void handle_auth_pasn(struct hostapd_data *hapd, struct sta_info *sta,
 		}
 
 		hapd_initialize_pasn(hapd, sta);
+
+		/* Security Profile element validation during PASN frame 1.
+		 * If the first Authentication frame includes an RSNE, RSNXE,
+		 * and a Security Profile element the AP must verify these
+		 * match an advertised profile; reject with
+		 * REJECTED_INVALID_SECURITY_PROFILE on mismatch.
+		 */
+		if (hapd->conf->security_profiles &&
+		    validate_security_profile(hapd, sta, &elems, "PASN",
+					      NULL)) {
+			wpa_printf(MSG_INFO, "PASN: Rejecting auth from " MACSTR
+				   " - security profile mismatch",
+				   MAC2STR(sta->addr));
+			send_auth_reply(
+				hapd, sta, sta->addr,
+				le_to_host16(mgmt->u.auth.auth_alg),
+				WLAN_AUTH_TR_SEQ_PASN_AUTH2,
+				WLAN_STATUS_REJECTED_INVALID_SECURITY_PROFILE,
+				NULL, 0,
+				"pasn-sec-profile-reject");
+			ap_free_sta(hapd, sta);
+			return;
+		}
+
+		if (sta->sec_prof_used)
+			sta->pasn->sec_prof_used = true;
 
 		hapd_pasn_update_params(hapd, sta, mgmt, len);
 		ret = handle_auth_pasn_1(sta->pasn, hapd->own_addr, sta->addr,
