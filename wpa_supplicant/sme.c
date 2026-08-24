@@ -1264,6 +1264,35 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 		   MAC2STR(pasn->peer_addr), pasn->akmp,
 		   pasn->cipher, pasn->group);
 
+	/*
+	 * Security Profile + EPPKE (SME-in-wpa_supplicant):
+	 * Include the Security Profile element in EPPKE Auth1 frame.
+	 * Per IEEE P802.11bn/D2.0, 37.33, the Security Profile element is only
+	 * sent when the RSNE is present in the Authentication frame. Auth1
+	 * contains RSNE; Auth3 does not. pasn_set_security_profile() wires it
+	 * into Auth1 only.
+	 *
+	 * The Security Profile element was populated in
+	 * wpa_supplicant_set_suites() based on the negotiated AKM and cipher.
+	 *
+	 * Conditions to include the Security Profile element:
+	 *   1. Security Profile support is active
+	 *   2. AP is advertising the Security Profile element
+	 *   3. A matching profile number was selected
+	 */
+	if (wpas_security_profile_active(wpa_s) &&
+	    wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE) &&
+	    wpa_s->sel_security_profile >= 0 &&
+	    wpa_s->security_profile_len > 0) {
+		if (pasn_set_security_profile(
+			    pasn,
+			    wpa_s->security_profile,
+			    wpa_s->security_profile_len) == 0)
+			wpa_printf(MSG_DEBUG,
+				   "EPPKE: Including Security Profile element in EPPKE Auth1 frame (profile=%d)",
+				   wpa_s->sel_security_profile);
+	}
+
 	return 0;
 
 fail:
