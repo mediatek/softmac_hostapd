@@ -1469,6 +1469,17 @@ struct wpa_driver_associate_params {
 	 * Request frame.
 	 */
 	bool okc_pmkid_in_assoc;
+
+	/**
+	 * security_profile_active - Whether Security Profile element is active
+	 *
+	 * This indicates when the Security Profile element (defined in IEEE
+	 * 802.11bn) functionality is enabled locally. Drivers that handle the
+	 * Security Profile element themselves (e.g., for driver-SME) can use
+	 * this flag to know whether to parse, validate, and apply the element
+	 * in case the target AP supports security profiles.
+	 */
+	bool security_profile_active;
 };
 
 enum hide_ssid {

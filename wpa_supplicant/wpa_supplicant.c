@@ -5329,6 +5329,8 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	params.sae_pwe = wpas_get_ssid_sae_pwe(wpa_s, ssid);
 #endif /* CONFIG_SAE */
 
+	params.security_profile_active = wpas_security_profile_active(wpa_s);
+
 	ret = wpa_drv_associate(wpa_s, &params);
 	forced_memzero(psk, sizeof(psk));
 	os_free(wpa_ie);
