@@ -1121,18 +1121,18 @@ int wpa_ft_mic(int key_mgmt, const u8 *kck, size_t kck_len, const u8 *sta_addr,
 		num_elem++;
 	}
 
-	if (extra) {
-		addr[num_elem] = wpabuf_head(extra);
-		len[num_elem] = wpabuf_len(extra);
-		num_elem++;
-	}
-
 	if (ft_links_data) {
 		for (i = 0; i < ft_links_data->link_count; i++) {
 			addr[num_elem] = ft_links_data->links[i].link_addr;
 			len[num_elem] = ETH_ALEN;
 			num_elem++;
 		}
+	}
+
+	if (extra) {
+		addr[num_elem] = wpabuf_head(extra);
+		len[num_elem] = wpabuf_len(extra);
+		num_elem++;
 	}
 
 	for (i = 0; i < num_elem; i++)
