@@ -2268,4 +2268,13 @@ bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
 
 bool wpas_security_profile_active(struct wpa_supplicant *wpa_s);
 
+/*
+ * Security Profile element helper functions (wpa_supplicant.c).
+ * Used by both wpa_supplicant_set_suites() and BSS selection
+ * (wpa_supplicant_ssid_bss_match() in events.c).
+ */
+int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt);
+const u8 * security_profile_get_rsnx(const u8 *sp, size_t *rsnx_len);
+int security_profile_get_rsn_caps(const u8 *sp);
+
 #endif /* WPA_SUPPLICANT_I_H */
