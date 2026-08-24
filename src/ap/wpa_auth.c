@@ -5234,6 +5234,9 @@ SM_STATE(WPA_PTK, PTKINITNEGOTIATING)
 		kde_len += wpabuf_len(conf->eapol_m3_elements);
 #endif /* CONFIG_TESTING_OPTIONS */
 
+	if (sm->security_profile)
+		kde_len += conf->security_profile_len;
+
 	kde = os_malloc(kde_len);
 	if (!kde)
 		goto done;
@@ -5386,6 +5389,16 @@ SM_STATE(WPA_PTK, PTKINITNEGOTIATING)
 	if (conf->eapol_m3_no_encrypt)
 		encr = 0;
 #endif /* CONFIG_TESTING_OPTIONS */
+
+	/*
+	 * Add own Security Profile element to message 3 if STA used a security
+	 * profile for the association.
+	 */
+	if (sm->security_profile) {
+		os_memcpy(pos, conf->security_profile,
+			  conf->security_profile_len);
+		pos += conf->security_profile_len;
+	}
 
 	wpa_send_eapol(sm->wpa_auth, sm,
 		       (secure ? WPA_KEY_INFO_SECURE : 0) |
@@ -7577,6 +7590,14 @@ void wpa_auth_set_ssid_protection(struct wpa_state_machine *sm, bool val)
 {
 	if (sm)
 		sm->ssid_protection = val;
+}
+
+
+void wpa_auth_set_security_profile(struct wpa_state_machine *sm,
+				   const struct security_profile_entry_ap *val)
+{
+	if (sm)
+		sm->security_profile = val;
 }
 
 

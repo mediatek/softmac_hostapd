@@ -347,6 +347,9 @@ struct wpa_auth_config {
 
 	unsigned int sae_pw_id_num;
 	u8 sae_pw_id_key[32];
+
+	u8 security_profile[257];
+	size_t security_profile_len;
 };
 
 typedef enum {
@@ -680,6 +683,8 @@ void wpa_auth_set_rsn_selection(struct wpa_state_machine *sm, const u8 *ie,
 				size_t len);
 void wpa_auth_set_dpp_z(struct wpa_state_machine *sm, const struct wpabuf *z);
 void wpa_auth_set_ssid_protection(struct wpa_state_machine *sm, bool val);
+void wpa_auth_set_security_profile(struct wpa_state_machine *sm,
+				   const struct security_profile_entry_ap *val);
 void wpa_auth_set_transition_disable(struct wpa_authenticator *wpa_auth,
 				     u8 val);
 
