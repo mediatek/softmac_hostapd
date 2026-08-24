@@ -1005,6 +1005,7 @@ static u8 * hostapd_probe_resp_fill_elems(struct hostapd_data *hapd,
 		pos = hostapd_eid_uhr_operation(hapd, pos, false);
 	}
 #endif /* CONFIG_IEEE80211BN */
+	pos = hostapd_eid_security_profile(hapd, pos);
 
 #ifdef CONFIG_IEEE80211AC
 	if (hapd->conf->vendor_vht)
@@ -2338,6 +2339,7 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 	if (hostapd_is_uhr_enabled(hapd))
 		tail_len += 3 + sizeof(struct ieee80211_uhr_operation);
 #endif /* CONFIG_IEEE80211BN */
+	tail_len += hostapd_security_profile_len(hapd);
 
 	tail_len += hostapd_mbo_ie_len(hapd);
 	tail_len += hostapd_eid_owe_trans_len(hapd);
@@ -2540,6 +2542,7 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 		}
 	}
 #endif /* CONFIG_IEEE80211BN */
+	tailpos = hostapd_eid_security_profile(hapd, tailpos);
 
 #ifdef CONFIG_IEEE80211AC
 	if (hapd->conf->vendor_vht)

@@ -6759,6 +6759,9 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 #endif /* CONFIG_IEEE80211BN */
 
+	if (hapd->conf->security_profiles)
+		buflen += hostapd_security_profile_len(hapd);
+
 	buf = os_zalloc(buflen);
 	if (!buf) {
 		res = WLAN_STATUS_UNSPECIFIED_FAILURE;
@@ -6958,6 +6961,8 @@ rsnxe_done:
 	     sta->auth_alg == WLAN_AUTH_802_1X) &&
 	    wpa_auth_ap_sta_support_assoc_enc(sta->wpa_sm) &&
 	    status_code == WLAN_STATUS_SUCCESS) {
+		int left;
+
 		/* Ensure GMK/Counter are initialized before the Key Delivery
 		 * element is built. For auth-frame STAs the normal 4-way
 		 * handshake path (SM_STATE AUTHENTICATION2) is skipped, so
@@ -7035,9 +7040,18 @@ rsnxe_done:
 #endif /* CONFIG_SAE */
 #endif /* CONFIG_PMKSA_PRIVACY */
 
-		p = wpa_auth_write_assoc_resp_eppke(sta->wpa_sm, p,
-						    buf + buflen - p,
+		left = buf + buflen - p - hostapd_security_profile_len(hapd);
+		if (left <= 0) {
+			wpa_printf(MSG_ERROR,
+				   "EPP: No room for EPPKE/security profile in assoc resp");
+			goto no_room;
+		}
+		p = wpa_auth_write_assoc_resp_eppke(sta->wpa_sm, p, left,
 						    ap_sta_is_mld(hapd, sta));
+
+		if (hapd->conf->security_profiles)
+			p = hostapd_eid_security_profile(hapd, p);
+	no_room:
 	}
 #endif /* CONFIG_ENC_ASSOC */
 
