@@ -24,6 +24,7 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
 			       const u8 *pmkid);
 u64 wpa_sm_get_rsnxe_capab(struct wpa_sm *sm);
 bool security_profile_akm_matches(int profile_num, int key_mgmt);
+bool security_profile_has_eppke(const u8 *sp, int ssid_key_mgmt);
 int security_profile_select_num(int akmp, int pairwise_cipher,
 				bool eap_over_auth,
 				const u8 *bitmap, size_t bitmap_len);

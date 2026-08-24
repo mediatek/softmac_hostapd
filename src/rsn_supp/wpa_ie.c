@@ -487,6 +487,51 @@ bool security_profile_akm_matches(int profile_num, int key_mgmt)
 
 
 /*
+ * security_profile_has_eppke - Does the AP's Security Profile element bitmap
+ * advertise an EPPKE profile (0, 1, or 2) usable with @ssid_key_mgmt?
+ * @sp: AP's Security Profile element
+ * @ssid_key_mgmt: Locally configured WPA_KEY_MGMT_* bitmask
+ * Returns: Whether the matching EPPKE profile bit is set
+ *
+ * Unlike security_profile_get_key_mgmt(), which reports a match whenever
+ * the profile's pre-authentication AKM matches an AKM bit configured locally
+ * (matching profile 9/10 against SAE-EXT-KEY/FT-SAE-EXT-KEY, too), this helper
+ * only considers the three EPPKE profiles themselves. It is used to decide
+ * whether the AP intends EPPKE authentication for the current
+ * SAE-EXT-KEY/FT-SAE-EXT-KEY connection attempt even though its RSNE does not
+ * list the EPPKE AKM suite (IEEE P802.11bn/D2.0, Table 9-bb18: for profiles 1
+ * and 2 the RSNE advertises only the pre-authentication AKM).
+ *
+ */
+bool security_profile_has_eppke(const u8 *sp, int ssid_key_mgmt)
+{
+	u8 bitmap_len;
+	const u8 *bitmap;
+	int profile;
+
+	if (!sp || sp[1] < 3)
+		return false;
+
+	bitmap_len = sp[4] & 0x0F;
+	if (sp[1] < 3 + bitmap_len)
+		return false;
+
+	bitmap = sp + 5;
+
+	for (profile = SEC_PROF_EPPKE_NO_AUTH;
+	     profile <= SEC_PROF_EPPKE_FT_SAE && profile < bitmap_len * 8;
+	     profile++) {
+		if (!(bitmap[profile / 8] & BIT(profile % 8)))
+			continue;
+		if (security_profile_akm_matches(profile, ssid_key_mgmt))
+			return true;
+	}
+
+	return false;
+}
+
+
+/*
  * security_profile_select_num - Map parameters to a unique profile number
  * @akmp: Negotiated AKM (WPA_KEY_MGMT_*)
  * @pairwise_cipher: Negotiated pairwise cipher (WPA_CIPHER_*)
