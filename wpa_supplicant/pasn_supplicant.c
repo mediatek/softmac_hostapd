@@ -1043,21 +1043,30 @@ static void wpas_pasn_auth_start_cb(struct wpa_radio_work *work, int deinit)
 				   "EPPKE: No network profile found");
 			goto fail;
 		}
-		if (!ieee802_11_rsnx_capab(rsnxe, WLAN_RSNX_CAPAB_KEK_IN_PASN))
-		{
+		/*
+		 * Security Profile element preference (IEEE P802.11bn/D2.0,
+		 * 37.33):
+		 * check both the AP RSNXE and the (unmasked) Extended
+		 * RSN Capabilities embedded in the Security Profile element --
+		 * the AP might mask capabilities from the RSNXE, but not from
+		 * the Security Profile element's copy.
+		 */
+		if (!wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+					     WLAN_RSNX_CAPAB_KEK_IN_PASN)) {
 			wpa_printf(MSG_INFO,
 				   "EPPKE: KEK_IN_PASN not set in AP RSNXE");
 			goto fail;
 		}
-		if (!ieee802_11_rsnx_capab(rsnxe,
-					   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
+		if (!wpas_eppke_ap_rsnx_capab(
+			    wpa_s, bss,
+			    WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
 			wpa_printf(MSG_INFO,
 				   "EPPKE: ASSOC_FRAME_ENCRYPTION not set in AP RSNXE");
 			goto fail;
 		}
 		if (awork->akmp == WPA_KEY_MGMT_EPPKE &&
-		    !ieee802_11_rsnx_capab(rsnxe,
-					   WLAN_RSNX_CAPAB_UNAUTH_EPPKE)) {
+		    !wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+					     WLAN_RSNX_CAPAB_UNAUTH_EPPKE)) {
 			wpa_printf(MSG_DEBUG,
 				   "EPPKE: AP does not support unauthenticated EPPKE");
 			goto fail;

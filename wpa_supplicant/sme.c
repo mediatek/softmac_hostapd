@@ -1212,13 +1212,21 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 
 	/* Use the RSNXOE, if it was included, for actual AP capability check */
 	ap_rsnxe = wpa_bss_get_rsnxe(wpa_s, bss, NULL, false);
-	if (!ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_KEK_IN_PASN)) {
+	/*
+	 * Security Profile element preference (IEEE P802.11bn/D2.0, 37.33):
+	 * check both the AP RSNXE and the (unmasked) Extended RSN Capabilities
+	 * embedded in the Security Profile element -- the AP might mask
+	 * capabilities from the RSNXE, but not from the Security Profile
+	 * element's copy.
+	 */
+	if (!wpas_eppke_ap_rsnx_capab(wpa_s, bss, WLAN_RSNX_CAPAB_KEK_IN_PASN))
+	{
 		wpa_printf(MSG_DEBUG, "EPPKE: AP does not support KEK_IN_PASN");
 		goto fail;
 	}
 
-	if (!ieee802_11_rsnx_capab(ap_rsnxe,
-				   WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
+	if (!wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+				      WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION)) {
 		wpa_printf(MSG_DEBUG,
 			   "EPPKE: AP does not support association frame encryption");
 		goto fail;
@@ -1243,7 +1251,15 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_SAE
 	} else if (wpa_key_mgmt_sae_ext_key(ssid->key_mgmt)) {
 		capab |= BIT(WLAN_RSNX_CAPAB_SAE_H2E);
-		if (!ieee802_11_rsnx_capab(ap_rsnxe, WLAN_RSNX_CAPAB_SAE_H2E)) {
+		/*
+		 * Security Profile element preference (IEEE P802.11bn/D2.0,
+		 * 37.33): check both the AP RSNXE and the (unmasked)
+		 * Extended RSN Capabilities embedded in the Security Profile
+		 * element -- the AP might mask capabilities from the RSNXE,
+		 * butnot from the Security Profile element's copy.
+		 */
+		if (!wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+					     WLAN_RSNX_CAPAB_SAE_H2E)) {
 			wpa_printf(MSG_DEBUG,
 				   "EPPKE: AP does not support SAE H2E");
 			goto fail;
@@ -1528,7 +1544,24 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 #ifdef CONFIG_ENC_ASSOC
 		} else if ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
 			   (ssid->key_mgmt & WPA_KEY_MGMT_EPPKE) &&
-			   (ied.key_mgmt & WPA_KEY_MGMT_EPPKE) &&
+			   /*
+			    * Security Profile element preference (IEEE
+			    * P802.11bn/D2.0, 37.33): Profile 1 and 2 APs
+			    * might advertise EPPKE only via the Security
+			    * Profile element bitmap -- their RSNE lists only
+			    * the pre-authentication AKM (SAE-EXT-KEY /
+			    * FT-SAE-EXT-KEY), not the EPPKE AKM suite itself.
+			    * Accept either the legacy RSNE EPPKE AKM or a
+			    * matching EPPKE sub-profile in the Security
+			    * Profile element.
+			    */
+			   ((ied.key_mgmt & WPA_KEY_MGMT_EPPKE) ||
+			    (wpas_security_profile_active(wpa_s) &&
+			     security_profile_has_eppke(
+				     wpa_bss_get_ie_ext(
+					     bss,
+					     WLAN_EID_EXT_SECURITY_PROFILE),
+				     ssid->key_mgmt))) &&
 			   wpa_key_mgmt_sae_ext_key(ssid->key_mgmt) &&
 			   wpa_key_mgmt_sae_ext_key(ied.key_mgmt) &&
 			   !wpas_is_sae_avoided(wpa_s, ssid, &ied) &&
