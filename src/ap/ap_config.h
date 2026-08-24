@@ -1024,6 +1024,9 @@ struct hostapd_bss_config {
 #endif /* CONFIG_ROBUST_AV */
 
 	unsigned int gas_max_peers;
+
+	int *security_profiles; /* -1 terminated array of enabled security
+				 * profiles */
 };
 
 /**

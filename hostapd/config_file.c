@@ -833,7 +833,7 @@ static int hostapd_parse_chanlist(struct hostapd_config *conf, char *val)
 }
 
 
-static int hostapd_parse_intlist(int **int_list, char *val)
+static int hostapd_parse_intlist_helper(int **int_list, char *val, int delim)
 {
 	int *list;
 	int count;
@@ -865,10 +865,25 @@ static int hostapd_parse_intlist(int **int_list, char *val)
 			break;
 		pos = end + 1;
 	}
-	list[count] = 0;
+	list[count] = delim;
 
 	*int_list = list;
 	return 0;
+}
+
+
+static int hostapd_parse_intlist(int **int_list, char *val)
+{
+	return hostapd_parse_intlist_helper(int_list, val, 0);
+}
+
+
+
+/* Like hostapd_parse_intlist but uses -1 as the list terminator so that 0
+ * remains a valid entry. */
+static int hostapd_parse_intlist_neg1(int **int_list, char *val)
+{
+	return hostapd_parse_intlist_helper(int_list, val, -1);
 }
 
 
@@ -3189,6 +3204,13 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "peerkey") == 0) {
 		wpa_printf(MSG_INFO,
 			   "Line %d: Obsolete peerkey parameter ignored", line);
+	} else if (os_strcmp(buf, "security_profiles") == 0) {
+		if (hostapd_parse_intlist_neg1(&bss->security_profiles, pos)) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid security_profiles value '%s'",
+				   line, pos);
+			return 1;
+		}
 #ifdef CONFIG_IEEE80211R_AP
 	} else if (os_strcmp(buf, "mobility_domain") == 0) {
 		if (os_strlen(pos) != 2 * MOBILITY_DOMAIN_ID_LEN ||

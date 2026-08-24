@@ -1023,6 +1023,8 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_PASN */
 
+	os_free(conf->security_profiles);
+
 	wpabuf_clear_free(conf->sae_pw_id_key);
 
 	os_free(conf);
