@@ -508,21 +508,15 @@ int hostapd_setup_sae_pt(struct hostapd_bss_config *conf)
 
 	if ((conf->sae_pwe == SAE_PWE_HUNT_AND_PECK &&
 	     !hostapd_sae_pw_id_in_use(conf) &&
-	     !wpa_key_mgmt_sae_ext_key(conf->wpa_key_mgmt |
-				       conf->rsn_override_key_mgmt |
-				       conf->rsn_override_key_mgmt_2) &&
+	     !wpa_key_mgmt_sae_ext_key(hostapd_config_all_key_mgmt(conf)) &&
 	     !hostapd_sae_pk_in_use(conf)) ||
 	    conf->sae_pwe == SAE_PWE_FORCE_HUNT_AND_PECK ||
-	    !wpa_key_mgmt_sae(conf->wpa_key_mgmt |
-			      conf->rsn_override_key_mgmt |
-			      conf->rsn_override_key_mgmt_2))
+	    (!wpa_key_mgmt_sae(hostapd_config_all_key_mgmt(conf))))
 		return 0; /* PT not needed */
 
 	if (!groups) {
 		groups = default_groups;
-		if (wpa_key_mgmt_sae_ext_key(conf->wpa_key_mgmt |
-					     conf->rsn_override_key_mgmt |
-					     conf->rsn_override_key_mgmt_2))
+		if (wpa_key_mgmt_sae_ext_key(hostapd_config_all_key_mgmt(conf)))
 			default_groups[1] = 20;
 	}
 
@@ -1854,4 +1848,34 @@ void hostapd_remove_acl_mac(struct mac_acl_entry **acl, int *num,
 			i++;
 		}
 	}
+}
+
+
+/**
+ * hostapd_config_sp_key_mgmt - Derive implied key_mgmt from security profiles
+ * @conf: hostapd BSS level configuration
+ * Returns: Union of all AKMs defined by the enabled security profiles
+ *
+ * This can be used to allow the AP to accept associations whose AKM is implied
+ * by an enabled security profile even when that AKM is not explicitly listed in
+ * wpa_key_mgmt to be enabled in the RSNE.
+ */
+int hostapd_config_sp_key_mgmt(const struct hostapd_bss_config *conf)
+{
+	return wpa_auth_sp_implied_key_mgmt(conf->security_profiles);
+}
+
+
+int hostapd_config_all_key_mgmt(const struct hostapd_bss_config *conf)
+{
+	return conf->wpa_key_mgmt |
+		conf->rsn_override_key_mgmt |
+		conf->rsn_override_key_mgmt_2 |
+		hostapd_config_sp_key_mgmt(conf);
+}
+
+
+bool hostapd_config_sae_ext_key(const struct hostapd_bss_config *conf)
+{
+	return wpa_key_mgmt_sae_ext_key(hostapd_config_all_key_mgmt(conf));
 }

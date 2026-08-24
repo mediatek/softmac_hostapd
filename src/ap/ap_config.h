@@ -1499,5 +1499,8 @@ void hostapd_remove_acl_mac(struct mac_acl_entry **acl, int *num,
 			    const u8 *addr);
 bool hostapd_config_check_bss_6g(struct hostapd_bss_config *bss);
 void hostapd_config_free_afc_cert_ids(struct hostapd_config *conf);
+int hostapd_config_sp_key_mgmt(const struct hostapd_bss_config *conf);
+int hostapd_config_all_key_mgmt(const struct hostapd_bss_config *conf);
+bool hostapd_config_sae_ext_key(const struct hostapd_bss_config *conf);
 
 #endif /* HOSTAPD_CONFIG_H */
