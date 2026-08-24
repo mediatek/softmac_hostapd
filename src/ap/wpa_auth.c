@@ -8056,7 +8056,7 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 	u8 rsc[WPA_KEY_RSC_LEN] = {0}, *gtk;
 	struct wpa_group *gsm = sm->group;
 	u8 hdr[2];
-	u8 *kde, *buf;
+	u8 *kde, *buf, *start = eid, *end = eid + max_len;
 	const u8 *ptr;
 	size_t slice_len;
 	size_t buflen = 1024;
@@ -8115,6 +8115,8 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 	 * handle fragmentation.
 	 */
 	slice_len = kde_len <= 246 ? kde_len : 246;
+	if (3 + WPA_KEY_RSC_LEN + slice_len > (size_t) (end - eid))
+		goto not_room;
 	/* ElementID(0xff)|Length(1B)|ElementID Extn(1B)|RSC(8B)|KDE list */
 	*eid++ = WLAN_EID_EXTENSION;
 	*eid++ = slice_len + 1 + WPA_KEY_RSC_LEN;
@@ -8130,6 +8132,8 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 
 	while (kde_len) {
 		slice_len = kde_len <= 255 ? kde_len : 255;
+		if (2 + slice_len > (size_t) (end - eid))
+			goto not_room;
 		*eid++ = WLAN_EID_FRAGMENT;
 		*eid++ = slice_len;
 		os_memcpy(eid, ptr, slice_len);
@@ -8139,8 +8143,14 @@ u8 * wpa_auth_eid_key_delivery(u8 *eid, size_t max_len,
 		kde_len -= slice_len;
 	}
 
+out:
 	bin_clear_free(buf, buflen);
 	return eid;
+not_room:
+	wpa_printf(MSG_ERROR,
+		   "Not enough room for writing Key Delivery element");
+	eid = start;
+	goto out;
 }
 
 
