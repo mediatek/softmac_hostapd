@@ -566,6 +566,85 @@ def test_eht_mld_owe_two_links_only_one_negotiated(dev, apdev):
     """AP MLD with MLD client OWE connection when only one of the links is negotiated"""
     _eht_mld_owe_two_links(dev, apdev, only_one_link=True)
 
+def _eht_mld_owe(dev, apdev, links):
+    with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
+        HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
+
+        wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
+        wpas.interface_add(wpas_iface)
+        check_owe_capab(wpas)
+
+        ssid = "mld_ap_owe"
+        params = eht_mld_ap_wpa2_params(ssid, key_mgmt="OWE", mfp="2")
+
+        freqs = []
+        hapds = []
+        for link in range(links):
+            freqs.append(str(2412 + 5 * link))
+            params["channel"] = str(link + 1)
+            hapds.append(eht_mld_enable_ap(hapd_iface, link, params))
+        hapd0 = hapds[0]
+
+        # Check legacy client connection
+        dev[0].connect(ssid, scan_freq="2412", key_mgmt="OWE", ieee80211w="2")
+
+        wpas.connect(ssid, scan_freq=" ".join(freqs), key_mgmt="OWE",
+                     ieee80211w="2")
+
+        exp_links = 2 ** links - 1
+        eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
+                          valid_links=exp_links, active_links=exp_links)
+        eht_verify_wifi_version(wpas)
+        for h in hapds:
+            traffic_test(wpas, h)
+
+        wpas.request("DISCONNECT")
+        wpas.wait_disconnected()
+
+def test_eht_mld_owe_1_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 1 link"""
+    _eht_mld_owe(dev, apdev, 1)
+
+def test_eht_mld_owe_2_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 2 link"""
+    _eht_mld_owe(dev, apdev, 2)
+
+def test_eht_mld_owe_3_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 3 link"""
+    _eht_mld_owe(dev, apdev, 3)
+
+def test_eht_mld_owe_4_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 4 link"""
+    _eht_mld_owe(dev, apdev, 4)
+
+def test_eht_mld_owe_5_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 5 link"""
+    _eht_mld_owe(dev, apdev, 5)
+
+def test_eht_mld_owe_6_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 6 link"""
+    _eht_mld_owe(dev, apdev, 6)
+
+def test_eht_mld_owe_7_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 7 link"""
+    _eht_mld_owe(dev, apdev, 7)
+
+def test_eht_mld_owe_8_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 8 link"""
+    _eht_mld_owe(dev, apdev, 8)
+
+def test_eht_mld_owe_9_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 9 link"""
+    _eht_mld_owe(dev, apdev, 9)
+
+def test_eht_mld_owe_10_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 10 link"""
+    _eht_mld_owe(dev, apdev, 10)
+
+def test_eht_mld_owe_11_link(dev, apdev):
+    """AP MLD with MLD client OWE connection - 11 link"""
+    _eht_mld_owe(dev, apdev, 11)
+
 def test_eht_mld_sae_single_link(dev, apdev):
     """EHT MLD AP with MLD client SAE H2E connection using single link"""
     run_eht_mld_sae_single_link(dev, apdev)
