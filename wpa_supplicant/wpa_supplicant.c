@@ -780,6 +780,7 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 
 	wnm_bss_keep_alive_deinit(wpa_s);
 	wnm_btm_reset(wpa_s);
+	wnm_sleep_mode_clear(wpa_s);
 
 	ext_password_deinit(wpa_s->ext_pw);
 	wpa_s->ext_pw = NULL;

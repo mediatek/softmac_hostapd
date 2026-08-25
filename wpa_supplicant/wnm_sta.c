@@ -9,6 +9,7 @@
 #include "utils/includes.h"
 
 #include "utils/common.h"
+#include "utils/eloop.h"
 #include "common/ieee802_11_defs.h"
 #include "common/ieee802_11_common.h"
 #include "common/wpa_ctrl.h"
@@ -48,6 +49,20 @@ static int ieee80211_11_set_tfs_ie(struct wpa_supplicant *wpa_s,
 	wpa_printf(MSG_DEBUG, "%s: TFS set operation %d", __func__, oper);
 
 	return wpa_drv_wnm_oper(wpa_s, oper, addr, (u8 *) buf, &len);
+}
+
+
+static void wnmsleep_mode_exit_timeout(void *eloop_ctx, void *sock_ctx)
+{
+	struct wpa_supplicant *wpa_s = eloop_ctx;
+
+	if (wpa_s->wpa_state <= WPA_ASSOCIATED ||
+	    wpa_s->wnmsleep_state != WNM_SLEEP_WAIT_RESP_EXIT)
+		return;
+
+	wpa_printf(MSG_INFO,
+		   "WNM: Timeout on WNM Sleep Mode Response (exit) - deauthenticate");
+	wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 }
 
 
@@ -189,13 +204,17 @@ int ieee802_11_send_wnmsleep_req(struct wpa_supplicant *wpa_s,
 	res = wpa_drv_send_action(wpa_s, wpa_s->assoc_freq, 0, wpa_s->bssid,
 				  wpa_s->own_addr, wpa_s->bssid,
 				  &mgmt->u.action.category, len, 0);
-	if (res < 0)
+	if (res < 0) {
 		wpa_printf(MSG_DEBUG, "Failed to send WNM-Sleep Request "
 			   "(action=%d, intval=%d)", action, intval);
-	else if (action == WNM_SLEEP_MODE_ENTER)
+	} else if (action == WNM_SLEEP_MODE_ENTER) {
 		wpa_s->wnmsleep_state = WNM_SLEEP_WAIT_RESP_ENTER;
-	else if (action == WNM_SLEEP_MODE_EXIT)
+	} else if (action == WNM_SLEEP_MODE_EXIT) {
 		wpa_s->wnmsleep_state = WNM_SLEEP_WAIT_RESP_EXIT;
+		eloop_cancel_timeout(wnmsleep_mode_exit_timeout, wpa_s, NULL);
+		eloop_register_timeout(5, 0, wnmsleep_mode_exit_timeout,
+				       wpa_s, NULL);
+	}
 
 	os_free(wnmsleep_ie);
 	os_free(wnmtfs_ie);
@@ -437,6 +456,13 @@ static void ieee802_11_rx_wnmsleep_resp(struct wpa_supplicant *wpa_s,
 			wpa_drv_wnm_oper(wpa_s, WNM_SLEEP_EXIT_FAIL,
 					 wpa_s->bssid, NULL, NULL);
 	}
+}
+
+
+void wnm_sleep_mode_clear(struct wpa_supplicant *wpa_s)
+{
+	eloop_cancel_timeout(wnmsleep_mode_exit_timeout, wpa_s, NULL);
+	wpa_s->wnmsleep_state = WNM_SLEEP_IDLE;
 }
 
 

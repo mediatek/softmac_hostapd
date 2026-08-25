@@ -427,8 +427,8 @@ void wpa_supplicant_mark_disassoc(struct wpa_supplicant *wpa_s)
 #ifndef CONFIG_NO_RRM
 	wpas_rrm_reset(wpa_s);
 #endif /* CONFIG_NO_RRM */
-	wpa_s->wnmsleep_state = WNM_SLEEP_IDLE;
 #ifdef CONFIG_WNM
+	wnm_sleep_mode_clear(wpa_s);
 	wpa_s->wnm_mode = 0;
 #endif /* CONFIG_WNM */
 	wnm_clear_coloc_intf_reporting(wpa_s);
