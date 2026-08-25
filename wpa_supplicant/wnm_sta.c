@@ -192,8 +192,10 @@ int ieee802_11_send_wnmsleep_req(struct wpa_supplicant *wpa_s,
 	if (res < 0)
 		wpa_printf(MSG_DEBUG, "Failed to send WNM-Sleep Request "
 			   "(action=%d, intval=%d)", action, intval);
-	else
-		wpa_s->wnmsleep_used = 1;
+	else if (action == WNM_SLEEP_MODE_ENTER)
+		wpa_s->wnmsleep_state = WNM_SLEEP_WAIT_RESP_ENTER;
+	else if (action == WNM_SLEEP_MODE_EXIT)
+		wpa_s->wnmsleep_state = WNM_SLEEP_WAIT_RESP_EXIT;
 
 	os_free(wnmsleep_ie);
 	os_free(wnmtfs_ie);
@@ -324,7 +326,8 @@ static void ieee802_11_rx_wnmsleep_resp(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_OCV */
 	size_t left;
 
-	if (!wpa_s->wnmsleep_used) {
+	if (wpa_s->wnmsleep_state != WNM_SLEEP_WAIT_RESP_ENTER &&
+	    wpa_s->wnmsleep_state != WNM_SLEEP_WAIT_RESP_EXIT) {
 		wpa_printf(MSG_DEBUG,
 			   "WNM: Ignore WNM-Sleep Mode Response frame since WNM-Sleep Mode operation has not been requested");
 		return;
@@ -379,6 +382,16 @@ static void ieee802_11_rx_wnmsleep_resp(struct wpa_supplicant *wpa_s,
 		return;
 	}
 
+	if (!((wnmsleep_ie->action_type == WNM_SLEEP_MODE_ENTER &&
+	       wpa_s->wnmsleep_state == WNM_SLEEP_WAIT_RESP_ENTER) ||
+	      (wnmsleep_ie->action_type == WNM_SLEEP_MODE_EXIT &&
+	       wpa_s->wnmsleep_state == WNM_SLEEP_WAIT_RESP_EXIT))) {
+		wpa_printf(MSG_DEBUG,
+			   "WNM: Ignore WNM Sleep Mode Response frame with unexpected Action Type %u",
+			   wnmsleep_ie->action_type);
+		return;
+	}
+
 #ifdef CONFIG_OCV
 	if (wnmsleep_ie->action_type == WNM_SLEEP_MODE_EXIT &&
 	    wpa_sm_ocv_enabled(wpa_s->wpa)) {
@@ -400,7 +413,7 @@ static void ieee802_11_rx_wnmsleep_resp(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_OCV */
 
-	wpa_s->wnmsleep_used = 0;
+	wpa_s->wnmsleep_state = WNM_SLEEP_IDLE;
 
 	if (wnmsleep_ie->status == WNM_STATUS_SLEEP_ACCEPT ||
 	    wnmsleep_ie->status == WNM_STATUS_SLEEP_EXIT_ACCEPT_GTK_UPDATE) {

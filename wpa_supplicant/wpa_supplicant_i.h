@@ -1052,7 +1052,6 @@ struct wpa_supplicant {
 	unsigned int reattach:1; /* reassociation to the same BSS requested */
 	unsigned int mac_addr_changed:1;
 	unsigned int added_vif:1;
-	unsigned int wnmsleep_used:1;
 	unsigned int owe_transition_select:1;
 	unsigned int owe_transition_search:1;
 	unsigned int connection_set:1;
@@ -1062,6 +1061,13 @@ struct wpa_supplicant {
 	unsigned int connection_eht:1;
 	unsigned int connection_uhr:1;
 	unsigned int disable_mbo_oce:1;
+
+	enum wnmsleep_state {
+		WNM_SLEEP_IDLE,
+		WNM_SLEEP_WAIT_RESP_ENTER,
+		WNM_SLEEP_WAIT_RESP_EXIT,
+	} wnmsleep_state;
+
 	u8 connection_max_nss_rx;
 	u8 connection_max_nss_tx;
 	enum chan_width connection_channel_bandwidth;
