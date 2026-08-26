@@ -861,7 +861,7 @@ static void eap_peap_process_phase2_soh(struct eap_sm *sm,
 		}
 		switch (tlv_type) {
 		case EAP_TLV_VENDOR_SPECIFIC_TLV:
-			if (tlv_len < 4) {
+			if (tlv_len < 8) {
 				wpa_printf(MSG_DEBUG, "EAP-PEAP: Too short "
 					   "vendor specific TLV (len=%d)",
 					   (int) tlv_len);
