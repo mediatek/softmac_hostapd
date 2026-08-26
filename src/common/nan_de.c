@@ -999,7 +999,11 @@ static void nan_de_start_new_publish_state(struct nan_de *de,
 		srv->in_multi_chan = !srv->in_multi_chan;
 
 	/* Use same values for N and M. */
-	n = de->cfg.n_min + os_random() % (de->cfg.n_max - de->cfg.n_min);
+	if (de->cfg.n_max > de->cfg.n_min)
+		n = de->cfg.n_min +
+			os_random() % (de->cfg.n_max - de->cfg.n_min);
+	else
+		n = de->cfg.n_min;
 	srv->next_publish_duration = n * 100;
 
 	nan_de_set_publish_times(srv);
