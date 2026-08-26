@@ -6116,6 +6116,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 #ifdef CONFIG_IEEE80211BE
 	check_mscs_desc_elem(hapd, sta, elems);
 
+	sta->default_ttlm_in_assoc_resp = false;
 	if (hostapd_is_eht_enabled(hapd)) {
 		resp = copy_sta_eht_capab(hapd, sta, IEEE80211_MODE_AP,
 					  elems->he_capabilities,
@@ -6139,6 +6140,14 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 			if (resp != WLAN_STATUS_SUCCESS)
 				goto out;
 		}
+
+		/* TODO If the STA include TTLM element(s) in the association
+		 * request, always reject it by inlucde a default TTLM in the
+		 * association response
+		 */
+		if (type != LINK_PARSE_RECONF && elems->ttlm_num > 0 &&
+		    !assoc_wpa_sm && ap_sta_is_mld(hapd, sta))
+			sta->default_ttlm_in_assoc_resp = true;
 	}
 #endif /* CONFIG_IEEE80211BE */
 #ifdef CONFIG_IEEE80211BN
@@ -7476,6 +7485,8 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 			buflen += hostapd_eid_eht_basic_ml_len(hapd, sta,
 							       false, true);
 		}
+		if (status_code == WLAN_STATUS_SUCCESS)
+			buflen += hostapd_eid_eht_assoc_ttlm_len(hapd, sta);
 	}
 #endif /* CONFIG_IEEE80211BE */
 #ifdef CONFIG_IEEE80211BN
@@ -7648,7 +7659,8 @@ rsnxe_done:
 			p = hostapd_eid_eht_ml_assoc(hapd, sta, p);
 		p = hostapd_eid_eht_capab(hapd, p, IEEE80211_MODE_AP);
 		p = hostapd_eid_eht_operation(hapd, p);
-		p = hostapd_eid_eht_attlm(hapd, p);
+		if (status_code == WLAN_STATUS_SUCCESS)
+			p = hostapd_eid_eht_assoc_ttlm(hapd, sta, p);
 	}
 #endif /* CONFIG_IEEE80211BE */
 

@@ -1057,6 +1057,61 @@ u8 * hostapd_eid_eht_attlm(struct hostapd_data *hapd, u8 *eid)
 }
 
 
+static bool hostapd_attlm_switch_time_expired(struct hostapd_data *hapd)
+{
+	return hostapd_is_attlm_active(hapd) &&
+		hapd->mld->new_attlm.switch_time_tsf_tu == 0;
+}
+
+
+size_t hostapd_eid_eht_assoc_ttlm_len(struct hostapd_data *hapd,
+				      struct sta_info *sta)
+{
+	/* An established A-TTLM is always advertised, but only to MLD STAs. */
+	if (ap_sta_is_mld(hapd, sta) && hostapd_attlm_switch_time_expired(hapd))
+		return hostapd_eid_eht_attlm_len(hapd);
+
+	/* Reject a TTLM requested at association time by responding
+	 * with a default (bi-directional) TTLM element:
+	 * Element ID (1) + Length (1) + Extended Element ID (1) +
+	 * Control field without Link Mapping Presence Bitmap (1)
+	 */
+	if (sta && sta->default_ttlm_in_assoc_resp)
+		return 3 + 1;
+
+	return 0;
+}
+
+
+u8 * hostapd_eid_eht_assoc_ttlm(struct hostapd_data *hapd,
+				struct sta_info *sta, u8 *eid)
+{
+	u8 *pos = eid;
+
+	/* An established A-TTLM is always advertised, but only to MLD STAs. */
+	if (ap_sta_is_mld(hapd, sta) && hostapd_attlm_switch_time_expired(hapd)) {
+		pos = hostapd_eid_eht_attlm(hapd, eid);
+		goto out;
+	}
+
+	if (!sta || !sta->default_ttlm_in_assoc_resp)
+		return eid;
+
+	/* Reject the requested TTLM with a default bi-directional mapping.
+	 * The default mapping element only carries the control field
+	 * (no link mapping is present). */
+	*pos++ = WLAN_EID_EXTENSION;
+	*pos++ = 1 + 1; /* Extended Element ID + Control */
+	*pos++ = WLAN_EID_EXT_TID_TO_LINK_MAPPING;
+	*pos++ = IEEE80211_TTLM_CONTROL_DEF_LINK_MAP;
+
+out:
+	if (sta)
+		sta->default_ttlm_in_assoc_resp = false;
+	return pos;
+}
+
+
 static size_t hostapd_eid_eht_ml_len(struct hostapd_data *hapd,
 				     struct mld_info *info,
 				     bool include_mld_id, bool include_bpcc)

@@ -350,6 +350,7 @@ struct sta_info {
 	struct sta_info *mld_assoc_sta;
 	struct scs_session_status scs_session[SCS_MAX_CFG_CNT];
 	struct ieee80211_neg_ttlm neg_ttlm;
+	bool default_ttlm_in_assoc_resp;
 	u16 mscs_assoc_setup_status;
 #endif /* CONFIG_IEEE80211BE */
 
