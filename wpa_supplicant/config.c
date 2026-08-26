@@ -4964,6 +4964,8 @@ struct wpa_config * wpa_config_alloc_empty(const char *ctrl_interface,
 	config->mld_connect_band_pref = DEFAULT_MLD_CONNECT_BAND_PREF;
 #endif /* CONFIG_TESTING_OPTIONS */
 
+	config->security_profiles = DEFAULT_SECURITY_PROFILES;
+
 	return config;
 }
 
@@ -6020,6 +6022,7 @@ static const struct global_parse_data global_fields[] = {
 	{ BOOL(disable_op_classes_80_80_mhz), 0 },
 	{ INT(pr_pasn_type), 0 },
 	{ INT_RANGE(pr_preferred_role, 0, 1), 0},
+	{ BOOL(security_profiles), 0},
 	/* NOTE: When adding new parameters here, add_interface() in
 	 * wpa_supplicant/dbus_new_introspect.c may need to be modified to
 	 * increase the size of the iface->xml buffer. */

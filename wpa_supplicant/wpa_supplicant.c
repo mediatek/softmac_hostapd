@@ -10537,6 +10537,8 @@ void wpas_configure_frame_filters(struct wpa_supplicant *wpa_s)
  */
 bool wpas_security_profile_active(struct wpa_supplicant *wpa_s)
 {
+	if (!wpa_s->conf->security_profiles)
+		return false;
 	if (wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME)
 		return true; /* wpa_supplicant-SME: always active */
 	/* driver-SME: only when driver advertises support */
