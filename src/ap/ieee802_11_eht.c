@@ -2308,7 +2308,7 @@ hostapd_parse_link_reconf_req_sta_profile(struct hostapd_data *hapd,
 	sta_info_len += nstr_bitmap_size;
 
 	sta_info = per_sta_prof->variable;
-	if (*sta_info > end - sta_info) {
+	if (sta_info >= end || *sta_info > end - sta_info) {
 		wpa_printf(MSG_DEBUG, "MLD: Not enough room for STA Info");
 		goto out;
 	}
