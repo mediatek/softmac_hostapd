@@ -3864,7 +3864,11 @@ unsigned int get_max_nss_capability(struct ieee802_11_elems *elems,
 		(struct ieee80211_he_capabilities *) elems->he_capabilities;
 	le16 mcs_map;
 
-	if (hecaps) {
+	if (hecaps &&
+	    (bw != CHAN_WIDTH_160 ||
+	     elems->he_capabilities_len >= HE_CAPABILITIES_ELEM_MIN_LEN + 4) &&
+	    (bw != CHAN_WIDTH_80P80 ||
+	     elems->he_capabilities_len >= HE_CAPABILITIES_ELEM_MIN_LEN + 8)) {
 		unsigned int max_nss_he;
 		const u8 *optional = hecaps->optional;
 
