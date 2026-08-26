@@ -1839,7 +1839,7 @@ static void hostapd_action_rx(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_DPP */
 #ifdef CONFIG_NAN_USD
-	if (mgmt->u.action.category == WLAN_ACTION_PUBLIC && plen >= 5 &&
+	if (mgmt->u.action.category == WLAN_ACTION_PUBLIC && plen >= 6 &&
 	    mgmt->u.action.u.vs_public_action.action ==
 	    WLAN_PA_VENDOR_SPECIFIC &&
 	    WPA_GET_BE24(mgmt->u.action.u.vs_public_action.oui) ==

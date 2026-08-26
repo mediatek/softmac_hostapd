@@ -8709,7 +8709,7 @@ static int handle_action(struct hostapd_data *hapd,
 #endif /* CONFIG_DPP */
 #ifdef CONFIG_NAN_USD
 		if (mgmt->u.action.category == WLAN_ACTION_PUBLIC &&
-		    len >= IEEE80211_HDRLEN + 5 &&
+		    len >= IEEE80211_HDRLEN + 6 &&
 		    mgmt->u.action.u.vs_public_action.action ==
 		    WLAN_PA_VENDOR_SPECIFIC &&
 		    WPA_GET_BE24(mgmt->u.action.u.vs_public_action.oui) ==
