@@ -7848,6 +7848,7 @@ static void handle_assoc(struct hostapd_data *hapd,
 	int omit_rsnxe = 0;
 	bool set_beacon = false;
 	bool mld_addrs_not_translated = false;
+	bool epp_sta = false;
 
 	if (len < IEEE80211_HDRLEN + (reassoc ? sizeof(mgmt->u.reassoc_req) :
 				      sizeof(mgmt->u.assoc_req))) {
@@ -8012,6 +8013,10 @@ static void handle_assoc(struct hostapd_data *hapd,
 			return;
 		}
 	}
+
+#ifdef CONFIG_ENC_ASSOC
+	epp_sta = sta->epp_sta;
+#endif /* CONFIG_ENC_ASSOC */
 
 	if ((fc & WLAN_FC_RETRY) &&
 	    sta->last_seq_ctrl != WLAN_INVALID_MGMT_SEQ &&
@@ -8294,11 +8299,16 @@ static void handle_assoc(struct hostapd_data *hapd,
 
 	/*
 	 * Remove the station in case transmission of a success response fails
-	 * (the STA was added associated to the driver) or if the station was
-	 * previously added unassociated.
+	 * (the STA was added associated to the driver) or if a non-EPP station
+	 * was previously added unassociated. For an EPP non-AP STA, defer the
+	 * cleanup until reception of a (Re)Association Response frame TX
+	 * callback to ensure that the STA context and its associated pairwise
+	 * keys are available until transmission of the encrypted
+	 * (Re)Association Response frame carrying a failure status is complete.
 	 */
 	if (sta && ((reply_res != WLAN_STATUS_SUCCESS &&
-		     resp == WLAN_STATUS_SUCCESS) || sta->added_unassoc)) {
+		     resp == WLAN_STATUS_SUCCESS) ||
+		    (sta->added_unassoc && !epp_sta))) {
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		sta->added_unassoc = 0;
 	}
@@ -9160,6 +9170,7 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 	u16 status;
 	struct sta_info *sta;
 	int new_assoc = 1;
+	bool epp_sta = false;
 
 	sta = ap_get_sta(hapd, mgmt->da);
 	if (!sta) {
@@ -9167,6 +9178,10 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 			   MAC2STR(mgmt->da));
 		return;
 	}
+
+#ifdef CONFIG_ENC_ASSOC
+	epp_sta = sta->epp_sta;
+#endif /* CONFIG_ENC_ASSOC */
 
 #ifdef CONFIG_IEEE80211BE
 	if (ap_sta_is_mld(hapd, sta) &&
@@ -9198,15 +9213,26 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "did not acknowledge association response");
 		sta->flags &= ~WLAN_STA_ASSOC_REQ_OK;
-		/* The STA is added only in case of SUCCESS */
-		if (status == WLAN_STATUS_SUCCESS)
+		/*
+		 * A non-EPP STA is added to the driver only for a successful
+		 * association. For EPP stations, the driver may retain the STA
+		 * context even for association failures until the
+		 * (Re)Association Response frame TX callback is received.
+		 * Remove the driver STA entry once the callback is received
+		 */
+		if (status == WLAN_STATUS_SUCCESS || epp_sta)
 			hostapd_drv_sta_remove(hapd, sta->addr);
 
 		goto handle_ml;
 	}
 
-	if (status != WLAN_STATUS_SUCCESS)
+	if (status != WLAN_STATUS_SUCCESS) {
+		if (epp_sta) {
+			hostapd_drv_sta_remove(hapd, sta->addr);
+			sta->added_unassoc = 0;
+		}
 		goto handle_ml;
+	}
 
 	/* Stop previous accounting session, if one is started, and allocate
 	 * new session id for the new session. */
