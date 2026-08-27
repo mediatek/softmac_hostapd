@@ -4222,6 +4222,11 @@ int wpa_sm_rx_eapol(struct wpa_sm *sm, const u8 *src_addr,
 		if ((mic_len && (key_info & WPA_KEY_INFO_MIC)) ||
 		    (!mic_len && (key_info & WPA_KEY_INFO_ENCR_KEY_DATA))) {
 			/* 1/2 Group Key Handshake */
+			if (sm->wnm_sleep_mode) {
+				wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
+					"RSN: Discard unexpected group key handshake message 1 while in WNM sleep mode");
+				goto out;
+			}
 			if (sm->mlo.valid_links)
 				wpa_supplicant_process_mlo_1_of_2(sm, src_addr,
 								  key, key_data,
@@ -4638,6 +4643,7 @@ void wpa_sm_notify_assoc(struct wpa_sm *sm, const u8 *bssid)
 #endif /* CONFIG_P2P */
 
 	sm->keyidx_active = 0;
+	sm->wnm_sleep_mode = false;
 }
 
 
@@ -4678,6 +4684,14 @@ void wpa_sm_notify_disassoc(struct wpa_sm *sm)
 	sm->msg_3_of_4_ok = 0;
 	os_memset(sm->bssid, 0, ETH_ALEN);
 	sm->hash_alg = RSN_HASH_NOT_SPECIFIED;
+	sm->wnm_sleep_mode = false;
+}
+
+
+void wpa_sm_notify_wnm_sleep_mode(struct wpa_sm *sm, bool active)
+{
+	if (sm)
+		sm->wnm_sleep_mode = active;
 }
 
 

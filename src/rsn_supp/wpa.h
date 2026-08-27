@@ -202,6 +202,7 @@ struct wpa_sm * wpa_sm_init(struct wpa_sm_ctx *ctx);
 void wpa_sm_deinit(struct wpa_sm *sm);
 void wpa_sm_notify_assoc(struct wpa_sm *sm, const u8 *bssid);
 void wpa_sm_notify_disassoc(struct wpa_sm *sm);
+void wpa_sm_notify_wnm_sleep_mode(struct wpa_sm *sm, bool active);
 void wpa_sm_set_pmk(struct wpa_sm *sm, const u8 *pmk, size_t pmk_len,
 		    const u8 *pmkid, const u8 *bssid);
 void wpa_sm_set_pmk_from_pmksa(struct wpa_sm *sm);
@@ -310,6 +311,10 @@ static inline void wpa_sm_notify_assoc(struct wpa_sm *sm, const u8 *bssid)
 }
 
 static inline void wpa_sm_notify_disassoc(struct wpa_sm *sm)
+{
+}
+
+static inline void wpa_sm_notify_wnm_sleep_mode(struct wpa_sm *sm, bool active)
 {
 }
 

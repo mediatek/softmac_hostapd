@@ -229,6 +229,8 @@ static void wnm_sleep_mode_enter_success(struct wpa_supplicant *wpa_s,
 					 const u8 *tfsresp_ie_start,
 					 const u8 *tfsresp_ie_end)
 {
+	wpa_sm_notify_wnm_sleep_mode(wpa_s->wpa, true);
+
 	wpa_drv_wnm_oper(wpa_s, WNM_SLEEP_ENTER_CONFIRM,
 			 wpa_s->bssid, NULL, NULL);
 	/* remove GTK/IGTK ?? */
@@ -255,6 +257,8 @@ static void wnm_sleep_mode_exit_success(struct wpa_supplicant *wpa_s,
 {
 	u8 *ptr, *end;
 	u8 gtk_len;
+
+	wpa_sm_notify_wnm_sleep_mode(wpa_s->wpa, false);
 
 	wpa_drv_wnm_oper(wpa_s, WNM_SLEEP_EXIT_CONFIRM,  wpa_s->bssid,
 			 NULL, NULL);

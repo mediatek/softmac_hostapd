@@ -257,6 +257,8 @@ struct wpa_sm {
 	int last_kck_eapol_key_ver;
 	u8 last_kck_aa[ETH_ALEN];
 	int last_eapol_key_ver;
+
+	bool wnm_sleep_mode;
 };
 
 
