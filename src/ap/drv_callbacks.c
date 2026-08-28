@@ -2731,7 +2731,7 @@ static void hostapd_event_color_change(struct hostapd_data *hapd, bool success)
 static void hostapd_iface_enable(struct hostapd_data *hapd)
 {
 	wpa_msg(hapd->msg_ctx, MSG_INFO, INTERFACE_ENABLED);
-	if (hapd->disabled && hapd->started) {
+	if (hapd->disabled && hapd->started && !hapd->user_disabled) {
 		hapd->disabled = 0;
 		/*
 		 * Try to re-enable interface if the driver stopped it

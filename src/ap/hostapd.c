@@ -4216,12 +4216,16 @@ int hostapd_reload_bss_only(struct hostapd_data *bss)
 
 int hostapd_enable_bss(struct hostapd_data *hapd)
 {
-	if (hapd->beacon_set_done)
+	if (!hapd->user_disabled) {
+		wpa_printf(MSG_DEBUG,
+			   "The BSS is enabled, skip the ENABLE_BSS command");
 		return 0;
+	}
 
 	if (ieee802_11_set_beacon_per_bss_only(hapd))
 		return -1;
 
+	hapd->user_disabled = 0;
 	if (hapd == bss_load_get_hapd(hapd->iface) &&
 	    bss_load_update_init(hapd->iface)) {
 		hostapd_disable_bss(hapd);
@@ -4328,22 +4332,39 @@ int hostapd_disable_iface(struct hostapd_iface *hapd_iface)
 int hostapd_disable_bss(struct hostapd_data *hapd)
 {
 	struct hostapd_iface *iface = hapd->iface;
+	struct hostapd_data *h;
 	int i, remain_bss = 0;
 
-	if (!hapd->beacon_set_done)
+	if (hapd->user_disabled) {
+		wpa_printf(MSG_DEBUG,
+			   "The BSS is disabled, skip the DISABLE_BSS command");
 		return 0;
+	}
 
-	for (i = 0; i < iface->num_bss; i++)
-		remain_bss += iface->bss[i]->beacon_set_done ? 1 : 0;
+	if (!hapd->beacon_set_done) {
+		wpa_printf(MSG_ERROR,
+			   "Cannot disable BSS '%s' before it has started",
+			   hapd->conf->iface);
+		return -1;
+	}
+
+	for (i = 0; i < iface->num_bss; i++) {
+		h = iface->bss[i];
+		remain_bss += (h->beacon_set_done && !h->user_disabled)? 1 : 0;
+	}
 
 	if (remain_bss == 1) {
 		wpa_printf(MSG_ERROR, "Cannot disable last BSS");
 		return -1;
 	}
 
-	hapd->beacon_set_done = 0;
 	hostapd_bss_deinit_no_free(hapd);
-	return hostapd_drv_stop_ap(hapd);
+	if (hostapd_drv_stop_ap(hapd))
+		wpa_printf(MSG_ERROR, "Failed to stop AP '%s'", hapd->conf->iface);
+	hapd->beacon_set_done = 0;
+	hapd->user_disabled = 1;
+
+	return 0;
 }
 
 
