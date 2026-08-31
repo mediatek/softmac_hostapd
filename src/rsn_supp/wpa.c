@@ -758,7 +758,7 @@ static int wpa_derive_ptk(struct wpa_sm *sm, const unsigned char *src_addr,
 			     sm->own_addr, wpa_sm_get_auth_addr(sm), sm->snonce,
 			     key->key_nonce, ptk, akmp,
 			     sm->pairwise_cipher, z, z_len,
-			     kdk_len);
+			     kdk_len, NULL, 0);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "WPA: PTK derivation failed");
 		return ret;

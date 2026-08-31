@@ -205,6 +205,9 @@ struct wpa_state_machine {
 	struct wpabuf *sae_pw_id;
 	unsigned int sae_pw_id_counter;
 	const struct security_profile_entry *security_profile;
+
+	u8 smd_id[ETH_ALEN];
+	bool smd_ptk_mode;
 };
 
 

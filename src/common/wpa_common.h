@@ -272,6 +272,7 @@ struct wpa_ptk {
 	u8 kck2[WPA_KCK_MAX_LEN]; /* FT reasoc Key Confirmation Key (KCK2) */
 	u8 kek2[WPA_KEK_MAX_LEN]; /* FT reassoc Key Encryption Key (KEK2) */
 	u8 kdk[WPA_KDK_MAX_LEN]; /* Key Derivation Key */
+	u8 smd_kdk[PMK_LEN_MAX]; /* SMD Key Derivation Key */
 	u8 ltf_keyseed[WPA_LTF_KEYSEED_MAX_LEN]; /* LTF Key seed */
 	size_t kck_len;
 	size_t kek_len;
@@ -279,6 +280,7 @@ struct wpa_ptk {
 	size_t kck2_len;
 	size_t kek2_len;
 	size_t kdk_len;
+	size_t smd_kdk_len;
 	size_t ptk_len;
 	size_t ltf_keyseed_len;
 	enum rsn_hash_alg hash_alg;
@@ -503,7 +505,8 @@ int wpa_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const char *label,
 		   const u8 *addr1, const u8 *addr2,
 		   const u8 *nonce1, const u8 *nonce2,
 		   struct wpa_ptk *ptk, int akmp, int cipher,
-		   const u8 *z, size_t z_len, size_t kdk_len);
+		   const u8 *z, size_t z_len, size_t kdk_len,
+		   const u8 *smd_id, size_t smd_kdk_len);
 int fils_rmsk_to_pmk(int akmp, const u8 *rmsk, size_t rmsk_len,
 		     const u8 *snonce, const u8 *anonce, const u8 *dh_ss,
 		     size_t dh_ss_len, u8 *pmk, size_t *pmk_len);

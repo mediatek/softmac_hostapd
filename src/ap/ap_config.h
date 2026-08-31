@@ -1500,6 +1500,10 @@ enum dfs_tx_mode {
 	DFS_TX_CERT_MODE,
 };
 
+enum smd_ptk_mode {
+	PER_SMD_PTK = 0,
+	PER_MLD_PTK = 1,
+};
 
 #define EDCCA_DEFAULT_COMPENSATION -6
 #define EDCCA_MIN_COMPENSATION -126

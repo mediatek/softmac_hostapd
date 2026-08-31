@@ -3098,8 +3098,8 @@ static int wpa_derive_ptk(struct wpa_state_machine *sm, const u8 *snonce,
 			  u8 *pmk_r0, u8 *pmk_r1, u8 *pmk_r0_name,
 			  size_t *key_len, bool no_kdk)
 {
-	const u8 *z = NULL;
-	size_t z_len = 0, kdk_len;
+	const u8 *z = NULL, *smd_id = NULL;
+	size_t z_len = 0, kdk_len, smd_kdk_len = 0;
 	int akmp;
 	int ret;
 
@@ -3158,10 +3158,16 @@ static int wpa_derive_ptk(struct wpa_state_machine *sm, const u8 *snonce,
 	akmp = sm->wpa_key_mgmt;
 	if (force_sha256)
 		akmp |= WPA_KEY_MGMT_PSK_SHA256;
+#ifdef CONFIG_IEEE80211BN
+	if (!is_zero_ether_addr(sm->smd_id)) {
+		smd_kdk_len = sm->smd_ptk_mode ? pmk_len : 0;
+		smd_id = sm->smd_id;
+	}
+#endif /* CONFIG_IEEE80211BN */
 	ret = wpa_pmk_to_ptk(pmk, pmk_len, "Pairwise key expansion",
 			     wpa_auth_get_aa(sm), wpa_auth_get_spa(sm),
 			     sm->ANonce, snonce, ptk, akmp,
-			     sm->pairwise, z, z_len, kdk_len);
+			     sm->pairwise, z, z_len, kdk_len, smd_id, smd_kdk_len);
 	if (ret) {
 		wpa_printf(MSG_DEBUG,
 			   "WPA: PTK derivation failed");

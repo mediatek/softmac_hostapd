@@ -1502,6 +1502,17 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		sm->rsnxe_len = 0;
 	}
 
+#ifdef CONFIG_IEEE80211BN
+	/* TODO: check the security profile element smd cap */
+	if (is_ml && ieee802_11_rsnx_capab(sm->rsnxe, WLAN_RSNX_CAPAB_SMD) &&
+	    !is_zero_ether_addr(wpa_auth->conf.smd_id)) {
+		os_memcpy(sm->smd_id, wpa_auth->conf.smd_id, ETH_ALEN);
+		sm->smd_ptk_mode = !!(wpa_auth->conf.smd_capab &
+				      IEEE80211_SMD_CAP_PTK_MODE);
+	} else
+		os_memset(sm->smd_id, 0, ETH_ALEN);
+#endif /* CONFIG_IEEE80211BN */
+
 	return WPA_IE_OK;
 }
 
