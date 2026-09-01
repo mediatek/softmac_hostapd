@@ -1229,6 +1229,11 @@ size_t hostapd_security_profile_len(struct hostapd_data *hapd)
 	u8 rsnxe_buf[2 + sizeof(u64)];
 	u8 *rsnxe_end;
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (hapd->conf->security_profile_override)
+		return wpabuf_len(hapd->conf->security_profile_override);
+#endif /* CONFIG_TESTING_OPTIONS */
+
 	max_profile = get_max_security_profile(hapd->conf->security_profiles);
 	if (max_profile < 0)
 		return 0;
@@ -1276,6 +1281,16 @@ u8 * hostapd_eid_security_profile(struct hostapd_data *hapd, u8 *eid)
 	int i, max_profile;
 	u8 rsnxe_buf[2 + sizeof(u64)];
 	u8 *rsnxe_end;
+
+#ifdef CONFIG_TESTING_OPTIONS
+	if (hapd->conf->security_profile_override) {
+		os_memcpy(eid,
+			  wpabuf_head(hapd->conf->security_profile_override),
+			  wpabuf_len(hapd->conf->security_profile_override));
+		eid += wpabuf_len(hapd->conf->security_profile_override);
+		return eid;
+	}
+#endif /* CONFIG_TESTING_OPTIONS */
 
 	max_profile = get_max_security_profile(hapd->conf->security_profiles);
 	if (max_profile < 0)

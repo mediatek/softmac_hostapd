@@ -965,6 +965,7 @@ void hostapd_config_free_bss(struct hostapd_bss_config *conf)
 	wpabuf_free(conf->rsno2e_override);
 	wpabuf_free(conf->rsnxe_override);
 	wpabuf_free(conf->rsnxoe_override);
+	wpabuf_free(conf->security_profile_override);
 	wpabuf_free(conf->sae_commit_override);
 	wpabuf_free(conf->rsne_override_eapol);
 	wpabuf_free(conf->rsnxe_override_eapol);

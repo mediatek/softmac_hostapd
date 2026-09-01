@@ -694,6 +694,7 @@ struct hostapd_bss_config {
 	struct wpabuf *rsno2e_override;
 	struct wpabuf *rsnxe_override;
 	struct wpabuf *rsnxoe_override;
+	struct wpabuf *security_profile_override;
 	int sae_reflection_attack;
 	int sae_commit_status;
 	int sae_pk_omit;

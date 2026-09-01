@@ -4551,6 +4551,10 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		if (!get_hexstream(pos, &bss->rsnxoe_override,
 				   "rsnxoe_override", line))
 			return 1;
+	} else if (os_strcmp(buf, "security_profile_override") == 0) {
+		if (!get_hexstream(pos, &bss->security_profile_override,
+				   "security_profile_override", line))
+			return 1;
 	} else if (os_strcmp(buf, "sae_reflection_attack") == 0) {
 		bss->sae_reflection_attack = atoi(pos);
 	} else if (os_strcmp(buf, "sae_commit_status") == 0) {
