@@ -4301,8 +4301,6 @@ static bool wpas_set_802_1x_auth_alg(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_IEEE8021X_AUTH */
 
 
-#ifdef CONFIG_ENC_ASSOC
-
 /*
  * wpas_eppke_ap_rsnx_capab - Check an RSNX capability bit for EPPKE purposes,
  * consulting both the AP's RSNXE and the (unmasked) Extended RSN
@@ -4339,6 +4337,8 @@ bool wpas_eppke_ap_rsnx_capab(struct wpa_supplicant *wpa_s,
 	return false;
 }
 
+
+#ifdef CONFIG_ENC_ASSOC
 
 bool wpas_eppke_ap_capable(struct wpa_supplicant *wpa_s,
 				  struct wpa_bss *bss, bool unauth_eppke)
