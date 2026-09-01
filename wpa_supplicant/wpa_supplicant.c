@@ -2737,6 +2737,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		 * security_profile_akm_matches() resolves the ambiguity without
 		 * any extra parameter.
 		 */
+#ifdef CONFIG_IEEE8021X_AUTH
 		if (ssid && ssid->eap_over_auth_frame) {
 			const u8 *bss_rsnxe =
 				wpa_bss_get_ie(bss, WLAN_EID_RSNX);
@@ -2748,6 +2749,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 				(wpa_s->drv_flags2 &
 				 WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION);
 		}
+#endif /* CONFIG_IEEE8021X_AUTH */
 
 		wpa_s->sel_security_profile =
 			security_profile_select_num(
