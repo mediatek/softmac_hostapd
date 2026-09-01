@@ -17,6 +17,7 @@
 #include "common/dpp.h"
 #include "utils/list.h"
 #include "ap_config.h"
+#include "comeback_token.h"
 #include "mld.h"
 #include "drivers/driver.h"
 
@@ -380,7 +381,6 @@ struct hostapd_data {
 #ifdef CONFIG_SAE
 
 #define COMEBACK_KEY_SIZE 8
-#define COMEBACK_PENDING_IDX_SIZE 256
 
 	/** Key used for generating SAE anti-clogging tokens */
 	u8 comeback_key[COMEBACK_KEY_SIZE];

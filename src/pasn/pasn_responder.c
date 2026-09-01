@@ -20,7 +20,6 @@
 #include "crypto/sha512.h"
 #include "crypto/random.h"
 #include "crypto/crypto.h"
-#include "ap/hostapd.h"
 #include "ap/comeback_token.h"
 #include "ap/ieee802_1x.h"
 #include "ap/pmksa_cache_auth.h"
