@@ -4274,7 +4274,6 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 	struct ieee80211_neg_ttlm *neg_ttlm;
 	struct hostapd_data *assoc_hapd;
 	char *token;
-	u16 valid_links = hapd->mld->valid_links;
 	int dir = -1, tmp;
 
 	/*
@@ -4329,7 +4328,7 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 
 		if (os_strncmp(token, "def_link_map=", 13) == 0) {
 			tmp = atoi(token + 13);
-			if (tmp < 0 || tmp > 2) {
+			if (tmp < 0 || tmp > 1) {
 				wpa_printf(MSG_ERROR,
 					   "TTLM: Invalid def_link_map value: %d",
 					   tmp);
@@ -4345,16 +4344,16 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 			}
 
 			neg_ttlm->def_link_map = !!tmp;
-		} else if (os_strncmp(token, "link_map_size=", 15) == 0) {
-			tmp = atoi(token + 15);
-			if (tmp < 0 || tmp > 2) {
+		} else if (os_strncmp(token, "link_map_size=", 14) == 0) {
+			tmp = atoi(token + 14);
+			if (tmp < 0 || tmp > 1) {
 				wpa_printf(MSG_ERROR,
 					   "TTLM: Invalid link_map_size value: %d",
 					   tmp);
 				return -1;
 			}
 
-			neg_ttlm->link_map_size = tmp;
+			neg_ttlm->link_map_size = !!tmp;
 		} else if (os_strncmp(token, "num_tids=", 9) == 0) {
 			int num_tids = atoi(token + 9), i, tid, map;
 			char *tid_str, *map_str;
@@ -4366,10 +4365,13 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 			}
 
 			/* If the link map is not specified for some tids, the
-			 * tids should be mapped to all valid links
+			 * tids should be mapped to all links set up by the STA
 			 */
-			os_memset(neg_ttlm->dlink, valid_links, sizeof(neg_ttlm->dlink));
-			os_memset(neg_ttlm->ulink, valid_links, sizeof(neg_ttlm->ulink));
+			for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
+				neg_ttlm->dlink[i] = sta->mld_info.valid_links;
+				neg_ttlm->ulink[i] = sta->mld_info.valid_links;
+			}
+
 			for (i = 0; i < num_tids; i++) {
 				tid_str = strtok_r(NULL, " ", &cmd);
 				map_str = strtok_r(NULL, " ", &cmd);
@@ -4381,7 +4383,7 @@ hostapd_ctrl_iface_negotiated_ttlm_request(struct hostapd_data *hapd,
 				}
 
 				tid = atoi(tid_str);
-				if (tid < 0 || tid > IEEE80211_TTLM_NUM_TIDS) {
+				if (tid < 0 || tid >= IEEE80211_TTLM_NUM_TIDS) {
 					wpa_printf(MSG_ERROR,
 						   "TTLM: Invalid TID: %d", tid);
 					return -1;
@@ -4433,7 +4435,8 @@ static int hostapd_ctrl_iface_negotiated_ttlm(struct hostapd_data *hapd, char *c
 		return hostapd_ctrl_iface_neg_ttlm_teardown(hapd, cmd + 9);
 	}
 
-	return 0;
+	wpa_printf(MSG_ERROR, "TTLM: Invalid TTLM command");
+	return -1;
 }
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */

@@ -3562,7 +3562,8 @@ int ieee802_11_send_neg_ttlm_request(struct hostapd_data *hapd, struct sta_info 
 	       1 + /* len */
 	       1 + /* Element ID Extension */
 	       2 + /* Control */
-	       2 * IEEE80211_TTLM_NUM_TIDS; /* Link Mapping of each TID */
+	       /* Link Mapping of each TID */
+	       (map_size ? 1 : 2) * IEEE80211_TTLM_NUM_TIDS;
 
 	buf = wpabuf_alloc(len);
 	if (!buf)
