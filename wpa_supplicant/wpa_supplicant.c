@@ -1604,7 +1604,7 @@ static int matching_ciphers(struct wpa_ssid *ssid, struct wpa_ie_data *ie,
  */
 int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt)
 {
-	u8 bitmap_len;
+	u8 bitmap_len, num_vendor;
 	const u8 *bitmap;
 	int profile, result = 0;
 	int akm_bit;
@@ -1622,7 +1622,8 @@ int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt)
 		return 0;
 
 	bitmap_len = sp[4] & 0x0F;
-	if (sp[1] < 3 + bitmap_len)
+	num_vendor = (sp[4] & 0xF0) >> 4;
+	if (sp[1] < 3 + bitmap_len + 4 * num_vendor)
 		return 0;
 
 	bitmap = sp + 5;
@@ -1666,25 +1667,42 @@ int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt)
  */
 const u8 * security_profile_get_rsnx(const u8 *sp, size_t *rsnx_len)
 {
-	u8 bitmap_len;
+	u8 bitmap_len, num_vendor;
 	size_t offset;
+	const u8 *rsnxe;
 
 	if (!sp || sp[1] < 3)
 		return NULL;
 
 	bitmap_len = sp[4] & 0x0F;
+	num_vendor = (sp[4] & 0xF0) >> 4;
+	if (sp[1] < 3 + bitmap_len + 4 * num_vendor)
+		return NULL;
 
 	/*
 	 * Offset of Extended RSN Capabilities within sp:
 	 *   EID(1) + Len(1) + EID_EXT(1) + ReducedRSNCaps(1) +
-	 *   SecProfInd(1) + bitmap(bitmap_len) = 5 + bitmap_len
+	 *   SecProfInd(1) + bitmap(bitmap_len) + vendor specific security
+	 *   profiles = 5 + bitmap_len + 4 * num_vendor
 	 */
-	offset = 5 + bitmap_len;
+	offset = 5 + bitmap_len + 4 * num_vendor;
 	if ((size_t) (sp[1] + 2) <= offset)
 		return NULL; /* no room for the full field */
 
+	rsnxe = sp + offset;
 	*rsnx_len = (size_t) (sp[1] + 2) - offset;
-	return sp + offset;
+	if (*rsnx_len > 0) {
+		unsigned int capa_len;
+
+		/* Use the Field length bits 0-3 to determine the length of the
+		 * field. */
+		capa_len = (rsnxe[0] & 0x0f) + 1;
+		if (capa_len > *rsnx_len)
+			return NULL; /* no room for the full field */
+		*rsnx_len = capa_len;
+	}
+
+	return rsnxe;
 }
 
 
