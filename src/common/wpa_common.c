@@ -4834,65 +4834,100 @@ security_profile_table[] = {
 	 * assoc_frame_encrypt, pmksa_caching_privacy */
 
 	/* 0: EPPKE (AKM 29), unauth‑EPPKE allowed */
-	{ 0, WPA_KEY_MGMT_EPPKE, WPA_CIPHER_GCMP_256, false, true, true },
+	{ 0, WPA_KEY_MGMT_EPPKE, WPA_CIPHER_GCMP_256, false, true, true, -1 },
 
 	/* 1: EPPKE + SAE (AKM 29+24) */
 	{ 1, WPA_KEY_MGMT_EPPKE | WPA_KEY_MGMT_SAE_EXT_KEY,
-	  WPA_CIPHER_GCMP_256, false, true, true },
+	  WPA_CIPHER_GCMP_256, false, true, true, -1 },
 
 	/* 2: EPPKE + FT‑SAE (AKM 29+25) */
 	{ 2, WPA_KEY_MGMT_EPPKE | WPA_KEY_MGMT_FT_SAE_EXT_KEY,
-	  WPA_CIPHER_GCMP_256, false, true, true },
+	  WPA_CIPHER_GCMP_256, false, true, true, -1 },
 
 	/* 3: EPP 802.1X (AKM 5) */
 	{ 3, WPA_KEY_MGMT_IEEE8021X_SHA256, WPA_CIPHER_GCMP_256,
-	  true, true, true },
+	  true, true, true, -1 },
 
 	/* 4: EPP FT‑802.1X (AKM 3) */
-	{ 4, WPA_KEY_MGMT_FT_IEEE8021X, WPA_CIPHER_GCMP_256, true, true, true },
+	{ 4, WPA_KEY_MGMT_FT_IEEE8021X, WPA_CIPHER_GCMP_256, true, true, true,
+	  -1 },
 
 	/* 5: EPP 802.1X (AKM 23) */
 	{ 5, WPA_KEY_MGMT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
-	  true, true, true },
+	  true, true, true, -1 },
 
 	/* 6: EPP FT‑802.1X (AKM 22) */
 	{ 6, WPA_KEY_MGMT_FT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
-	  true, true, true },
+	  true, true, true, -1 },
 
 	/* 7: EPP 802.1X (AKM 12) */
 	{ 7, WPA_KEY_MGMT_IEEE8021X_SUITE_B_192,  WPA_CIPHER_GCMP_256,
-	  true, true, true },
+	  true, true, true, -1 },
 
 	/* 8: OWE (AKM 18) */
-	{ 8, WPA_KEY_MGMT_OWE, WPA_CIPHER_GCMP_256, false, false, false },
+	{ 8, WPA_KEY_MGMT_OWE, WPA_CIPHER_GCMP_256, false, false, false, -1 },
 
 	/* 9: SAE (AKM 24) */
 	{ 9, WPA_KEY_MGMT_SAE_EXT_KEY, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 10: FT‑SAE (AKM 25) */
 	{ 10, WPA_KEY_MGMT_FT_SAE_EXT_KEY, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 11: 802.1X (AKM 5) */
 	{ 11, WPA_KEY_MGMT_IEEE8021X_SHA256, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 12: FT‑802.1X (AKM 3) */
 	{ 12, WPA_KEY_MGMT_FT_IEEE8021X, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 13: 802.1X (AKM 23) */
 	{ 13, WPA_KEY_MGMT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 14: FT‑802.1X (AKM 22) */
 	{ 14, WPA_KEY_MGMT_FT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
 
 	/* 15: 802.1X (AKM 12) */
 	{ 15, WPA_KEY_MGMT_IEEE8021X_SUITE_B_192, WPA_CIPHER_GCMP_256,
-	  false, false, false },
+	  false, false, false, -1 },
+
+#ifdef CONFIG_PQC
+	/* 16: PQC 802.1X (AKM 31), no ECP, SHA-512, ML-KEM-1024 */
+	{ 16, WPA_KEY_MGMT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 0 },
+
+	/* 17: PQC 802.1X (AKM 31), P-256, SHA-256, ML-KEM-512 */
+	{ 17, WPA_KEY_MGMT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 1 },
+
+	/* 18: PQC 802.1X (AKM 31), P-384, SHA-384, ML-KEM-768 */
+	{ 18, WPA_KEY_MGMT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 2 },
+
+	/* 19: PQC 802.1X (AKM 31), P-521, SHA-512, ML-KEM-1024 */
+	{ 19, WPA_KEY_MGMT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 3 },
+
+	/* 20: FT PQC 802.1X (AKM 32), no ECP, SHA-512, ML-KEM-1024 */
+	{ 20, WPA_KEY_MGMT_FT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 0 },
+
+	/* 21: FT PQC 802.1X (AKM 32), P-256, SHA-256, ML-KEM-512 */
+	{ 21, WPA_KEY_MGMT_FT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 1 },
+
+	/* 22: FT PQC 802.1X (AKM 32), P-384, SHA-384, ML-KEM-768 */
+	{ 22, WPA_KEY_MGMT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 2 },
+
+	/* 23: FT PQC 802.1X (AKM 32), P-521, SHA-512, ML-KEM-1024 */
+	{ 23, WPA_KEY_MGMT_FT_PQC_8021X, WPA_CIPHER_GCMP_256,
+	  true, true, true, 3 },
+#endif /* CONFIG_PQC */
 };
 
 

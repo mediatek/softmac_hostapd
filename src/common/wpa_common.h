@@ -102,6 +102,8 @@ WPA_CIPHER_BIP_CMAC_256)
 #define RSN_AUTH_KEY_MGMT_SAE_EXT_KEY RSN_SELECTOR(0x00, 0x0f, 0xac, 24)
 #define RSN_AUTH_KEY_MGMT_FT_SAE_EXT_KEY RSN_SELECTOR(0x00, 0x0f, 0xac, 25)
 #define RSN_AUTH_KEY_MGMT_EPPKE RSN_SELECTOR(0x00, 0x0f, 0xac, 29)
+#define RSN_AUTH_KEY_MGMT_PQC RSN_SELECTOR(0x00, 0x0f, 0xac, 31)
+#define RSN_AUTH_KEY_MGMT_FT_PQC RSN_SELECTOR(0x00, 0x0f, 0xac, 32)
 
 #define RSN_AUTH_KEY_MGMT_CCKM RSN_SELECTOR(0x00, 0x40, 0x96, 0x00)
 #define RSN_AUTH_KEY_MGMT_DPP RSN_SELECTOR(0x50, 0x6f, 0x9a, 0x02)
@@ -865,6 +867,7 @@ struct security_profile_entry {
 	bool ieee8021x_auth_frame;
 	bool assoc_frame_encrypt;
 	bool pmksa_caching_privacy;
+	int pqc_profile;
 };
 
 
