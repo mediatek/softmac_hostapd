@@ -421,68 +421,12 @@ int wpa_external_auth_add_rsne(u8 *rsne, size_t rsne_len, int akmp,
  */
 bool security_profile_akm_matches(int profile_num, int key_mgmt)
 {
-	switch (profile_num) {
-	case SEC_PROF_EPPKE_NO_AUTH:
-		/*
-		 * Profile 0: EPPKE (29) without mutual authentication
-		 * No SAE pre-authentication; EPPKE is used standalone, so the
-		 * negotiated AKM is plain EPPKE.
-		 */
-		return !!(key_mgmt & WPA_KEY_MGMT_EPPKE);
-	case SEC_PROF_EPPKE_SAE:
-		/*
-		 * Profile 1: EPPKE (29) with SAE (24).
-		 * The AKMP "SAE (24)" refers specifically to the OUI type 24,
-		 * i.e., WPA_KEY_MGMT_SAE_EXT_KEY (hash-to-element only). SAE
-		 * provides mutual authentication before EPPKE key
-		 * derivation; the negotiated AKM carried is SAE_EXT_KEY.
-		 * Also accept the EPPKE AKM itself: callers match this profile
-		 * against a locally configured key_mgmt of plain EPPKE when
-		 * the AP advertises profile 1 without a legacy SAE-EXT-KEY
-		 * AKM.
-		 */
-		return !!(key_mgmt &
-			  (WPA_KEY_MGMT_SAE_EXT_KEY | WPA_KEY_MGMT_EPPKE));
-	case SEC_PROF_EPPKE_FT_SAE:
-		/*
-		 * Profile 2: EPPKE (29) with FT authentication over SAE (25)
-		 * Also accept the EPPKE AKM itself for the same reason as
-		 * profile 1 above.
-		 */
-		return !!(key_mgmt &
-			  (WPA_KEY_MGMT_FT_SAE_EXT_KEY | WPA_KEY_MGMT_EPPKE));
-	case SEC_PROF_8021X_AUTH:
-	case SEC_PROF_8021X:
-		/* Profiles 3/11: 802.1X (5) */
-		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SHA256;
-	case SEC_PROF_8021X_FT_AUTH:
-	case SEC_PROF_8021X_FT:
-		/* Profiles 4/12: 802.1X+FT (3) AKM (00-0F-AC:3) */
-		return key_mgmt == WPA_KEY_MGMT_FT_IEEE8021X;
-	case SEC_PROF_8021X_SHA384_AUTH:
-	case SEC_PROF_8021X_SHA384:
-		/* Profiles 5/13: 802.1X (23) AKM (00-0F-AC:23) */
-		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SHA384;
-	case SEC_PROF_8021X_FT384_AUTH:
-	case SEC_PROF_8021X_FT384:
-		/* Profiles 6/14: 802.1X+FT (22) AKM (00-0F-AC:22) */
-		return key_mgmt == WPA_KEY_MGMT_FT_IEEE8021X_SHA384;
-	case SEC_PROF_8021X_SUITEB_AUTH:
-	case SEC_PROF_8021X_SUITEB:
-		/* Profiles 7/15: 802.1X (12) AKM (00-0F-AC:12) */
-		return key_mgmt == WPA_KEY_MGMT_IEEE8021X_SUITE_B_192;
-	case SEC_PROF_OWE:
-		/* Profile 8: None (18) AKM (00-0F-AC:18) */
-		return key_mgmt == WPA_KEY_MGMT_OWE;
-	case SEC_PROF_SAE:
-		/* Profile 9: SAE (24). */
-		return key_mgmt == WPA_KEY_MGMT_SAE_EXT_KEY;
-	case SEC_PROF_FT_SAE:
-		/* Profile 10: FT authentication over SAE (25) */
-		return key_mgmt == WPA_KEY_MGMT_FT_SAE_EXT_KEY;
-	default:
+	const struct security_profile_entry *sp;
+
+	sp = sec_prof_get(profile_num);
+	if (!sp)
 		return false;
-	}
+	return key_mgmt & sp->key_mgmt;
 }
 
 
@@ -568,6 +512,7 @@ int security_profile_select_num(int akmp, int pairwise_cipher,
 				const u8 *bitmap, size_t bitmap_len)
 {
 	unsigned int profile;
+	const struct security_profile_entry *sp;
 
 	if (!bitmap || bitmap_len == 0)
 		return -1;
@@ -585,8 +530,12 @@ int security_profile_select_num(int akmp, int pairwise_cipher,
 		if (!(byte & BIT(profile % 8)))
 			continue;
 
+		sp = sec_prof_get(profile);
+		if (!sp)
+			continue;
+
 		/* Check AKM match using the per-profile mapping */
-		if (!security_profile_akm_matches(profile, akmp))
+		if (!(akmp & sp->key_mgmt))
 			continue;
 
 		/*
@@ -598,31 +547,9 @@ int security_profile_select_num(int akmp, int pairwise_cipher,
 		 * _AUTH profiles  (3-7): require eap_over_auth == true
 		 * non-_AUTH profiles (11-15): require eap_over_auth == false
 		 */
-		switch (profile) {
-		case SEC_PROF_8021X_AUTH:
-		case SEC_PROF_8021X_FT_AUTH:
-		case SEC_PROF_8021X_SHA384_AUTH:
-		case SEC_PROF_8021X_FT384_AUTH:
-		case SEC_PROF_8021X_SUITEB_AUTH:
-			if (!eap_over_auth)
-				continue;
-			break;
-		case SEC_PROF_8021X:
-		case SEC_PROF_8021X_FT:
-		case SEC_PROF_8021X_SHA384:
-		case SEC_PROF_8021X_FT384:
-		case SEC_PROF_8021X_SUITEB:
-			if (eap_over_auth)
-				continue;
-			break;
-		default:
-			/*
-			 * EPPKE profiles (0-2), OWE (8), SAE (9), FT/SAE (10):
-			 * AKM match alone is sufficient - no further
-			 * disambiguation needed.
-			 */
-			break;
-		}
+		if ((eap_over_auth && !sp->ieee8021x_auth_frame) ||
+		    (!eap_over_auth && sp->ieee8021x_auth_frame))
+			continue;
 
 		return profile;
 	}
