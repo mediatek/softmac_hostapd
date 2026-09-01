@@ -709,7 +709,6 @@ struct hostapd_bss_config {
 	int no_beacon_rsnxe;
 	int skip_prune_assoc;
 	int ft_rsnxe_used;
-	u64 rsnxe_capab_mask;
 	unsigned int oci_freq_override_eapol_m3;
 	unsigned int oci_freq_override_eapol_g1;
 	unsigned int oci_freq_override_saquery_req;
@@ -1029,6 +1028,7 @@ struct hostapd_bss_config {
 
 	int *security_profiles; /* -1 terminated array of enabled security
 				 * profiles */
+	u64 rsnxe_capab_mask;
 };
 
 /**
