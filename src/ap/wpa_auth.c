@@ -28,7 +28,7 @@
 #include "crypto/random.h"
 #include "eapol_auth/eapol_auth_sm.h"
 #include "drivers/driver.h"
-#include "sta_info.h"
+#include "mld.h"
 #include "wpa_auth.h"
 #include "pmksa_cache_auth.h"
 #include "wpa_auth_i.h"
