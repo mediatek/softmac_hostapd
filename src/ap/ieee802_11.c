@@ -260,9 +260,9 @@ static bool find_and_validate_profile(
 	int sta_profile_num,
 	const struct wpa_ie_data *rsne_data,
 	const u8 *rsnxe, size_t rsnxe_len,
-	const struct security_profile_entry_ap **profile_matched)
+	const struct security_profile_entry **profile_matched)
 {
-	const struct security_profile_entry_ap *entry;
+	const struct security_profile_entry *entry;
 
 	/* Vaidate that security profile is enabled */
 	if (!hostapd_sec_prof_enabled(hapd->conf, sta_profile_num)) {
@@ -274,7 +274,7 @@ static bool find_and_validate_profile(
 	}
 
 	/* Validate that the profile number is known */
-	entry = wpa_auth_sp_get(sta_profile_num);
+	entry = sec_prof_get(sta_profile_num);
 	if (!entry) {
 		wpa_printf(MSG_INFO, "Unsupported security profile %d",
 			   sta_profile_num);
@@ -365,7 +365,7 @@ static bool validate_sta_security_profile(
 	const u8 *rsne, size_t rsne_len,
 	const u8 *rsnxe, size_t rsnxe_len,
 	const u8 *sec_prof, size_t sec_prof_len,
-	const struct security_profile_entry_ap **profile_matched)
+	const struct security_profile_entry **profile_matched)
 {
 	struct wpa_ie_data data;
 	int sta_profile_num;
@@ -427,7 +427,7 @@ static u16 validate_security_profile(
 	struct sta_info *sta,
 	struct ieee802_11_elems *elems,
 	const char *auth_context,
-	const struct security_profile_entry_ap **profile_matched)
+	const struct security_profile_entry **profile_matched)
 {
 	u8 *addr;
 
@@ -5839,7 +5839,7 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 	const u8 *wpa_ie;
 	size_t wpa_ie_len;
 	const u8 *p2p_dev_addr = NULL;
-	const struct security_profile_entry_ap *matched_profile = NULL;
+	const struct security_profile_entry *matched_profile = NULL;
 #ifdef CONFIG_PMKSA_PRIVACY
 	bool derive_next_pmkid = true;
 #endif /* CONFIG_PMKSA_PRIVACY */

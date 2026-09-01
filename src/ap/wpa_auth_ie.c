@@ -917,7 +917,7 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		    const u8 *mdie, size_t mdie_len,
 		    const u8 *owe_dh, size_t owe_dh_len,
 		    struct wpa_state_machine *assoc_sm, bool is_ml,
-		    const struct security_profile_entry_ap *security_profile)
+		    const struct security_profile_entry *security_profile)
 {
 	struct wpa_auth_config *conf = &wpa_auth->conf;
 	struct wpa_ie_data data;

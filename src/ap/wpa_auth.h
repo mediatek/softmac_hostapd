@@ -139,17 +139,6 @@ struct ft_rrb_seq {
 #endif /* _MSC_VER */
 
 
-/* Security Profile entry (IEEE P802.11bn/D2.0) */
-struct security_profile_entry_ap {
-	int number;
-	int key_mgmt;
-	int pairwise_cipher;
-	bool ieee8021x_auth_frame;
-	bool assoc_frame_encrypt;
-	bool pmksa_caching_privacy;
-};
-
-
 /* per STA state machine data */
 
 struct wpa_authenticator;
@@ -496,7 +485,7 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		    const u8 *owe_dh, size_t owe_dh_len,
 		    struct wpa_state_machine *assoc_sm,
 		    bool is_ml,
-		    const struct security_profile_entry_ap *security_profile);
+		    const struct security_profile_entry *security_profile);
 int wpa_validate_osen(struct wpa_authenticator *wpa_auth,
 		      struct wpa_state_machine *sm,
 		      const u8 *osen_ie, size_t osen_ie_len);
@@ -686,7 +675,7 @@ void wpa_auth_set_rsn_selection(struct wpa_state_machine *sm, const u8 *ie,
 void wpa_auth_set_dpp_z(struct wpa_state_machine *sm, const struct wpabuf *z);
 void wpa_auth_set_ssid_protection(struct wpa_state_machine *sm, bool val);
 void wpa_auth_set_security_profile(struct wpa_state_machine *sm,
-				   const struct security_profile_entry_ap *val);
+				   const struct security_profile_entry *val);
 void wpa_auth_set_transition_disable(struct wpa_authenticator *wpa_auth,
 				     u8 val);
 
@@ -786,7 +775,5 @@ int wpa_write_eppke_rsne(const u8 *wpa_ie, size_t wpa_ie_len,
 			 u8 *buf, size_t len,
 			 const u8 *pmkid, int akmp,
 			 int pairwise_cipher, enum mfp_options mfp);
-int wpa_auth_sp_implied_key_mgmt(const int *profiles);
-const struct security_profile_entry_ap * wpa_auth_sp_get(int p);
 
 #endif /* WPA_AUTH_H */

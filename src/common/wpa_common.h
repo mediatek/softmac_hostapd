@@ -857,4 +857,19 @@ int wpa_auth_802_1x_pmk_to_ptk(const u8 *pmk, size_t pmk_len, const u8 *spa,
 			       size_t kdk_len);
 void wpa_add_supported_groups(struct wpabuf *buf, const int *groups);
 
+/* Security Profile entry (IEEE P802.11bn/D2.0) */
+struct security_profile_entry {
+	int number;
+	int key_mgmt;
+	int pairwise_cipher;
+	bool ieee8021x_auth_frame;
+	bool assoc_frame_encrypt;
+	bool pmksa_caching_privacy;
+};
+
+
+
+int sec_prof_implied_key_mgmt(const int *profiles);
+const struct security_profile_entry * sec_prof_get(int p);
+
 #endif /* WPA_COMMON_H */

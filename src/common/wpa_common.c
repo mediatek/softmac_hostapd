@@ -4826,3 +4826,111 @@ void wpa_add_supported_groups(struct wpabuf *buf, const int *groups)
 	for (i = 0; i < count; i++)
 		wpabuf_put_le16(buf, groups[i]);
 }
+
+
+static const struct security_profile_entry
+security_profile_table[] = {
+	/* number, key_mgmt, pairwise_cipher, ieee8021x_auth_frame,
+	 * assoc_frame_encrypt, pmksa_caching_privacy */
+
+	/* 0: EPPKE (AKM 29), unauth‑EPPKE allowed */
+	{ 0, WPA_KEY_MGMT_EPPKE, WPA_CIPHER_GCMP_256, false, true, true },
+
+	/* 1: EPPKE + SAE (AKM 29+24) */
+	{ 1, WPA_KEY_MGMT_EPPKE | WPA_KEY_MGMT_SAE_EXT_KEY,
+	  WPA_CIPHER_GCMP_256, false, true, true },
+
+	/* 2: EPPKE + FT‑SAE (AKM 29+25) */
+	{ 2, WPA_KEY_MGMT_EPPKE | WPA_KEY_MGMT_FT_SAE_EXT_KEY,
+	  WPA_CIPHER_GCMP_256, false, true, true },
+
+	/* 3: EPP 802.1X (AKM 5) */
+	{ 3, WPA_KEY_MGMT_IEEE8021X_SHA256, WPA_CIPHER_GCMP_256,
+	  true, true, true },
+
+	/* 4: EPP FT‑802.1X (AKM 3) */
+	{ 4, WPA_KEY_MGMT_FT_IEEE8021X, WPA_CIPHER_GCMP_256, true, true, true },
+
+	/* 5: EPP 802.1X (AKM 23) */
+	{ 5, WPA_KEY_MGMT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
+	  true, true, true },
+
+	/* 6: EPP FT‑802.1X (AKM 22) */
+	{ 6, WPA_KEY_MGMT_FT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
+	  true, true, true },
+
+	/* 7: EPP 802.1X (AKM 12) */
+	{ 7, WPA_KEY_MGMT_IEEE8021X_SUITE_B_192,  WPA_CIPHER_GCMP_256,
+	  true, true, true },
+
+	/* 8: OWE (AKM 18) */
+	{ 8, WPA_KEY_MGMT_OWE, WPA_CIPHER_GCMP_256, false, false, false },
+
+	/* 9: SAE (AKM 24) */
+	{ 9, WPA_KEY_MGMT_SAE_EXT_KEY, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 10: FT‑SAE (AKM 25) */
+	{ 10, WPA_KEY_MGMT_FT_SAE_EXT_KEY, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 11: 802.1X (AKM 5) */
+	{ 11, WPA_KEY_MGMT_IEEE8021X_SHA256, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 12: FT‑802.1X (AKM 3) */
+	{ 12, WPA_KEY_MGMT_FT_IEEE8021X, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 13: 802.1X (AKM 23) */
+	{ 13, WPA_KEY_MGMT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 14: FT‑802.1X (AKM 22) */
+	{ 14, WPA_KEY_MGMT_FT_IEEE8021X_SHA384, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+
+	/* 15: 802.1X (AKM 12) */
+	{ 15, WPA_KEY_MGMT_IEEE8021X_SUITE_B_192, WPA_CIPHER_GCMP_256,
+	  false, false, false },
+};
+
+
+/**
+ * sec_prof_implied_key_mgmt - Derive implied key_mgmt from security profiles
+ * @profiles: -1 terminated int array of enabled security profile numbers
+ * Returns: Union of all AKMs defined by the enabled security profiles
+ */
+int sec_prof_implied_key_mgmt(const int *profiles)
+{
+	int i, implied = 0;
+
+	if (!profiles)
+		return 0;
+
+	for (i = 0; profiles[i] >= 0; i++) {
+		const struct security_profile_entry *sp;
+
+		sp = sec_prof_get(profiles[i]);
+		if (sp)
+			implied |= sp->key_mgmt;
+	}
+
+	return implied;
+}
+
+
+const struct security_profile_entry * sec_prof_get(int p)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(security_profile_table); i++) {
+		const struct security_profile_entry *sp;
+
+		sp = &security_profile_table[i];
+		if (sp->number == p)
+			return sp;
+	}
+
+	return NULL;
+}

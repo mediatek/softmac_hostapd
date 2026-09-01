@@ -1864,7 +1864,7 @@ void hostapd_remove_acl_mac(struct mac_acl_entry **acl, int *num,
  */
 int hostapd_config_sp_key_mgmt(const struct hostapd_bss_config *conf)
 {
-	return wpa_auth_sp_implied_key_mgmt(conf->security_profiles);
+	return sec_prof_implied_key_mgmt(conf->security_profiles);
 }
 
 
