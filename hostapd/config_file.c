@@ -887,34 +887,6 @@ static int hostapd_parse_intlist_neg1(int **int_list, char *val)
 }
 
 
-/*
- * Connac2 hostapd configurations provided thresholds for 20/40/80 MHz only.
- * Keep accepting that form with the unified driver and leave the 160 MHz
- * threshold unchanged in firmware.
- */
-static int hostapd_parse_edcca_threshold(int **threshold, char *val)
-{
-	int count = 1;
-	char *pos;
-
-	for (pos = val; *pos; pos++) {
-		if (*pos == ' ')
-			count++;
-	}
-
-	if (count != 3 && count != 4)
-		return -1;
-
-	if (hostapd_parse_intlist(threshold, val))
-		return -1;
-
-	if (count == 3)
-		(*threshold)[3] = 0x7f;
-
-	return 0;
-}
-
-
 static int hostapd_config_bss(struct hostapd_config *conf, const char *ifname)
 {
 	struct hostapd_bss_config **all, *bss;
@@ -2415,6 +2387,56 @@ static bool get_hexstream(const char *val, struct wpabuf **var,
 }
 #endif /* CONFIG_TESTING_OPTIONS */
 
+
+static int hostapd_parse_edcca_threshold(int **thres_list, char *val, int num_bw)
+{
+	int i, count = 1;
+	char *pos;
+
+	for (pos = val; *pos; pos++) {
+		if (*pos == ' ')
+			count++;
+	}
+
+	if (count != num_bw && count != num_bw - 1)
+		return -1;
+
+	os_free(*thres_list);
+	*thres_list = os_malloc(sizeof(**thres_list) * num_bw);
+	if (!*thres_list)
+		return -1;
+
+	for (i = 0; i < count; i++) {
+		char *end;
+		long threshold;
+
+		threshold = strtol(val, &end, 0);
+		if (end == val ||
+		    (threshold != EDCCA_THRES_KEEP &&
+		     (threshold < EDCCA_MIN_CONFIG_THRES ||
+		      threshold > EDCCA_MAX_CONFIG_THRES)))
+			goto fail;
+
+		(*thres_list)[i] = threshold;
+
+		while (*end == ' ')
+			end++;
+		val = end;
+	}
+
+	if (*val != '\0')
+		goto fail;
+
+	if (count == num_bw - 1)
+		(*thres_list)[num_bw - 1] = EDCCA_THRES_KEEP;
+
+	return 0;
+
+fail:
+	os_free(*thres_list);
+	*thres_list = NULL;
+	return -1;
+}
 
 static int hostapd_config_fill(struct hostapd_config *conf,
 			       struct hostapd_bss_config *bss,
@@ -5394,19 +5416,21 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		os_strlcpy(bss->apup_peer_ifname_prefix,
 		           pos, sizeof(bss->apup_peer_ifname_prefix));
 #endif // def CONFIG_APUP
-	} else if (os_strcmp(buf, "edcca_threshold") == 0) {
-		if (hostapd_parse_edcca_threshold(&conf->edcca_threshold, pos) ||
-		    conf->edcca_threshold[0] < EDCCA_MIN_CONFIG_THRES ||
-		    conf->edcca_threshold[0] > EDCCA_MAX_CONFIG_THRES ||
-		    conf->edcca_threshold[1] < EDCCA_MIN_CONFIG_THRES ||
-		    conf->edcca_threshold[1] > EDCCA_MAX_CONFIG_THRES ||
-		    conf->edcca_threshold[2] < EDCCA_MIN_CONFIG_THRES ||
-		    conf->edcca_threshold[2] > EDCCA_MAX_CONFIG_THRES ||
-		    (conf->edcca_threshold[3] != 0x7f &&
-		     (conf->edcca_threshold[3] < EDCCA_MIN_CONFIG_THRES ||
-		      conf->edcca_threshold[3] > EDCCA_MAX_CONFIG_THRES))) {
-			wpa_printf(MSG_ERROR, "Line %d: invalid edcca threshold",
-				   line);
+	} else if (os_strcmp(buf, "edcca_threshold") == 0 ||
+		   os_strcmp(buf, "cbw_threshold") == 0) {
+		int **threshold = &conf->edcca_threshold;
+		int num_bw = EDCCA_SBF_BW_NUM;
+
+		if (os_strcmp(buf, "cbw_threshold") == 0) {
+			threshold = &conf->cbw_threshold;
+			num_bw = EDCCA_MAX_BW_NUM;
+		}
+
+		if (hostapd_parse_edcca_threshold(threshold, pos, num_bw)) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: invalid %s, expect %d values in %d ~ %d",
+				   line, buf, num_bw, EDCCA_MIN_CONFIG_THRES,
+				   EDCCA_MAX_CONFIG_THRES);
 			return 1;
 		}
 	} else if (os_strcmp(buf, "edcca_enable") == 0) {

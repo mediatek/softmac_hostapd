@@ -616,6 +616,22 @@ static const char *edcca_mode_str(enum edcca_mode status)
 	}
 }
 
+static const char *edcca_region_str(u8 region_code)
+{
+	switch (region_code) {
+	case 0:
+		return "DEFAULT";
+	case 1:
+		return "FCC";
+	case 3:
+		return "JAPAN";
+	case 4:
+		return "ETSI_2023";
+	default:
+		return "UNKNOWN";
+	}
+}
+
 #ifdef CONFIG_HS20
 static int hostapd_ctrl_iface_hs20_deauth_req(struct hostapd_data *hapd,
 					      const char *cmd)
@@ -4655,6 +4671,41 @@ static int hostapd_ctrl_iface_negotiated_ttlm(struct hostapd_data *hapd, char *c
 #endif /* CONFIG_IEEE80211BE */
 
 static int
+hostapd_ctrl_iface_set_threshold(struct hostapd_data *hapd, char *value,
+				 int num_bw, bool cbw)
+{
+	int threshold_arr[EDCCA_MAX_BW_NUM];
+	int bw_idx, threshold, bw;
+	char *thres_value;
+
+	thres_value = os_strchr(value, ':');
+	if (!thres_value)
+		return -1;
+	*thres_value++ = '\0';
+
+	bw_idx = atoi(value);
+	threshold = atoi(thres_value);
+
+	if (bw_idx < EDCCA_BW_20 || bw_idx >= num_bw) {
+		wpa_printf(MSG_ERROR,
+			   "Unsupported Bandwidth idx %d for SET_EDCCA", bw_idx);
+		return -1;
+	}
+	if (threshold < EDCCA_MIN_CONFIG_THRES ||
+	    threshold > EDCCA_MAX_CONFIG_THRES) {
+		wpa_printf(MSG_ERROR,
+			   "Unsupported threshold %d for SET_EDCCA", threshold);
+		return -1;
+	}
+
+	for (bw = EDCCA_BW_20; bw < EDCCA_MAX_BW_NUM; bw++)
+		threshold_arr[bw] = EDCCA_THRES_KEEP;
+	threshold_arr[bw_idx] = threshold;
+
+	return hostapd_drv_configure_edcca_threshold(hapd, threshold_arr, cbw);
+}
+
+static int
 hostapd_ctrl_iface_set_edcca(struct hostapd_data *hapd, char *cmd,
 			     char *buf, size_t buflen)
 {
@@ -4687,37 +4738,14 @@ hostapd_ctrl_iface_set_edcca(struct hostapd_data *hapd, char *cmd,
 		if (hostapd_drv_configure_edcca_enable(hapd) != 0)
 			return -1;
 	} else if (os_strcmp(config, "threshold") == 0) {
-		char *thres_value;
-		int threshold_arr[EDCCA_MAX_BW_NUM];
-		int bw_idx, threshold;
-
-		thres_value = os_strchr(value, ':');
-		if (thres_value == NULL)
+		if (hostapd_ctrl_iface_set_threshold(hapd, value,
+						     EDCCA_SBF_BW_NUM,
+						     false) != 0)
 			return -1;
-		*thres_value++ = '\0';
-
-		bw_idx = atoi(value);
-		threshold = atoi(thres_value);
-
-		if (bw_idx < EDCCA_BW_20 || bw_idx > EDCCA_BW_160) {
-			wpa_printf(MSG_ERROR,
-				   "Unsupported Bandwidth idx %d for SET_EDCCA",
-				   bw_idx);
-			return -1;
-		}
-		if (threshold < EDCCA_MIN_CONFIG_THRES ||
-		    threshold > EDCCA_MAX_CONFIG_THRES) {
-			wpa_printf(MSG_ERROR,
-				   "Unsupported threshold %d for SET_EDCCA",
-				   threshold);
-			return -1;
-		}
-
-		/* 0x7f means keep the origival value in firmware */
-		os_memset(threshold_arr, 0x7f, sizeof(threshold_arr));
-		threshold_arr[bw_idx] = threshold;
-
-		if (hostapd_drv_configure_edcca_threshold(hapd, threshold_arr) != 0)
+	} else if (os_strcmp(config, "cbw_threshold") == 0) {
+		if (hostapd_ctrl_iface_set_threshold(hapd, value,
+						     EDCCA_MAX_BW_NUM,
+						     true) != 0)
 			return -1;
 	} else {
 		wpa_printf(MSG_ERROR,
@@ -4744,16 +4772,64 @@ hostapd_ctrl_iface_get_edcca(struct hostapd_data *hapd, char *cmd, char *buf,
 		return os_snprintf(pos, end - pos, "Compensation: %d\n",
 				   hapd->iconf->edcca_compensation);
 	} else if (os_strcmp(cmd, "threshold") == 0) {
-		u8 value[EDCCA_MAX_BW_NUM] = {0};
+		struct edcca_info info;
+		int ret;
 
-		if (hostapd_drv_get_edcca(hapd, EDCCA_CTRL_GET_THRES, value) != 0)
+		if (hostapd_drv_get_edcca(hapd, EDCCA_CTRL_GET_THRES, &info) != 0)
 			return -1;
-		return os_snprintf(pos, end - pos,
-				   "Threshold BW20: 0x%x, BW40: 0x%x, BW80: 0x%x, BW160: 0x%x\n",
-				   value[0], value[1], value[2], value[3]);
+
+		if (info.th_type == EDCCA_TH_TYPE_CBW) {
+			ret = os_snprintf(pos, end - pos,
+					  "CBW threshold: %d\n",
+					  (s8)info.value[0]);
+		} else {
+			ret = os_snprintf(pos, end - pos,
+					  "EDCCA threshold BW20: %d, BW40: %d, BW80: %d, BW160: %d\n",
+					  (s8)info.value[0], (s8)info.value[1],
+					  (s8)info.value[2], (s8)info.value[3]);
+		}
+		if (os_snprintf_error(end - pos, ret))
+			return -1;
+		pos += ret;
+
+		ret = os_snprintf(pos, end - pos, "band_idx: %u",
+				  info.band_idx);
+		if (os_snprintf_error(end - pos, ret))
+			return -1;
+		pos += ret;
+
+		if (info.region_code != EDCCA_INFO_NA) {
+			ret = os_snprintf(pos, end - pos, ", region: %s",
+					  edcca_region_str(info.region_code));
+			if (os_snprintf_error(end - pos, ret))
+				return -1;
+			pos += ret;
+		}
+
+		if (info.rx_fe_loss != EDCCA_INFO_NA) {
+			ret = os_snprintf(pos, end - pos, ", RX FE loss: %d",
+					  (s8)info.rx_fe_loss);
+			if (os_snprintf_error(end - pos, ret))
+				return -1;
+			pos += ret;
+		}
+
+		if (info.th_offset != EDCCA_INFO_NA) {
+			ret = os_snprintf(pos, end - pos, ", threshold offset: %d",
+					  (s8)info.th_offset);
+			if (os_snprintf_error(end - pos, ret))
+				return -1;
+			pos += ret;
+		}
+
+		ret = os_snprintf(pos, end - pos, "\n");
+		if (os_snprintf_error(end - pos, ret))
+			return -1;
+
+		return pos + ret - buf;
 	} else {
 		wpa_printf(MSG_ERROR,
-			"Unsupported parameter %s for GET_EDCCA", cmd);
+			   "Unsupported parameter %s for GET_EDCCA", cmd);
 		return -1;
 	}
 }

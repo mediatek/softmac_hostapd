@@ -1416,6 +1416,7 @@ struct hostapd_config {
 	u8 edcca_enable;
 	s8 edcca_compensation;
 	int *edcca_threshold;
+	int *cbw_threshold;
 	struct {
 		u8 ext_sel;
 		u8 ceb_band_sel;
@@ -1483,7 +1484,26 @@ enum edcca_bw_id {
 	EDCCA_BW_40,
 	EDCCA_BW_80,
 	EDCCA_BW_160,
+	EDCCA_BW_320,
 	EDCCA_MAX_BW_NUM,
+};
+
+/* SBF has one threshold per BW20/40/80/160, CBW adds BW320. */
+#define EDCCA_SBF_BW_NUM	EDCCA_BW_320
+#define EDCCA_INFO_NA		EDCCA_THRES_KEEP
+
+enum edcca_th_type {
+	EDCCA_TH_TYPE_EDCCA = 0,
+	EDCCA_TH_TYPE_CBW = 1,
+};
+
+struct edcca_info {
+	u8 value[EDCCA_MAX_BW_NUM];
+	u8 th_type;
+	u8 band_idx;
+	u8 region_code;
+	u8 rx_fe_loss;
+	u8 th_offset;
 };
 
 enum mtk_vendor_attr_edcca_ctrl_mode {
@@ -1515,6 +1535,7 @@ enum smd_ptk_mode {
 #define EDCCA_MAX_COMPENSATION 126
 #define EDCCA_MIN_CONFIG_THRES -126
 #define EDCCA_MAX_CONFIG_THRES 0
+#define EDCCA_THRES_KEEP 0x7f
 
 static inline enum oper_chan_width
 hostapd_get_oper_chwidth(struct hostapd_config *conf)

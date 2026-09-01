@@ -120,6 +120,7 @@ static struct nla_policy edcca_ctrl_policy[NUM_MTK_VENDOR_ATTRS_EDCCA_CTRL] = {
 	[MTK_VENDOR_ATTR_EDCCA_CTRL_COMPENSATE] = { .type = NLA_S8 },
 	[MTK_VENDOR_ATTR_EDCCA_CTRL_SEC160_VAL] = { .type = NLA_U8 },
 	[MTK_VENDOR_ATTR_EDCCA_CTRL_RADIO_IDX] = { .type = NLA_U8 },
+	[MTK_VENDOR_ATTR_EDCCA_CTRL_BW320_VAL] = { .type = NLA_U8 },
 };
 
 static const struct nla_policy
@@ -16613,7 +16614,8 @@ nl80211_configure_edcca_enable(void *priv, u8 radio_idx, const u8 edcca_enable,
 }
 
 static int
-nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold)
+nl80211_configure_edcca_threshold(void *priv, u8 radio_idx,
+				  const int *threshold, bool cbw)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -16621,17 +16623,16 @@ nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold
 	struct nlattr *data;
 	int ret;
 
-	if (!drv->mtk_edcca_vendor_cmd_avail) {
+	if (!(cbw ? drv->mtk_edcca_cbw_vendor_cmd_avail :
+		    drv->mtk_edcca_vendor_cmd_avail)) {
 		wpa_printf(MSG_INFO,
-			   "nl80211: Driver does not support setting EDCCA threshold");
+			   "nl80211: Driver does not support setting %s threshold",
+			   cbw ? "CBW" : "EDCCA");
 		return 0;
 	}
 
-	if (!threshold) {
-		wpa_printf(MSG_INFO,
-			   "nl80211: Input EDCCA threshold is empty!");
+	if (!threshold)
 		return 0;
-	}
 
 	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
 	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
@@ -16643,6 +16644,11 @@ nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold
 	    nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_SEC40_VAL, threshold[1] & 0xff) ||
 	    nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_SEC80_VAL, threshold[2] & 0xff) ||
 	    nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_SEC160_VAL, threshold[3] & 0xff) ||
+	    (cbw &&
+	     (nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_BW320_VAL,
+			 threshold[EDCCA_BW_320] & 0xff) ||
+	      nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_TH_TYPE,
+			 EDCCA_TH_TYPE_CBW))) ||
 	    nla_put_u8(msg, MTK_VENDOR_ATTR_EDCCA_CTRL_RADIO_IDX, radio_idx)) {
 		wpa_printf (MSG_ERROR, "Prepare nl80211 msg fail");
 		nlmsg_free(msg);
@@ -16651,8 +16657,9 @@ nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold
 	nla_nest_end(msg, data);
 	ret = send_and_recv_cmd(drv, msg);
 	if (ret) {
-		wpa_printf(MSG_ERROR, "Failed to configure EDCCA threshold. ret=%d (%s) ",
-			   ret, strerror(-ret));
+		wpa_printf(MSG_ERROR,
+			   "Failed to configure %s threshold. ret=%d (%s) ",
+			   cbw ? "CBW" : "EDCCA", ret, strerror(-ret));
 	}
 	return ret;
 }
@@ -16660,11 +16667,13 @@ nl80211_configure_edcca_threshold(void *priv, u8 radio_idx, const int *threshold
 
 static int edcca_info_handler(struct nl_msg *msg, void *arg)
 {
-	u8 *info = (u8 *) arg;
+	struct edcca_info *info = arg;
+	u8 *value = info->value;
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
 	struct nlattr *tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_MAX + 1];
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct nlattr *nl_vend, *attr;
+	int attr_id, last_value_attr;
 
 	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
 		  genlmsg_attrlen(gnlh, 0), NULL);
@@ -16676,39 +16685,49 @@ static int edcca_info_handler(struct nl_msg *msg, void *arg)
 	nla_parse(tb_vendor, MTK_VENDOR_ATTR_EDCCA_DUMP_MAX,
 		  nla_data(nl_vend), nla_len(nl_vend), NULL);
 
-	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_PRI20_VAL];
-	if (!attr) {
-		wpa_printf(MSG_ERROR, "nl80211: MTK_VENDOR_ATTR_EDCCA_DUMP_PRI20_VAL");
-		return NL_SKIP;
+	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_TH_TYPE];
+	info->th_type = attr ? nla_get_u8(attr) : EDCCA_TH_TYPE_EDCCA;
+	last_value_attr = info->th_type == EDCCA_TH_TYPE_CBW ?
+		MTK_VENDOR_ATTR_EDCCA_DUMP_PRI20_VAL :
+		MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL;
+
+	for (attr_id = MTK_VENDOR_ATTR_EDCCA_DUMP_PRI20_VAL;
+	     attr_id <= last_value_attr; attr_id++) {
+		attr = tb_vendor[attr_id];
+
+		if (!attr) {
+			wpa_printf(MSG_DEBUG,
+				   "nl80211: missing EDCCA dump attr %d",
+				   attr_id);
+			return NL_SKIP;
+		}
+
+		*value++ = nla_get_u8(attr);
 	}
 
-	*info++ = nla_get_u8(attr);
+	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_BAND_IDX];
+	if (attr)
+		info->band_idx = nla_get_u8(attr);
 
-	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_SEC40_VAL];
-	if (!attr) {
-		wpa_printf(MSG_ERROR, "nl80211: MTK_VENDOR_ATTR_EDCCA_DUMP_SEC40_VAL");
-		return NL_SKIP;
-	}
+	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_REGION_CODE];
+	if (attr)
+		info->region_code = nla_get_u8(attr);
 
-	*info++ = nla_get_u8(attr);
+	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_RX_FE_LOSS];
+	if (attr)
+		info->rx_fe_loss = nla_get_u8(attr);
 
-	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_SEC80_VAL];
-	if (!attr) {
-		wpa_printf(MSG_ERROR, "nl80211: MTK_VENDOR_ATTR_EDCCA_DUMP_SEC80_VAL");
-		return NL_SKIP;
-	}
+	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_TH_OFFSET];
+	if (attr)
+		info->th_offset = nla_get_u8(attr);
 
-	*info++ = nla_get_u8(attr);
-
-	attr = tb_vendor[MTK_VENDOR_ATTR_EDCCA_DUMP_SEC160_VAL];
-	/* Connac2 returns only 20/40/80 MHz thresholds. */
-	*info = attr ? nla_get_u8(attr) : 0x7f;
 	return NL_SKIP;
 }
 
 
 static int
-nl80211_get_edcca(void *priv, u8 radio_idx, const u8 mode, u8 *value)
+nl80211_get_edcca(void *priv, u8 radio_idx, const u8 mode,
+		  struct edcca_info *info)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -16734,7 +16753,7 @@ nl80211_get_edcca(void *priv, u8 radio_idx, const u8 mode, u8 *value)
 		return -ENOBUFS;
 	}
 	nla_nest_end(msg, data);
-	ret = send_and_recv_resp(drv, msg, edcca_info_handler, value);
+	ret = send_and_recv_resp(drv, msg, edcca_info_handler, info);
 	if (ret) {
 		wpa_printf(MSG_ERROR, "Failed to get EDCCA configuration. ret=%d (%s)",
 			   ret, strerror(-ret));

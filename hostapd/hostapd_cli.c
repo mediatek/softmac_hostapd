@@ -2405,9 +2405,14 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "del_mscs", hostapd_cli_cmd_del_mscs, NULL,
 		" = Delete MSCS for the specific STA" },
 	{ "set_edcca", hostapd_cli_cmd_set_edcca, NULL,
-		" = Configure EDCCA mode or threshold" },
+		" <enable|compensation|threshold|cbw_threshold> <value> ="
+		" Configure EDCCA mode or threshold, both threshold parameters"
+		" take <bw_idx>:<value>, bw_idx is 0..3 (BW20/40/80/160) for"
+		" threshold and 0..4 (plus BW320) for cbw_threshold" },
 	{ "get_edcca", hostapd_cli_cmd_get_edcca, NULL,
-		" = Get EDCCA threshold from driver" },
+		" <enable|compensation|threshold> = Get EDCCA configuration from"
+		" driver, the threshold output tells which threshold type is"
+		" active" },
 	{ "dfs_detect_mode", hostapd_cli_cmd_dfs_detect_mode, NULL,
 		" = Set DFS detection mode" },
 	{ "get_disconn_counter", hostapd_cli_cmd_get_disconn_counter, NULL,

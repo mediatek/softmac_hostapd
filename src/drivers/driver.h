@@ -32,6 +32,7 @@
 struct nan_subscribe_params;
 struct nan_publish_params;
 struct pr_pasn_ranging_params;
+struct edcca_info;
 
 #define HOSTAPD_CHAN_DISABLED 0x00000001
 #define HOSTAPD_CHAN_NO_IR 0x00000002
@@ -6210,8 +6211,9 @@ struct wpa_driver_ops {
 	int (*configure_edcca_enable)(void *priv, u8 radio_idx, const u8 edcca_enable,
 				      const s8 edcca_compensation);
 	int (*configure_edcca_threshold)(void *priv, u8 radio_idx,
-					 const int *threshold);
-	int (*get_edcca)(void *priv, u8 radio_idx, const u8 mode, u8 *value);
+					 const int *threshold, bool cbw);
+	int (*get_edcca)(void *priv, u8 radio_idx, const u8 mode,
+			 struct edcca_info *info);
 
 	/**
 	 * mu_ctrl - ctrl for UL/DL MURU

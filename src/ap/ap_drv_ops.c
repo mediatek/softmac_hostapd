@@ -1604,7 +1604,7 @@ int hostapd_drv_configure_edcca_enable(struct hostapd_data *hapd)
 
 
 int hostapd_drv_configure_edcca_threshold(struct hostapd_data *hapd,
-					  const int *threshold)
+					  const int *threshold, bool cbw)
 {
 	u8 radio_idx = 0;
 
@@ -1615,13 +1615,18 @@ int hostapd_drv_configure_edcca_threshold(struct hostapd_data *hapd,
 		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
 	return hapd->driver->configure_edcca_threshold(hapd->drv_priv, radio_idx,
-						       threshold);
+						       threshold, cbw);
 }
 
-
-int hostapd_drv_get_edcca(struct hostapd_data *hapd, const u8 mode, u8 *value)
+int hostapd_drv_get_edcca(struct hostapd_data *hapd, const u8 mode,
+			  struct edcca_info *info)
 {
 	u8 radio_idx = 0;
+
+	os_memset(info, 0, sizeof(*info));
+	info->region_code = EDCCA_INFO_NA;
+	info->rx_fe_loss = EDCCA_INFO_NA;
+	info->th_offset = EDCCA_INFO_NA;
 
 	if (!hapd->driver || !hapd->driver->get_edcca)
 		return 0;
@@ -1629,7 +1634,7 @@ int hostapd_drv_get_edcca(struct hostapd_data *hapd, const u8 mode, u8 *value)
 	if (hapd->iface->current_hw_info)
 		radio_idx = hapd->iface->current_hw_info->hw_idx;
 
-	return hapd->driver->get_edcca(hapd->drv_priv, radio_idx, mode, value);
+	return hapd->driver->get_edcca(hapd->drv_priv, radio_idx, mode, info);
 }
 
 int hostapd_drv_mu_ctrl(struct hostapd_data *hapd, u8 mode)
