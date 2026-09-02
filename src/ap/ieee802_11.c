@@ -6205,13 +6205,15 @@ static int __check_assoc_ies(struct hostapd_data *hapd, struct sta_info *sta,
 				hapd, sta, elems, type == LINK_PARSE_REASSOC ?
 				"Reassoc" : "Assoc", &matched_profile);
 
-			if (sp_resp == WLAN_STATUS_SUCCESS) {
-				wpa_printf(MSG_DEBUG,
-					   "Security Profile validated for "
-					   MACSTR
-					   " in (Re)Association Request frame",
-					   MAC2STR(sta->addr));
+			if (sp_resp != WLAN_STATUS_SUCCESS) {
+				resp = WLAN_STATUS_REJECTED_INVALID_SECURITY_PROFILE;
+				goto out;
 			}
+			wpa_printf(MSG_DEBUG,
+				   "Security Profile validated for "
+				   MACSTR
+				   " in (Re)Association Request frame",
+				   MAC2STR(sta->addr));
 		}
 
 		res = wpa_validate_wpa_ie(hapd->wpa_auth, sta->wpa_sm,
