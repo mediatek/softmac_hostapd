@@ -5255,6 +5255,13 @@ SM_STATE(WPA_PTK, PTKINITNEGOTIATING)
 	if (sm->ssid_protection)
 		kde_len += 2 + conf->ssid_len;
 
+#ifdef CONFIG_IEEE80211BN
+	/* TODO: Add check with SMD cap in SPE */
+	if (ieee802_11_rsnx_capab(sm->rsnxe, WLAN_RSNX_CAPAB_SMD) &&
+	    !is_zero_ether_addr(conf->smd_id))
+		kde_len += 3 + sizeof(struct ieee80211_smd_info);
+#endif /* CONFIG_IEEE80211BN */
+
 #ifdef CONFIG_SAE
 	if (wpa_key_mgmt_sae(sm->wpa_key_mgmt) &&
 	    conf->sae_pw_id_num &&
@@ -5425,6 +5432,20 @@ SM_STATE(WPA_PTK, PTKINITNEGOTIATING)
 		}
 	}
 #endif /* CONFIG_SAE */
+
+#ifdef CONFIG_IEEE80211BN
+	/* TODO: Add check with SMD cap in SPE */
+	if (ieee802_11_rsnx_capab(sm->rsnxe, WLAN_RSNX_CAPAB_SMD) &&
+	    !is_zero_ether_addr(conf->smd_id)) {
+		*pos++ = WLAN_EID_EXTENSION;
+		*pos++ = 1 + sizeof(struct ieee80211_smd_info);
+		*pos++ = WLAN_EID_EXT_SMD_INFO;
+		os_memcpy(pos, conf->smd_id, ETH_ALEN);
+		pos += ETH_ALEN;
+		*pos++ = conf->smd_capab;
+		*pos++ = conf->smd_prep_timeout;
+	}
+#endif /* CONFIG_IEEE80211BN */
 
 #ifdef CONFIG_TESTING_OPTIONS
 	if (conf->eapol_m3_elements) {

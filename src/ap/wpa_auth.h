@@ -338,6 +338,12 @@ struct wpa_auth_config {
 	struct wpa_authenticator *first_link_auth;
 #endif /* CONFIG_IEEE80211BE */
 
+#ifdef CONFIG_IEEE80211BN
+	u8 smd_id[ETH_ALEN];
+	u8 smd_capab;
+	u8 smd_prep_timeout;
+#endif /* CONFIG_IEEE80211BN */
+
 	bool ssid_protection;
 
 	int rsn_override_omit_rsnxe;

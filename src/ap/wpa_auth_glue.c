@@ -349,6 +349,12 @@ static void hostapd_wpa_auth_conf(struct hostapd_iface *iface,
 	wconf->force_kdk_derivation = conf->force_kdk_derivation;
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_PASN */
+#ifdef CONFIG_IEEE80211BN
+	os_memcpy(wconf->smd_id, conf->smd_id, ETH_ALEN);
+	wconf->smd_capab = conf->smd_capab;
+	wconf->smd_prep_timeout = conf->smd_prep_timeout;
+#endif /* CONFIG_IEEE80211BN */
+
 
 	if (conf->urnm_mfpr_x20 == 1)
 		wconf->urnm_mfpr_x20 = true;
