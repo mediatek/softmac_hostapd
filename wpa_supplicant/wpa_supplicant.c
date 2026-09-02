@@ -653,6 +653,10 @@ static void wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 	wpa_s->rsnxe_override_assoc = NULL;
 	wpabuf_free(wpa_s->rsnxe_override_eapol);
 	wpa_s->rsnxe_override_eapol = NULL;
+	wpabuf_free(wpa_s->sec_prof_override_auth);
+	wpa_s->sec_prof_override_auth = NULL;
+	wpabuf_free(wpa_s->sec_prof_override_assoc);
+	wpa_s->sec_prof_override_assoc = NULL;
 	wpas_clear_driver_signal_override(wpa_s);
 	for (i = 0; i < MAX_NUM_MLD_LINKS; i++) {
 		wpabuf_free(wpa_s->link_ies[i]);
@@ -4897,6 +4901,18 @@ pfs_fail:
 	}
 
 	/* Security Profile element - driver-SME path */
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->sec_prof_override_assoc &&
+	    wpabuf_len(wpa_s->sec_prof_override_assoc) <=
+	    max_wpa_ie_len - wpa_ie_len) {
+		wpa_printf(MSG_DEBUG,
+			   "TESTING: Security Profile element AssocReq override");
+		os_memcpy(wpa_ie + wpa_ie_len,
+			  wpabuf_head(wpa_s->sec_prof_override_assoc),
+			  wpabuf_len(wpa_s->sec_prof_override_assoc));
+		wpa_ie_len += wpabuf_len(wpa_s->sec_prof_override_assoc);
+	} else
+#endif /* CONFIG_TESTING_OPTIONS */
 	if (wpa_s->security_profile_len > 0 &&
 	    wpas_security_profile_active(wpa_s) &&
 	    wpa_s->security_profile_len <= max_wpa_ie_len - wpa_ie_len) {

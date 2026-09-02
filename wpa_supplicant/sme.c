@@ -737,6 +737,10 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 		return NULL;
 
 	sp_len = sme_802_1x_auth_start_sec_prof(wpa_s, external);
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->sec_prof_override_auth)
+		sp_len = wpabuf_len(wpa_s->sec_prof_override_auth);
+#endif /* CONFIG_TESTING_OPTIONS */
 
 	buf_len = 2 + 2 + 2 + wpabuf_len(eapol_pdu);
 
@@ -775,6 +779,13 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 		wpabuf_put_be32(buf, suite);
 	}
 
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->sec_prof_override_auth) {
+		wpa_printf(MSG_DEBUG,
+			   "TESTING: Security Profile element Auth override");
+		wpabuf_put_buf(buf, wpa_s->sec_prof_override_auth);
+	} else
+#endif /* CONFIG_TESTING_OPTIONS */
 	if (sp_len > 0) {
 		wpabuf_put_data(buf, wpa_s->security_profile, sp_len);
 		wpa_printf(MSG_DEBUG,
@@ -1409,6 +1420,16 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 	 *   2. AP is advertising the Security Profile element
 	 *   3. A matching profile number was selected
 	 */
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->sec_prof_override_auth) {
+		wpa_printf(MSG_DEBUG,
+			   "TESTING: Security Profile element Auth override");
+		pasn_set_security_profile(
+			pasn,
+			wpabuf_head(wpa_s->sec_prof_override_auth),
+			wpabuf_len(wpa_s->sec_prof_override_auth));
+	} else
+#endif /* CONFIG_TESTING_OPTIONS */
 	if (wpas_security_profile_active(wpa_s) &&
 	    wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE) &&
 	    wpa_s->sel_security_profile >= 0 &&
@@ -4805,6 +4826,18 @@ mscs_fail:
 	 * from the same wpa_sm state as the RSNE and RSNXE, guaranteeing
 	 * consistency.
 	 */
+#ifdef CONFIG_TESTING_OPTIONS
+	if (wpa_s->sec_prof_override_assoc &&
+	    wpabuf_len(wpa_s->sec_prof_override_assoc) <=
+	    sizeof(wpa_s->sme.assoc_req_ie) - wpa_s->sme.assoc_req_ie_len) {
+		wpa_printf(MSG_DEBUG, "TESTING: Security Profile element AssocReq override");
+		os_memcpy(wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
+			  wpabuf_head(wpa_s->sec_prof_override_assoc),
+			  wpabuf_len(wpa_s->sec_prof_override_assoc));
+		wpa_s->sme.assoc_req_ie_len +=
+			wpabuf_len(wpa_s->sec_prof_override_assoc);
+	} else
+#endif /* CONFIG_TESTING_OPTIONS */
 	if (wpa_s->sel_security_profile >= 0 &&
 	    wpa_s->security_profile_len > 0 &&
 	    wpa_s->security_profile_len <=
