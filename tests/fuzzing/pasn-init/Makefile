@@ -11,6 +11,7 @@ CFLAGS += -DCONFIG_IEEE80211R
 CFLAGS += -DCONFIG_PTKSA_CACHE
 
 OBJS += $(SRC)/utils/common.o
+OBJS += $(SRC)/utils/eloop.o
 OBJS += $(SRC)/utils/os_unix.o
 OBJS += $(SRC)/utils/wpa_debug.o
 OBJS += $(SRC)/utils/wpabuf.o
