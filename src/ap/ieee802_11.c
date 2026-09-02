@@ -176,7 +176,7 @@ static size_t hostapd_supp_rates(struct hostapd_data *hapd, u8 *buf)
 
 static int get_sta_profile_num(const u8 *sec_prof, size_t len)
 {
-	u8 indication, bitmap_len;
+	u8 indication, bitmap_len, num_vendor;
 	const u8 *bitmap;
 	unsigned int i;
 	int num = -1;
@@ -190,6 +190,13 @@ static int get_sta_profile_num(const u8 *sec_prof, size_t len)
 	 */
 	indication = sec_prof[1];
 	bitmap_len = indication & 0x0f;
+	num_vendor = (indication & 0xf0) >> 4;
+
+	if (num_vendor > 0) {
+		wpa_printf(MSG_DEBUG,
+			   "STA Security Profile element indicated a not supported vendor profile");
+		return -1;
+	}
 
 	if (len < (size_t) (2 + bitmap_len)) {
 		wpa_printf(MSG_DEBUG,
