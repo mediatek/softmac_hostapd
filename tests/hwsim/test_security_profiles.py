@@ -2637,3 +2637,58 @@ def test_security_profile_sta_proto_valid_sae(dev, apdev):
               "ff11a200230002ffaabbccdd1122334420ffff" ]
     for t in tests:
         run_security_profile_sta_proto_sae(dev, apdev, t)
+
+def run_security_profile_ap_proto_sae(dev, apdev, sp_elem, failure=False):
+    check_owe_capab(dev[0])
+    enable_sta_security_profiles(dev[0])
+
+    ssid = "security profile proto sae"
+    password = "sae password"
+    params = hostapd.wpa3_params(ssid=ssid, password=password)
+    params['wpa_key_mgmt'] = 'SAE-EXT-KEY'
+    params['rsn_pairwise'] = 'GCMP-256'
+    params['group_cipher'] = 'GCMP-256'
+    params['group_mgmt_cipher'] = 'BIP-GMAC-256'
+    params['security_profiles'] = '9'
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    hapd.note("Test iteration with STA Security Profile element: " + sp_elem)
+    dev[0].note("Test iteration with STA Security Profile element: " + sp_elem)
+
+    dev[0].set("sec_prof_override_auth", sp_elem)
+    dev[0].set("sec_prof_override_assoc", sp_elem)
+    dev[0].connect(ssid, key_mgmt="SAE-EXT-KEY", ieee80211w="2",
+                   sae_password=password, pairwise="GCMP-256", group="GCMP-256",
+                   group_mgmt="BIP-GMAC-256", scan_freq="2412",
+                   wait_connect=not failure)
+    if failure:
+        ev = dev[0].wait_event(["CTRL-EVENT-ASSOC-REJECT"], timeout=10)
+        dev[0].request("REMOVE_NETWORK all")
+        if not ev:
+            raise Exception("Association was not rejected")
+        if "status_code=159" not in ev:
+            raise Exception("Unexpected rejection reason: " + ev)
+    else:
+        dev[0].request("REMOVE_NETWORK all")
+        dev[0].wait_disconnected()
+
+    dev[0].dump_monitor()
+    hapd.disable()
+    hapd.dump_monitor()
+
+def test_security_profile_ap_proto_valid_sae(dev, apdev):
+    """Security profile protocol testing - AP with valid STA elements (SAE)"""
+    tests = [ "ff06a20002000220",
+              "ff07a20002000220ff",
+              "ff08a2000300020020ff" ]
+    for t in tests:
+        run_security_profile_ap_proto_sae(dev, apdev, t)
+
+def test_security_profile_ap_proto_invalid_sae(dev, apdev):
+    """Security profile protocol testing - AP with invalid STA elements (SAE)"""
+    tests = [ "ff03a20001",
+              "ff04a2000100",
+              "ff06a20002010220",
+              "ff0aa200120002aabbccdd20" ]
+    for t in tests:
+        run_security_profile_ap_proto_sae(dev, apdev, t, failure=True)
