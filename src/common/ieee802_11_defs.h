@@ -666,6 +666,7 @@
 #define WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY 29
 #define WLAN_RSNX_CAPAB_SAE_PW_ID_CHANGE 34
 #define WLAN_RSNX_CAPAB_UNAUTH_EPPKE 36
+#define WLAN_RSNX_CAPAB_SMD 37
 
 /* Security Profile element fields (IEEE P802.11bn/D2.0, 9.4.2.369) */
 /* Reduced RSN Capabilities field bits (Figure 9-aa75) */
@@ -3516,6 +3517,23 @@ struct ieee80211_uhr_operation {
 /* Max size in IEEE P802.11bn/D1.4 with DUO, DPS, NPCA, P-EDCA, DBE */
 #define IEEE80211_UHR_OPER_MAX_SIZE	\
 	(sizeof(struct ieee80211_uhr_operation) + 1 + 4 + 6 + 3 + 3)
+
+/* IEEE P802.11bn/D2.0, 9.4.2.363 - SMD Information element */
+
+/* SMD Capabilities field (Figure 9-aa44) */
+#define IEEE80211_SMD_CAP_DL_DATA_FORWARDING		BIT(0)
+#define IEEE80211_SMD_CAP_MAX_PREP_TARGET_AP_MLD_SHIFT	1
+#define IEEE80211_SMD_CAP_MAX_PREP_TARGET_AP_MLD_MASK	0x0E
+#define IEEE80211_SMD_CAP_SMD_TYPE			BIT(4)
+#define IEEE80211_SMD_CAP_PTK_MODE			BIT(5)
+#define IEEE80211_SMD_CAP_NEIGHBOR_AP_PROBING		BIT(6)
+
+/* SMD Information element format (Figure 9-aa43) */
+struct ieee80211_smd_info {
+	u8 smd_id[ETH_ALEN]; /* SMD Identifier: 48-bit MAC address */
+	u8 smd_capab;        /* SMD Capabilities */
+	u8 prep_timeout;     /* Preparation Timeout (units of 64 TU, 0 and 1 reserved) */
+} STRUCT_PACKED;
 
 /* IEEE P802.11bn/D1.4, Figure 9-aa4 (NPCA Operation Parameters field format) */
 #define UHR_OPER_PARAMS_NPCA_PRI_CHAN_OFFS		0x0000000F

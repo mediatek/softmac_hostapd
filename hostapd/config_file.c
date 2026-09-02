@@ -5479,6 +5479,26 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 		conf->lpi_bcn_enhance = !!en;
 	} else if (os_strcmp(buf, "sku_filename") == 0) {
 		os_strlcpy(conf->sku_filename, pos, sizeof(conf->sku_filename));
+#ifdef CONFIG_IEEE80211BN
+	} else if (os_strcmp(buf, "smd_id") == 0) {
+		if (hwaddr_aton(pos, bss->smd_id)) {
+			wpa_printf(MSG_ERROR, "Line %d: invalid smd_id '%s'",
+				   line, pos);
+			return 1;
+		}
+	} else if (os_strcmp(buf, "smd_prep_timeout") == 0) {
+		u8 val = strtol(pos, NULL, 10);
+
+		if (val < 2) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: invalid smd_prep_timeout=%d",
+				   line, val);
+			return 1;
+		}
+		bss->smd_prep_timeout = val;
+	} else if (os_strcmp(buf, "smd_ptk_mode") == 0) {
+		bss->smd_ptk_mode = !!atoi(pos);
+#endif /* CONFIG_IEEE80211BN */
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Line %d: unknown configuration item '%s'",

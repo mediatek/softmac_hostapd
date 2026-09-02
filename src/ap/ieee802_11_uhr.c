@@ -156,6 +156,49 @@ u8 * hostapd_eid_uhr_operation(struct hostapd_data *hapd, u8 *eid, bool beacon)
 }
 
 
+bool hostapd_is_smd_ap(struct hostapd_data *hapd)
+{
+	return hostapd_is_uhr_enabled(hapd) &&
+	       hapd->conf->mld_ap &&
+	       !is_zero_ether_addr(hapd->conf->smd_id);
+}
+
+
+size_t hostapd_eid_smd_info_len(struct hostapd_data *hapd)
+{
+	if (!hostapd_is_smd_ap(hapd))
+		return 0;
+
+	/* ext elem header (3) + struct ieee80211_smd_info */
+	return 3 + sizeof(struct ieee80211_smd_info);
+}
+
+
+u8 * hostapd_eid_smd_info(struct hostapd_data *hapd, u8 *eid)
+{
+	struct ieee80211_smd_info *smd;
+	u8 *pos = eid;
+
+	if (!hostapd_is_smd_ap(hapd))
+		return eid;
+
+	*pos++ = WLAN_EID_EXTENSION;
+	*pos++ = 1 + sizeof(struct ieee80211_smd_info);
+	*pos++ = WLAN_EID_EXT_SMD_INFO;
+
+	smd = (struct ieee80211_smd_info *) pos;
+	os_memcpy(smd->smd_id, hapd->conf->smd_id, ETH_ALEN);
+
+	/* TODO: B0 DL Data Forwarding, B1-B3 Max Prepared Target AP MLDs,
+	 *       B4 SMD Type, B6 Neighboring AP Probing Support — hardcoded 0 for now */
+	smd->smd_capab = hapd->conf->smd_capab;
+	smd->prep_timeout = hapd->conf->smd_prep_timeout;
+
+	pos += sizeof(*smd);
+	return pos;
+}
+
+
 static bool ieee80211_invalid_uhr_cap_size(enum hostapd_hw_mode mode,
 					   const u8 *uhr_cap, size_t len)
 {

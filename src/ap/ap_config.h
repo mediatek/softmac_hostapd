@@ -1031,6 +1031,15 @@ struct hostapd_bss_config {
 	bool mld_indicate_disabled;
 #endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CONFIG_IEEE80211BE */
+#ifdef CONFIG_IEEE80211BN
+	u8 smd_id[ETH_ALEN];
+	u8 smd_capab;
+	/* TODO: SMD Capabilities */
+	/* B0 DL Data Forwarding, B1-B3 Max Prepared Target AP MLDs,
+	 * B4 SMD Type, B6 Neighboring AP Probing Support — hardcoded 0 for now */
+	u8 smd_prep_timeout;
+	bool smd_ptk_mode; /* 0=Per-SMD PTK, 1=Per-AP MLD PTK */
+#endif /* CONFIG_IEEE80211BN */
 #ifdef CONFIG_IEEE80211AX
 	bool he_btwt_disabled;
 #endif

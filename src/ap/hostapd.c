@@ -1881,6 +1881,13 @@ setup_mld:
 		return -1;
 #endif /* CONFIG_WEP */
 
+#ifdef CONFIG_IEEE80211BN
+	if (hostapd_is_smd_ap(hapd))
+		if (hapd->conf->smd_ptk_mode)
+			hapd->conf->smd_capab |= IEEE80211_SMD_CAP_PTK_MODE;
+#endif /* CONFIG_IEEE80211BN */
+
+
 	/*
 	 * Fetch the SSID from the system and use it or,
 	 * if one was specified in the config file, verify they

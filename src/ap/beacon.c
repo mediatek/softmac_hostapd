@@ -877,6 +877,7 @@ static size_t hostapd_probe_resp_elems_len(struct hostapd_data *hapd,
 	if (hostapd_is_uhr_enabled(hapd)) {
 		buflen += hostapd_eid_uhr_capab_len(hapd, IEEE80211_MODE_AP);
 		buflen += 3 + IEEE80211_UHR_OPER_MAX_SIZE;
+		buflen += hostapd_eid_smd_info_len(hapd);
 	}
 #endif /* CONFIG_IEEE80211BN */
 
@@ -1058,6 +1059,7 @@ static u8 * hostapd_probe_resp_fill_elems(struct hostapd_data *hapd,
 	if (hostapd_is_uhr_enabled(hapd)) {
 		pos = hostapd_eid_uhr_capab(hapd, pos, IEEE80211_MODE_AP);
 		pos = hostapd_eid_uhr_operation(hapd, pos, false);
+		pos = hostapd_eid_smd_info(hapd, pos);
 	}
 #endif /* CONFIG_IEEE80211BN */
 	pos = hostapd_eid_security_profile(hapd, pos);
@@ -2502,8 +2504,10 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 	tail_len += hostapd_eid_rnr_len(hapd, WLAN_FC_STYPE_BEACON, true);
 
 #ifdef CONFIG_IEEE80211BN
-	if (hostapd_is_uhr_enabled(hapd))
+	if (hostapd_is_uhr_enabled(hapd)) {
 		tail_len += 3 + sizeof(struct ieee80211_uhr_operation);
+		tail_len += hostapd_eid_smd_info_len(hapd);
+	}
 #endif /* CONFIG_IEEE80211BN */
 	tail_len += hostapd_security_profile_len(hapd);
 
@@ -2740,6 +2744,7 @@ int ieee802_11_build_ap_params(struct hostapd_data *hapd,
 			os_free(params->uhr_oper);
 			params->uhr_oper = NULL;
 		}
+		tailpos = hostapd_eid_smd_info(hapd, tailpos);
 	}
 #endif /* CONFIG_IEEE80211BN */
 	tailpos = hostapd_eid_security_profile(hapd, tailpos);
@@ -3208,6 +3213,9 @@ static bool is_restricted_ext_eid_in_sta_profile(u8 ext_id)
 	switch (ext_id) {
 	case WLAN_EID_EXT_MULTI_LINK:
 	case WLAN_EID_EXT_TID_TO_LINK_MAPPING:
+#ifdef CONFIG_IEEE80211BN
+	case WLAN_EID_EXT_SMD_INFO:
+#endif /* CONFIG_IEEE80211BN */
 		return true;
 	default:
 		return false;
