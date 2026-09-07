@@ -35,8 +35,26 @@ def sta_cleanup(dev):
     if connected:
         dev.wait_disconnected()
 
+def check_security_profile(hapd, dev, number, eht=True, akm=None,
+                           auth_alg=None):
+    sta = hapd.get_sta(dev.own_addr())
+
+    if eht and "[EHT]" not in sta['flags']:
+        raise Exception("Missing STA flag: EHT")
+    if "[MFP]" not in sta['flags']:
+        raise Exception("Missing STA flag: MFP")
+    if akm is not None and sta["AKMSuiteSelector"] != akm:
+        raise Exception("Incorrect AKMSuiteSelector value (%s != %s)" % (sta["AKMSuiteSelector"], akm))
+    if auth_alg is not None and sta["auth_alg"] != auth_alg:
+        raise Exception("Incorrect auth_alg value (%s != %s)" % (sta["auth_alg"], auth_alg))
+
+    if "security_profile" not in sta:
+        raise Exception("hostapd did not report security profile number for the STA")
+    if int(sta["security_profile"]) != number:
+        raise Exception("hostapd reported unexpected security profile number (%s != %d)" % (sta["security_profile"], number))
+
 # Helper functions to start APs with different Security Profiles
-def start_eppke_ap_security_profile_0(apdev):
+def start_eppke_ap_security_profile_1(apdev):
     """Start EPPKE AP with Security Profile 1"""
     ssid = "sp1-eppke"
     params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
@@ -82,7 +100,6 @@ def start_mixed_eppke_sae_ap_security_profile_1(apdev):
     params['beacon_prot'] = '1'
     params['assoc_frame_encryption'] = '1'
     params['pmksa_caching_privacy'] = '1'
-    params['eppke_unauth'] = '1'
     params['sae_pwe'] = '2'
 
     # Advertise both security profiles 1 and 9
@@ -98,8 +115,8 @@ def start_mixed_eppke_sae_ap_security_profile_1(apdev):
 
     return hapd, passphrase
 
-def start_mixed_eppke_base_ap_security_profile_1(apdev):
-    """Start AP with EPPKE base AKMP advertising Security Profiles 1 and 9"""
+def start_mixed_eppke_base_ap_security_profile_0(apdev):
+    """Start AP with EPPKE base AKMP advertising Security Profiles 0 and 8"""
     ssid = "sp1-eppke-base"
 
     params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
@@ -116,8 +133,8 @@ def start_mixed_eppke_base_ap_security_profile_1(apdev):
     params['pmksa_caching_privacy'] = '1'
     params['eppke_unauth'] = '1'
 
-    # Advertise both security profiles 1 and 9
-    params['security_profiles'] = '1 9'
+    # Advertise both security profiles 0 and 8
+    params['security_profiles'] = '0 8'
 
     try:
         hapd = hostapd.add_ap(apdev, params)
@@ -129,12 +146,13 @@ def start_mixed_eppke_base_ap_security_profile_1(apdev):
 
     return hapd
 
-def test_security_profile_0_eppke(dev, apdev):
+def test_security_profile_1_eppke(dev, apdev):
     """Security Profile 1 - EPPKE with GCMP-256"""
     check_eppke_capab(dev[0])
-    hapd = start_eppke_ap_security_profile_0(apdev[0])
+    hapd = start_eppke_ap_security_profile_1(apdev[0])
 
     try:
+        enable_sta_security_profiles(dev[0])
         dev[0].connect("sp1-eppke", scan_freq="2412", key_mgmt="EPPKE",
                        ieee80211w="2", beacon_prot="1",
                        pairwise="GCMP-256", group="GCMP-256",
@@ -147,13 +165,7 @@ def test_security_profile_0_eppke(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[EHT]" not in sta['flags']:
-            raise Exception("Missing STA flag: EHT")
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
-        if sta["AKMSuiteSelector"] != '00-0f-ac-29' or sta["auth_alg"] != '9':
-            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+        check_security_profile(hapd, dev[0], 1, akm='00-0f-ac-29', auth_alg='9')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -187,28 +199,21 @@ def test_security_profile_1_mixed_sae_ext_sta(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[EHT]" not in sta['flags']:
-            raise Exception("Missing STA flag: EHT")
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
-
-        # Verify SAE-EXT-KEY was used (AKMP Suite Selector 00-0f-ac-18)
-        if sta["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("Expected SAE-EXT-KEY AKM, got: " + sta["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
     finally:
         sta_cleanup(dev[0])
 
-def test_security_profile_1_mixed_eppke_sta(dev, apdev):
-    """Security Profile 1+9 - EPPKE STA connecting to AP with EPPKE base"""
+def test_security_profile_0_mixed_eppke_sta(dev, apdev):
+    """Security Profile 0+8 - EPPKE STA connecting to AP with EPPKE base"""
     check_eppke_capab(dev[0])
-    hapd = start_mixed_eppke_base_ap_security_profile_1(apdev[0])
+    hapd = start_mixed_eppke_base_ap_security_profile_0(apdev[0])
 
     try:
-        # EPPKE STA connecting to AP that advertises EPPKE + Security Profiles 1 and 9
+        # EPPKE STA connecting to AP that advertises EPPKE + Security Profiles 0 and 8
+        enable_sta_security_profiles(dev[0])
         dev[0].connect("sp1-eppke-base", scan_freq="2412",
                        key_mgmt="EPPKE",
                        ieee80211w="2", beacon_prot="1",
@@ -224,17 +229,7 @@ def test_security_profile_1_mixed_eppke_sta(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[EHT]" not in sta['flags']:
-            raise Exception("Missing STA flag: EHT")
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
-
-        # Verify EPPKE was used (AKMP Suite Selector 00-0f-ac-29)
-        if sta["AKMSuiteSelector"] != '00-0f-ac-29':
-            raise Exception("Expected EPPKE AKM, got: " + sta["AKMSuiteSelector"])
-        if sta["auth_alg"] != '9':
-            raise Exception("Expected EPPKE auth_alg=9, got: " + sta["auth_alg"])
+        check_security_profile(hapd, dev[0], 0, akm='00-0f-ac-29', auth_alg='9')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -280,11 +275,7 @@ def test_security_profile_3_eap_tls_mlo_single_link(dev, apdev):
                      group="GCMP-256")
 
         hapd0.wait_sta()
-
-        sta = hapd0.get_sta(wpas.own_addr())
-        if sta["AKMSuiteSelector"] != '00-0f-ac-5':
-            raise Exception("Incorrect AKMSuiteSelector (single-link), got: " +
-                            sta["AKMSuiteSelector"])
+        check_security_profile(hapd0, wpas, 3, akm='00-0f-ac-5')
 
         # Verify MLD state: single link active
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
@@ -334,14 +325,7 @@ def test_security_profile_5_eap_sha384_mlo(dev, apdev):
                      group_mgmt="BIP-GMAC-256")
 
         hapd0.wait_sta()
-
-        sta = hapd0.get_sta(wpas.own_addr())
-        # AKM 23 decimal = 0x17 hex, but wpa_supplicant reports it as 00-0f-ac-23
-        # (the suite type byte is displayed in hex: 0x23 = 35 decimal is wrong;
-        #  the actual value seen is 00-0f-ac-23 which is what the implementation uses)
-        if sta["AKMSuiteSelector"] != '00-0f-ac-23':
-            raise Exception("Incorrect AKMSuiteSelector for Profile 5, got: " +
-                            sta["AKMSuiteSelector"])
+        check_security_profile(hapd0, wpas, 5, akm='00-0f-ac-23')
 
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=1, active_links=1)
@@ -398,12 +382,7 @@ def test_security_profile_7_eap_suite_b_192_mlo(dev, apdev):
                      group_mgmt="BIP-GMAC-256")
 
         hapd0.wait_sta()
-
-        sta = hapd0.get_sta(wpas.own_addr())
-        # AKM 12 = WPA-EAP-SUITE-B-192; suite selector uses decimal: 00-0f-ac-12
-        if sta["AKMSuiteSelector"] != '00-0f-ac-12':
-            raise Exception("Incorrect AKMSuiteSelector for Profile 7, got: " +
-                            sta["AKMSuiteSelector"])
+        check_security_profile(hapd0, wpas, 7, akm='00-0f-ac-12')
 
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=1, active_links=1)
@@ -423,7 +402,7 @@ def test_eppke_sae_ext_key_mlo_group_19(dev, apdev):
     params['sae_pwe'] = '2'
     params['pasn_groups'] = str(group)
     params['security_profiles'] = '1'
-    params['rsn_pairwise'] = 'CCMP'
+    params['rsn_pairwise'] = 'CCMP GCMP-256'
     params['sae_groups'] = str(group)
     params['group_cipher'] = 'GCMP-256'
     params['group_mgmt_cipher'] = 'BIP-GMAC-256'
@@ -449,7 +428,7 @@ def test_eppke_sae_ext_key_mlo_group_19(dev, apdev):
         sta_cleanup(dev[0])
 
 def test_eppke_sp_mlo_two_link(dev, apdev):
-    """EPPKE authentication with Security Profiles (SP 0-7) on MLO with two links"""
+    """EPPKE authentication with Security Profiles (SP 1) on MLO with two links"""
     with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
          HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
         wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
@@ -458,11 +437,10 @@ def test_eppke_sp_mlo_two_link(dev, apdev):
         passphrase = '1234567890'
         ssid = "test-eppke-sp"
         params = eht_mld_ap_wpa2_params(ssid, passphrase,
-                                        key_mgmt="SAE-EXT-KEY EPPKE", mfp="2", pwe='1',
-                                        beacon_prot=1)
+                                        key_mgmt="SAE-EXT-KEY EPPKE", mfp="2",
+                                        pwe='1', beacon_prot=1)
         params['assoc_frame_encryption'] = '1'
         params['pmksa_caching_privacy'] = '1'
-        params['eap_using_authentication_frames'] = '1'
         params['rsn_pairwise'] = "CCMP GCMP-256"
         params['security_profiles'] = '1'
         hapd0 = eht_mld_enable_ap(hapd_iface, 0, params)
@@ -474,18 +452,17 @@ def test_eppke_sp_mlo_two_link(dev, apdev):
         wpas.set("pasn_groups", "")
         wpas.set("sae_pwe", "1")
         wpas.connect(ssid, sae_password=passphrase, scan_freq="2412 2437",
-                     key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2", beacon_prot="1",
+                     key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
+                     beacon_prot="1",
                      pairwise="CCMP GCMP-256", pmksa_privacy="1")
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=3, active_links=3)
         hapd0.wait_sta()
-        sta = hapd0.get_sta(wpas.own_addr())
-        if sta["AKMSuiteSelector"] != '00-0f-ac-24' or sta["auth_alg"] != '9':
-            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+        check_security_profile(hapd0, wpas, 1, akm='00-0f-ac-24', auth_alg='9')
         hwsim_utils.test_connectivity(wpas, hapd0)
 
 def test_sp9_sp_mlo_two_link(dev, apdev):
-    """EPPKE authentication with Security Profiles (SP 0-7) on MLO with two links"""
+    """Non-EPPKE authentication with Security Profiles (SP 9) on MLO with two links"""
     with HWSimRadio(use_mlo=True) as (hapd_radio, hapd_iface), \
          HWSimRadio(use_mlo=True) as (wpas_radio, wpas_iface):
         wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
@@ -512,9 +489,7 @@ def test_sp9_sp_mlo_two_link(dev, apdev):
         eht_verify_status(wpas, hapd0, 2412, 20, is_ht=True, mld=True,
                           valid_links=3, active_links=3)
         hapd0.wait_sta()
-        sta = hapd0.get_sta(wpas.own_addr())
-        if sta["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("Incorrect Auth Algo/AKMSuiteSelector value")
+        check_security_profile(hapd0, wpas, 9, akm='00-0f-ac-24')
         hwsim_utils.test_connectivity(wpas, hapd0)
 
 def test_eppke_sae_ext_key_mlo_group_19_TB(dev, apdev):
@@ -825,11 +800,7 @@ def test_security_profile_9_sae(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[EHT]" not in sta['flags']:
-            raise Exception("Missing STA flag: EHT")
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -877,7 +848,7 @@ def test_security_profile_9_11ax_sta(dev, apdev):
         status = dev[0].get_status()
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24', eht=False)
 
         # Test traffic
         hwsim_utils.test_connectivity(dev[0], hapd)
@@ -931,11 +902,7 @@ def test_security_profile_9_sae_ext_with_rsnxe_mask(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[EHT]" not in sta['flags']:
-            raise Exception("Missing STA flag: EHT")
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1008,9 +975,7 @@ def test_security_profile_9_psk2_base_sta_sae_ext_key(dev, apdev):
             raise Exception("PMF not enabled")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1074,9 +1039,7 @@ def test_security_profile_9_sae_base_sta_sae_ext_key(dev, apdev):
             raise Exception("PMF not enabled")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1141,9 +1104,7 @@ def test_security_profile_9_sae_ccmp_base_sta_sae_ext_key(dev, apdev):
             raise Exception("PMF not enabled")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1210,9 +1171,7 @@ def test_security_profile_override_akm_cipher_9(dev, apdev):
             raise Exception("PMF not enabled (expected from security profile MFPR=1)")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1273,9 +1232,7 @@ def test_security_profile_override_akm_cipher_8(dev, apdev):
             raise Exception("PMF not enabled (expected from security profile MFPR=1)")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 8, akm='00-0f-ac-18')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1338,9 +1295,7 @@ def test_security_profile_override_akm_cipher_11(dev, apdev):
             raise Exception("PMF not enabled (expected from security profile MFPR=1)")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 11)
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1406,9 +1361,7 @@ def test_security_profile_override_rsnx_capab(dev, apdev):
             raise Exception("PMF not enabled")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1468,9 +1421,7 @@ def test_security_profile_override_rsn_caps_mfpr(dev, apdev):
             raise Exception("PMF not enabled (expected from security profile MFPR=1)")
 
         hapd.wait_sta()
-        sta = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta['flags']:
-            raise Exception("Missing STA flag: MFP")
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -1652,12 +1603,7 @@ def test_security_profile_9_and_13_coexistence(dev, apdev):
         if status0['pairwise_cipher'] != 'GCMP-256':
             raise Exception("STA0: Expected GCMP-256 pairwise, got: " +
                             status0['pairwise_cipher'])
-        sta0 = hapd.get_sta(dev[0].own_addr())
-        if "[MFP]" not in sta0['flags']:
-            raise Exception("STA0: Missing MFP flag")
-        if sta0["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA0: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta0["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24')
 
         # ---- STA 1: Security Profile 13 (WPA-EAP-SHA384 / GCMP-256) ----
         dev[1].connect(ssid, key_mgmt="WPA-EAP-SHA384",
@@ -1868,12 +1814,7 @@ def test_rsn_override_three_layer_coexistence(dev, apdev):
         if status2['pairwise_cipher'] != 'GCMP-256':
             raise Exception("STA2: Expected GCMP-256 pairwise, got: " +
                             status2['pairwise_cipher'])
-        sta2 = hapd.get_sta(dev[2].own_addr())
-        if "[MFP]" not in sta2['flags']:
-            raise Exception("STA2: Missing MFP flag")
-        if sta2["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA2: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta2["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[2], 9, akm='00-0f-ac-24')
 
         # All three connected simultaneously - verify independent data paths
         hwsim_utils.test_connectivity(dev[0], hapd)
@@ -2008,12 +1949,7 @@ def test_rsn_override_four_layer_coexistence(dev, apdev):
         if status3['pairwise_cipher'] != 'GCMP-256':
             raise Exception("STA3: Expected GCMP-256 pairwise, got: " +
                             status3['pairwise_cipher'])
-        sta3 = hapd.get_sta(wpas.own_addr())
-        if "[MFP]" not in sta3['flags']:
-            raise Exception("STA3: Missing MFP flag")
-        if sta3["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA3: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta3["AKMSuiteSelector"])
+        check_security_profile(hapd, wpas, 9, akm='00-0f-ac-24')
 
         # All four connected simultaneously - verify independent data paths
         hwsim_utils.test_connectivity(dev[0], hapd)
@@ -2110,12 +2046,7 @@ def test_rsn_override_eap_sha256_sp9(dev, apdev):
                        group_mgmt="BIP-GMAC-256",
                        scan_freq="2412")
         hapd.wait_sta()
-        sta2 = hapd.get_sta(dev[2].own_addr())
-        if "[MFP]" not in sta2['flags']:
-            raise Exception("STA2: Missing MFP flag")
-        if sta2["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA2: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta2["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[2], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
         hwsim_utils.test_connectivity(dev[1], hapd)
@@ -2194,6 +2125,7 @@ def test_rsn_override_sae_sp11(dev, apdev):
                             sta1["AKMSuiteSelector"])
 
         # ---- STA 2: Security Profile 11 - WPA-EAP-SHA256 / GCMP-256 ----
+        enable_sta_security_profiles(dev[2])
         dev[2].connect(ssid, key_mgmt="WPA-EAP-SHA256",
                        ieee80211w="2", eap="TLS",
                        identity="tls user",
@@ -2208,12 +2140,7 @@ def test_rsn_override_sae_sp11(dev, apdev):
         if status2['key_mgmt'] != 'WPA2-EAP-SHA256':
             raise Exception("STA2: Expected WPA2-EAP-SHA256, got: " +
                             status2['key_mgmt'])
-        sta2 = hapd.get_sta(dev[2].own_addr())
-        if "[MFP]" not in sta2['flags']:
-            raise Exception("STA2: Missing MFP flag")
-        if sta2["AKMSuiteSelector"] != '00-0f-ac-5':
-            raise Exception("STA2: Expected WPA-EAP-SHA256 (00-0f-ac-5), got: " +
-                            sta2["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[2], 11, akm='00-0f-ac-5')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
         hwsim_utils.test_connectivity(dev[1], hapd)
@@ -2299,12 +2226,7 @@ def test_rsn_override_psk_owe_sp9(dev, apdev):
                        group_mgmt="BIP-GMAC-256",
                        scan_freq="2412")
         hapd.wait_sta()
-        sta2 = hapd.get_sta(dev[2].own_addr())
-        if "[MFP]" not in sta2['flags']:
-            raise Exception("STA2: Missing MFP flag")
-        if sta2["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA2: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta2["AKMSuiteSelector"])
+        check_security_profile(hapd, dev[2], 9, akm='00-0f-ac-24')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
         hwsim_utils.test_connectivity(dev[1], hapd)
@@ -2388,20 +2310,13 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
         # ---- STA 2: Security Profile 1 (EPPKE) ----
         wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
         wpas.interface_add('wlan5')
+        enable_sta_security_profiles(wpas)
         wpas.connect(ssid, scan_freq="2412", key_mgmt="EPPKE",
                      ieee80211w="2",
                      pairwise="GCMP-256", group="GCMP-256",
                      group_mgmt="BIP-GMAC-256", pmksa_privacy="1")
         hapd.wait_sta()
-        sta2 = hapd.get_sta(wpas.own_addr())
-        if "[MFP]" not in sta2['flags']:
-            raise Exception("STA2: Missing MFP flag")
-        if sta2["AKMSuiteSelector"] != '00-0f-ac-29':
-            raise Exception("STA2: Expected EPPKE (00-0f-ac-29), got: " +
-                            sta2["AKMSuiteSelector"])
-        if sta2["auth_alg"] != '9':
-            raise Exception("STA2: Expected EPPKE auth_alg=9, got: " +
-                            sta2["auth_alg"])
+        check_security_profile(hapd, wpas, 1, akm='00-0f-ac-29', auth_alg='9')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
         hwsim_utils.test_connectivity(dev[1], hapd)
@@ -2519,30 +2434,19 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
                              pmksa_privacy="1",
                              scan_freq="2412")
         hapd.wait_sta()
-        sta3 = hapd.get_sta(wpas_sae_ext.own_addr())
-        if "[MFP]" not in sta3['flags']:
-            raise Exception("STA3: Missing MFP flag")
-        if sta3["AKMSuiteSelector"] != '00-0f-ac-24':
-            raise Exception("STA3: Expected SAE-EXT-KEY (00-0f-ac-24), got: " +
-                            sta3["AKMSuiteSelector"])
+        check_security_profile(hapd, wpas_sae_ext, 9, akm='00-0f-ac-24')
 
         # ---- STA 4: Security Profile 1 - EPPKE ----
         wpas_eppke = WpaSupplicant(global_iface='/tmp/wpas-wlan6')
         wpas_eppke.interface_add('wlan6')
+        enable_sta_security_profiles(wpas_eppke)
         wpas_eppke.connect(ssid, scan_freq="2412", key_mgmt="EPPKE",
                            ieee80211w="2",
                            pairwise="GCMP-256", group="GCMP-256",
                            group_mgmt="BIP-GMAC-256", pmksa_privacy="1")
         hapd.wait_sta()
-        sta4 = hapd.get_sta(wpas_eppke.own_addr())
-        if "[MFP]" not in sta4['flags']:
-            raise Exception("STA4: Missing MFP flag")
-        if sta4["AKMSuiteSelector"] != '00-0f-ac-29':
-            raise Exception("STA4: Expected EPPKE (00-0f-ac-29), got: " +
-                            sta4["AKMSuiteSelector"])
-        if sta4["auth_alg"] != '9':
-            raise Exception("STA4: Expected EPPKE auth_alg=9, got: " +
-                            sta4["auth_alg"])
+        check_security_profile(hapd, wpas_eppke, 1, akm='00-0f-ac-29',
+                               auth_alg='9')
 
         # All four connected simultaneously - verify independent data paths
         hwsim_utils.test_connectivity(dev[0], hapd)
