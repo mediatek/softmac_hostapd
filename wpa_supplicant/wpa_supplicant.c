@@ -8119,6 +8119,17 @@ static void radio_start_next_work(void *eloop_ctx, void *timeout_ctx)
 }
 
 
+void radio_remove_work(struct wpa_supplicant *wpa_s,
+		       struct wpa_radio_work *work)
+{
+	wpa_dbg(wpa_s, MSG_DEBUG, "Remove radio work '%s'@%p%s",
+		work->type, work, work->started ? " (started)" : "");
+	dl_list_del(&work->list);
+	work->cb(work, 1);
+	radio_work_free(work);
+}
+
+
 /*
  * This function removes both started and pending radio works running on
  * the provided interface's radio.
@@ -8145,11 +8156,7 @@ void radio_remove_works(struct wpa_supplicant *wpa_s,
 		if (!remove_all && work->wpa_s != wpa_s)
 			continue;
 
-		wpa_dbg(wpa_s, MSG_DEBUG, "Remove radio work '%s'@%p%s",
-			work->type, work, work->started ? " (started)" : "");
-		dl_list_del(&work->list);
-		work->cb(work, 1);
-		radio_work_free(work);
+		radio_remove_work(wpa_s, work);
 	}
 
 	/* in case we removed the started work */

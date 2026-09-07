@@ -405,6 +405,8 @@ radio_add_work(struct wpa_supplicant *wpa_s, unsigned int freq,
 	       void (*cb)(struct wpa_radio_work *work, int deinit),
 	       void *ctx);
 void radio_work_done(struct wpa_radio_work *work);
+void radio_remove_work(struct wpa_supplicant *wpa_s,
+		       struct wpa_radio_work *work);
 void radio_remove_works(struct wpa_supplicant *wpa_s,
 			const char *type, int remove_all);
 void radio_work_check_next(struct wpa_supplicant *wpa_s);
