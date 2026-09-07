@@ -2700,6 +2700,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		u8 bitmap_len;
 		const u8 *bitmap;
 		bool eap_over_auth = false;
+		bool eppke = false;
 
 		if (!sp ||sp[1] < 3)
 			goto no_valid_sp;
@@ -2755,24 +2756,31 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		}
 #endif /* CONFIG_IEEE8021X_AUTH */
 
+#ifdef CONFIG_ENC_ASSOC
+		if (wpa_s->key_mgmt == WPA_KEY_MGMT_EPPKE ||
+		    ((wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
+		     (sel & WPA_KEY_MGMT_EPPKE)))
+			eppke = true;
+#endif /* CONFIG_ENC_ASSOC */
+
 		wpa_s->sel_security_profile =
 			security_profile_select_num(
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
-				eap_over_auth, bitmap, bitmap_len);
+				eap_over_auth, eppke, bitmap, bitmap_len);
 
 		if (wpa_s->sel_security_profile >= 0) {
 			wpa_dbg(wpa_s, MSG_DEBUG,
-				"Security Profile: selected profile %d (key_mgmt=0x%x eap_over_auth=%d)",
+				"Security Profile: selected profile %d (key_mgmt=0x%x eap_over_auth=%d eppke=%d)",
 				wpa_s->sel_security_profile, wpa_s->key_mgmt,
-				eap_over_auth);
+				eap_over_auth, eppke);
 			wpa_sm_set_param(wpa_s->wpa,
 					 WPA_PARAM_SECURITY_PROFILE_ACTIVE,
 					 true);
 		} else {
 			wpa_dbg(wpa_s, MSG_DEBUG,
-				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x eap_over_auth=%d)",
+				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x eap_over_auth=%d eppke=%d)",
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
-				eap_over_auth);
+				eap_over_auth, eppke);
 		}
 	no_valid_sp:
 	}

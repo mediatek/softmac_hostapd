@@ -26,7 +26,7 @@ u64 wpa_sm_get_rsnxe_capab(struct wpa_sm *sm);
 bool security_profile_akm_matches(int profile_num, int key_mgmt);
 bool security_profile_has_eppke(const u8 *sp, int ssid_key_mgmt);
 int security_profile_select_num(int akmp, int pairwise_cipher,
-				bool eap_over_auth,
+				bool eap_over_auth, bool eppke,
 				const u8 *bitmap, size_t bitmap_len);
 int security_profile_build_sta(struct wpa_sm *sm, int selected_profile_num,
 			       u8 *buf, size_t buf_len);

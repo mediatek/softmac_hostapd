@@ -680,7 +680,7 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 	bitmap = sp_ap + 5;
 
 	profile_num = security_profile_select_num(
-		key_mgmt, wpa_s->sme.ext_pairwise_cipher, true,
+		key_mgmt, wpa_s->sme.ext_pairwise_cipher, true, false,
 		bitmap, bitmap_len);
 
 	if (profile_num < 0)

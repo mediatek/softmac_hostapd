@@ -484,6 +484,7 @@ bool security_profile_has_eppke(const u8 *sp, int ssid_key_mgmt)
  *                 Used to disambiguate 802.1X _AUTH profiles (3-7) from the
  *                 corresponding non-_AUTH profiles (11-15) that share the
  *                 same AKM.  Must be false for non-802.1X AKMs.
+ * @eppke: Whether EPPKE is used
  * @bitmap: AP's Security Profile Bitmap (from the Security Profile element)
  * @bitmap_len: Length of @bitmap in bytes
  * Returns: Selected profile number (0-119) on success, -1 if no match found.
@@ -508,7 +509,7 @@ bool security_profile_has_eppke(const u8 *sp, int ssid_key_mgmt)
  *     capabilities.
  */
 int security_profile_select_num(int akmp, int pairwise_cipher,
-				bool eap_over_auth,
+				bool eap_over_auth, bool eppke,
 				const u8 *bitmap, size_t bitmap_len)
 {
 	unsigned int profile;
@@ -549,6 +550,12 @@ int security_profile_select_num(int akmp, int pairwise_cipher,
 		 */
 		if ((eap_over_auth && !sp->ieee8021x_auth_frame) ||
 		    (!eap_over_auth && sp->ieee8021x_auth_frame))
+			continue;
+
+		/* Handle the profile 1 vs. 9 based on whether EPPKE is used */
+		if (sp->key_mgmt == (WPA_KEY_MGMT_EPPKE |
+				     WPA_KEY_MGMT_SAE_EXT_KEY) &&
+		    sp->assoc_frame_encrypt != eppke)
 			continue;
 
 		return profile;

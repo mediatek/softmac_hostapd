@@ -905,7 +905,8 @@ static void wpas_pasn_sec_prof_eppke(struct wpa_supplicant *wpa_s,
 	 * No new driver attribute is required.
 	 */
 	profile_num = security_profile_select_num(awork->akmp, awork->cipher,
-						  false, bitmap, bitmap_len);
+						  false, true,
+						  bitmap, bitmap_len);
 	if (profile_num < 0)
 		return;
 
