@@ -53,6 +53,12 @@ def check_security_profile(hapd, dev, number, eht=True, akm=None,
     if int(sta["security_profile"]) != number:
         raise Exception("hostapd reported unexpected security profile number (%s != %d)" % (sta["security_profile"], number))
 
+    sp = dev.get_status_field("security_profile")
+    if sp is None:
+        raise Exception("wpa_supplicant did not report security profile number")
+    if int(sp) != number:
+        raise Exception("wpa_supplicant reported unexpected security profile number (%s != %d)" % (sp, number))
+
 # Helper functions to start APs with different Security Profiles
 def start_eppke_ap_security_profile_1(apdev):
     """Start EPPKE AP with Security Profile 1"""
