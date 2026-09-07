@@ -707,6 +707,7 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 
 	wpa_s->security_profile_len = ret;
 	wpa_s->sel_security_profile = profile;
+	wpa_sm_set_security_profile(wpa_s->wpa, profile);
 	wpa_printf(MSG_DEBUG,
 		   "IEEE 802.1X: External auth: Security Profile element built (profile=%d)",
 		   profile->number);

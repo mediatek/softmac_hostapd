@@ -430,6 +430,7 @@ void wpa_supplicant_set_non_wpa_policy(struct wpa_supplicant *wpa_s,
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
+	wpa_sm_set_security_profile(wpa_s->wpa, NULL);
 	wpa_s->sel_security_profile = NULL;
 	wpa_s->security_profile_len = 0;
 	wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
@@ -2687,13 +2688,14 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	 * selection.
 	 * For SME in driver: only run when the driver indicates Security
 	 *  Profile element support via WPA_DRIVER_FLAGS2_SECURITY_PROFILE.
-	 *  Without this flag, leave sel_security_profile = -1 so no element is
-	 * built or sent.
+	 *  Without this flag, leave sel_security_profile = NULL so no element
+	 * is* built or sent.
 	 *
 	 * sel_security_profile is set here (or left at -1 if no matching
 	 * profile is found or the AP does not advertise the element).
 	 */
 	wpa_s->sel_security_profile = NULL;
+	wpa_sm_set_security_profile(wpa_s->wpa, NULL);
 	if (bss && wpas_security_profile_active(wpa_s)) {
 		const u8 *sp = wpa_bss_get_ie_ext(
 			bss, WLAN_EID_EXT_SECURITY_PROFILE);
@@ -2782,6 +2784,8 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
 				eap_over_auth, eppke);
 		}
+		wpa_sm_set_security_profile(wpa_s->wpa,
+					    wpa_s->sel_security_profile);
 	no_valid_sp:
 	}
 
@@ -5308,6 +5312,7 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
 	wpa_s->sel_security_profile = NULL;
+	wpa_sm_set_security_profile(wpa_s->wpa, NULL);
 	wpa_s->security_profile_len = 0;
 #ifndef CONFIG_NO_ROBUST_AV
 	wpa_s->mscs_setup_done = false;

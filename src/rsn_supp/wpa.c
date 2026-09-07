@@ -5671,6 +5671,27 @@ int wpa_sm_set_assoc_rsnxe(struct wpa_sm *sm, const u8 *ie, size_t len)
 
 
 /**
+ * wpa_sm_set_security_profile - Set selected security profile for association
+ * @sm: Pointer to WPA state machine data from wpa_sm_init()
+ * @sp: Pointer to the security profile entyr of %NULL for none
+ * Returns: 0 on success, -1 on failure
+ *
+ * Inform WPA state machine about the security profile that was selected for
+ * association.
+ */
+int wpa_sm_set_security_profile(struct wpa_sm *sm,
+				const struct security_profile_entry *sp)
+{
+	if (!sm)
+		return -1;
+
+	sm->security_profile = sp;
+
+	return 0;
+}
+
+
+/**
  * wpa_sm_set_ap_wpa_ie - Set AP WPA IE from Beacon/ProbeResp
  * @sm: Pointer to WPA state machine data from wpa_sm_init()
  * @ie: Pointer to IE data (starting from id)
