@@ -9,6 +9,7 @@
 #include "utils/includes.h"
 
 #include "utils/common.h"
+#include "utils/eloop.h"
 #include "common/defs.h"
 #include "common/wpa_common.h"
 #include "common/sae.h"
