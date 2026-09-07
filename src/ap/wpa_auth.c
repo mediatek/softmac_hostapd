@@ -6714,6 +6714,15 @@ int wpa_get_mib_sta(struct wpa_state_machine *sm, char *buf, size_t buflen)
 		return len;
 	len += ret;
 
+	if (sm->security_profile) {
+		ret = os_snprintf(buf + len, buflen - len,
+				  "security_profile=%u\n",
+				  sm->security_profile->number);
+		if (os_snprintf_error(buflen - len, ret))
+			return len;
+		len += ret;
+	}
+
 	return len;
 }
 
