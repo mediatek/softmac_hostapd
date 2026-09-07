@@ -619,7 +619,8 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 	struct wpa_bss *sp_bss;
 	u8 bitmap_len;
 	const u8 *bitmap;
-	int profile_num, ret;
+	int ret;
+	const struct security_profile_entry *profile;
 
 	/*
 	 * Security Profile element is included only when the RSNE is present in
@@ -658,7 +659,7 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 		NULL;
 
 	if (sp_ap &&
-	    wpa_s->sel_security_profile >= 0 &&
+	    wpa_s->sel_security_profile &&
 	    wpa_s->security_profile_len > 0) {
 		/* SME-in-wpa_supplicant: use pre-built Security Profile
 		 * element */
@@ -679,11 +680,11 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 
 	bitmap = sp_ap + 5;
 
-	profile_num = security_profile_select_num(
-		key_mgmt, wpa_s->sme.ext_pairwise_cipher, true, false,
-		bitmap, bitmap_len);
+	profile = security_profile_select(key_mgmt,
+					  wpa_s->sme.ext_pairwise_cipher, true,
+					  false, bitmap, bitmap_len);
 
-	if (profile_num < 0)
+	if (!profile)
 		return 0;
 
 	/*
@@ -699,16 +700,16 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 	ret = security_profile_build(
 		wpa_s->sme.ext_rsn_capab,
 		wpa_s->sme.ext_rsnxe_len > 0 ? wpa_s->sme.ext_rsnxe : NULL,
-		wpa_s->sme.ext_rsnxe_len, profile_num,
+		wpa_s->sme.ext_rsnxe_len, profile->number,
 		wpa_s->security_profile, sizeof(wpa_s->security_profile));
 	if (ret <= 0)
 		return 0;
 
 	wpa_s->security_profile_len = ret;
-	wpa_s->sel_security_profile = profile_num;
+	wpa_s->sel_security_profile = profile;
 	wpa_printf(MSG_DEBUG,
 		   "IEEE 802.1X: External auth: Security Profile element built (profile=%d)",
-		   profile_num);
+		   profile->number);
 	return wpa_s->security_profile_len;
 }
 
@@ -786,11 +787,11 @@ static struct wpabuf * sme_build_802_1x_auth_start(struct wpa_supplicant *wpa_s,
 		wpabuf_put_buf(buf, wpa_s->sec_prof_override_auth);
 	} else
 #endif /* CONFIG_TESTING_OPTIONS */
-	if (sp_len > 0) {
+	if (sp_len > 0 && wpa_s->sel_security_profile) {
 		wpabuf_put_data(buf, wpa_s->security_profile, sp_len);
 		wpa_printf(MSG_DEBUG,
 			   "IEEE 802.1X: Including Security Profile element in auth start frame (profile=%d)",
-			   wpa_s->sel_security_profile);
+			   wpa_s->sel_security_profile->number);
 	}
 
 	wpabuf_free(eapol_pdu);
@@ -1432,7 +1433,7 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_TESTING_OPTIONS */
 	if (wpas_security_profile_active(wpa_s) &&
 	    wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE) &&
-	    wpa_s->sel_security_profile >= 0 &&
+	    wpa_s->sel_security_profile &&
 	    wpa_s->security_profile_len > 0) {
 		if (pasn_set_security_profile(
 			    pasn,
@@ -1440,7 +1441,7 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 			    wpa_s->security_profile_len) == 0)
 			wpa_printf(MSG_DEBUG,
 				   "EPPKE: Including Security Profile element in EPPKE Auth1 frame (profile=%d)",
-				   wpa_s->sel_security_profile);
+				   wpa_s->sel_security_profile->number);
 	}
 
 	return 0;
@@ -4838,7 +4839,7 @@ mscs_fail:
 			wpabuf_len(wpa_s->sec_prof_override_assoc);
 	} else
 #endif /* CONFIG_TESTING_OPTIONS */
-	if (wpa_s->sel_security_profile >= 0 &&
+	if (wpa_s->sel_security_profile &&
 	    wpa_s->security_profile_len > 0 &&
 	    wpa_s->security_profile_len <=
 	    sizeof(wpa_s->sme.assoc_req_ie) - wpa_s->sme.assoc_req_ie_len) {
@@ -4848,7 +4849,7 @@ mscs_fail:
 		wpa_s->sme.assoc_req_ie_len += wpa_s->security_profile_len;
 		wpa_printf(MSG_DEBUG,
 			   "SME: Appended Security Profile element to Association Request frame elements (profile=%d)",
-			   wpa_s->sel_security_profile);
+			   wpa_s->sel_security_profile->number);
 	}
 
 	params.bssid = bssid;

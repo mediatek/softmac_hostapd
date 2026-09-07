@@ -855,7 +855,7 @@ static void wpas_pasn_sec_prof_eppke(struct wpa_supplicant *wpa_s,
 				     struct wpa_bss *bss)
 {
 	const u8 *sp, *bitmap;
-	int profile_num = -1;
+	const struct security_profile_entry *profile = NULL;
 	u8 bitmap_len;
 	u8 sp_buf[256];
 	int sp_len;
@@ -904,10 +904,9 @@ static void wpas_pasn_sec_prof_eppke(struct wpa_supplicant *wpa_s,
 	 *   WPA_KEY_MGMT_FT_SAE_EXT_KEY -> profile 2
 	 * No new driver attribute is required.
 	 */
-	profile_num = security_profile_select_num(awork->akmp, awork->cipher,
-						  false, true,
-						  bitmap, bitmap_len);
-	if (profile_num < 0)
+	profile = security_profile_select(awork->akmp, awork->cipher,
+					  false, true, bitmap, bitmap_len);
+	if (!profile)
 		return;
 
 	/*
@@ -922,11 +921,12 @@ static void wpas_pasn_sec_prof_eppke(struct wpa_supplicant *wpa_s,
 	sp_len = security_profile_build(awork->rsn_capab, awork->rsnxe_data,
 					awork->rsnxe_data ?
 					2 + awork->rsnxe_data[1] : 0,
-					profile_num, sp_buf, sizeof(sp_buf));
+					profile->number,
+					sp_buf, sizeof(sp_buf));
 	if (sp_len > 0 && pasn_set_security_profile(pasn, sp_buf, sp_len) == 0)
 		wpa_printf(MSG_DEBUG,
 			   "EPPKE: Including Security Profile element in external auth EPPKE Auth1 frame (profile=%d)",
-			   profile_num);
+			   profile->number);
 }
 
 

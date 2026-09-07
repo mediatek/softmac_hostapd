@@ -430,7 +430,7 @@ void wpa_supplicant_set_non_wpa_policy(struct wpa_supplicant *wpa_s,
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
-	wpa_s->sel_security_profile = -1;
+	wpa_s->sel_security_profile = NULL;
 	wpa_s->security_profile_len = 0;
 	wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
 	wpa_s->group_cipher = WPA_CIPHER_NONE;
@@ -2693,7 +2693,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	 * sel_security_profile is set here (or left at -1 if no matching
 	 * profile is found or the AP does not advertise the element).
 	 */
-	wpa_s->sel_security_profile = -1;
+	wpa_s->sel_security_profile = NULL;
 	if (bss && wpas_security_profile_active(wpa_s)) {
 		const u8 *sp = wpa_bss_get_ie_ext(
 			bss, WLAN_EID_EXT_SECURITY_PROFILE);
@@ -2764,15 +2764,15 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_ENC_ASSOC */
 
 		wpa_s->sel_security_profile =
-			security_profile_select_num(
+			security_profile_select(
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
 				eap_over_auth, eppke, bitmap, bitmap_len);
 
-		if (wpa_s->sel_security_profile >= 0) {
+		if (wpa_s->sel_security_profile) {
 			wpa_dbg(wpa_s, MSG_DEBUG,
 				"Security Profile: selected profile %d (key_mgmt=0x%x eap_over_auth=%d eppke=%d)",
-				wpa_s->sel_security_profile, wpa_s->key_mgmt,
-				eap_over_auth, eppke);
+				wpa_s->sel_security_profile->number,
+				wpa_s->key_mgmt, eap_over_auth, eppke);
 			wpa_sm_set_param(wpa_s->wpa,
 					 WPA_PARAM_SECURITY_PROFILE_ACTIVE,
 					 true);
@@ -2820,22 +2820,22 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	 * sme_send_authentication() and sme_associate().
 	 */
 	wpa_s->security_profile_len = 0;
-	if (wpa_s->sel_security_profile >= 0) {
+	if (wpa_s->sel_security_profile) {
 		int ret;
 
 		ret = security_profile_build_sta(
-			wpa_s->wpa, wpa_s->sel_security_profile,
+			wpa_s->wpa, wpa_s->sel_security_profile->number,
 			wpa_s->security_profile,
 			sizeof(wpa_s->security_profile));
 		if (ret > 0) {
 			wpa_s->security_profile_len = ret;
 			wpa_dbg(wpa_s, MSG_DEBUG,
 				"Security Profile element built: profile=%d len=%d",
-				wpa_s->sel_security_profile, ret);
+				wpa_s->sel_security_profile->number, ret);
 		} else {
 			wpa_msg(wpa_s, MSG_WARNING,
 				"Security Profile: failed to build element (profile=%d)",
-				wpa_s->sel_security_profile);
+				wpa_s->sel_security_profile->number);
 			return -1;
 		}
 	}
@@ -4922,6 +4922,7 @@ pfs_fail:
 	} else
 #endif /* CONFIG_TESTING_OPTIONS */
 	if (wpa_s->security_profile_len > 0 &&
+	    wpa_s->sel_security_profile &&
 	    wpas_security_profile_active(wpa_s) &&
 	    wpa_s->security_profile_len <= max_wpa_ie_len - wpa_ie_len) {
 		os_memcpy(wpa_ie + wpa_ie_len,
@@ -4930,7 +4931,7 @@ pfs_fail:
 		wpa_ie_len += wpa_s->security_profile_len;
 		wpa_dbg(wpa_s, MSG_DEBUG,
 			"Security Profile element appended to connect elements (profile=%d)",
-			wpa_s->sel_security_profile);
+			wpa_s->sel_security_profile->number);
 	} else if (wpa_s->security_profile_len > 0 &&
 		   !wpas_security_profile_active(wpa_s)) {
 		wpa_dbg(wpa_s, MSG_DEBUG,
@@ -5306,7 +5307,7 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	wpa_sm_set_assoc_rsnxe(wpa_s->wpa, NULL, 0);
 #endif /* CONFIG_NO_WPA */
 	wpa_s->rsnxe_len = 0;
-	wpa_s->sel_security_profile = -1;
+	wpa_s->sel_security_profile = NULL;
 	wpa_s->security_profile_len = 0;
 #ifndef CONFIG_NO_ROBUST_AV
 	wpa_s->mscs_setup_done = false;
