@@ -5359,6 +5359,14 @@ int wpa_sm_get_status(struct wpa_sm *sm, char *buf, size_t buflen,
 		}
 	}
 
+	if (sm->security_profile) {
+		ret = os_snprintf(pos, end - pos, "security_profile=%u\n",
+			sm->security_profile->number);
+		if (os_snprintf_error(end - pos, ret))
+			return pos - buf;
+		pos += ret;
+	}
+
 	return pos - buf;
 }
 
