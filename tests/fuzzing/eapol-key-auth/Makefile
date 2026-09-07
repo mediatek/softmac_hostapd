@@ -37,3 +37,6 @@ eapol-key-auth: $(OBJS) $(LIBS)
 
 clean: common-clean
 	rm -f eapol-key-auth *~ *.o *.d ../*~ ../*.o ../*.d
+
+test: eapol-key-auth
+	./eapol-key-auth corpus/*

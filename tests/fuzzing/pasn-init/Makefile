@@ -41,3 +41,6 @@ pasn-init: $(OBJS)
 
 clean: common-clean
 	rm -f pasn-init *~ *.o *.d ../*~ ../*.o ../*.d
+
+test: pasn-init
+	./pasn-init corpus/*
