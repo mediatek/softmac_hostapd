@@ -438,7 +438,7 @@ static struct wpabuf * nan_de_alloc_sdf(struct nan_de *de, const u8 *dst,
 static int nan_de_tx(struct nan_de *de, unsigned int freq,
 		     unsigned int wait_time,
 		     const u8 *dst, const u8 *src, const u8 *bssid,
-		     const struct wpabuf *buf,  u32 *cookie)
+		     const struct wpabuf *buf,  u32 *cookie, int handle)
 {
 	struct nan_de_tracked_tx *tracked_tx = NULL;
 	int res;
@@ -453,7 +453,8 @@ static int nan_de_tx(struct nan_de *de, unsigned int freq,
 			return -1;
 	}
 
-	res = de->cb.tx(de->cb.ctx, freq, wait_time, dst, src, bssid, buf);
+	res = de->cb.tx(de->cb.ctx, freq, wait_time, dst, src, bssid, buf,
+			handle);
 	if (res < 0) {
 		if (tracked_tx) {
 			dl_list_del(&tracked_tx->list);
@@ -675,7 +676,7 @@ static void nan_de_tx_sdf(struct nan_de *de, struct nan_de_service *srv,
 	}
 
 	nan_de_tx(de, srv->sync ? 0 : srv->freq, srv->sync ? 0 : wait_time,
-		  dst, forced_addr, a3, buf, cookie);
+		  dst, forced_addr, a3, buf, cookie, srv->id);
 	wpabuf_free(buf);
 }
 

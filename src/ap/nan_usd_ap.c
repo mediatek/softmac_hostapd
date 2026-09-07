@@ -19,14 +19,14 @@
 static int hostapd_nan_de_tx(void *ctx, unsigned int freq,
 			     unsigned int wait_time,
 			     const u8 *dst, const u8 *src, const u8 *bssid,
-			     const struct wpabuf *buf)
+			     const struct wpabuf *buf, int handle)
 {
 	struct hostapd_data *hapd = ctx;
 
 	wpa_printf(MSG_DEBUG, "NAN: TX NAN SDF A1=" MACSTR " A2=" MACSTR
-		   " A3=" MACSTR " len=%zu",
+		   " A3=" MACSTR " len=%zu handle=%d",
 		   MAC2STR(dst), MAC2STR(src), MAC2STR(bssid),
-		   wpabuf_len(buf));
+		   wpabuf_len(buf), handle);
 
 	/* TODO: Force use of OFDM */
 	return hostapd_drv_send_action_forced_addr3(hapd, hapd->iface->freq, 0,

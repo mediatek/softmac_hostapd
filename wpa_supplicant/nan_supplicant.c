@@ -4106,6 +4106,7 @@ struct wpas_nan_usd_tx_work {
 	u8 src[ETH_ALEN];
 	u8 bssid[ETH_ALEN];
 	struct wpabuf *buf;
+	int handle;
 };
 
 
@@ -4162,6 +4163,9 @@ static void wpas_nan_usd_start_tx_cb(struct wpa_radio_work *work, int deinit)
 		return;
 	}
 
+	wpa_printf(MSG_DEBUG,
+		   "NAN: Starting nan-usd-tx radio work for handle=%d",
+		   twork->handle);
 	wpa_s->nan_usd_tx_work = work;
 
 	if (wpas_nan_de_tx_send(wpa_s, twork->freq, twork->wait_time,
@@ -4173,7 +4177,7 @@ static void wpas_nan_usd_start_tx_cb(struct wpa_radio_work *work, int deinit)
 
 static int wpas_nan_de_tx(void *ctx, unsigned int freq, unsigned int wait_time,
 			  const u8 *dst, const u8 *src, const u8 *bssid,
-			  const struct wpabuf *buf)
+			  const struct wpabuf *buf, int handle)
 {
 	struct wpa_supplicant *wpa_s = ctx;
 	struct wpas_nan_usd_tx_work *twork;
@@ -4182,9 +4186,9 @@ static int wpas_nan_de_tx(void *ctx, unsigned int freq, unsigned int wait_time,
 		int ret;
 
 		wpa_printf(MSG_DEBUG, "NAN: SYNC TX NAN SDF A1=" MACSTR " A2="
-			   MACSTR " A3=" MACSTR " len=%zu",
+			   MACSTR " A3=" MACSTR " len=%zu handle=%d",
 			   MAC2STR(dst), MAC2STR(src), MAC2STR(bssid),
-			   wpabuf_len(buf));
+			   wpabuf_len(buf), handle);
 		ret = wpa_drv_send_action(wpa_s, 0, 0, dst, src, bssid,
 					  wpabuf_head(buf), wpabuf_len(buf),
 					  1);
@@ -4201,11 +4205,14 @@ static int wpas_nan_de_tx(void *ctx, unsigned int freq, unsigned int wait_time,
 					   bssid, buf);
 	}
 
+	wpa_printf(MSG_DEBUG, "NAN: Add nan-usd-tx radio work for handle=%d",
+		   handle);
 	twork = os_zalloc(sizeof(*twork));
 	if (!twork)
 		return -1;
 	twork->freq = freq;
 	twork->wait_time = wait_time;
+	twork->handle = handle;
 	os_memcpy(twork->dst, dst, ETH_ALEN);
 	os_memcpy(twork->src, src, ETH_ALEN);
 	os_memcpy(twork->bssid, bssid, ETH_ALEN);
