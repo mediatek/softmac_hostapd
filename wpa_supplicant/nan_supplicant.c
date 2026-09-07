@@ -4625,11 +4625,24 @@ int wpas_nan_publish(struct wpa_supplicant *wpa_s, const char *service_name,
 
 void wpas_nan_cancel_publish(struct wpa_supplicant *wpa_s, int publish_id)
 {
+	struct wpa_radio_work *work;
+
 	if (!wpa_s->nan_de)
 		return;
 	nan_de_cancel_publish(wpa_s->nan_de, publish_id);
 	if (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD)
 		wpas_drv_nan_cancel_publish(wpa_s, publish_id);
+
+	work = radio_work_pending(wpa_s, "nan-usd-tx");
+	if (work) {
+		struct wpas_nan_usd_tx_work *twork = work->ctx;
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pending nan-usd-tx radio work for handle=%d when canceling publish_id=%d",
+			   twork->handle, publish_id);
+		if (twork->handle == publish_id)
+			radio_remove_work(wpa_s, work);
+	}
 }
 
 
@@ -4790,11 +4803,24 @@ int wpas_nan_subscribe(struct wpa_supplicant *wpa_s,
 void wpas_nan_cancel_subscribe(struct wpa_supplicant *wpa_s,
 			       int subscribe_id)
 {
+	struct wpa_radio_work *work;
+
 	if (!wpa_s->nan_de)
 		return;
 	nan_de_cancel_subscribe(wpa_s->nan_de, subscribe_id);
 	if (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_NAN_USD_OFFLOAD)
 		wpas_drv_nan_cancel_subscribe(wpa_s, subscribe_id);
+
+	work = radio_work_pending(wpa_s, "nan-usd-tx");
+	if (work) {
+		struct wpas_nan_usd_tx_work *twork = work->ctx;
+
+		wpa_printf(MSG_DEBUG,
+			   "NAN: Pending nan-usd-tx radio work for handle=%d when canceling subscribe_id=%d",
+			   twork->handle, subscribe_id);
+		if (twork->handle == subscribe_id)
+			radio_remove_work(wpa_s, work);
+	}
 }
 
 
