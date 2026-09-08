@@ -1980,6 +1980,129 @@ def test_nan_sae_pairing_bootstrap(dev, apdev, params):
     """NAN Pairing setup using opportunistic bootstrapping"""
     run_nan_pairing_bootstrap("SAE", password="password123")
 
+def test_nan_pbea_pairing_setup_info_discovery(dev, apdev, params):
+    """NAN PBEA: Pairing Setup Info fields and extended PBM"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        pid = pub.publish("test_pbea_disc", ssi="aabbccdd", unsolicited=0,
+                          pbm=1, extended_pbm=1,
+                          pairing_setup_info="locale=en-US,vendorName=Qualcomm,modelName=TestDevice,pairingName=MyPairing")
+        sid = sub.subscribe("test_pbea_disc", ssi="ddbbccaa")
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (PBEA PSI)")
+
+        _check_discovery_result_field(ev, "locale", "en-US")
+        _check_discovery_result_field(ev, "vendorName", "Qualcomm")
+        _check_discovery_result_field(ev, "modelName", "TestDevice")
+        _check_discovery_result_field(ev, "pairingName", "MyPairing")
+
+def test_nan_pbea_pairing_setup_info_bootstrap_request(dev, apdev, params):
+    """NAN PBEA: Pairing Setup Info in NAN-BOOTSTRAP-REQUEST event"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        paddr = pub.wpas.own_addr()
+
+        pid = pub.publish("test_pbea_bsr", ssi="aabbccdd", unsolicited=0,
+                          pbm=4)
+        sid = sub.subscribe("test_pbea_bsr", ssi="ddbbccaa", pbm=4,
+                            pairing_setup_info="locale=fr-FR,vendorName=Acme,modelName=Widget,pairingName=AcmePair")
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (PBEA BSR)")
+
+        data = split_nan_event(ev)
+        pub_id = data["publish_id"]
+        sub_id = data["subscribe_id"]
+
+        sub.bootstrap(paddr, sub_id, pub_id, 0x40)
+
+        ev = pub.wpas.wait_event(["NAN-BOOTSTRAP-REQUEST"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-BOOTSTRAP-REQUEST not seen on publisher")
+
+        if "locale=fr-FR" not in ev:
+            raise Exception(f"locale not found in NAN-BOOTSTRAP-REQUEST: {ev}")
+        if "vendorName=Acme" not in ev:
+            raise Exception(f"vendorName not found in NAN-BOOTSTRAP-REQUEST: {ev}")
+        if "modelName=Widget" not in ev:
+            raise Exception(f"modelName not found in NAN-BOOTSTRAP-REQUEST: {ev}")
+        if "pairingName=AcmePair" not in ev:
+            raise Exception(f"pairingName not found in NAN-BOOTSTRAP-REQUEST: {ev}")
+
+def test_nan_pbea_pairing_setup_info_subscribe(dev, apdev, params):
+    """NAN PBEA: Pairing Setup Info set on subscriber side"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        pid = pub.publish("test_pbea_sub", ssi="aabbccdd", unsolicited=0, pbm=1)
+        sid = sub.subscribe("test_pbea_sub", ssi="ddbbccaa", pbm=1,
+                            pairing_setup_info="locale=ja-JP,vendorName=SubCo,modelName=SubModel,pairingName=SubPair")
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (PBEA sub side)")
+
+        ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
+        if ev is None:
+            raise Exception("NAN-REPLIED not seen on publisher (PBEA sub side)")
+
+def test_nan_pbea_randomized_sid(dev, apdev, params):
+    """NAN PBEA: Service ID randomization combined with Pairing Setup Info"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        self_nik = "0102030405060708090a0b0c0d0e0f10"
+        pub.set("self_nik", f"{self_nik} 1")
+        sub.set("peer_nik", f"{self_nik} 1")
+
+        pid = pub.publish("test_rand_pbea", ssi="aabbccdd", unsolicited=0,
+                          pbm=1, randomized_service_id=1,
+                          pairing_setup_info="locale=en-GB,vendorName=ComboCo,modelName=ComboModel,pairingName=ComboPair")
+        sid = sub.subscribe("test_rand_pbea", ssi="ddbbccaa")
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (randomized SID + PBEA PSI)")
+
+        _check_discovery_result_field(ev, "locale", "en-GB")
+        _check_discovery_result_field(ev, "vendorName", "ComboCo")
+        _check_discovery_result_field(ev, "modelName", "ComboModel")
+        _check_discovery_result_field(ev, "pairingName", "ComboPair")
+
+        ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
+        if ev is None:
+            raise Exception("NAN-REPLIED not seen (randomized SID + PBEA PSI)")
+
+def test_nan_proxied_service_publish(dev, apdev, params):
+    """NAN: Publish a proxied service with PBEA and verify discovery"""
+    with hwsim_nan_radios(count=3) as [wpas1, wpas2, wpas3], \
+        NanDevice(wpas1, "nan0") as proxy, \
+        NanDevice(wpas2, "nan1") as sub, \
+        NanDevice(wpas3, "nan2") as orig:
+        orig_nmi = orig.wpas.own_addr()
+
+        pid = proxy.publish("test_proxy", ssi="aabbccdd",
+                            orig_nmi=orig_nmi, instance_id=1, pbm=1,
+                            pairing_setup_info="locale=zh-CN,vendorName=ProxyCo,modelName=ProxyModel,pairingName=ProxyPair")
+        sid = sub.subscribe("test_proxy", ssi="ddbbccaa", active=0)
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen for proxied service")
+
+        data = split_nan_event(ev)
+        if "orig_nmi" not in data:
+            raise Exception(f"orig_nmi missing in proxied discovery result: {ev}")
+
+        if data["orig_nmi"].lower() != orig_nmi.lower():
+            raise Exception(f"orig_nmi mismatch: got {data['orig_nmi']}, expected {orig_nmi} in: {ev}")
+
+        _check_discovery_result_field(ev, "locale", "zh-CN")
+        _check_discovery_result_field(ev, "vendorName", "ProxyCo")
+        _check_discovery_result_field(ev, "modelName", "ProxyModel")
+        _check_discovery_result_field(ev, "pairingName", "ProxyPair")
+
 def run_nan_pairing_verification(pairing_type, password=None,
                                   send_followup=False):
     with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
