@@ -2577,3 +2577,110 @@ def test_security_profile_ap_proto_invalid_sae(dev, apdev):
               "ff0aa200120002aabbccdd20" ]
     for t in tests:
         run_security_profile_ap_proto_sae(dev, apdev, t, failure=True)
+
+def test_security_profile_1_sta_sec_prof(dev, apdev):
+    """Security Profile 1 with STA security profile config"""
+    check_eppke_capab(dev[0])
+    enable_sta_security_profiles(dev[0])
+
+    ssid = "test-sp1-sta-sec-prof"
+    password = "12345678"
+
+    params = hostapd.wpa2_params(ssid=ssid, passphrase=password,
+                                 ieee80211w='2')
+    params['wpa_key_mgmt'] = 'SAE EPPKE'
+    params['rsn_pairwise'] = 'GCMP-256'
+    params['group_cipher'] = 'GCMP-256'
+    params['group_mgmt_cipher'] = 'BIP-GMAC-256'
+    params['beacon_prot'] = '1'
+    params['sae_pwe'] = '2'
+    params['sae_groups'] = '19 20'
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params['security_profiles'] = '1'
+    params['ieee80211ax'] = '1'
+
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    try:
+        dev[0].set("pasn_groups", "")
+        dev[0].connect(ssid, sae_password=password, scan_freq="2412",
+                       security_profiles="1")
+        hapd.wait_sta()
+        check_security_profile(hapd, dev[0], 1, akm='00-0f-ac-24', auth_alg='9',
+                               eht=False)
+        hwsim_utils.test_connectivity(dev[0], hapd)
+    finally:
+        sta_cleanup(dev[0])
+
+def test_security_profile_3_sta_sec_prof(dev, apdev):
+    """Security Profile 3 with STA security profile config"""
+    check_eppke_capab(dev[0])
+    enable_sta_security_profiles(dev[0])
+
+    ssid = "test-sp3-sta-sec-prof"
+
+    params = hostapd.wpa3_params(ssid=ssid, wpa_key_mgmt="WPA-EAP-SHA256")
+    params.update(hostapd.radius_params())
+    params["ieee8021x"] = "1"
+    params['rsn_pairwise'] = 'GCMP-256'
+    params['group_cipher'] = 'GCMP-256'
+    params['group_mgmt_cipher'] = 'BIP-GMAC-256'
+    params['beacon_prot'] = '1'
+    params['sae_pwe'] = '2'
+    params['sae_groups'] = '19 20'
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params["eap_using_authentication_frames"] = "1"
+    params['security_profiles'] = '3'
+    params['ieee80211ax'] = '1'
+
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    try:
+        dev[0].connect(ssid, scan_freq="2412",
+                       security_profiles="3",
+                       eap="TLS",
+                       identity="tls user",
+                       ca_cert="auth_serv/ca.pem",
+                       client_cert="auth_serv/user.pem",
+                       private_key="auth_serv/user.key")
+        hapd.wait_sta()
+        check_security_profile(hapd, dev[0], 3, akm='00-0f-ac-5', eht=False)
+        hwsim_utils.test_connectivity(dev[0], hapd)
+    finally:
+        sta_cleanup(dev[0])
+
+def test_security_profile_9_sta_sec_prof(dev, apdev):
+    """Security Profile 9 with STA security profile config"""
+    check_eppke_capab(dev[0])
+    enable_sta_security_profiles(dev[0])
+
+    ssid = "test-sp9-sta-sec-prof"
+    password = "12345678"
+
+    params = hostapd.wpa2_params(ssid=ssid, passphrase=password,
+                                 ieee80211w='2')
+    params['wpa_key_mgmt'] = 'SAE EPPKE'
+    params['rsn_pairwise'] = 'GCMP-256'
+    params['group_cipher'] = 'GCMP-256'
+    params['group_mgmt_cipher'] = 'BIP-GMAC-256'
+    params['beacon_prot'] = '1'
+    params['sae_pwe'] = '2'
+    params['sae_groups'] = '19 20'
+    params['assoc_frame_encryption'] = '1'
+    params['pmksa_caching_privacy'] = '1'
+    params['security_profiles'] = '9'
+    params['ieee80211ax'] = '1'
+
+    hapd = hostapd.add_ap(apdev[0], params)
+
+    try:
+        dev[0].set("pasn_groups", "")
+        dev[0].connect(ssid, sae_password=password, scan_freq="2412",
+                       security_profiles="9")
+        hapd.wait_sta()
+        check_security_profile(hapd, dev[0], 9, akm='00-0f-ac-24', eht=False)
+        hwsim_utils.test_connectivity(dev[0], hapd)
+    finally:
+        sta_cleanup(dev[0])
