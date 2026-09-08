@@ -66,9 +66,9 @@ def check_security_profile(hapd, dev, number, eht=True, akm=None,
         raise Exception("wpa_supplicant reported unexpected security profile number (%s != %d)" % (sp, number))
 
 # Helper functions to start APs with different Security Profiles
-def start_eppke_ap_security_profile_1(apdev):
+def start_eppke_ap_security_profile_0(apdev):
     """Start EPPKE AP with Security Profile 1"""
-    ssid = "sp1-eppke"
+    ssid = "sp0-eppke"
     params = hostapd.wpa2_params(ssid=ssid, wpa_key_mgmt="EPPKE",
                                  ieee80211w="2")
     params["ieee80211ax"] = "1"
@@ -80,7 +80,7 @@ def start_eppke_ap_security_profile_1(apdev):
     params['assoc_frame_encryption'] = '1'
     params['pmksa_caching_privacy'] = '1'
     params['eppke_unauth'] = '1'
-    params['security_profiles'] = '1'
+    params['security_profiles'] = '0'
     passphrase = '1234567890'
 
     try:
@@ -158,14 +158,17 @@ def start_mixed_eppke_base_ap_security_profile_0(apdev):
 
     return hapd
 
-def test_security_profile_1_eppke(dev, apdev):
-    """Security Profile 1 - EPPKE with GCMP-256"""
+# FIX: This is not security profile 1, but 0.. Looks like hostapd does not
+# enforce sp 0 correctly for unauth EPPKE and wpa_supplicant select sp 1 for
+# this case somehow (based on AP advertisement?)
+def test_security_profile_0_eppke(dev, apdev):
+    """Security Profile 0 - EPPKE with GCMP-256"""
     check_eppke_capab(dev[0])
-    hapd = start_eppke_ap_security_profile_1(apdev[0])
+    hapd = start_eppke_ap_security_profile_0(apdev[0])
 
     try:
         enable_sta_security_profiles(dev[0])
-        dev[0].connect("sp1-eppke", scan_freq="2412", key_mgmt="EPPKE",
+        dev[0].connect("sp0-eppke", scan_freq="2412", key_mgmt="EPPKE",
                        ieee80211w="2", beacon_prot="1",
                        pairwise="GCMP-256", group="GCMP-256",
                        group_mgmt="BIP-GMAC-256", pmksa_privacy="1")
@@ -177,7 +180,7 @@ def test_security_profile_1_eppke(dev, apdev):
             raise Exception("Unexpected group cipher: " + status['group_cipher'])
 
         hapd.wait_sta()
-        check_security_profile(hapd, dev[0], 1, akm='00-0f-ac-29', auth_alg='9')
+        check_security_profile(hapd, dev[0], 0, akm='00-0f-ac-29', auth_alg='9')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
 
@@ -2237,7 +2240,7 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
     params['rsn_override_key_mgmt'] = 'SAE'
     params['rsn_override_pairwise'] = 'CCMP GCMP-256'
     params['rsn_override_mfp'] = '1'
-    params['security_profiles'] = '1'
+    params['security_profiles'] = '0 1'
     params['ieee80211ax'] = '1'
     params['ieee80211be'] = '1'
 
@@ -2283,7 +2286,7 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
             raise Exception("STA1: Expected SAE (00-0f-ac-8), got: " +
                             sta1["AKMSuiteSelector"])
 
-        # ---- STA 2: Security Profile 1 (EPPKE) ----
+        # ---- STA 2: Security Profile 0 (EPPKE) ----
         wpas = WpaSupplicant(global_iface='/tmp/wpas-wlan5')
         wpas.interface_add('wlan5')
         enable_sta_security_profiles(wpas)
@@ -2292,7 +2295,7 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
                      pairwise="GCMP-256", group="GCMP-256",
                      group_mgmt="BIP-GMAC-256", pmksa_privacy="1")
         hapd.wait_sta()
-        check_security_profile(hapd, wpas, 1, akm='00-0f-ac-29', auth_alg='9')
+        check_security_profile(hapd, wpas, 0, akm='00-0f-ac-29', auth_alg='9')
 
         hwsim_utils.test_connectivity(dev[0], hapd)
         hwsim_utils.test_connectivity(dev[1], hapd)
@@ -2338,7 +2341,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
     params['rsn_override_key_mgmt_2'] = 'OWE'
     params['rsn_override_pairwise_2'] = 'GCMP-256'
     params['rsn_override_mfp_2'] = '2'
-    params['security_profiles'] = '1 9'
+    params['security_profiles'] = '0 1 9'
     params['ieee80211ax'] = '1'
     params['ieee80211be'] = '1'
 
@@ -2413,7 +2416,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
         hapd.wait_sta()
         check_security_profile(hapd, wpas_sae_ext, 9, akm='00-0f-ac-24')
 
-        # ---- STA 4: Security Profile 1 - EPPKE ----
+        # ---- STA 4: Security Profile 0 - EPPKE ----
         wpas_eppke = WpaSupplicant(global_iface='/tmp/wpas-wlan6')
         wpas_eppke.interface_add('wlan6')
         enable_sta_security_profiles(wpas_eppke)
@@ -2422,7 +2425,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
                            pairwise="GCMP-256", group="GCMP-256",
                            group_mgmt="BIP-GMAC-256", pmksa_privacy="1")
         hapd.wait_sta()
-        check_security_profile(hapd, wpas_eppke, 1, akm='00-0f-ac-29',
+        check_security_profile(hapd, wpas_eppke, 0, akm='00-0f-ac-29',
                                auth_alg='9')
 
         # All four connected simultaneously - verify independent data paths
