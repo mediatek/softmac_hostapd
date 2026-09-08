@@ -3645,7 +3645,7 @@ int wpas_nan_bootstrap_request(struct wpa_supplicant *wpa_s, char *cmd)
 			continue;
 
 		if (os_strncmp(token, "method=", 7) == 0) {
-			bootstrap_method = atoi(token + 7);
+			bootstrap_method = strtol(token + 7, NULL, 0);
 			continue;
 		}
 
