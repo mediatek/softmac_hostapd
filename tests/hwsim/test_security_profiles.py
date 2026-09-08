@@ -20,6 +20,12 @@ def enable_sta_security_profiles(dev):
     except:
         raise HwsimSkip("Security profiles not supported")
 
+def disable_sta_security_profiles(dev):
+    try:
+        dev.set("security_profiles", "0")
+    except:
+        pass
+
 def sta_cleanup(dev):
     try:
         dev.set("sae_pwe", "0")
@@ -419,7 +425,7 @@ def test_eppke_sae_ext_key_mlo_group_19(dev, apdev):
     hapd = hostapd.add_ap(apdev[0], params)
 
     try:
-        enable_sta_security_profiles(dev[0])
+        disable_sta_security_profiles(dev[0])
         dev[0].set("pasn_groups", str(group))
         dev[0].set("sae_pwe", "1")
         dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
@@ -1717,6 +1723,7 @@ def test_rsn_override_three_layer_coexistence(dev, apdev):
 
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -1736,7 +1743,7 @@ def test_rsn_override_three_layer_coexistence(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override - SAE / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].set("sae_pwe", "2")
         dev[1].set("sae_groups", "")
@@ -1833,6 +1840,7 @@ def test_rsn_override_four_layer_coexistence(dev, apdev):
     wpas = None
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -1852,7 +1860,7 @@ def test_rsn_override_four_layer_coexistence(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override 1 - SAE / CCMP ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].set("sae_pwe", "2")
         dev[1].set("sae_groups", "")
@@ -1871,7 +1879,7 @@ def test_rsn_override_four_layer_coexistence(dev, apdev):
                             sta1["AKMSuiteSelector"])
 
         # ---- STA 2: RSN Override 2 - OWE / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[2])
+        disable_sta_security_profiles(dev[2])
         dev[2].set("rsn_overriding", "1")
         dev[2].connect(ssid, key_mgmt="OWE",
                        ieee80211w="2",
@@ -1966,6 +1974,7 @@ def test_rsn_override_eap_sha256_sp9(dev, apdev):
 
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -1977,7 +1986,7 @@ def test_rsn_override_eap_sha256_sp9(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override - WPA-EAP-SHA256 / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].connect(ssid, key_mgmt="WPA-EAP-SHA256",
                        ieee80211w="2", eap="TLS",
@@ -2054,6 +2063,7 @@ def test_rsn_override_sae_sp11(dev, apdev):
 
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -2065,7 +2075,7 @@ def test_rsn_override_sae_sp11(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override - SAE / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].set("sae_pwe", "2")
         dev[1].set("sae_groups", "")
@@ -2148,6 +2158,7 @@ def test_rsn_override_psk_owe_sp9(dev, apdev):
 
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -2159,7 +2170,7 @@ def test_rsn_override_psk_owe_sp9(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override - OWE / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].connect(ssid, key_mgmt="OWE",
                        ieee80211w="2",
@@ -2240,6 +2251,7 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
     wpas = None
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -2251,7 +2263,7 @@ def test_rsn_override_sae_sp1_eppke(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override - SAE / GCMP-256 ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].set("sae_pwe", "2")
         dev[1].set("sae_groups", "")
@@ -2341,6 +2353,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
     wpas_sae_ext = None
     try:
         # ---- STA 0: base AKM - WPA-PSK / CCMP ----
+        disable_sta_security_profiles(dev[0])
         dev[0].connect(ssid, psk=passphrase, key_mgmt="WPA-PSK",
                        ieee80211w="1",
                        pairwise="CCMP", group="GCMP-256",
@@ -2352,7 +2365,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
                             sta0["AKMSuiteSelector"])
 
         # ---- STA 1: RSN Override 1 - SAE / GCMP-256 ----
-        enable_sta_security_profiles(dev[1])
+        disable_sta_security_profiles(dev[1])
         dev[1].set("rsn_overriding", "1")
         dev[1].set("sae_pwe", "2")
         dev[1].set("sae_groups", "")
@@ -2370,7 +2383,7 @@ def test_rsn_override_five_layer_eppke(dev, apdev):
                             sta1["AKMSuiteSelector"])
 
         # ---- STA 2: RSN Override 2 - OWE / GCMP-256 / MFP-required ----
-        enable_sta_security_profiles(dev[2])
+        disable_sta_security_profiles(dev[2])
         dev[2].set("rsn_overriding", "1")
         dev[2].connect(ssid, key_mgmt="OWE",
                        ieee80211w="2",
