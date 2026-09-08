@@ -4403,8 +4403,6 @@ static bool wpas_set_802_1x_auth_alg(struct wpa_supplicant *wpa_s,
 				     struct wpa_ssid *ssid,
 				     struct wpa_driver_associate_params *params)
 {
-	const u8 *rsnxe;
-
 	if (!ssid->eap_over_auth_frame ||
 	    !(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_802_1X_AUTH) ||
 	    !wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt &
@@ -4420,9 +4418,8 @@ static bool wpas_set_802_1x_auth_alg(struct wpa_supplicant *wpa_s,
 					~WPA_KEY_MGMT_IEEE8021X))
 		return false;
 
-	rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
-	if (ieee802_11_rsnx_capab(rsnxe,
-				  WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES)) {
+	if (wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+				     WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES)) {
 		wpa_dbg(wpa_s, MSG_DEBUG,
 			"Using IEEE 802.1X authentication using Authentication frames");
 		return true;
@@ -11283,4 +11280,23 @@ bool wpas_security_profile_active(struct wpa_supplicant *wpa_s)
 		return true; /* wpa_supplicant-SME: always active */
 	/* driver-SME: only when driver advertises support */
 	return !!(wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_SECURITY_PROFILE);
+}
+
+
+bool sec_prof_list_has_eap_over_auth(const int *numbers)
+{
+	int i;
+
+	if (!numbers)
+		return false;
+
+	for (i = 0; numbers[i] != -1; i++) {
+		const struct security_profile_entry *e;
+
+		e = sec_prof_get(numbers[i]);
+		if (e && e->ieee8021x_auth_frame)
+			return true;
+	}
+
+	return false;
 }

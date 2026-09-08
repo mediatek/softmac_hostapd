@@ -683,10 +683,13 @@ static size_t sme_802_1x_auth_start_sec_prof(struct wpa_supplicant *wpa_s,
 
 	bitmap = sp_ap + 5;
 
-	profile = security_profile_select(key_mgmt,
-					  wpa_s->sme.ext_pairwise_cipher, true,
-					  false, bitmap, bitmap_len);
-
+	if (wpa_s->sel_security_profile)
+		profile = wpa_s->sel_security_profile;
+	else
+		profile = security_profile_select(
+			key_mgmt,
+			wpa_s->sme.ext_pairwise_cipher, true,
+			false, bitmap, bitmap_len);
 	if (!profile)
 		return 0;
 
@@ -847,16 +850,17 @@ static void sme_check_802_1x_pmksa_caching(struct wpa_supplicant *wpa_s,
 					   bool external)
 {
 	struct rsn_pmksa_cache_entry *pmksa;
-	const u8 *rsnxe, *peer_addr;
+	const u8 *peer_addr;
 	int key_mgmt;
 
 	peer_addr = sme_get_peer_addr(wpa_s, external);
 	key_mgmt = sme_get_key_mgmt(wpa_s, external);
 
-	rsnxe = bss ? wpa_bss_get_ie(bss, WLAN_EID_RSNX) : NULL;
-	if (ssid->eap_over_auth_frame &&
-	    ieee802_11_rsnx_capab(rsnxe,
-				  WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) &&
+	if ((ssid->eap_over_auth_frame ||
+	     (wpas_security_profile_active(wpa_s) &&
+	      sec_prof_list_has_eap_over_auth(ssid->security_profiles))) &&
+	    wpas_eppke_ap_rsnx_capab(wpa_s, bss,
+				     WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION) &&
 	    (wpa_s->drv_flags2 &
 	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION))
 		wpa_s->auth_1x->derive_ptk = true;
@@ -1746,10 +1750,12 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_WEP */
 
 #ifdef CONFIG_IEEE8021X_AUTH
-	if (ssid->eap_over_auth_frame &&
-	    wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt &
-				       ~WPA_KEY_MGMT_IEEE8021X)) {
-		const u8 *rsne, *rsnxe;
+	if ((ssid->eap_over_auth_frame &&
+	     wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt &
+					~WPA_KEY_MGMT_IEEE8021X)) ||
+	    (wpas_security_profile_active(wpa_s) &&
+	     sec_prof_list_has_eap_over_auth(ssid->security_profiles))) {
+		const u8 *rsne;
 		struct wpa_ie_data ied;
 
 		rsne = wpa_bss_get_rsne(wpa_s, bss, ssid, false);
@@ -1760,9 +1766,8 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 			   wpa_parse_wpa_ie(rsne, 2 + rsne[1], &ied) == 0 &&
 			   wpa_key_mgmt_wpa_ieee8021x(
 				   ied.key_mgmt & ~WPA_KEY_MGMT_IEEE8021X)) {
-			rsnxe = wpa_bss_get_ie(bss, WLAN_EID_RSNX);
-			if (ieee802_11_rsnx_capab(
-				    rsnxe,
+			if (wpas_eppke_ap_rsnx_capab(
+				    wpa_s, bss,
 				    WLAN_RSNX_CAPAB_802_1X_IN_AUTH_FRAMES) &&
 			    (wpa_s->drv_flags2 &
 			     WPA_DRIVER_FLAGS2_802_1X_AUTH)) {

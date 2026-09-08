@@ -2283,5 +2283,6 @@ security_profile_select_best(const u8 *sp, const int *numbers);
 int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt);
 const u8 * security_profile_get_rsnx(const u8 *sp, size_t *rsnx_len);
 int security_profile_get_rsn_caps(const u8 *sp);
+bool sec_prof_list_has_eap_over_auth(const int *numbers);
 
 #endif /* WPA_SUPPLICANT_I_H */
