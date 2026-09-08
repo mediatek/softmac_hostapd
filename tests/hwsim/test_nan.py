@@ -1132,6 +1132,99 @@ def test_nan_merged_sdf_multiple_services(dev, apdev, params):
         if len(replied) < n_services:
             raise Exception(f"Only {len(replied)}/{n_services} services replied (merged SDF test)")
 
+def _nan_service_id_randomization(pub_randomized=False, sub_randomized=False,
+                                   pub_nik=None, sub_nik=None,
+                                   group_nik=None, assoc_self_nik=None,
+                                   expect_discovery=True):
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        paddr = pub.wpas.own_addr()
+
+        if pub_nik:
+            pub.set("self_nik", f"{pub_nik} 1")
+        if sub_nik:
+            sub.set("self_nik", f"{sub_nik} 1")
+        if pub_nik and pub_randomized:
+            sub.set("peer_nik", f"{pub_nik} 1")
+        if sub_nik and sub_randomized:
+            pub.set("peer_nik", f"{sub_nik} 1")
+        if group_nik and assoc_self_nik:
+            pub.set("self_nik", f"{assoc_self_nik} 1")
+            pub.set("group_nik", f"{group_nik} associated_nik {assoc_self_nik} 1")
+            sub.set("group_nik", f"{group_nik} associated_nik {assoc_self_nik} 1")
+
+        pssi = "aabbccdd"
+        sssi = "ddbbccaa"
+
+        pid = pub.publish("test_rand_svc", ssi=pssi, unsolicited=0,
+                          randomized_service_id=1 if pub_randomized else 0)
+        sid = sub.subscribe("test_rand_svc", ssi=sssi,
+                            randomized_service_id=1 if sub_randomized else 0)
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if expect_discovery:
+            if ev is None:
+                raise Exception("NAN-DISCOVERY-RESULT not seen with randomized service ID")
+            data = split_nan_event(ev)
+            if data.get("address") != paddr:
+                raise Exception(f"Unexpected peer address in discovery result: {ev}")
+            ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
+            if ev is None:
+                raise Exception("NAN-REPLIED not seen on publisher")
+        else:
+            if ev is not None:
+                raise Exception("Unexpected NAN-DISCOVERY-RESULT without NIK for randomized service ID")
+
+def test_nan_service_id_randomization_publish(dev, apdev, params):
+    """NAN: Service ID randomization on publish side"""
+    pub_nik = "0102030405060708090a0b0c0d0e0f10"
+    _nan_service_id_randomization(pub_randomized=True, pub_nik=pub_nik,
+                                  sub_nik=None)
+
+def test_nan_service_id_randomization_subscribe(dev, apdev, params):
+    """NAN: Service ID randomization on subscribe side"""
+    sub_nik = "1112131415161718191a1b1c1d1e1f20"
+    _nan_service_id_randomization(pub_randomized=False, sub_randomized=True,
+                                  sub_nik=sub_nik)
+
+def test_nan_service_id_randomization_no_nik(dev, apdev, params):
+    """NAN: Service ID randomization without NIK - no discovery expected"""
+    _nan_service_id_randomization(pub_randomized=True, expect_discovery=False)
+
+def test_nan_service_id_randomization_group_nik(dev, apdev, params):
+    """NAN: Service ID randomization using group NIK"""
+    group_nik = "deadbeefcafe0102030405060708090a"
+    assoc_self_nik = "0102030405060708090a0b0c0d0e0f10"
+    _nan_service_id_randomization(pub_randomized=True,
+                                  group_nik=group_nik,
+                                  assoc_self_nik=assoc_self_nik)
+
+def test_nan_service_id_randomization_irsa_unicast(dev, apdev, params):
+    """NAN: IRSA unicast response uses matched NIK context"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        paddr = pub.wpas.own_addr()
+
+        pub_nik = "aabbccddeeff00112233445566778899"
+        pub.set("self_nik", f"{pub_nik} 1")
+
+        sub_self_nik = "99887766554433221100ffeeddccbbaa"
+        sub.set("self_nik", f"{sub_self_nik} 1")
+        sub.set("peer_nik", f"{pub_nik} associated_nik {sub_self_nik} 1")
+        pub.set("peer_nik", f"{sub_self_nik} 1")
+
+        pid = pub.publish("test_irsa_uni", ssi="aabbccdd", unsolicited=0,
+                          randomized_service_id=1)
+        sid = sub.subscribe("test_irsa_uni", ssi="ddbbccaa")
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (IRSA unicast response)")
+
+        ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
+        if ev is None:
+            raise Exception("NAN-REPLIED not seen (IRSA unicast response)")
+
 def test_nan_config(dev, apdev, params):
     """NAN configuration testing"""
     with hwsim_nan_radios(count=1) as [wpas1], \
@@ -1605,6 +1698,23 @@ def test_nan_dp_wrong_pwd(dev, apdev, params):
 def test_nan_dp_pmk(dev, apdev, params):
     """NAN DP - 3way NDL + SK CCMP security with PMK"""
     run_nan_dp(counter=True, csid=1, use_pmk=True, use_interface_id=True)
+
+def test_nan_sdf_dp_params(dev, apdev, params):
+    """NAN SDF: Data path parameters in publish and subscribe SDF"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        pid = pub.publish("test_dp_params", ssi="aabbccdd", unsolicited=0,
+                          dp_type=1, security_required=1)
+        sid = sub.subscribe("test_dp_params", ssi="ddbbccaa",
+                            dp_required=1, dp_type=1, security_required=1)
+
+        ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=5)
+        if ev is None:
+            raise Exception("NAN-DISCOVERY-RESULT not seen (SDF dp params)")
+
+        ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=2)
+        if ev is None:
+            raise Exception("NAN-REPLIED not seen (SDF dp params)")
 
 def nan_pre_bootstrap(pub, sub, pmb=0x1):
     paddr = pub.wpas.own_addr()
