@@ -2279,6 +2279,8 @@ bool wpas_security_profile_active(struct wpa_supplicant *wpa_s);
  * Used by both wpa_supplicant_set_suites() and BSS selection
  * (wpa_supplicant_ssid_bss_match() in events.c).
  */
+const struct security_profile_entry *
+security_profile_select_best(const u8 *sp, const int *numbers);
 int security_profile_get_key_mgmt(const u8 *sp, int ssid_key_mgmt);
 const u8 * security_profile_get_rsnx(const u8 *sp, size_t *rsnx_len);
 int security_profile_get_rsn_caps(const u8 *sp);

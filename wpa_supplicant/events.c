@@ -822,6 +822,14 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 	if (wpas_security_profile_active(wpa_s))
 		sp = wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE);
 
+	if (sp && ssid->security_profiles &&
+	    security_profile_select_best(sp, ssid->security_profiles)) {
+		if (debug_print)
+			wpa_dbg(wpa_s, MSG_DEBUG,
+				"   selected based on Security Profile element");
+		return 1;
+	}
+
 	while ((ssid->proto & WPA_PROTO_RSN) && rsn_ie) {
 		proto_match++;
 
