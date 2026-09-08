@@ -5069,6 +5069,15 @@ static int wpa_supplicant_ctrl_iface_get_capability(
 		return res;
 	}
 
+#ifdef CONFIG_PQC
+	if (os_strcmp(field, "pqc") == 0) {
+		res = os_snprintf(buf, buflen, "supported");
+		if (os_snprintf_error(buflen, res))
+			return -1;
+		return res;
+	}
+#endif /* CONFIG_PQC */
+
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE: Unknown GET_CAPABILITY field '%s'",
 		   field);
 
