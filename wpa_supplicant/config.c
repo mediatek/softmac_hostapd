@@ -1523,16 +1523,17 @@ static char * wpa_config_write_auth_alg(const struct parse_data *data,
 #endif /* NO_CONFIG_WRITE */
 
 
-static int * wpa_config_parse_int_array(const char *value)
+static int * wpa_config_parse_int_array_helper(const char *value,
+					       int terminator)
 {
-	int *freqs;
+	int *vals;
 	size_t used, len;
 	const char *pos;
 
 	used = 0;
 	len = 10;
-	freqs = os_calloc(len + 1, sizeof(int));
-	if (freqs == NULL)
+	vals = os_calloc(len + 1, sizeof(int));
+	if (!vals)
 		return NULL;
 
 	pos = value;
@@ -1542,25 +1543,32 @@ static int * wpa_config_parse_int_array(const char *value)
 		if (used == len) {
 			int *n;
 			size_t i;
-			n = os_realloc_array(freqs, len * 2 + 1, sizeof(int));
-			if (n == NULL) {
-				os_free(freqs);
+
+			n = os_realloc_array(vals, len * 2 + 1, sizeof(int));
+			if (!n) {
+				os_free(vals);
 				return NULL;
 			}
 			for (i = len; i <= len * 2; i++)
-				n[i] = 0;
-			freqs = n;
+				n[i] = terminator;
+			vals = n;
 			len *= 2;
 		}
 
-		freqs[used] = atoi(pos);
-		if (freqs[used] == 0)
+		vals[used] = atoi(pos);
+		if (vals[used] == terminator)
 			break;
 		used++;
 		pos = os_strchr(pos + 1, ' ');
 	}
 
-	return freqs;
+	return vals;
+}
+
+
+static int * wpa_config_parse_int_array(const char *value)
+{
+	return wpa_config_parse_int_array_helper(value, 0);
 }
 
 
@@ -1628,28 +1636,29 @@ static int wpa_config_parse_freq_list(const struct parse_data *data,
 
 
 #ifndef NO_CONFIG_WRITE
-static char * wpa_config_write_freqs(const struct parse_data *data,
-				     const int *freqs)
+
+static char * wpa_config_write_int_array(const struct parse_data *data,
+					 const int *vals, int terminator)
 {
 	char *buf, *pos, *end;
 	int i, ret;
 	size_t count;
 
-	if (freqs == NULL)
+	if (!vals)
 		return NULL;
 
 	count = 0;
-	for (i = 0; freqs[i]; i++)
+	for (i = 0; vals[i] != terminator; i++)
 		count++;
 
 	pos = buf = os_zalloc(10 * count + 1);
-	if (buf == NULL)
+	if (!buf)
 		return NULL;
 	end = buf + 10 * count + 1;
 
-	for (i = 0; freqs[i]; i++) {
-		ret = os_snprintf(pos, end - pos, "%s%u",
-				  i == 0 ? "" : " ", freqs[i]);
+	for (i = 0; vals[i] != terminator; i++) {
+		ret = os_snprintf(pos, end - pos, "%s%d",
+				  i == 0 ? "" : " ", vals[i]);
 		if (os_snprintf_error(end - pos, ret)) {
 			end[-1] = '\0';
 			return buf;
@@ -1658,6 +1667,13 @@ static char * wpa_config_write_freqs(const struct parse_data *data,
 	}
 
 	return buf;
+}
+
+
+static char * wpa_config_write_freqs(const struct parse_data *data,
+				     const int *freqs)
+{
+	return wpa_config_write_int_array(data, freqs, 0);
 }
 
 
@@ -1673,6 +1689,7 @@ static char * wpa_config_write_freq_list(const struct parse_data *data,
 {
 	return wpa_config_write_freqs(data, ssid->freq_list);
 }
+
 #endif /* NO_CONFIG_WRITE */
 
 
@@ -2593,6 +2610,35 @@ static char * wpa_config_write_pasn_groups(const struct parse_data *data,
 #endif /* CONFIG_PASN */
 
 
+static int wpa_config_parse_security_profiles(const struct parse_data *data,
+					      struct wpa_ssid *ssid, int line,
+					      const char *value)
+{
+	int *vals;
+
+	vals = wpa_config_parse_int_array_helper(value, -1);
+	if (!vals)
+		return -1;
+	if (vals[0] == -1) {
+		os_free(vals);
+		vals = NULL;
+	}
+	os_free(ssid->security_profiles);
+	ssid->security_profiles = vals;
+
+	return 0;
+}
+
+
+#ifndef NO_CONFIG_WRITE
+static char * wpa_config_write_security_profiles(const struct parse_data *data,
+						 struct wpa_ssid *ssid)
+{
+	return wpa_config_write_int_array(data, ssid->security_profiles, -1);
+}
+#endif /* NO_CONFIG_WRITE */
+
+
 /* Helper macros for network block parser */
 
 #ifdef OFFSET
@@ -2961,6 +3007,7 @@ static const struct parse_data ssid_fields[] = {
 #ifdef CONFIG_PASN
 	{ FUNC(pasn_groups) },
 #endif /* CONFIG_PASN */
+	{ FUNC(security_profiles) },
 };
 
 #undef OFFSET
@@ -3173,6 +3220,7 @@ void wpa_config_free_ssid(struct wpa_ssid *ssid)
 #ifdef CONFIG_PASN
 	os_free(ssid->pasn_groups);
 #endif /* CONFIG_PASN */
+	os_free(ssid->security_profiles);
 	bin_clear_free(ssid, sizeof(*ssid));
 }
 
