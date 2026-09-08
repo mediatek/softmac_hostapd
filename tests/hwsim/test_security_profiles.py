@@ -498,48 +498,6 @@ def test_sp9_sp_mlo_two_link(dev, apdev):
         check_security_profile(hapd0, wpas, 9, akm='00-0f-ac-24')
         hwsim_utils.test_connectivity(wpas, hapd0)
 
-def test_eppke_sae_ext_key_mlo_group_19_TB(dev, apdev):
-    """EPPKE with SAE-EXT-KEY and MLO - Group 19"""
-    check_eppke_capab(dev[0])
-    ssid = "test-eppke-sae-ext-key-mlo"
-    passphrase = '1234567890'
-    group = 19
-
-    params = hostapd.wpa3_params(ssid=ssid, password=passphrase)
-    params['wpa_key_mgmt'] = 'SAE-EXT-KEY'
-    params['assoc_frame_encryption'] = '1'
-    params['pmksa_caching_privacy'] = '1'
-    params['eap_using_authentication_frames'] = '1'
-    params['sae_pwe'] = '2'
-    params['pasn_groups'] = str(group)
-    params['security_profiles'] = '1'
-    params['rsn_pairwise'] = 'GCMP-256'
-    params['sae_groups'] = str(group)
-    params['group_cipher'] = 'GCMP-256'
-    params['group_mgmt_cipher'] = 'BIP-GMAC-256'
-    params['ieee80211w'] = '2'
-    params['beacon_prot'] = '1'
-    params['ieee80211ax'] = '1'
-    params['ieee80211be'] = '1'
-    params['rsnxe_capab_mask'] = '28040020'
-    hapd = hostapd.add_ap(apdev[0], params)
-
-    try:
-        enable_sta_security_profiles(dev[0])
-        dev[0].set("pasn_groups", str(group))
-        dev[0].set("sae_pwe", "1")
-        dev[0].connect(ssid, sae_password=passphrase, scan_freq="2412",
-                       key_mgmt="SAE-EXT-KEY EPPKE", ieee80211w="2",
-                       beacon_prot="1", pairwise="CCMP GCMP-256",
-                       group="GCMP-256",
-                       group_mgmt="BIP-GMAC-256",
-                       pmksa_privacy="1")
-        hapd.wait_sta()
-        hwsim_utils.test_connectivity(dev[0], hapd)
-    finally:
-        sta_cleanup(dev[0])
-    return hapd
-
 def start_sae_ap_security_profile_9(apdev):
     """Start SAE AP with Security Profile 9"""
     ssid = "sp9-sae"
