@@ -771,6 +771,19 @@ static void write_mka_ckn(FILE *f, struct wpa_ssid *ssid)
 #endif /* CONFIG_MACSEC */
 
 
+#ifdef CONFIG_PASN
+static void write_pasn_groups(FILE *f, struct wpa_ssid *ssid)
+{
+	char *value = wpa_config_get(ssid, "pasn_groups");
+
+	if (!value)
+		return;
+	fprintf(f, "\tpasn_groups=%s\n", value);
+	os_free(value);
+}
+#endif /* CONFIG_PASN */
+
+
 static void wpa_config_write_network(FILE *f, struct wpa_ssid *ssid,
 				     struct wpa_config *config)
 {
@@ -1045,6 +1058,9 @@ static void wpa_config_write_network(FILE *f, struct wpa_ssid *ssid,
 #endif /* CONFIG_IEEE8021X_AUTH */
 	INT_DEF(drop_unicast_ip_in_l2_multicast, 1);
 	INT_DEF(always_use_proxy_arp, 0);
+#ifdef CONFIG_PASN
+	write_pasn_groups(f, ssid);
+#endif /* CONFIG_PASN */
 #undef STR
 #undef INT
 #undef INT_DEF
