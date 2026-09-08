@@ -835,3 +835,22 @@ int security_profile_build(u16 rsn_capab, const u8 *rsnxe, size_t rsnxe_len,
 
 	return pos - buf;
 }
+
+
+int security_profile_build_empty(u8 *buf, size_t buf_len)
+{
+	u8 *pos = buf;
+
+	/* EID(1) + Len(1) + EID_EXT(1) + ReducedRSNCaps(1) +
+	 * SecProfInd(1) */
+	if (buf_len < 5)
+		return -1;
+
+	*pos++ = WLAN_EID_EXTENSION;
+	*pos++ = 3;
+	*pos++ = WLAN_EID_EXT_SECURITY_PROFILE;
+	*pos++ = 0; /* Reduced RSN Capabilities */
+	*pos++ = 0; /* Security Profile Indication: no security profiles */
+
+	return pos - buf;
+}

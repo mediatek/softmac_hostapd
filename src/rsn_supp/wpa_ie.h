@@ -34,5 +34,6 @@ int security_profile_build_sta(struct wpa_sm *sm, int selected_profile_num,
 int security_profile_build(u16 rsn_capab, const u8 *rsnxe,
 			   size_t rsnxe_len, int selected_profile_num,
 			   u8 *buf, size_t buf_len);
+int security_profile_build_empty(u8 *buf, size_t buf_len);
 
 #endif /* WPA_IE_H */

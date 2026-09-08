@@ -4940,6 +4940,18 @@ pfs_fail:
 		   !wpas_security_profile_active(wpa_s)) {
 		wpa_dbg(wpa_s, MSG_DEBUG,
 			"Security Profile: driver does not support element - omitting from connect elements");
+	} else if (wpas_security_profile_active(wpa_s)) {
+		u8 sp_elem[10];
+		int sp_len;
+
+		sp_len = security_profile_build_empty(sp_elem, sizeof(sp_elem));
+		if (sp_len > 0 &&
+		    (size_t) sp_len <= max_wpa_ie_len - wpa_ie_len) {
+			os_memcpy(wpa_ie + wpa_ie_len, sp_elem, sp_len);
+			wpa_ie_len += sp_len;
+			wpa_printf(MSG_DEBUG,
+				   "An empty Security Profile element appended to connect elements");
+		}
 	}
 
 #ifndef CONFIG_NO_ROBUST_AV
