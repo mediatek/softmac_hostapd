@@ -2597,6 +2597,7 @@ def test_security_profile_ap_proto_valid_sae(dev, apdev):
 def test_security_profile_ap_proto_invalid_sae(dev, apdev):
     """Security profile protocol testing - AP with invalid STA elements (SAE)"""
     tests = [ "ff03a20001",
+              "ff03a20000",
               "ff04a2000100",
               "ff06a20002010220",
               "ff0aa200120002aabbccdd20" ]
