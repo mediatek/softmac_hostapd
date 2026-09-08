@@ -103,7 +103,9 @@ class NanDevice:
     def publish(self, service_name, ssi=None, unsolicited=1, solicited=1,
                 sync=1, match_filter_rx=None, match_filter_tx=None,
                 close_proximity=0, pbm=0, nd_pmk=None, cipher_suites=None,
-                ttl=None, data_path=False):
+                ttl=None, data_path=False, pairing_setup_info=None,
+                randomized_service_id=0, orig_nmi=None, instance_id=None,
+                dp_type=None, security_required=0, extended_pbm=0):
 
         cmd = f"NAN_PUBLISH service_name={service_name} sync={sync} srv_proto_type=2 fsd=0"
 
@@ -136,6 +138,27 @@ class NanDevice:
 
         if data_path:
             cmd += " data_path=1"
+
+        if pairing_setup_info is not None:
+            cmd += f" pairing_setup_info={pairing_setup_info}"
+
+        if randomized_service_id:
+            cmd += " randomized_service_id=1"
+
+        if orig_nmi is not None:
+            cmd += f" orig_nmi={orig_nmi}"
+
+        if instance_id is not None:
+            cmd += f" instance_id={instance_id}"
+
+        if dp_type is not None:
+            cmd += f" dp_type={dp_type}"
+
+        if security_required:
+            cmd += " security_required=1"
+
+        if extended_pbm:
+            cmd += " extended_pbm=1"
 
         return self.wpas.request(cmd)
 
@@ -210,7 +233,10 @@ class NanDevice:
     def subscribe(self, service_name, ssi=None, active=1,
                   sync=1, match_filter_rx=None, match_filter_tx=None,
                   srf_include=0, srf_mac_list=None, srf_bf_len=0,
-                  srf_bf_idx=0, close_proximity=0):
+                  srf_bf_idx=0, close_proximity=0, pbm=0,
+                  pairing_setup_info=None, randomized_service_id=0,
+                  dp_required=0, dp_type=None, security_required=0,
+                  cipher_suites=None):
 
         cmd = f"NAN_SUBSCRIBE service_name={service_name} sync={sync} srv_proto_type=2"
 
@@ -237,6 +263,27 @@ class NanDevice:
 
         if close_proximity:
             cmd += " close_proximity=1"
+
+        if pbm:
+            cmd += f" pbm={pbm}"
+
+        if pairing_setup_info is not None:
+            cmd += f" pairing_setup_info={pairing_setup_info}"
+
+        if randomized_service_id:
+            cmd += " randomized_service_id=1"
+
+        if dp_required:
+            cmd += " dp_required=1"
+
+        if dp_type is not None:
+            cmd += f" dp_type={dp_type}"
+
+        if security_required:
+            cmd += " security_required=1"
+
+        if cipher_suites is not None:
+            cmd += f" cipher_suites={cipher_suites}"
 
         return self.wpas.request(cmd)
 
@@ -321,6 +368,14 @@ def split_nan_event(ev):
             name, val = p.split('=', 1)
             vals[name] = val
     return vals
+
+def _check_discovery_result_field(ev, field, expected):
+    """Assert that a key=value pair is present in a NAN-DISCOVERY-RESULT event."""
+    data = split_nan_event(ev)
+    if field not in data:
+        raise Exception(f"Field '{field}' missing in NAN-DISCOVERY-RESULT: {ev}")
+    if data[field] != expected:
+        raise Exception(f"Field '{field}': expected '{expected}', got '{data[field]}' in: {ev}")
 
 def nan_sync_verify_event(ev, addr, pid, sid, ssi, data_path=None):
     data = split_nan_event(ev)
