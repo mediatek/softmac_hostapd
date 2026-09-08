@@ -1488,12 +1488,41 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_MBO */
 	int omit_rsnxe = 0;
 	unsigned int keys_to_clear = 0;
+	bool set_suites_done = false;
 
 	if (bss == NULL) {
 		wpa_msg(wpa_s, MSG_ERROR, "SME: No scan result available for "
 			"the network");
 		wpas_connect_work_done(wpa_s);
 		return;
+	}
+
+	if (start && wpas_security_profile_active(wpa_s) &&
+	    ssid->security_profiles &&
+	    wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE)) {
+		bool try_opportunistic;
+		const u8 *cache_id = NULL;
+
+		try_opportunistic = ssid->proactive_key_caching < 0 ?
+			wpa_s->conf->okc : ssid->proactive_key_caching;
+		if (pmksa_cache_set_current(wpa_s->wpa, NULL,
+					    params.mld ? params.ap_mld_addr :
+					    bss->bssid,
+					    wpa_s->current_ssid,
+					    try_opportunistic, cache_id,
+					    0, false) == 0)
+			eapol_sm_notify_pmkid_attempt(wpa_s->eapol);
+		wpa_s->sme.assoc_req_ie_len = sizeof(wpa_s->sme.assoc_req_ie);
+		if (wpa_supplicant_set_suites(wpa_s, bss, ssid,
+					      wpa_s->sme.assoc_req_ie,
+					      &wpa_s->sme.assoc_req_ie_len,
+					      false)) {
+			wpa_msg(wpa_s, MSG_WARNING,
+				"SME: Failed to set key management and encryption suites");
+			wpas_connect_work_done(wpa_s);
+			return;
+		}
+		set_suites_done = true;
 	}
 
 	os_memset(&params, 0, sizeof(params));
@@ -1730,9 +1759,10 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 
 	if (!start)
 		goto skip_setup;
-	if ((wpa_bss_get_vendor_ie(bss, WPA_IE_VENDOR_TYPE) ||
-	     wpa_bss_get_rsne(wpa_s, bss, ssid, false)) &&
-	    wpa_key_mgmt_wpa(ssid->key_mgmt)) {
+	if (set_suites_done) {
+	} else if ((wpa_bss_get_vendor_ie(bss, WPA_IE_VENDOR_TYPE) ||
+		    wpa_bss_get_rsne(wpa_s, bss, ssid, false)) &&
+		   wpa_key_mgmt_wpa(ssid->key_mgmt)) {
 		int try_opportunistic;
 		const u8 *cache_id = NULL;
 
@@ -1820,6 +1850,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		}
 	} else if (wpa_s->wpa_proto == WPA_PROTO_RSN &&
 		   wpa_key_mgmt_wpa_psk_no_sae(wpa_s->key_mgmt) &&
+		   !wpa_s->sel_security_profile &&
 		   !wpa_bss_get_rsnxe(wpa_s, bss, ssid, false)) {
 		/* Omit RSNXE for WPA2-Personal connections to avoid AP
 		 * compatibility issues. */
@@ -4784,7 +4815,9 @@ mscs_fail:
 #ifdef CONFIG_PMKSA_PRIVACY
 	ap_rsnxe = wpa_bss_get_rsnxe(wpa_s, wpa_s->current_bss,
 				     NULL, wpa_s->valid_links);
-	if (ssid->pmksa_privacy &&
+	if ((ssid->pmksa_privacy ||
+	     (wpas_security_profile_active(wpa_s) &&
+	      ssid->security_profiles)) &&
 	    (wpa_s->drv_flags2 &
 	     WPA_DRIVER_FLAGS2_ASSOCIATION_FRAME_ENCRYPTION) &&
 	    ieee802_11_rsnx_capab(ap_rsnxe,

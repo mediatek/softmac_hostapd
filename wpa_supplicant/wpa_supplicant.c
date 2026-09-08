@@ -1824,20 +1824,26 @@ int security_profile_get_rsn_caps(const u8 *sp)
 }
 
 
-void wpas_set_mgmt_group_cipher(struct wpa_supplicant *wpa_s,
-				struct wpa_ssid *ssid, struct wpa_ie_data *ie)
+static void
+wpas_set_mgmt_group_cipher(struct wpa_supplicant *wpa_s,
+			   struct wpa_ssid *ssid, struct wpa_ie_data *ie,
+			   const struct security_profile_entry *sel_sp)
 {
 	int sel;
+	int cipher;
 
 	sel = ie->mgmt_group_cipher;
-	if (ssid->group_mgmt_cipher)
-		sel &= ssid->group_mgmt_cipher;
+	cipher = ssid->group_mgmt_cipher;
+	if (sel_sp)
+		cipher |= WPA_CIPHER_BIP_GMAC_256;
+	if (cipher)
+		sel &= cipher;
 	if (wpas_get_ssid_pmf(wpa_s, ssid) == NO_MGMT_FRAME_PROTECTION ||
 	    !(ie->capabilities & WPA_CAPABILITY_MFPC))
 		sel = 0;
 	wpa_dbg(wpa_s, MSG_DEBUG,
 		"WPA: AP mgmt_group_cipher 0x%x network profile mgmt_group_cipher 0x%x; available mgmt_group_cipher 0x%x",
-		ie->mgmt_group_cipher, ssid->group_mgmt_cipher, sel);
+		ie->mgmt_group_cipher, cipher, sel);
 	if (sel & WPA_CIPHER_AES_128_CMAC) {
 		wpa_s->mgmt_group_cipher = WPA_CIPHER_AES_128_CMAC;
 		wpa_dbg(wpa_s, MSG_DEBUG,
@@ -2100,6 +2106,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 			      bool skip_default_rsne)
 {
 	struct wpa_ie_data ie;
+	bool rsne_parsed = false;
 	int sel, proto;
 #ifdef CONFIG_SAE
 	enum sae_pwe sae_pwe;
@@ -2110,6 +2117,8 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 				  * element */
 	bool wmm;
 	struct rsn_pmksa_cache_entry *pmksa;
+	const struct security_profile_entry *sel_sp = NULL;
+	int cipher;
 
 	if (bss) {
 		bss_wpa = wpa_bss_get_vendor_ie(bss, WPA_IE_VENDOR_TYPE);
@@ -2131,31 +2140,40 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		bss_wpa = bss_rsn = bss_rsnx = NULL;
 	}
 
-	if (bss_rsn && (ssid->proto & WPA_PROTO_RSN) &&
-	    wpa_parse_wpa_ie(bss_rsn, 2 + bss_rsn[1], &ie) == 0 &&
-	    (matching_ciphers(ssid, &ie, bss->freq) ||
-	     /*
-	      * Security profile preference (IEEE P802.11bn/D2.0, 37.33):
-	      * All defined profiles use GCMP-256 as pairwise cipher.
-	      * If the AP advertises a security profile that matches the
-	      * STA's configured AKM, treat GCMP-256 as available even if
-	      * the RSNE/RSNOE/RSNO2E does not list it.
-	      */
-	     (bss_sp &&
-	      security_profile_get_key_mgmt(bss_sp, ssid->key_mgmt) &&
-	      (ssid->pairwise_cipher & WPA_CIPHER_GCMP_256))) &&
-	    ((ie.key_mgmt & ssid->key_mgmt) ||
-	     /*
-	      * Security profile preference (IEEE P802.11bn/D2.0, 37.33):
-	      * Consider the AP as supporting the AKM implied by any security
-	      * profile number it advertises, even if the RSNE/RSNOE/RSNO2E
-	      * does not explicitly list that AKM. Similarly, all defined
-	      * profiles use GCMP-256 as pairwise cipher, so treat GCMP-256 as
-	      * available when a matching profile exists.
-	      */
-	     (bss_sp &&
-	      security_profile_get_key_mgmt(bss_sp, ssid->key_mgmt) &&
-	      (ssid->pairwise_cipher & WPA_CIPHER_GCMP_256)))) {
+	if (bss_rsn && wpa_parse_wpa_ie(bss_rsn, 2 + bss_rsn[1], &ie) == 0)
+		rsne_parsed = true;
+
+	if (bss_sp && ssid->security_profiles && rsne_parsed &&
+	    ssid->security_profiles &&
+	    (sel_sp = security_profile_select_best(bss_sp,
+						   ssid->security_profiles))) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"RSN: using Security Profile element");
+		proto = WPA_PROTO_RSN;
+	} else if (bss_rsn && (ssid->proto & WPA_PROTO_RSN) && rsne_parsed &&
+		   (matching_ciphers(ssid, &ie, bss->freq) ||
+		    /*
+		     * Security profile preference (IEEE P802.11bn/D2.0, 37.33):
+		     * All defined profiles use GCMP-256 as pairwise cipher.
+		     * If the AP advertises a security profile that matches the
+		     * STA's configured AKM, treat GCMP-256 as available even if
+		     * the RSNE/RSNOE/RSNO2E does not list it.
+		     */
+		    (bss_sp &&
+		     security_profile_get_key_mgmt(bss_sp, ssid->key_mgmt) &&
+		     (ssid->pairwise_cipher & WPA_CIPHER_GCMP_256))) &&
+		   ((ie.key_mgmt & ssid->key_mgmt) ||
+		    /*
+		     * Security profile preference (IEEE P802.11bn/D2.0, 37.33):
+		     * Consider the AP as supporting the AKM implied by any
+		     * security profile number it advertises, even if the
+		     * RSNE/RSNOE/RSNO2E does not explicitly list that AKM.
+		     * Similarly, all defined profiles use GCMP-256 as pairwise
+		     * cipher, so treat GCMP-256 as available when a matching
+		     * profile exists. */
+		    (bss_sp &&
+		     security_profile_get_key_mgmt(bss_sp, ssid->key_mgmt) &&
+		     (ssid->pairwise_cipher & WPA_CIPHER_GCMP_256)))) {
 		/*
 		 * When the RSNE did not advertise the AKM/cipher but the
 		 * Security Profile element did, augment ie so that the rest of
@@ -2376,10 +2394,13 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	wpa_s->group_cipher = WPA_CIPHER_NONE;
 	wpa_s->pairwise_cipher = WPA_CIPHER_NONE;
 #else /* CONFIG_NO_WPA */
-	sel = ie.group_cipher & ssid->group_cipher;
+	cipher = ssid->group_cipher;
+	if (sel_sp)
+		cipher |= WPA_CIPHER_GCMP_256;
+	sel = ie.group_cipher & cipher;
 	wpa_dbg(wpa_s, MSG_DEBUG,
 		"WPA: AP group 0x%x network profile group 0x%x; available group 0x%x",
-		ie.group_cipher, ssid->group_cipher, sel);
+		ie.group_cipher, cipher, sel);
 	wpa_s->group_cipher = wpa_pick_group_cipher(sel);
 	if (wpa_s->group_cipher < 0) {
 		wpa_msg(wpa_s, MSG_WARNING, "WPA: Failed to select group "
@@ -2389,10 +2410,14 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	wpa_dbg(wpa_s, MSG_DEBUG, "WPA: using GTK %s",
 		wpa_cipher_txt(wpa_s->group_cipher));
 
-	sel = ie.pairwise_cipher & ssid->pairwise_cipher;
+	if (sel_sp)
+		cipher = WPA_CIPHER_GCMP_256;
+	else
+		cipher = ssid->pairwise_cipher;
+	sel = ie.pairwise_cipher & cipher;
 	wpa_dbg(wpa_s, MSG_DEBUG,
 		"WPA: AP pairwise 0x%x network profile pairwise 0x%x; available pairwise 0x%x",
-		ie.pairwise_cipher, ssid->pairwise_cipher, sel);
+		ie.pairwise_cipher, cipher, sel);
 	wpa_s->pairwise_cipher = wpa_pick_pairwise_cipher(sel, 1);
 	if (wpa_s->pairwise_cipher < 0) {
 		wpa_msg(wpa_s, MSG_WARNING, "WPA: Failed to select pairwise "
@@ -2416,6 +2441,8 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 				  WPA_DRIVER_FLAGS_UPDATE_FT_IES)))
 		sel &= ~WPA_KEY_MGMT_FT;
 #endif /* CONFIG_IEEE80211R */
+	if (sel_sp)
+		sel = sel_sp->key_mgmt;
 	wpa_dbg(wpa_s, MSG_DEBUG,
 		"WPA: AP key_mgmt 0x%x network profile key_mgmt 0x%x; available key_mgmt 0x%x",
 		ie.key_mgmt, ssid->key_mgmt, sel);
@@ -2578,7 +2605,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
-	wpas_set_mgmt_group_cipher(wpa_s, ssid, &ie);
+	wpas_set_mgmt_group_cipher(wpa_s, ssid, &ie, sel_sp);
 #ifdef CONFIG_OCV
 	if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME) ||
 	    (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_OCV))
@@ -2745,7 +2772,7 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 			 ssid->sae_password_id && ssid->sae_password_id_change);
 #ifdef CONFIG_PMKSA_PRIVACY
 	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_PMKSA_CACHING_PRIVACY,
-			 ssid->pmksa_privacy);
+			 ssid->pmksa_privacy || ssid->security_profiles);
 #endif /* CONFIG_PMKSA_PRIVACY */
 
 	wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SECURITY_PROFILE_ACTIVE, false);
@@ -2771,7 +2798,15 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 	 */
 	wpa_s->sel_security_profile = NULL;
 	wpa_sm_set_security_profile(wpa_s->wpa, NULL);
-	if (bss && wpas_security_profile_active(wpa_s)) {
+	if (sel_sp) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Security Profile: selected profile %d",
+			sel_sp->number);
+		wpa_s->sel_security_profile = sel_sp;
+		wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_SECURITY_PROFILE_ACTIVE,
+				 true);
+		wpa_sm_set_security_profile(wpa_s->wpa, sel_sp);
+	} else if (bss && wpas_security_profile_active(wpa_s)) {
 		const u8 *sp = wpa_bss_get_ie_ext(
 			bss, WLAN_EID_EXT_SECURITY_PROFILE);
 		u8 bitmap_len;
@@ -2928,7 +2963,9 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 		wpa_sm_set_param(wpa_s->wpa, WPA_PARAM_DPP_PFS, ssid->dpp_pfs);
 #endif /* CONFIG_DPP2 */
 #endif /* CONFIG_DPP */
-	} else if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt)) {
+	} else if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt) &&
+		   !(wpas_security_profile_active(wpa_s) &&
+		     ssid->security_profiles)) {
 		int psk_set = 0;
 
 		if (wpa_key_mgmt_wpa_psk_no_sae(ssid->key_mgmt)) {
