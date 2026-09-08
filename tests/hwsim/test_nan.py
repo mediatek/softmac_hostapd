@@ -1097,6 +1097,41 @@ def test_nan_sync_multi_services_4(dev, apdev, params):
 
     _nan_sync_multi_services(test_params)
 
+def test_nan_merged_sdf_multiple_services(dev, apdev, params):
+    """NAN: Multiple active services merged into a single SDF per DW"""
+    with hwsim_nan_radios(count=2) as [wpas1, wpas2], \
+        NanDevice(wpas1, "nan0") as pub, NanDevice(wpas2, "nan1") as sub:
+        n_services = 5
+        pids = []
+        sids = []
+
+        for i in range(n_services):
+            sname = f"test_merged_{i}"
+            pid = pub.publish(sname, ssi=f"aabb{i:02x}{i:02x}", unsolicited=0)
+            sid = sub.subscribe(sname, ssi=f"ddcc{i:02x}{i:02x}")
+            pids.append(pid)
+            sids.append(sid)
+
+        discovered = set()
+        replied = set()
+
+        for _ in range(n_services * 3):
+            ev = sub.wpas.wait_event(["NAN-DISCOVERY-RESULT"], timeout=2)
+            if ev:
+                data = split_nan_event(ev)
+                discovered.add(data.get("subscribe_id"))
+            ev = pub.wpas.wait_event(["NAN-REPLIED"], timeout=1)
+            if ev:
+                data = split_nan_event(ev)
+                replied.add(data.get("publish_id"))
+            if len(discovered) >= n_services and len(replied) >= n_services:
+                break
+
+        if len(discovered) < n_services:
+            raise Exception(f"Only {len(discovered)}/{n_services} services discovered (merged SDF test)")
+        if len(replied) < n_services:
+            raise Exception(f"Only {len(replied)}/{n_services} services replied (merged SDF test)")
+
 def test_nan_config(dev, apdev, params):
     """NAN configuration testing"""
     with hwsim_nan_radios(count=1) as [wpas1], \
@@ -1123,6 +1158,40 @@ def test_nan_config(dev, apdev, params):
         # and finally update the configuration
         logger.info("Updating NAN configuration")
         nan.update_config()
+
+        nan.set("master_pref", "255")
+        nan.update_config()
+
+def test_nan_nik_config(dev, apdev, params):
+    """NAN NIK list management configuration"""
+    with hwsim_nan_radios(count=1) as [wpas1], \
+        NanDevice(wpas1, "nan0") as nan:
+        nik1 = "0102030405060708090a0b0c0d0e0f10"
+        nan.set("self_nik", f"{nik1} 1")
+
+        nik2 = "1112131415161718191a1b1c1d1e1f20"
+        nan.set("self_nik", f"{nik2} 0")
+
+        nik3 = "2122232425262728292a2b2c2d2e2f30"
+        nik4 = "3132333435363738393a3b3c3d3e3f40"
+        nan.set("self_nik", f"{nik3},{nik4} 1")
+
+        peer_nik = "aabbccddeeff00112233445566778899"
+        nan.set("peer_nik", f"{peer_nik} 1")
+
+        assoc_nik = "0102030405060708090a0b0c0d0e0f10"
+        nan.set("peer_nik", f"{peer_nik} associated_nik {assoc_nik} 1")
+
+        group_nik = "deadbeefcafe0102030405060708090a"
+        nan.set("group_nik", f"{group_nik} associated_nik {assoc_nik} 1")
+
+        nan.set("self_nik", "0102030405060708090a0b0c0d0e0f", ok=False)
+        nan.set("self_nik", "0102030405060708090a0b0c0d0e0fgg", ok=False)
+
+        valid_nik = "0102030405060708090a0b0c0d0e0f10"
+        nan.set("peer_nik",
+                f"{valid_nik} associated_nik 0102030405060708090a0b0c0d0e0f",
+                ok=False)
 
 def test_nan_sched(dev, apdev, params):
     """NAN configure schedule"""
