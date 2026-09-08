@@ -367,6 +367,9 @@ static struct wpabuf * sme_auth_build_sae_commit(struct wpa_supplicant *wpa_s,
 	if (bss && is_6ghz_freq(bss->freq) &&
 	    sae_pwe != SAE_PWE_FORCE_HUNT_AND_PECK)
 		use_pt = 1;
+	if (wpa_s->sel_security_profile &&
+	    wpa_key_mgmt_sae_ext_key(wpa_s->sel_security_profile->key_mgmt))
+		use_pt = 1;
 #ifdef CONFIG_SAE_PK
 	if ((rsnxe_capa & BIT(WLAN_RSNX_CAPAB_SAE_PK)) &&
 	    ssid->sae_pk != SAE_PK_MODE_DISABLED &&
@@ -1255,14 +1258,18 @@ static int wpas_eppke_initialize(struct wpa_supplicant *wpa_s,
 	capab |= BIT(WLAN_RSNX_CAPAB_ASSOC_FRAME_ENCRYPTION);
 	capab |= BIT(WLAN_RSNX_CAPAB_KEK_IN_PASN);
 #ifdef CONFIG_PMKSA_PRIVACY
-	if (ssid->pmksa_privacy)
+	if (ssid->pmksa_privacy ||
+	    (wpas_security_profile_active(wpa_s) &&
+	     sec_prof_list_has_sae(ssid->security_profiles)))
 		capab |= BIT(WLAN_RSNX_CAPAB_PMKSA_CACHING_PRIVACY);
 #endif /* CONFIG_PMKSA_PRIVACY */
 	pasn->derive_kek = true;
 
 	if (0) {
 #ifdef CONFIG_SAE
-	} else if (wpa_key_mgmt_sae_ext_key(ssid->key_mgmt)) {
+	} else if (wpa_key_mgmt_sae_ext_key(ssid->key_mgmt) ||
+		   (wpas_security_profile_active(wpa_s) &&
+		    sec_prof_list_has_sae(ssid->security_profiles))) {
 		capab |= BIT(WLAN_RSNX_CAPAB_SAE_H2E);
 		/*
 		 * Security Profile element preference (IEEE P802.11bn/D2.0,
@@ -1586,7 +1593,23 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	}
 #ifdef CONFIG_SAE
 	wpa_s->sme.sae_pmksa_caching = 0;
-	if (wpa_key_mgmt_sae(ssid->key_mgmt)) {
+	if (false) {
+#ifdef CONFIG_ENC_ASSOC
+	} else if (wpa_s->sel_security_profile &&
+		   (wpa_s->drv_flags2 & WPA_DRIVER_FLAGS2_EPPKE) &&
+		   wpa_key_mgmt_sae(wpa_s->sel_security_profile->key_mgmt) &&
+		   (wpa_s->sel_security_profile->key_mgmt &
+		    WPA_KEY_MGMT_EPPKE)) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Use EPPKE based on the selected security profile");
+		params.auth_alg = WPA_AUTH_ALG_EPPKE;
+#endif /* CONFIG_ENC_ASSOC */
+	} else if (wpa_s->sel_security_profile &&
+		   wpa_key_mgmt_sae(wpa_s->sel_security_profile->key_mgmt)) {
+		wpa_dbg(wpa_s, MSG_DEBUG,
+			"Using SAE auth_alg based on the selected security profile");
+		params.auth_alg = WPA_AUTH_ALG_SAE;
+	} else if (wpa_key_mgmt_sae(ssid->key_mgmt)) {
 		const u8 *rsn;
 		struct wpa_ie_data ied;
 
