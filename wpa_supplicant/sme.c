@@ -4058,7 +4058,9 @@ static void sme_process_802_1x_auth_response(struct wpa_supplicant *wpa_s,
 		if (eapol_sm_get_success(wpa_s->eapol) &&
 		    auth->status_code != WLAN_STATUS_802_1_X_AUTH_SUCCESS) {
 			wpa_msg(wpa_s, MSG_INFO,
-				"IEEE 802.1X: Invalid status code in EAP-Success authentication frame");
+				"IEEE 802.1X: Invalid status code %u in EAP-Success authentication frame (expected %u)",
+				auth->status_code,
+				WLAN_STATUS_802_1_X_AUTH_SUCCESS);
 			goto fail;
 		}
 	}
