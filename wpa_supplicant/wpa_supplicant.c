@@ -2893,6 +2893,10 @@ int wpa_supplicant_set_suites(struct wpa_supplicant *wpa_s,
 				"Security Profile: no matching profile found in AP bitmap (key_mgmt=0x%x pairwise=0x%x eap_over_auth=%d eppke=%d)",
 				wpa_s->key_mgmt, wpa_s->pairwise_cipher,
 				eap_over_auth, eppke);
+			wpas_connection_failed(wpa_s, wpa_s->pending_bssid,
+					       NULL);
+			wpa_supplicant_set_state(wpa_s, WPA_DISCONNECTED);
+			return -1;
 		}
 		wpa_sm_set_security_profile(wpa_s->wpa,
 					    wpa_s->sel_security_profile);
@@ -5074,6 +5078,14 @@ pfs_fail:
 	} else if (wpas_security_profile_active(wpa_s)) {
 		u8 sp_elem[10];
 		int sp_len;
+
+		if (bss &&
+		    wpa_bss_get_ie_ext(bss, WLAN_EID_EXT_SECURITY_PROFILE)) {
+			wpa_printf(MSG_INFO,
+				   "Both STA and AP enables security profiles, but no matching security profile - do not try to connect with this AP");
+			os_free(wpa_ie);
+			return NULL;
+		}
 
 		sp_len = security_profile_build_empty(sp_elem, sizeof(sp_elem));
 		if (sp_len > 0 &&

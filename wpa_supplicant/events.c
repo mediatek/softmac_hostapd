@@ -886,8 +886,12 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 				sp, ssid->key_mgmt);
 
 			if (!sp_key_mgmt ||
-			    !(ssid->pairwise_cipher & WPA_CIPHER_GCMP_256))
-				goto no_matching_sp;
+			    !(ssid->pairwise_cipher & WPA_CIPHER_GCMP_256)) {
+				if (debug_print)
+					wpa_dbg(wpa_s, MSG_DEBUG,
+						"   No match between AP and STA security profiles");
+				break;
+			}
 
 			if (!(ie.pairwise_cipher & WPA_CIPHER_GCMP_256)) {
 				if (debug_print)
@@ -904,7 +908,6 @@ static int wpa_supplicant_ssid_bss_match(struct wpa_supplicant *wpa_s,
 			/* All defined profiles mandate MFPC=1/MFPR=1 */
 			ie.capabilities |= WPA_CAPABILITY_MFPC |
 				WPA_CAPABILITY_MFPR;
-		no_matching_sp:
 		}
 
 		if (!(ie.pairwise_cipher & ssid->pairwise_cipher)) {
