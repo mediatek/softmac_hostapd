@@ -300,7 +300,7 @@ static bool find_and_validate_profile(
 
 	if (!(entry->pairwise_cipher & rsne_data->pairwise_cipher)) {
 		wpa_printf(MSG_DEBUG,
-			   "Securityy profile number %d pairwise cipher mismatch: required=0x%x got=0x%x",
+			   "Security profile number %d pairwise cipher mismatch: required=0x%x got=0x%x",
 			   sta_profile_num, entry->pairwise_cipher,
 			   rsne_data->pairwise_cipher);
 		return false;
@@ -405,7 +405,8 @@ static bool validate_sta_security_profile(
 
 	/* Parse station's RSNE */
 	if (!rsne || rsne_len < 2) {
-		wpa_printf(MSG_INFO, "UHR: Station " MACSTR " missing RSNE",
+		wpa_printf(MSG_INFO, "Station " MACSTR
+			   " using security profiles without RSNE",
 			   MAC2STR(sta->addr));
 		return false;
 	}
