@@ -332,6 +332,13 @@ static bool find_and_validate_profile(
 		return false;
 	}
 
+	if (entry->assoc_frame_encrypt && !ap_sta_is_epp(sta)) {
+		wpa_printf(MSG_DEBUG,
+			   "STA used security profile number %d that requires EPP, but did not use EPP",
+			   sta_profile_num);
+		return false;
+	}
+
 	if (assoc && entry->assoc_frame_encrypt &&
 	    entry->key_mgmt == (WPA_KEY_MGMT_EPPKE |
 				WPA_KEY_MGMT_SAE_EXT_KEY) &&
