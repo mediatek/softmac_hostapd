@@ -515,6 +515,8 @@ static struct wpabuf * eap_peap_build_phase2_term(struct eap_sm *sm,
 	wpabuf_set(&msgbuf, hdr, req_len);
 	encr_req = eap_server_tls_encrypt(sm, &data->ssl, &msgbuf);
 	os_free(hdr);
+	if (!encr_req)
+		return NULL;
 
 	if (!data->ssl.tls_v13 ||
 	    !tls_connection_resumed(sm->cfg->ssl_ctx, data->ssl.conn)) {
