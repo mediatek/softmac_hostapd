@@ -6644,7 +6644,10 @@ static int p2p_ctrl_connect(struct wpa_supplicant *wpa_s, char *cmd,
 		}
 	}
 
-	pos2 = os_strstr(pos, "bstrapmethod=");
+	if (pos)
+		pos2 = os_strstr(pos, "bstrapmethod=");
+	else
+		pos2 = NULL;
 	if (pos2) {
 		pos2 += 13;
 		bootstrap = atoi(pos2);
