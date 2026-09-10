@@ -3886,7 +3886,7 @@ static void nl80211_vendor_event_brcm(struct wpa_driver_nl80211_data *drv,
 	case BRCM_VENDOR_EVENT_PRIV_STR:
 	case BRCM_VENDOR_EVENT_HANGED:
 		/* Dump the event on to the console */
-		wpa_msg(NULL, MSG_INFO, "%s", data);
+		wpa_msg(NULL, MSG_INFO, "%s", data ? (char *) data : "");
 		break;
 	case BRCM_VENDOR_EVENT_ACS:
 		brcm_nl80211_acs_select_ch(drv, data, len);
