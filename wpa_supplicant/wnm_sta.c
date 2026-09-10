@@ -1262,7 +1262,7 @@ int wnm_scan_process(struct wpa_supplicant *wpa_s, bool pre_scan_check)
 
 #ifndef CONFIG_NO_ROAMING
 	/* Apply normal roaming rules if we can stay with the current BSS */
-	if (current_bss && bss != current_bss &&
+	if (current_bss && bss && bss != current_bss &&
 	    wpa_scan_res_match(wpa_s, 0, current_bss, wpa_s->current_ssid,
 			       1, 0, false) &&
 	    !wpa_supplicant_need_to_roam_within_ess(wpa_s, current_bss, bss,
