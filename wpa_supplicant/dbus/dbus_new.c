@@ -1556,7 +1556,7 @@ static int wpas_dbus_get_group_obj_path(struct wpa_supplicant *wpa_s,
 {
 	char group_name[3];
 
-	if (!wpa_s->dbus_new_path ||
+	if (!wpa_s->dbus_new_path || !ssid ||
 	    os_memcmp(ssid->ssid, P2P_WILDCARD_SSID, P2P_WILDCARD_SSID_LEN))
 		return -1;
 
