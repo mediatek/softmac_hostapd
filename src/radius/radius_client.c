@@ -2017,6 +2017,9 @@ void radius_client_deinit(struct radius_client_data *radius)
 	radius_close_acct_socket(radius);
 
 	eloop_cancel_timeout(radius_retry_primary_timer, radius, NULL);
+#ifdef CONFIG_RADIUS_TLS
+	eloop_cancel_timeout(radius_tls_reconnect, radius, NULL);
+#endif /* CONFIG_RADIUS_TLS */
 
 	radius_client_flush(radius, 0);
 	os_free(radius->auth_handlers);
