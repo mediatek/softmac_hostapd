@@ -320,9 +320,15 @@ static inline void hostapd_drv_poll_client(struct hostapd_data *hapd,
 					   const u8 *own_addr, const u8 *addr,
 					   int qos)
 {
+	int link_id = -1;
+
 	if (hapd->driver == NULL || hapd->driver->poll_client == NULL)
 		return;
-	hapd->driver->poll_client(hapd->drv_priv, own_addr, addr, qos);
+#ifdef CONFIG_IEEE80211BE
+	if (hapd->conf->mld_ap)
+		link_id = hapd->mld_link_id;
+#endif /* CONFIG_IEEE80211BE */
+	hapd->driver->poll_client(hapd->drv_priv, own_addr, addr, qos, link_id);
 }
 
 static inline int hostapd_drv_get_survey(struct hostapd_data *hapd,

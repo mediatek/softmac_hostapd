@@ -5202,13 +5202,14 @@ struct wpa_driver_ops {
 	 * @own_addr: MAC address of sending interface
 	 * @addr: MAC address of the station to probe
 	 * @qos: Indicates whether station is QoS station
+	 * @link_id: Link ID to use for the probe, or -1 if not an MLD link
 	 *
 	 * This function is used to verify whether an associated station is
 	 * still present. This function does not need to be implemented if the
 	 * driver provides such inactivity polling mechanism.
 	 */
 	void (*poll_client)(void *priv, const u8 *own_addr,
-			    const u8 *addr, int qos);
+			    const u8 *addr, int qos, int link_id);
 
 	/**
 	 * radio_disable - Disable/enable radio

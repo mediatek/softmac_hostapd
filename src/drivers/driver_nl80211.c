@@ -11844,7 +11844,7 @@ static void nl80211_send_null_frame(struct i802_bss *bss, const u8 *own_addr,
 }
 
 static void nl80211_poll_client(void *priv, const u8 *own_addr, const u8 *addr,
-				int qos)
+				int qos, int link_id)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -11858,7 +11858,9 @@ static void nl80211_poll_client(void *priv, const u8 *own_addr, const u8 *addr,
 	}
 
 	if (!(msg = nl80211_bss_msg(bss, 0, NL80211_CMD_PROBE_CLIENT)) ||
-	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr)) {
+	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, addr) ||
+	    (link_id != NL80211_DRV_LINK_ID_NA &&
+	     nla_put_u8(msg, NL80211_ATTR_MLO_LINK_ID, link_id))) {
 		nlmsg_free(msg);
 		return;
 	}
