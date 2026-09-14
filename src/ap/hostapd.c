@@ -4216,6 +4216,14 @@ int hostapd_reload_bss_only(struct hostapd_data *bss)
 
 int hostapd_enable_bss(struct hostapd_data *hapd)
 {
+	if (hapd->iconf->mbssid &&
+	    hostapd_mbssid_get_tx_bss(hapd) == hapd) {
+		wpa_printf(MSG_ERROR,
+			   "Cannot enable MBSSID transmitted BSS '%s' individually",
+			   hapd->conf->iface);
+		return -1;
+	}
+
 	if (!hapd->user_disabled) {
 		wpa_printf(MSG_DEBUG,
 			   "The BSS is enabled, skip the ENABLE_BSS command");
@@ -4259,6 +4267,16 @@ int hostapd_enable_mld(struct hostapd_data *hapd)
 	if (mld->started) {
 		wpa_printf(MSG_DEBUG, "AP MLD is already enabled");
 		return 0;
+	}
+
+	for_each_mld_link(h, hapd) {
+		if (h->iconf->mbssid &&
+		    hostapd_mbssid_get_tx_bss(h) == h) {
+			wpa_printf(MSG_ERROR,
+				   "Cannot enable MLD: link %d is an MBSSID "
+				   "transmitted BSS", h->mld_link_id);
+			return -1;
+		}
 	}
 
 	mld->started = true;
@@ -4334,6 +4352,14 @@ int hostapd_disable_bss(struct hostapd_data *hapd)
 	struct hostapd_iface *iface = hapd->iface;
 	struct hostapd_data *h;
 	int i, remain_bss = 0;
+
+	if (hapd->iconf->mbssid &&
+	    hostapd_mbssid_get_tx_bss(hapd) == hapd) {
+		wpa_printf(MSG_ERROR,
+			   "Cannot disable MBSSID transmitted BSS '%s' individually",
+			   hapd->conf->iface);
+		return -1;
+	}
 
 	if (hapd->user_disabled) {
 		wpa_printf(MSG_DEBUG,
@@ -4411,6 +4437,14 @@ int hostapd_disable_mld(struct hostapd_data *hapd)
 		if (h->csa_in_progress || h->cca_in_progress ||
 		    hostapd_is_attlm_active(h)) {
 			wpa_printf(MSG_ERROR, "Cannot disable MLD during CSA/CCA/ATTLM");
+			return -1;
+		}
+
+		if (h->iconf->mbssid &&
+		    hostapd_mbssid_get_tx_bss(h) == h) {
+			wpa_printf(MSG_ERROR,
+				   "Cannot disable MLD: link %d is an MBSSID "
+				   "transmitted BSS", h->mld_link_id);
 			return -1;
 		}
 	}
