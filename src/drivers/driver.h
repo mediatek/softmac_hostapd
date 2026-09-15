@@ -986,6 +986,11 @@ struct hostapd_freq_params {
 	 * dfs_state_update - Whether DFS state update is requested
 	 */
 	bool dfs_state_update;
+
+	/**
+	 * uhr_enabled - Whether UHR is enabled
+	 */
+	bool uhr_enabled;
 };
 
 /**
@@ -3152,6 +3157,8 @@ struct wpa_channel_info {
  * @assocresp_ies: Extra information element(s) to add into (Re)Association
  *	Response frames or %NULL
  * @probe_resp: Probe Response frame template
+ * @uhr_oper: Full UHR operation (beacon only has abridged data),
+ *	includes the extended element header
  * @head_len: Length of @head
  * @tail_len: Length of @tail
  * @beacon_ies_len: Length of beacon_ies in octets
@@ -3166,6 +3173,7 @@ struct beacon_data {
 	u8 *proberesp_ies;
 	u8 *assocresp_ies;
 	u8 *probe_resp;
+	u8 *uhr_oper;
 
 	size_t head_len, tail_len;
 	size_t beacon_ies_len;

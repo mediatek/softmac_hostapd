@@ -5874,6 +5874,7 @@ static int nl80211_put_freq_params(struct nl_msg *msg,
 	if (nla_put_u32(msg, NL80211_ATTR_WIPHY_FREQ, freq->freq))
 		return -ENOBUFS;
 
+	wpa_printf(MSG_DEBUG, "  * uhr_enabled=%d", freq->uhr_enabled);
 	wpa_printf(MSG_DEBUG, "  * eht_enabled=%d", freq->eht_enabled);
 	wpa_printf(MSG_DEBUG, "  * he_enabled=%d", freq->he_enabled);
 	wpa_printf(MSG_DEBUG, "  * vht_enabled=%d", freq->vht_enabled);
@@ -5886,7 +5887,8 @@ static int nl80211_put_freq_params(struct nl_msg *msg,
 		hw_mode == HOSTAPD_MODE_IEEE80211B;
 
 	if (freq->vht_enabled ||
-	    ((freq->he_enabled || freq->eht_enabled) && !is_24ghz)) {
+	    ((freq->he_enabled || freq->eht_enabled || freq->uhr_enabled) &&
+	    !is_24ghz)) {
 		enum nl80211_chan_width cw;
 
 		wpa_printf(MSG_DEBUG, "  * bandwidth=%d", freq->bandwidth);
@@ -6434,10 +6436,10 @@ static int nl80211_set_channel(struct i802_bss *bss,
 	int ret;
 
 	wpa_printf(MSG_DEBUG,
-		   "nl80211: Set freq %d (ht_enabled=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d, bandwidth=%d MHz, cf1=%d MHz, cf2=%d MHz)",
+		   "nl80211: Set freq %d (ht_enabled=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d, uhr_enabled=%d, bandwidth=%d MHz, cf1=%d MHz, cf2=%d MHz)",
 		   freq->freq, freq->ht_enabled, freq->vht_enabled,
-		   freq->he_enabled, freq->eht_enabled, freq->bandwidth,
-		   freq->center_freq1, freq->center_freq2);
+		   freq->he_enabled, freq->eht_enabled, freq->uhr_enabled,
+		   freq->bandwidth, freq->center_freq1, freq->center_freq2);
 
 	msg = nl80211_bss_msg(bss, 0, set_chan ? NL80211_CMD_SET_CHANNEL :
 			      NL80211_CMD_SET_WIPHY);
@@ -12834,6 +12836,13 @@ static int set_beacon_data(struct nl_msg *msg, struct beacon_data *settings,
 	     nla_put(msg, NL80211_ATTR_PROBE_RESP,
 		     settings->probe_resp_len, settings->probe_resp)))
 		return -ENOBUFS;
+
+#ifdef CONFIG_IEEE80211BN
+	if (settings->uhr_oper &&
+	    nla_put(msg, NL80211_ATTR_UHR_OPERATION,
+		    settings->uhr_oper[1] - 1, settings->uhr_oper + 3))
+		return -ENOBUFS;
+#endif /* CONFIG_IEEE80211BN */
 
 #ifdef CONFIG_IEEE80211AX
 	if (!skip_mbssid && nl80211_mbssid(msg, &settings->mbssid) < 0)

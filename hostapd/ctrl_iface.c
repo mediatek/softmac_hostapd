@@ -2929,6 +2929,7 @@ static int hostapd_ctrl_iface_chan_switch(struct hostapd_iface *iface,
 					    background_settings.freq_params.vht_enabled,
 					    background_settings.freq_params.he_enabled,
 					    background_settings.freq_params.eht_enabled,
+					    background_settings.freq_params.uhr_enabled,
 					    background_settings.freq_params.sec_channel_offset,
 					    oper_chwidth, seg0, seg1, true, false);
 		if (ret) {
@@ -5800,6 +5801,7 @@ hostapd_ctrl_iface_set_offchain(struct hostapd_data *hapd, char *cmd,
 				  iface->conf->ieee80211ac,
 				  iface->conf->ieee80211ax,
 				  iface->conf->ieee80211be,
+				  iface->conf->ieee80211bn,
 				  secondary_chan, chwidth,
 				  seg0, seg1, true, true)) {
 		wpa_printf(MSG_ERROR, "DFS failed to start CAC offchannel");

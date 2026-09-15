@@ -1359,7 +1359,9 @@ int hostapd_parse_freq_params(const char *pos,
 	SET_FREQ_PARAM(punct_bitmap);
 	params->ht_enabled = !!os_strstr(pos, " ht");
 	params->vht_enabled = !!os_strstr(pos, " vht");
-	params->eht_enabled = !!os_strstr(pos, " eht");
+	params->uhr_enabled = !!os_strstr(pos, " uhr");
+	params->eht_enabled = !!os_strstr(pos, " eht") ||
+		params->uhr_enabled;
 	params->he_enabled = !!os_strstr(pos, " he") ||
 		params->eht_enabled;
 	params->radar_background = !!os_strstr(pos, " skip_cac");
@@ -1444,10 +1446,14 @@ static int hostapd_ctrl_check_freq_params(struct hostapd_freq_params *params,
 				return -1;
 		}
 	} else { /* Non-6 GHz channel */
-		/* An EHT STA is also an HE STA as defined in
-		 * IEEE Std 802.11be-2024, 4.3.16a (Extremely high throughput
-		 * (EHT) STA). */
-		if (params->he_enabled || params->eht_enabled) {
+		if (params->he_enabled || params->eht_enabled || params->uhr_enabled) {
+			/* An UHR STA is also an EHT STA */
+			if (params->uhr_enabled)
+				params->eht_enabled = 1;
+
+			/* An EHT STA is also an HE STA as defined in
+			 * IEEE Std 802.11be-2024, 4.3.16a (Extremely high throughput
+			 * (EHT) STA). */
 			params->he_enabled = 1;
 			/* An HE STA is also a VHT STA if operating in the 5 GHz
 			 * band and an HE STA is also an HT STA in the 2.4 GHz

@@ -782,6 +782,12 @@ hostapd_switch_chan(struct ubus_context *ctx, struct ubus_object *obj,
 			.eht.enabled = css.freq_params.eht_enabled,
 			.eht.cap = mode ? &mode->eht_capab[IEEE80211_MODE_AP] : NULL,
 			.eht.punct_bitmap = hostapd_get_punct_bitmap(hapd),
+#ifdef CONFIG_IEEE80211BN
+			.uhr.enabled = css.freq_params.uhr_enabled,
+			.uhr.cap = mode ? &mode->uhr_capab[IEEE80211_MODE_AP] : NULL,
+			.uhr.dbe_bandwidth = iconf->dbe_bandwidth,
+			.uhr.dbe_punct_bitmap = iconf->dbe_punct_bitmap,
+#endif
 			.oper_chwidth = chwidth,
 			.center_segment0 = seg0,
 			.center_segment1 = seg1,

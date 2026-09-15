@@ -1274,12 +1274,13 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 
 	hostapd_logger(hapd, NULL, HOSTAPD_MODULE_IEEE80211,
 		       HOSTAPD_LEVEL_INFO,
-		       "driver %s channel switch: iface->freq=%d, freq=%d, ht=%d, vht_ch=0x%x, he_ch=0x%x, eht_ch=0x%x, offset=%d, width=%d (%s), cf1=%d, cf2=%d, puncturing_bitmap=0x%x",
+		       "driver %s channel switch: iface->freq=%d, freq=%d, ht=%d, vht_ch=0x%x, he_ch=0x%x, eht_ch=0x%x, uhr_ch=0x%x, offset=%d, width=%d (%s), cf1=%d, cf2=%d, puncturing_bitmap=0x%x",
 		       finished ? "had" : "starting",
 		       hapd->iface->freq,
 		       freq, ht, hapd->iconf->ch_switch_vht_config,
 		       hapd->iconf->ch_switch_he_config,
-		       hapd->iconf->ch_switch_eht_config, offset,
+		       hapd->iconf->ch_switch_eht_config,
+		       hapd->iconf->ch_switch_uhr_config, offset,
 		       width, channel_width_to_string(width), cf1, cf2,
 		       punct_bitmap);
 
@@ -1392,9 +1393,26 @@ void hostapd_event_ch_switch(struct hostapd_data *hapd, int freq, int ht,
 			hapd->iconf->ieee80211be = 0;
 	}
 #endif /* CONFIG_IEEE80211BE */
+#ifdef CONFIG_IEEE80211BN
+	if (hapd->iconf->ch_switch_uhr_config) {
+		/* CHAN_SWITCH UHR config */
+		if (hapd->iconf->ch_switch_uhr_config &
+		    CH_SWITCH_UHR_ENABLED) {
+			hapd->iconf->ieee80211bn = 1;
+			hapd->iconf->ieee80211be = 1;
+			hapd->iconf->ieee80211ax = 1;
+			if (!is_6ghz_freq(hapd->iface->freq) &&
+			    hapd->iface->freq > 4000)
+				hapd->iconf->ieee80211ac = 1;
+		} else if (hapd->iconf->ch_switch_uhr_config &
+			   CH_SWITCH_UHR_DISABLED)
+			hapd->iconf->ieee80211bn = 0;
+	}
+#endif /* CONFIG_IEEE80211BE */
 	hapd->iconf->ch_switch_vht_config = 0;
 	hapd->iconf->ch_switch_he_config = 0;
 	hapd->iconf->ch_switch_eht_config = 0;
+	hapd->iconf->ch_switch_uhr_config = 0;
 
 	if (width == CHAN_WIDTH_40 || width == CHAN_WIDTH_80 ||
 	    width == CHAN_WIDTH_80P80 || width == CHAN_WIDTH_160 ||

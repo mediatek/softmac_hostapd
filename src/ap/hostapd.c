@@ -3072,6 +3072,7 @@ static int hostapd_setup_interface_complete_sync(struct hostapd_iface *iface,
 				     hapd->iconf->ieee80211ac,
 				     hapd->iconf->ieee80211ax,
 				     hapd->iconf->ieee80211be,
+				     hapd->iconf->ieee80211bn,
 				     hapd->iconf->secondary_channel,
 				     hostapd_get_oper_chwidth(hapd->iconf),
 				     hostapd_get_oper_centr_freq_seg0_idx(
@@ -5232,6 +5233,8 @@ void free_beacon_data(struct beacon_data *beacon)
 	beacon->mbssid.rnr_elem = NULL;
 	os_free(beacon->mbssid.rnr_elem_offset);
 	beacon->mbssid.rnr_elem_offset = NULL;
+	os_free(beacon->uhr_oper);
+	beacon->uhr_oper = NULL;
 }
 
 
@@ -5305,6 +5308,13 @@ int hostapd_build_beacon_data(struct hostapd_data *hapd,
 			goto free_beacon;
 
 		beacon->assocresp_ies_len = wpabuf_len(assocresp_extra);
+	}
+
+	if (params.uhr_oper) {
+		beacon->uhr_oper = os_memdup(params.uhr_oper,
+					     params.uhr_oper[1] + 2);
+		if (!beacon->uhr_oper)
+			goto free_beacon;
 	}
 
 	/* MBSSID element */
@@ -5441,6 +5451,13 @@ int hostapd_change_config_freq(struct hostapd_data *hapd,
 			.eht.cap = mode ? &mode->eht_capab[IEEE80211_MODE_AP] :
 			NULL,
 			.eht.punct_bitmap = hostapd_get_punct_bitmap(hapd),
+#ifdef CONFIG_IEEE80211BN
+			.uhr.enabled = conf->ieee80211bn,
+			.uhr.cap = mode ? &mode->uhr_capab[IEEE80211_MODE_AP] :
+			NULL,
+			.uhr.dbe_bandwidth = conf->dbe_bandwidth,
+			.uhr.dbe_punct_bitmap = conf->dbe_punct_bitmap,
+#endif
 		};
 
 		if (hostapd_set_freq_params(old_params, &info))
@@ -5632,12 +5649,13 @@ static int hostapd_fill_csa_settings(struct hostapd_data *hapd,
 		    &hapd->iface->cs_oper_class,
 		    &chan) == NUM_HOSTAPD_MODES) {
 		wpa_printf(MSG_DEBUG,
-			   "invalid frequency for channel switch (freq=%d, sec_channel_offset=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d)",
+			   "invalid frequency for channel switch (freq=%d, sec_channel_offset=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d, uhr_enabled=%d)",
 			   settings->freq_params.freq,
 			   settings->freq_params.sec_channel_offset,
 			   settings->freq_params.vht_enabled,
 			   settings->freq_params.he_enabled,
-			   settings->freq_params.eht_enabled);
+			   settings->freq_params.eht_enabled,
+			   settings->freq_params.uhr_enabled);
 		return -1;
 	}
 
@@ -5721,6 +5739,11 @@ void hostapd_cleanup_cs_params(struct hostapd_data *hapd)
 void hostapd_chan_switch_config(struct hostapd_data *hapd,
 				struct hostapd_freq_params *freq_params)
 {
+	if (freq_params->uhr_enabled)
+		hapd->iconf->ch_switch_uhr_config |= CH_SWITCH_UHR_ENABLED;
+	else
+		hapd->iconf->ch_switch_uhr_config |= CH_SWITCH_UHR_DISABLED;
+
 	if (freq_params->eht_enabled)
 		hapd->iconf->ch_switch_eht_config |= CH_SWITCH_EHT_ENABLED;
 	else
@@ -5738,7 +5761,8 @@ void hostapd_chan_switch_config(struct hostapd_data *hapd,
 
 	hostapd_logger(hapd, NULL, HOSTAPD_MODULE_IEEE80211,
 		       HOSTAPD_LEVEL_INFO,
-		       "CHAN_SWITCH EHT config 0x%x HE config 0x%x VHT config 0x%x",
+		       "CHAN_SWITCH UHR config 0x%x EHT config 0x%x HE config 0x%x VHT config 0x%x",
+		       hapd->iconf->ch_switch_uhr_config,
 		       hapd->iconf->ch_switch_eht_config,
 		       hapd->iconf->ch_switch_he_config,
 		       hapd->iconf->ch_switch_vht_config);
@@ -5941,6 +5965,7 @@ err:
 	iface->conf->ch_switch_vht_config = 0;
 	iface->conf->ch_switch_he_config = 0;
 	iface->conf->ch_switch_eht_config = 0;
+	iface->conf->ch_switch_uhr_config = 0;
 	for (; i >= 0; i--) {
 		hostapd_cleanup_cs_params(iface->bss[i]);
 #ifdef CONFIG_IEEE80211BE
@@ -6025,6 +6050,7 @@ hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 	iface->conf->ieee80211ac = freq_params->vht_enabled;
 	iface->conf->ieee80211ax = freq_params->he_enabled;
 	iface->conf->ieee80211be = freq_params->eht_enabled;
+	iface->conf->ieee80211bn = freq_params->uhr_enabled;
 	if (ieee80211_freq_to_channel_ext(iface->freq, iface->conf->secondary_channel,
 					  hostapd_get_oper_chwidth(iface->conf),
 					  &op_class, &chan) != NUM_HOSTAPD_MODES)

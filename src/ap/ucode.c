@@ -746,6 +746,7 @@ out:
 				 conf->ieee80211ac,
 				 conf->ieee80211ax,
 				 conf->ieee80211be,
+				 conf->ieee80211bn,
 				 conf->secondary_channel,
 				 hostapd_get_oper_chwidth(conf),
 				 hostapd_get_oper_centr_freq_seg0_idx(conf),
@@ -783,6 +784,9 @@ uc_hostapd_iface_switch_channel(uc_vm_t *vm, size_t nargs)
 	csa.freq_params.he_enabled = conf->ieee80211ax;
 #ifdef CONFIG_IEEE80211BE
 	csa.freq_params.eht_enabled = conf->ieee80211be;
+#endif
+#ifdef CONFIG_IEEE80211BN
+	csa.freq_params.uhr_enabled = conf->ieee80211bn;
 #endif
 	intval = ucv_int64_get(ucv_object_get(info, "oper_chwidth", NULL));
 	if (errno)

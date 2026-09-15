@@ -10771,13 +10771,15 @@ u8 * hostapd_eid_chsw_wrapper(struct hostapd_data *hapd, u8 *eid)
 
 	if (!hostapd_is_vht_enabled(hapd) &&
 	    !hostapd_is_he_enabled(hapd) &&
-	    !hostapd_is_eht_enabled(hapd))
+	    !hostapd_is_eht_enabled(hapd) &&
+	    !hostapd_is_uhr_enabled(hapd))
 		return eid;
 
 	if (!hapd->cs_freq_params.channel ||
 	    (!hapd->cs_freq_params.vht_enabled &&
 	     !hapd->cs_freq_params.he_enabled &&
-	     !hapd->cs_freq_params.eht_enabled))
+	     !hapd->cs_freq_params.eht_enabled &&
+	     !hapd->cs_freq_params.uhr_enabled))
 		return eid;
 
 	freq1 = hapd->cs_freq_params.center_freq1 ?

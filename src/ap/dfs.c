@@ -937,6 +937,7 @@ static int hostapd_start_dfs_background_cac(struct hostapd_iface *iface)
 				    iface->conf->ieee80211ac,
 				    iface->conf->ieee80211ax,
 				    iface->conf->ieee80211be,
+				    iface->conf->ieee80211bn,
 				    sec, iface->radar_background.oper_chwidth,
 				    oper_centr_freq_seg0_idx,
 				    oper_centr_freq_seg1_idx, true, false);
@@ -1043,7 +1044,7 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 		iface, iface->conf->hw_mode, iface->freq, iface->conf->channel,
 		iface->conf->ieee80211n, iface->conf->ieee80211ac,
 		iface->conf->ieee80211ax, iface->conf->ieee80211be,
-		iface->conf->secondary_channel,
+		iface->conf->ieee80211bn, iface->conf->secondary_channel,
 		hostapd_get_oper_chwidth(iface->conf),
 		hostapd_get_oper_centr_freq_seg0_idx(iface->conf),
 		hostapd_get_oper_centr_freq_seg1_idx(iface->conf),
@@ -1164,6 +1165,12 @@ static int hostapd_dfs_request_channel_switch(struct hostapd_iface *iface,
 		.he.cap = &cmode->he_capab[ieee80211_mode],
 		.eht.cap = &cmode->eht_capab[ieee80211_mode],
 		.eht.punct_bitmap = hostapd_get_punct_bitmap(iface->bss[0]),
+#ifdef CONFIG_IEEE80211BN
+		.uhr.enabled = iface->conf->ieee80211bn,
+		.uhr.cap = &cmode->uhr_capab[ieee80211_mode],
+		.uhr.dbe_bandwidth = iface->conf->dbe_bandwidth,
+		.uhr.dbe_punct_bitmap = iface->conf->dbe_punct_bitmap,
+#endif
 	};
 
 	err = hostapd_set_freq_params(&csa_settings.freq_params, &info);
@@ -1348,6 +1355,7 @@ static void hostapd_dfs_update_background_chain(struct hostapd_iface *iface)
 				  iface->conf->ieee80211ac,
 				  iface->conf->ieee80211ax,
 				  iface->conf->ieee80211be,
+				  iface->conf->ieee80211bn,
 				  sec, iface->radar_background.oper_chwidth,
 				  oper_centr_freq_seg0_idx,
 				  oper_centr_freq_seg1_idx, true, false)) {

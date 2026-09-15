@@ -733,8 +733,8 @@ int hostapd_flush(struct hostapd_data *hapd)
 
 int hostapd_set_freq(struct hostapd_data *hapd, enum hostapd_hw_mode mode,
 		     int freq, int channel, int edmg, u8 edmg_channel,
-		     int ht_enabled, int vht_enabled,
-		     int he_enabled, bool eht_enabled,
+		     int ht_enabled, int vht_enabled, int he_enabled,
+		     bool eht_enabled, bool uhr_enabled,
 		     int sec_channel_offset, int oper_chwidth,
 		     int center_segment0, int center_segment1)
 {
@@ -758,6 +758,12 @@ int hostapd_set_freq(struct hostapd_data *hapd, enum hostapd_hw_mode mode,
 		.he.cap = cmode ? &cmode->he_capab[IEEE80211_MODE_AP] : NULL,
 		.eht.cap = cmode ? &cmode->eht_capab[IEEE80211_MODE_AP] : NULL,
 		.eht.punct_bitmap = hostapd_get_punct_bitmap(hapd),
+#ifdef CONFIG_IEEE80211BN
+		.uhr.enabled = uhr_enabled,
+		.uhr.cap = cmode ? &cmode->uhr_capab[IEEE80211_MODE_AP] : NULL,
+		.uhr.dbe_bandwidth = hapd->iconf->dbe_bandwidth,
+		.uhr.dbe_punct_bitmap = hapd->iconf->dbe_punct_bitmap,
+#endif
 	};
 
 	if (hostapd_set_freq_params(&data, &info))
@@ -1192,7 +1198,7 @@ int hostapd_drv_send_action_forced_addr3(struct hostapd_data *hapd,
 int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 			  enum hostapd_hw_mode mode, int freq,
 			  int channel, int ht_enabled, int vht_enabled,
-			  int he_enabled, bool eht_enabled,
+			  int he_enabled, bool eht_enabled, bool uhr_enabled,
 			  int sec_channel_offset, int oper_chwidth,
 			  int center_segment0, int center_segment1,
 			  bool radar_background, bool update_state)
@@ -1217,6 +1223,12 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 		.he.cap = cmode ? &cmode->he_capab[IEEE80211_MODE_AP] : NULL,
 		.eht.cap = cmode ? &cmode->eht_capab[IEEE80211_MODE_AP] : NULL,
 		.eht.punct_bitmap = hostapd_get_punct_bitmap(hapd),
+#ifdef CONFIG_IEEE80211BN
+		.uhr.enabled = uhr_enabled,
+		.uhr.cap = cmode ? &cmode->uhr_capab[IEEE80211_MODE_AP] : NULL,
+		.uhr.dbe_bandwidth = hapd->iconf->dbe_bandwidth,
+		.uhr.dbe_punct_bitmap = hapd->iconf->dbe_punct_bitmap,
+#endif
 	};
 
 	if (!hapd->driver || !hapd->driver->start_dfs_cac || !cmode)
