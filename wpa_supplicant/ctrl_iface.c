@@ -9218,7 +9218,9 @@ static void wpa_supplicant_ctrl_iface_flush(struct wpa_supplicant *wpa_s)
 	dpp_test = DPP_TEST_DISABLED;
 #endif /* CONFIG_DPP */
 	wpa_sm_set_test_random_pmkid_count(wpa_s->wpa, 0);
+#ifdef CONFIG_PASN
 	wpa_s->pasn.test_random_pmkid_count = 0;
+#endif /* CONFIG_PASN */
 #endif /* CONFIG_TESTING_OPTIONS */
 
 	wpa_s->disconnected = 0;
@@ -14506,7 +14508,9 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			reply_len = -1;
 		} else {
 			wpa_sm_set_test_random_pmkid_count(wpa_s->wpa, count);
+#ifdef CONFIG_PASN
 			wpa_s->pasn.test_random_pmkid_count = count;
+#endif /* CONFIG_PASN */
 		}
 	} else if (os_strncmp(buf, "TEST_EAPOL_M2_ELEMS ", 20) == 0) {
 		if (wpas_ctrl_test_eapol_m2_elems(wpa_s, buf + 20) < 0)

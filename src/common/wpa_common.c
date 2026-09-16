@@ -4240,6 +4240,30 @@ int wpa_parse_kde_ies(const u8 *buf, size_t len, struct wpa_eapol_ie_parse *ie)
 }
 
 
+#ifdef CONFIG_TESTING_OPTIONS
+int wpa_rsne_inject_random_pmkids(u8 **pos, unsigned int count)
+{
+	unsigned int i;
+
+	wpa_printf(MSG_INFO, "TESTING: Inject %u random PMKID(s) into RSNE",
+		   count);
+	WPA_PUT_LE16(*pos, count);
+	*pos += 2;
+	for (i = 0; i < count; i++) {
+		if (random_get_bytes(*pos, PMKID_LEN) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "TESTING: Failed to generate random PMKID");
+			return -1;
+		}
+		wpa_hexdump(MSG_DEBUG, "TESTING: Random PMKID",
+			    *pos, PMKID_LEN);
+		*pos += PMKID_LEN;
+	}
+	return 0;
+}
+#endif /* CONFIG_TESTING_OPTIONS */
+
+
 #ifdef CONFIG_PASN
 
 /*
@@ -4279,30 +4303,6 @@ void wpa_pasn_build_auth_header(struct wpabuf *buf, const u8 *bssid,
 	auth->u.auth.auth_transaction = host_to_le16(trans_seq);
 	auth->u.auth.status_code = host_to_le16(status);
 }
-
-
-#ifdef CONFIG_TESTING_OPTIONS
-int wpa_rsne_inject_random_pmkids(u8 **pos, unsigned int count)
-{
-	unsigned int i;
-
-	wpa_printf(MSG_INFO, "TESTING: Inject %u random PMKID(s) into RSNE",
-		   count);
-	WPA_PUT_LE16(*pos, count);
-	*pos += 2;
-	for (i = 0; i < count; i++) {
-		if (random_get_bytes(*pos, PMKID_LEN) < 0) {
-			wpa_printf(MSG_WARNING,
-				   "TESTING: Failed to generate random PMKID");
-			return -1;
-		}
-		wpa_hexdump(MSG_DEBUG, "TESTING: Random PMKID",
-			    *pos, PMKID_LEN);
-		*pos += PMKID_LEN;
-	}
-	return 0;
-}
-#endif /* CONFIG_TESTING_OPTIONS */
 
 
 /*
