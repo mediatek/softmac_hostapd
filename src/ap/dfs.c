@@ -29,6 +29,32 @@ dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 			bool background);
 
 
+static void dfs_apply_ch_sel_pref(struct hostapd_iface *iface,
+				  enum dfs_channel_type *type)
+{
+	if (iface->conf->dfs_ch_sel < 0 || *type == iface->conf->dfs_ch_sel)
+		return;
+
+	switch (iface->conf->dfs_ch_sel) {
+	case DFS_ANY_CHANNEL:
+	case DFS_AVAILABLE:
+	case DFS_NO_CAC_YET:
+	case DFS_NON_RADAR:
+		break;
+	default:
+		wpa_printf(MSG_ERROR, "Unknown dfs_ch_sel %d, reset to -1",
+			   iface->conf->dfs_ch_sel);
+		iface->conf->dfs_ch_sel = -1;
+		return;
+	}
+
+	wpa_printf(MSG_DEBUG,
+		   "Replacing dfs_channel_type %d with customized dfs_ch_sel %d",
+		   *type, iface->conf->dfs_ch_sel);
+	*type = iface->conf->dfs_ch_sel;
+}
+
+
 static bool dfs_use_radar_background(struct hostapd_iface *iface)
 {
 	return (iface->drv_flags2 & WPA_DRIVER_FLAGS2_RADAR_BACKGROUND) &&
@@ -106,6 +132,9 @@ static int dfs_channel_available(struct hostapd_channel_data *chan,
 
 	if (chan->flag & HOSTAPD_CHAN_DISABLED)
 		return -1;
+
+	if (type == DFS_NON_RADAR)
+		return chan->flag & HOSTAPD_CHAN_RADAR ? -1 : 1;
 
 	if (type == DFS_NO_CAC_YET) {
 		/* Select only radar channel where CAC has not been
@@ -284,7 +313,8 @@ int dfs_find_channel(struct hostapd_iface *iface,
 	if (!n_chans)
 		n_chans = dfs_get_used_n_chans(iface, &n_chans1);
 
-	wpa_printf(MSG_DEBUG, "DFS new chan checking %d channels", n_chans);
+	wpa_printf(MSG_DEBUG, "DFS new chan checking %d channels with type %d",
+		   n_chans, type);
 	for (i = 0; i < mode->num_channels; i++) {
 		chan = &mode->channels[i];
 
@@ -694,6 +724,7 @@ static int dfs_set_valid_channel(struct hostapd_iface *iface, int skip_radar)
 	int sec = 0;
 
 	channel_type = skip_radar ? DFS_AVAILABLE : DFS_ANY_CHANNEL;
+	dfs_apply_ch_sel_pref(iface, &channel_type);
 	channel = dfs_get_valid_channel(iface, &sec, &cf1, &cf2,
 					channel_type, false);
 	if (!channel) {
@@ -966,7 +997,6 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 	struct hostapd_channel_data *channel;
 	int res, n_chans, n_chans1, start_chan_idx, start_chan_idx1, sec = 0;
 	u8 cf1 = 0, cf2 = 0;
-	enum dfs_channel_type channel_type = DFS_NO_CAC_YET;
 
 	if (is_6ghz_freq(iface->freq))
 		return 1;
@@ -1720,6 +1750,7 @@ static int hostapd_dfs_start_channel_switch_cac(struct hostapd_iface *iface)
 
 	/* Radar detected during active CAC */
 	iface->cac_started = 0;
+	dfs_apply_ch_sel_pref(iface, &channel_type);
 	channel = dfs_get_valid_channel(iface, &secondary_channel,
 					&oper_centr_freq_seg0_idx,
 					&oper_centr_freq_seg1_idx,
@@ -1866,6 +1897,8 @@ static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 	 */
 	if (iface->dfs_domain == HOSTAPD_DFS_REGION_ETSI)
 		channel_type = DFS_ANY_CHANNEL;
+
+	dfs_apply_ch_sel_pref(iface, &channel_type);
 
 	/* Perform channel switch/CSA */
 	channel = dfs_get_valid_channel(iface, &secondary_channel,

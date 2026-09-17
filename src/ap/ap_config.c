@@ -339,6 +339,7 @@ struct hostapd_config * hostapd_config_defaults(void)
 	conf->lpi_sku_idx = -1;
 	conf->lpi_bcn_enhance = 0;
 	conf->sku_filename[0] = '\0';
+	conf->dfs_ch_sel = -1;
 
 	hostapd_set_and_check_bw320_offset(conf, 0);
 

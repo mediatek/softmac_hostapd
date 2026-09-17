@@ -13,6 +13,7 @@ enum dfs_channel_type {
 	DFS_ANY_CHANNEL,
 	DFS_AVAILABLE, /* non-radar or radar-available */
 	DFS_NO_CAC_YET, /* radar-not-yet-available */
+	DFS_NON_RADAR,	/* non-radar only */
 };
 
 int hostapd_handle_dfs(struct hostapd_iface *iface);

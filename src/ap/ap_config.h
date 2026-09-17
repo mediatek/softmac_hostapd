@@ -1433,6 +1433,7 @@ struct hostapd_config {
 	u8 lpi_bcn_enhance;
 #define SKU_FILENAME_MAX		64
 	char sku_filename[SKU_FILENAME_MAX];
+	int dfs_ch_sel;
 };
 
 #define THREE_WIRE_EXT_SEL_UNSET	0xff

@@ -5523,6 +5523,8 @@ static int hostapd_config_fill(struct hostapd_config *conf,
 	} else if (os_strcmp(buf, "smd_ptk_mode") == 0) {
 		bss->smd_ptk_mode = !!atoi(pos);
 #endif /* CONFIG_IEEE80211BN */
+	} else if (os_strcmp(buf, "dfs_ch_sel") == 0) {
+		conf->dfs_ch_sel = strtol(pos, NULL, 10);
 	} else {
 		wpa_printf(MSG_ERROR,
 			   "Line %d: unknown configuration item '%s'",
