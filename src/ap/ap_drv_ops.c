@@ -1873,7 +1873,8 @@ int hostapd_drv_ap_trig_type(struct hostapd_data *hapd, u8 enable, u8 type)
 					 link_id);
 }
 
-int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_mac)
+int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_mac,
+			 u8 frm_type)
 {
 	s8 link_id = -1;
 
@@ -1886,7 +1887,7 @@ int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_ma
 #endif /* CONFIG_IEEE80211BE */
 
 	return hapd->driver->amnt_set(hapd->drv_priv, amnt_idx, amnt_sta_mac,
-				      link_id);
+				      frm_type, link_id);
 }
 
 int hostapd_drv_amnt_dump(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_dump_buf)

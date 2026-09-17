@@ -6064,6 +6064,7 @@ hostapd_ctrl_iface_set_amnt(struct hostapd_data *hapd, char *cmd,
 {
 	char *tmp, sta_mac[ETH_ALEN] = {0};
 	int amnt_idx = 0;
+	int frm_type = BIT(0); /* default: data only */
 
 	tmp = strtok_r(cmd, " ", &cmd);
 
@@ -6084,12 +6085,27 @@ hostapd_ctrl_iface_set_amnt(struct hostapd_data *hapd, char *cmd,
 		return -1;
 	}
 
-	if (hwaddr_aton(cmd, sta_mac) < 0) {
+	tmp = strtok_r(cmd, " ", &cmd);
+	if (!tmp) {
+		wpa_printf(MSG_ERROR, "Error in command format\n");
+		return -1;
+	}
+
+	if (hwaddr_aton(tmp, sta_mac) < 0) {
 		wpa_printf(MSG_ERROR, "station mac is not right.\n");
 		return -1;
 	}
 
-	if (hostapd_drv_amnt_set(hapd, amnt_idx, sta_mac)) {
+	/* optional frm_type bitmask: SET_AMNT <idx> <mac> <frm_type> */
+	if (*cmd)
+		frm_type = strtol(cmd, NULL, 10);
+
+	if (frm_type <= 0 || frm_type > 7) {
+		wpa_printf(MSG_ERROR, "frm_type out of range (1-7)\n");
+		return -1;
+	}
+
+	if (hostapd_drv_amnt_set(hapd, amnt_idx, sta_mac, frm_type)) {
 		wpa_printf(MSG_ERROR, "Not able to set amnt index\n");
 		return -1;
 	}

@@ -180,7 +180,8 @@ int hostapd_drv_ap_wireless(struct hostapd_data *hapd, u8 sub_vendor_id, int val
 int hostapd_drv_ap_rfeatures(struct hostapd_data *hapd, u8 sub_vendor_id, int value);
 int hostapd_drv_ap_trig_type(struct hostapd_data *hapd, u8 enable, u8 type);
 
-int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_mac);
+int hostapd_drv_amnt_set(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_sta_mac,
+			 u8 frm_type);
 int hostapd_drv_amnt_dump(struct hostapd_data *hapd, u8 amnt_idx, u8 *amnt_dump_buf);
 int hostapd_drv_background_radar_mode(struct hostapd_data *hapd);
 int hostapd_drv_pp_mode_set(struct hostapd_data *hapd);

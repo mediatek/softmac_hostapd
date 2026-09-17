@@ -18181,7 +18181,7 @@ fail:
 }
 
 static int
-nl80211_amnt_set(void *priv, u8 amnt_idx, u8 *amnt_sta_mac, s8 link_id)
+nl80211_amnt_set(void *priv, u8 amnt_idx, u8 *amnt_sta_mac, u8 frm_type, s8 link_id)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -18217,7 +18217,8 @@ nl80211_amnt_set(void *priv, u8 amnt_idx, u8 *amnt_sta_mac, s8 link_id)
 		goto fail;
 
 	if (nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_SET_INDEX, amnt_idx) ||
-	    nla_put(msg, MTK_VENDOR_ATTR_AMNT_SET_MACADDR, ETH_ALEN, amnt_sta_mac))
+	    nla_put(msg, MTK_VENDOR_ATTR_AMNT_SET_MACADDR, ETH_ALEN, amnt_sta_mac) ||
+	    nla_put_u8(msg, MTK_VENDOR_ATTR_AMNT_SET_FRAME_TYPE, frm_type))
 		goto fail;
 
 	nla_nest_end(msg, tb1);

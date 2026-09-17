@@ -6310,14 +6310,18 @@ struct wpa_driver_ops {
 	* @priv: Private driver interface data
 	* @amnt_idx: Monitor Index
 	* @amnt_sta_mac: station mac address
+	* @frm_type: bitmask of frame types to monitor
+	*           BIT(0) = data, BIT(1) = management, BIT(2) = control
+	* @link_id: MLD link id, or -1 for non-MLD
 	*/
-	int (*amnt_set)(void *priv, u8 amnt_idx, u8 *amnt_sta_mac, s8 link_id);
+	int (*amnt_set)(void *priv, u8 amnt_idx, u8 *amnt_sta_mac, u8 frm_type, s8 link_id);
 
 	/**
-	* amnt_dump - Dump particular/ all station
+	* amnt_dump - Dump particular/all station monitoring results
 	* @priv: Private driver interface data
-	* @amnt_idx: Monitor Index
-	* @amnt_dump_buf: Buffer to print
+	* @amnt_idx: Monitor index (0-15), or 0xff to dump all entries
+	* @amnt_dump_buf: Buffer to store the dump result (struct amnt_resp_data)
+	* @link_id: MLD link id, or -1 for non-MLD
 	*/
 	int (*amnt_dump)(void *priv, u8 amnt_idx, u8 *amnt_dump_buf, s8 link_id);
 
