@@ -2977,6 +2977,7 @@ struct hostapd_sta_add_params {
 	s8 mld_link_id;
 	const u8 *mld_link_addr;
 	u16 eml_cap;
+	u16 mld_cap;
 
 	const struct ieee80211_uhr_capabilities *uhr_capab;
 	size_t uhr_capab_len;

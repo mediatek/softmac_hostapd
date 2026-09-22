@@ -2168,6 +2168,7 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 	const u8 *mld_link_addr = NULL;
 	bool mld_link_sta = false, epp_sta = false;
 	u16 eml_cap = 0;
+	u16 mld_cap = 0;
 
 #ifdef CONFIG_ENC_ASSOC
 	epp_sta = sta->epp_sta;
@@ -2187,6 +2188,7 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 		mld_link_sta = sta->mld_assoc_link_id != mld_link_id;
 		mld_link_addr = sta->mld_info.links[mld_link_id].peer_addr;
 		eml_cap = sta->mld_info.common_info.eml_capa;
+		mld_cap = sta->mld_info.common_info.mld_capa;
 
 		/*
 		 * In case the AP is affiliated with an AP MLD, we need to
@@ -2205,7 +2207,8 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 			    sta->supported_rates_len,
 			    0, NULL, NULL, NULL, 0, NULL, 0, NULL, 0, NULL,
 			    sta->flags, 0, 0, 0, 0,
-			    mld_link_addr, mld_link_sta, eml_cap, epp_sta, sta->mtk_sta)) {
+			    mld_link_addr, mld_link_sta, eml_cap, epp_sta,
+			    sta->mtk_sta, mld_cap)) {
 		hostapd_logger(hapd, sta->addr,
 			       HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_NOTICE,

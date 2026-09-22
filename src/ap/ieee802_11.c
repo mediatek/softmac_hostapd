@@ -7314,6 +7314,7 @@ static int add_associated_sta(struct hostapd_data *hapd,
 	const u8 *mld_link_addr = NULL;
 	bool mld_link_sta = false, epp_sta = false;
 	u16 eml_cap = 0;
+	u16 mld_cap = 0;
 
 #ifdef CONFIG_ENC_ASSOC
 	epp_sta = sta->epp_sta;
@@ -7329,6 +7330,7 @@ static int add_associated_sta(struct hostapd_data *hapd,
 		if (hapd->mld_link_id != sta->mld_assoc_link_id)
 			set = 0;
 		eml_cap = sta->mld_info.common_info.eml_capa;
+		mld_cap = sta->mld_info.common_info.mld_capa;
 	}
 #endif /* CONFIG_IEEE80211BE */
 
@@ -7426,7 +7428,7 @@ static int add_associated_sta(struct hostapd_data *hapd,
 			    sta->flags | WLAN_STA_ASSOC, sta->qosinfo,
 			    sta->vht_opmode, sta->p2p_ie ? 1 : 0,
 			    set, mld_link_addr, mld_link_sta, eml_cap,
-			    epp_sta, sta->mtk_sta)) {
+			    epp_sta, sta->mtk_sta, mld_cap)) {
 		hostapd_logger(hapd, sta->addr,
 			       HOSTAPD_MODULE_IEEE80211, HOSTAPD_LEVEL_NOTICE,
 			       "Could not %s STA to kernel driver",
@@ -8261,7 +8263,8 @@ static void handle_assoc(struct hostapd_data *hapd,
 					    NULL, sta->flags, 0, 0, 0, 0,
 					    sta->setup_link_addr, false,
 					    sta->mld_info.common_info.eml_capa,
-					    false, sta->mtk_sta)) {
+					    false, sta->mtk_sta,
+					    sta->mld_info.common_info.mld_capa)) {
 				resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
 				goto fail;
 			}

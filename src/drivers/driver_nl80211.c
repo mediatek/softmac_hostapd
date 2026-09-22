@@ -6650,6 +6650,14 @@ static int wpa_driver_nl80211_sta_add(void *priv,
 				goto fail;
 		}
 
+		if (params->mld_link_addr && params->mld_cap) {
+			wpa_printf(MSG_DEBUG, "  * mld_cap =%u",
+				   params->mld_cap);
+			if (nla_put_u16(msg, NL80211_ATTR_MLD_CAPA_AND_OPS,
+					params->mld_cap))
+				goto fail;
+		}
+
 		if (params->mtk_sta) {
 			wpa_printf(MSG_DEBUG, "  * mtk_sta =%u",
 				   params->mtk_sta);
