@@ -17510,7 +17510,7 @@ nl80211_txpower_ctrl(void *priv, u8 lpi_psd, s8 sku_idx, u8 lpi_bcn_enhance, s8 
 		goto fail;
 
 	nla_put_u8(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_LPI_PSD, lpi_psd);
-	if (sku_filename[0] && drv->mtk_vendor_connac_version > 2)
+	if (sku_filename[0])
 		nla_put_string(msg, MTK_VENDOR_ATTR_TXPOWER_CTRL_SKU_FILENAME,
 			       sku_filename);
 	else if (sku_idx > -1)
