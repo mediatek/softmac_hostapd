@@ -587,6 +587,7 @@ int hostapd_set_freq_params(struct hostapd_freq_params *data,
 	data->vht_enabled = vht_enabled;
 	data->he_enabled = he_enabled;
 	data->eht_enabled = eht_enabled;
+	data->uhr_enabled = uhr_enabled;
 	data->sec_channel_offset = sec_channel_offset;
 	data->center_freq1 = freq + sec_channel_offset * 10;
 	data->center_freq2 = 0;
