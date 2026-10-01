@@ -213,11 +213,13 @@ u16 copy_sta_uhr_capab(struct hostapd_data *hapd, struct sta_info *sta,
 	struct hostapd_hw_modes *c_mode = hapd->iface->current_mode;
 	enum hostapd_hw_mode mode = c_mode ? c_mode->mode : NUM_HOSTAPD_MODES;
 
-	if (!hostapd_is_uhr_enabled(hapd) || !uhr_capab ||
+	if (!hostapd_is_uhr_enabled(hapd) || !ap_sta_is_mld(hapd, sta) ||
+	    !uhr_capab ||
 	    ieee80211_invalid_uhr_cap_size(mode, uhr_capab, uhr_capab_len)) {
 		sta->flags &= ~WLAN_STA_UHR;
 		os_free(sta->uhr_capab);
 		sta->uhr_capab = NULL;
+		sta->uhr_capab_len = 0;
 		return WLAN_STATUS_SUCCESS;
 	}
 

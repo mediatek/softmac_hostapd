@@ -1200,7 +1200,13 @@ hostapd_is_eht_enabled(struct hostapd_data *hapd)
 static inline bool
 hostapd_is_uhr_enabled(struct hostapd_data *hapd)
 {
-	return hapd->iconf->ieee80211bn && !hapd->conf->disable_11bn;
+#ifdef CONFIG_IEEE80211BE
+	/* A UHR AP must be part of an AP MLD. */
+	return hapd->iconf->ieee80211bn && !hapd->conf->disable_11bn &&
+	       hapd->conf->mld_ap;
+#else /* CONFIG_IEEE80211BE */
+	return false;
+#endif /* CONFIG_IEEE80211BE */
 }
 
 static inline u32 hostapd_get_radio_mask(struct hostapd_data *hapd)

@@ -6991,7 +6991,7 @@ omit_rsnxe:
 	}
 
 #ifdef CONFIG_IEEE80211BN
-	if (hostapd_is_uhr_enabled(hapd)) {
+	if (hostapd_is_uhr_enabled(hapd) && ap_sta_is_mld(hapd, sta)) {
 		p = hostapd_eid_uhr_capab(hapd, p, IEEE80211_MODE_AP);
 		p = hostapd_eid_uhr_operation(hapd, p, false);
 	}
@@ -7479,7 +7479,7 @@ static u16 send_assoc_resp(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 #endif /* CONFIG_IEEE80211BE */
 #ifdef CONFIG_IEEE80211BN
-	if (hostapd_is_uhr_enabled(hapd)) {
+	if (hostapd_is_uhr_enabled(hapd) && ap_sta_is_mld(hapd, sta)) {
 		buflen += hostapd_eid_uhr_capab_len(hapd, IEEE80211_MODE_AP);
 		buflen += 3 + IEEE80211_UHR_OPER_MAX_SIZE;
 	}
@@ -7653,7 +7653,7 @@ rsnxe_done:
 #endif /* CONFIG_IEEE80211BE */
 
 #ifdef CONFIG_IEEE80211BN
-	if (hostapd_is_uhr_enabled(hapd)) {
+	if (hostapd_is_uhr_enabled(hapd) && ap_sta_is_mld(hapd, sta)) {
 		p = hostapd_eid_uhr_capab(hapd, p, IEEE80211_MODE_AP);
 		p = hostapd_eid_uhr_operation(hapd, p, false);
 	}
