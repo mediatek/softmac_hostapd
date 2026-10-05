@@ -6399,6 +6399,15 @@ struct wpa_driver_ops {
 	 * @dfs_tx_mode: dfs tx mode
 	 */
 	int (*dfs_tx_mode)(void *priv, u8 radio_idx, u8 dfs_tx_mode);
+
+	/**
+	 * dfs_cal_ctrl - set DPD calibration mode for DFS cert
+	 * @priv: Private driver interface data
+	 * @radio_idx: Radio index
+	 * @mode: calibration mode
+	 * @trigger: trigger DPD calibration right after setting calibration mode
+	 */
+	int (*dfs_cal_ctrl)(void *priv, u8 radio_idx, u8 mode, bool trigger);
 };
 
 /**

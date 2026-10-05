@@ -841,6 +841,8 @@ struct hostapd_iface {
 	 * in wpa_supplicant builds for P2P GO functionality. */
 	bool assisted_dfs;
 
+	u8 dfs_cal_mode;
+
 #ifdef CONFIG_AFC
 	struct wpabuf *afc_request;
 	char *afc_response;

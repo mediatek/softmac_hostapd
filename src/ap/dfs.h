@@ -16,6 +16,12 @@ enum dfs_channel_type {
 	DFS_NON_RADAR,	/* non-radar only */
 };
 
+enum dfs_cal_ctrl_mode {
+	DFS_CAL_CTRL_UNSET,
+	DFS_CAL_CTRL_SKIP,
+	DFS_CAL_CTRL_NORMAL,
+};
+
 int hostapd_handle_dfs(struct hostapd_iface *iface);
 
 int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,

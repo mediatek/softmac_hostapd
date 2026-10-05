@@ -2032,3 +2032,18 @@ int hostapd_drv_dfs_tx_mode(struct hostapd_data *hapd, u8 dfs_tx_mode)
 
 	return hapd->driver->dfs_tx_mode(hapd->drv_priv, radio_idx, dfs_tx_mode);
 }
+
+int hostapd_drv_dfs_cal_ctrl(struct hostapd_data *hapd,
+			     u8 dfs_cal_mode, bool trigger)
+{
+	u8 radio_idx = 0;
+
+	if (!hapd->driver || !hapd->driver->dfs_cal_ctrl)
+		return 0;
+
+	if (hapd->iface->current_hw_info)
+		radio_idx = hapd->iface->current_hw_info->hw_idx;
+
+	return hapd->driver->dfs_cal_ctrl(hapd->drv_priv, radio_idx,
+					  dfs_cal_mode, trigger);
+}

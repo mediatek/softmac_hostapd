@@ -940,6 +940,26 @@ static unsigned int dfs_get_cac_time(struct hostapd_iface *iface,
 }
 
 
+static int hostapd_dfs_set_cal_mode(struct hostapd_iface *iface,
+				    u8 dfs_cal_mode, bool trigger)
+{
+	int ret;
+
+	/* avoid resetting the mode to DFS_CAL_CTRL_SKIP
+	 * after bootup background CAC completes
+	 */
+	if (iface->dfs_cal_mode == DFS_CAL_CTRL_NORMAL)
+		return 0;
+
+	ret = hostapd_drv_dfs_cal_ctrl(iface->bss[0], dfs_cal_mode, trigger);
+	if (ret)
+		return ret;
+
+	iface->dfs_cal_mode = dfs_cal_mode;
+	return 0;
+}
+
+
 static int hostapd_start_dfs_background_cac(struct hostapd_iface *iface)
 {
 	struct hostapd_channel_data *channel;
@@ -961,6 +981,9 @@ static int hostapd_start_dfs_background_cac(struct hostapd_iface *iface)
 					DFS_NO_CAC_YET, true);
 	if (!channel || channel->chan == iface->conf->channel)
 		return 1;
+
+	if (hostapd_dfs_set_cal_mode(iface, DFS_CAL_CTRL_SKIP, false))
+		return -1;
 
 	ret = hostapd_start_dfs_cac(iface, iface->conf->hw_mode,
 				    channel->freq, channel->chan,
@@ -1069,6 +1092,10 @@ int hostapd_handle_dfs(struct hostapd_iface *iface)
 		hostapd_get_oper_centr_freq_seg0_idx(iface->conf),
 		hostapd_get_oper_centr_freq_seg1_idx(iface->conf),
 		iface->dfs_cac_ms / 1000);
+
+	if (dfs_use_radar_background(iface) &&
+	    hostapd_dfs_set_cal_mode(iface, DFS_CAL_CTRL_SKIP, false))
+		return -1;
 
 	res = hostapd_start_dfs_cac(
 		iface, iface->conf->hw_mode, iface->freq, iface->conf->channel,
@@ -1587,15 +1614,21 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 			 * to a new DFS channel.
 			 */
 			if (hostapd_dfs_is_background_event(iface, freq)) {
+				int ret;
+
 				iface->radar_background.cac_started = 0;
 				if (!iface->conf->background_auto_ctrl ||
 				    !iface->radar_background.temp_ch)
-					return 0;
+					goto cal;
 
 				iface->radar_background.temp_ch = 0;
 
 				if (iface->radar_background.expand_ch)
 					hostapd_dfs_background_expand(iface, chan_width);
+
+				ret = hostapd_dfs_set_cal_mode(iface, DFS_CAL_CTRL_NORMAL, false);
+				if (ret)
+					return ret;
 
 				return hostapd_dfs_start_channel_switch_background(iface);
 			}
@@ -1648,6 +1681,10 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 		iface->radar_background.expand_ch = 0;
 		iface->radar_background.primary_backup = 0;
 		hostapd_dfs_update_background_chain(iface);
+		if (iface->radar_background.channel == -1) {
+			iface->radar_detected = false;
+			goto cal;
+		}
 	} else if (iface->state == HAPD_IFACE_ENABLED) {
 		iface->cac_started = 0;
 		/* Clear all the CSA params if the switch to DFS channel fails */
@@ -1657,6 +1694,9 @@ int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,
 
 	iface->radar_detected = false;
 	return 0;
+
+cal:
+	return hostapd_dfs_set_cal_mode(iface, DFS_CAL_CTRL_NORMAL, true);
 }
 
 
@@ -1838,6 +1878,10 @@ hostapd_dfs_background_start_channel_switch(struct hostapd_iface *iface,
 		if (iface->radar_background.primary_backup)
 			iface->radar_background.primary_backup = 0;
 		hostapd_dfs_update_background_chain(iface);
+
+		if (iface->radar_background.channel == -1)
+			return hostapd_dfs_set_cal_mode(iface, DFS_CAL_CTRL_NORMAL, true);
+
 		return 0;
 	}
 
