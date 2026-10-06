@@ -25,7 +25,7 @@ static struct hostapd_channel_data *
 dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 			u8 *oper_centr_freq_seg0_idx,
 			u8 *oper_centr_freq_seg1_idx,
-			enum dfs_channel_type *channel_type,
+			enum dfs_channel_type channel_type,
 			bool background);
 
 
@@ -698,7 +698,7 @@ static int dfs_set_valid_channel(struct hostapd_iface *iface, int skip_radar)
 					channel_type, false);
 	if (!channel) {
 		channel = dfs_downgrade_bandwidth(iface, &sec, &cf1, &cf2,
-						  &channel_type, false);
+						  channel_type, false);
 		if (!channel) {
 			wpa_printf(MSG_ERROR, "could not get valid channel");
 			return -1;
@@ -1344,7 +1344,7 @@ static void hostapd_dfs_update_background_chain(struct hostapd_iface *iface)
 		channel = dfs_downgrade_bandwidth(iface, &sec,
 						  &oper_centr_freq_seg0_idx,
 						  &oper_centr_freq_seg1_idx,
-						  &channel_type, true);
+						  channel_type, true);
 
 	if (!channel ||
 	    channel->chan == iface->conf->channel ||
@@ -1664,7 +1664,7 @@ static struct hostapd_channel_data *
 dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 			u8 *oper_centr_freq_seg0_idx,
 			u8 *oper_centr_freq_seg1_idx,
-			enum dfs_channel_type *channel_type,
+			enum dfs_channel_type channel_type,
 			bool background)
 {
 	struct hostapd_channel_data *channel;
@@ -1677,7 +1677,7 @@ dfs_downgrade_bandwidth(struct hostapd_iface *iface, int *secondary_channel,
 		channel = dfs_get_valid_channel(iface, secondary_channel,
 						oper_centr_freq_seg0_idx,
 						oper_centr_freq_seg1_idx,
-						*channel_type, background);
+						channel_type, background);
 		if (channel) {
 			wpa_printf(MSG_DEBUG, "DFS: Selected channel: %d",
 				   channel->chan);
@@ -1729,7 +1729,7 @@ static int hostapd_dfs_start_channel_switch_cac(struct hostapd_iface *iface)
 		channel = dfs_downgrade_bandwidth(iface, &secondary_channel,
 						  &oper_centr_freq_seg0_idx,
 						  &oper_centr_freq_seg1_idx,
-						  &channel_type, false);
+						  channel_type, false);
 		if (!channel) {
 			wpa_printf(MSG_ERROR, "No valid channel available");
 			return err;
@@ -1874,16 +1874,10 @@ static int hostapd_dfs_start_channel_switch(struct hostapd_iface *iface)
 					channel_type, false);
 
 	if (!channel) {
-		/*
-		 * If there is no channel to switch immediately to, check if
-		 * there is another channel where we can switch even if it
-		 * requires to perform a CAC first.
-		 */
-		channel_type = DFS_ANY_CHANNEL;
 		channel = dfs_downgrade_bandwidth(iface, &secondary_channel,
 						  &oper_centr_freq_seg0_idx,
 						  &oper_centr_freq_seg1_idx,
-						  &channel_type, false);
+						  channel_type, false);
 		if (!channel) {
 			/*
 			 * Toggle interface state to enter DFS state
