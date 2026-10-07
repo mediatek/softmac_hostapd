@@ -2386,7 +2386,7 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	{ "mld_link_add", hostapd_cli_cmd_link_add, NULL,
 		" = Add a new link to a MLD AP (QCA ver.)"},
 	{ "link_remove", hostapd_cli_cmd_link_remove, NULL,
-		" [count=<count>] = Remove affiliated link of a MLD AP"},
+	  "<count> = remove MLO link and send Reconfiguration MLE" },
 	{ "set_attlm", hostapd_cli_cmd_set_attlm, NULL,
 		" = Disable the affiliated AP of a MLD AP" },
 	{ "get_attlm", hostapd_cli_cmd_get_attlm, NULL,
