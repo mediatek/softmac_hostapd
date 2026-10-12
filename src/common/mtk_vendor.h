@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: ISC
+// SPDX-License-Identifier: BSD-3-Clause-Clear
 /* Copyright (C) 2020 Felix Fietkau <nbd@nbd.name> */
 #ifndef MTK_VENDOR_H
 #define MTK_VENDOR_H
