@@ -1227,10 +1227,11 @@ static int wiphy_info_handler(struct nl_msg *msg, void *arg)
 				case MTK_NL80211_VENDOR_SUBCMD_ABI_CONNAC2:
 					drv->mtk_vendor_connac_version = 2;
 					break;
-				default:
-					/* CONNAC3/5 share the same ABI now */
-					if (!drv->mtk_vendor_connac_version)
-						drv->mtk_vendor_connac_version = 3;
+				case MTK_NL80211_VENDOR_SUBCMD_ABI_CONNAC3:
+					drv->mtk_vendor_connac_version = 3;
+					break;
+				case MTK_NL80211_VENDOR_SUBCMD_ABI_CONNAC5:
+					drv->mtk_vendor_connac_version = 5;
 					break;
 				}
 			}
