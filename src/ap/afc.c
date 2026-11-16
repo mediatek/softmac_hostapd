@@ -460,7 +460,7 @@ static int
 hostad_afc_parse_available_freq_info(struct hostapd_iface *iface,
 				     struct json_object *reply_elem_obj)
 {
-	struct afc_freq_range_elem *f = NULL;
+	struct afc_freq_range_elem *f = NULL, *tmp;
 	struct json_object *obj;
 	int i, count = 0;
 
@@ -472,6 +472,7 @@ hostad_afc_parse_available_freq_info(struct hostapd_iface *iface,
 		struct json_object *range_elem_obj, *freq_range_obj;
 		struct json_object *high_freq_obj, *low_freq_obj;
 		struct json_object *max_psd_obj;
+		int low_freq, high_freq;
 
 		range_elem_obj = json_object_array_get_idx(obj, i);
 		if (!range_elem_obj)
@@ -492,20 +493,32 @@ hostad_afc_parse_available_freq_info(struct hostapd_iface *iface,
 					       &high_freq_obj))
 			continue;
 
+		low_freq = json_object_get_int(low_freq_obj);
+		high_freq = json_object_get_int(high_freq_obj);
+		if (low_freq < 5925 || high_freq > 7125 || low_freq >= high_freq) {
+			wpa_printf(MSG_DEBUG, "AFC: Ignore invalid frequencyRange %d-%d",
+				   low_freq, high_freq);
+			continue;
+		}
+
 		if (!json_object_object_get_ex(range_elem_obj, "maxPsd",
 					       &max_psd_obj) &&
 		    !json_object_object_get_ex(range_elem_obj, "maxPSD",
 					       &max_psd_obj))
 			continue;
 
-		f = os_realloc_array(f, count + 1, sizeof(*f));
-		if (!f)
+		tmp = os_realloc_array(f, count + 1, sizeof(*f));
+		if (!tmp) {
+			os_free(f);
 			return -ENOMEM;
+		}
+		f = tmp;
 
-		f[count].low_freq = json_object_get_int(low_freq_obj);
-		f[count].high_freq = json_object_get_int(high_freq_obj);
+		f[count].low_freq = low_freq;
+		f[count].high_freq = high_freq;
 		f[count++].max_psd = json_object_get_int(max_psd_obj);
 	}
+	os_free(iface->afc.freq_range);
 	iface->afc.freq_range = f;
 	iface->afc.num_freq_range = count;
 
@@ -518,7 +531,7 @@ static int hostad_afc_update_chan_info(struct afc_chan_info_elem **chan_list,
 				       int center_chan, int power)
 {
 	int op_class_pwr_index, num_low_subchan, ch, count = *chan_list_size;
-	struct afc_chan_info_elem *c = *chan_list;
+	struct afc_chan_info_elem *c = *chan_list, *tmp;
 
 	switch (op_class) {
 	case 132: /*  40MHz */
@@ -543,6 +556,13 @@ static int hostad_afc_update_chan_info(struct afc_chan_info_elem **chan_list,
 		break;
 	}
 
+	if (center_chan < 1 || center_chan > 233 || center_chan - num_low_subchan < 1 ||
+	    center_chan + num_low_subchan > 233) {
+		wpa_printf(MSG_DEBUG, "AFC: Ignore invalid channelCfi %d at opclass %u",
+			   center_chan, op_class);
+		return 0;
+	}
+
 	for (ch = center_chan - num_low_subchan;
 	     ch <= center_chan + num_low_subchan; ch += 4) {
 		int i;
@@ -553,9 +573,14 @@ static int hostad_afc_update_chan_info(struct afc_chan_info_elem **chan_list,
 		}
 
 		if (i == count) {
-			c = os_realloc_array(c, count + 1, sizeof(*c));
-			if (!c)
+			tmp = os_realloc_array(c, count + 1, sizeof(*c));
+			if (!tmp) {
+				os_free(c);
+				*chan_list = NULL;
+				*chan_list_size = 0;
 				return -ENOMEM;
+			}
+			c = tmp;
 
 			c[count].chan = ch;
 			for (int j = 0; j < 5; j++)
@@ -611,7 +636,7 @@ hostad_afc_parse_available_chan_info(struct hostapd_iface *iface,
 		     ch < json_object_array_length(chan_cfi_obj); ch++) {
 			struct json_object *pwr_obj;
 			struct json_object *ch_obj;
-			int channel, power;
+			int channel, power, ret;
 
 			ch_obj = json_object_array_get_idx(chan_cfi_obj, ch);
 			if (!ch_obj)
@@ -624,12 +649,19 @@ hostad_afc_parse_available_chan_info(struct hostapd_iface *iface,
 			channel = json_object_get_int(ch_obj);
 			power = json_object_get_int(pwr_obj);
 
-			hostad_afc_update_chan_info(&c, &count, op_class,
-						    channel, power);
+			ret = hostad_afc_update_chan_info(&c, &count, op_class,
+							  channel, power);
+			if (ret) {
+				os_free(iface->afc.chan_info_list);
+				iface->afc.chan_info_list = NULL;
+				iface->afc.num_chan_info = 0;
+				return ret;
+			}
 		}
-		iface->afc.chan_info_list = c;
-		iface->afc.num_chan_info = count;
 	}
+	os_free(iface->afc.chan_info_list);
+	iface->afc.chan_info_list = c;
+	iface->afc.num_chan_info = count;
 
 	return 0;
 }
@@ -1261,8 +1293,9 @@ void hostapd_afc_parse_bw320(int table_idx, s8 *power_list)
 
 int hostapd_afc_parse_psd_to_dbm(struct hostapd_iface *iface, s8 ***power_table)
 {
-	int i, freq, channel, bw, table_idx, target_power;
+	int i, freq, channel, bw, target_power;
 	s8 *chan_power_list;
+	u8 table_idx;
 
 	for (i = 0; i < iface->afc.num_freq_range; i++) {
 		struct afc_freq_range_elem *freq_range = &iface->afc.freq_range[i];
@@ -1292,8 +1325,9 @@ int hostapd_afc_parse_psd_to_dbm(struct hostapd_iface *iface, s8 ***power_table)
 
 int hostapd_afc_parse_eirp_to_dbm(struct hostapd_iface *iface, s8 ***power_table)
 {
-	int i, bw, table_idx, target_power;
+	int i, bw, target_power;
 	s8 *chan_power_list;
+	u8 table_idx;
 
 	for (i = 0; i < iface->afc.num_chan_info; i++) {
 		struct afc_chan_info_elem *chan_info = &iface->afc.chan_info_list[i];
