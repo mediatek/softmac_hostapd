@@ -332,6 +332,8 @@ hostapd_afc_build_request(struct hostapd_iface *iface)
 		goto error;
 
 	wpabuf_put_buf(req_obj, location_obj);
+	wpabuf_free(location_obj);
+	location_obj = NULL;
 
 	if (iconf->afc.n_freq_range) {
 		json_start_array(req_obj, "inquiredFrequencyRange");
@@ -356,6 +358,8 @@ hostapd_afc_build_request(struct hostapd_iface *iface)
 	if (!op_class_list_obj)
 		goto error;
 	wpabuf_put_buf(req_obj, op_class_list_obj);
+	wpabuf_free(op_class_list_obj);
+	op_class_list_obj = NULL;
 
 	if (iconf->afc.min_power) {
 		json_value_sep(req_obj);
@@ -435,6 +439,7 @@ hostad_afc_parse_available_freq_info(struct hostapd_iface *iface,
 		f[count].high_freq = high_freq;
 		f[count++].max_psd = max_psd;
 	}
+	os_free(iface->afc.freq_range);
 	iface->afc.freq_range = f;
 	iface->afc.num_freq_range = count;
 
@@ -493,7 +498,7 @@ static int hostad_afc_update_chan_info(struct afc_chan_info_elem **chan_list,
 			tmp = os_realloc_array(c, count + 1, sizeof(*c));
 			if (!tmp) {
 				os_free(c);
-				c = NULL;
+				*chan_list = NULL;
 				*chan_list_size = 0;
 				return -ENOMEM;
 			}
@@ -571,9 +576,10 @@ hostad_afc_parse_available_chan_info(struct hostapd_iface *iface,
 			chan_arr = chan_arr->sibling;
 			power_arr = power_arr->sibling;
 		}
-		iface->afc.chan_info_list = c;
-		iface->afc.num_chan_info = count;
 	}
+	os_free(iface->afc.chan_info_list);
+	iface->afc.chan_info_list = c;
+	iface->afc.num_chan_info = count;
 
 	return 0;
 }
